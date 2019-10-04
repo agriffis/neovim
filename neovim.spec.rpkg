@@ -50,8 +50,9 @@ BuildRequires:  jemalloc-devel
 BuildRequires:  msgpack-devel >= 1.2.0
 BuildRequires:  libtermkey-devel
 BuildRequires:  libuv-devel
-BuildRequires:  libvterm-devel
+BuildRequires:  libvterm-devel >= 0.1.1
 BuildRequires:  unibilium-devel
+BuildRequires:  utf8proc-devel
 %if 0%{?el7}
 BuildRequires:  lua-bit32
 Requires:       lua-bit32
