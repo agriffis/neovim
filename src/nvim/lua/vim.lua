@@ -189,7 +189,7 @@ paste = (function()
     if mode == 'c' and not got_line1 then  -- cmdline-mode: paste only 1 line.
       got_line1 = (#lines > 1)
       vim.api.nvim_set_option('paste', true)  -- For nvim_input().
-      local line1, _ = string.gsub(lines[1], '[\r\n\012\027]', ' ')  -- Scrub.
+      local line1 = lines[1]:gsub('<', '<lt>'):gsub('[\r\n\012\027]', ' ')  -- Scrub.
       vim.api.nvim_input(line1)
       vim.api.nvim_set_option('paste', false)
     elseif mode ~= 'c' then  -- Else: discard remaining cmdline-mode chunks.
@@ -232,6 +232,9 @@ local function __index(t, key)
   if key == 'inspect' then
     t.inspect = require('vim.inspect')
     return t.inspect
+  elseif key == 'treesitter' then
+    t.treesitter = require('vim.treesitter')
+    return t.treesitter
   elseif require('vim.shared')[key] ~= nil then
     -- Expose all `vim.shared` functions on the `vim` module.
     t[key] = require('vim.shared')[key]

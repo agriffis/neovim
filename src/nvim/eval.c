@@ -5746,13 +5746,13 @@ static int dict_get_tv(char_u **arg, typval_T *rettv, int evaluate)
         goto failret;
       }
       item = tv_dict_item_alloc((const char *)key);
-      tv_clear(&tvkey);
       item->di_tv = tv;
       item->di_tv.v_lock = 0;
       if (tv_dict_add(d, item) == FAIL) {
         tv_dict_item_free(item);
       }
     }
+    tv_clear(&tvkey);
 
     if (**arg == '}')
       break;
@@ -7004,6 +7004,8 @@ static int assert_equalfile(typval_T *argvars)
           break;
         }
       }
+      fclose(fd1);
+      fclose(fd2);
     }
   }
   if (IObuff[0] != NUL) {
@@ -7076,7 +7078,7 @@ static void f_assert_exception(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   rettv->vval.v_number = assert_exception(argvars);
 }
 
-/// "assert_fails(cmd [, error])" function
+/// "assert_fails(cmd [, error [, msg]])" function
 static void f_assert_fails(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
   const char *const cmd = tv_get_string_chk(&argvars[0]);
@@ -7094,7 +7096,14 @@ static void f_assert_fails(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   if (!called_emsg) {
     prepare_assert_error(&ga);
     ga_concat(&ga, (const char_u *)"command did not fail: ");
-    ga_concat(&ga, (const char_u *)cmd);
+    if (argvars[1].v_type != VAR_UNKNOWN
+        && argvars[2].v_type != VAR_UNKNOWN) {
+      char *const tofree = encode_tv2echo(&argvars[2], NULL);
+      ga_concat(&ga, (char_u *)tofree);
+      xfree(tofree);
+    } else {
+      ga_concat(&ga, (const char_u *)cmd);
+    }
     assert_error(&ga);
     ga_clear(&ga);
     ret = 1;
@@ -18437,6 +18446,7 @@ static void timer_due_cb(TimeWatcher *tw, void *data)
   timer_T *timer = (timer_T *)data;
   int save_did_emsg = did_emsg;
   int save_called_emsg = called_emsg;
+  const bool save_ex_pressedreturn = get_pressedreturn();
 
   if (timer->stopped || timer->paused) {
     return;
@@ -18465,6 +18475,7 @@ static void timer_due_cb(TimeWatcher *tw, void *data)
   }
   did_emsg = save_did_emsg;
   called_emsg = save_called_emsg;
+  set_pressedreturn(save_ex_pressedreturn);
 
   if (timer->emsg_count >= 3) {
     timer_stop(timer);
@@ -18834,8 +18845,9 @@ static void f_visualmode(typval_T *argvars, typval_T *rettv, FunPtr fptr)
  */
 static void f_wildmenumode(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
-  if (wild_menu_showing)
+  if (wild_menu_showing || ((State & CMDLINE) && pum_visible())) {
     rettv->vval.v_number = 1;
+  }
 }
 
 /// "win_findbuf()" function
@@ -22259,7 +22271,7 @@ void func_dump_profile(FILE *fd)
               .channel_id = 0,
           };
           char_u *p = get_scriptname(last_set, &should_free);
-          fprintf(fd, "    Defined: %s line %" PRIdLINENR "\n",
+          fprintf(fd, "    Defined: %s:%" PRIdLINENR "\n",
                   p, fp->uf_script_ctx.sc_lnum);
           if (should_free) {
             xfree(p);

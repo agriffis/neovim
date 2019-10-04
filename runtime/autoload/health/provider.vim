@@ -265,6 +265,22 @@ function! s:check_bin(bin) abort
   return 1
 endfunction
 
+" Check "loaded" var for given a:provider.
+" Returns 1 if the caller should return (skip checks).
+function! s:disabled_via_loaded_var(provider) abort
+  let loaded_var = 'g:loaded_'.a:provider.'_provider'
+  if exists(loaded_var) && !exists('*provider#'.a:provider.'#Call')
+    let v = eval(loaded_var)
+    if 0 is v
+      call health#report_info('Disabled ('.loaded_var.'='.v.').')
+      return 1
+    else
+      call health#report_info('Disabled ('.loaded_var.'='.v.').  This might be due to some previous error.')
+    endif
+  endif
+  return 0
+endfunction
+
 function! s:check_python(version) abort
   call health#report_start('Python ' . a:version . ' provider (optional)')
 
@@ -272,11 +288,10 @@ function! s:check_python(version) abort
   let python_exe = ''
   let venv = exists('$VIRTUAL_ENV') ? resolve($VIRTUAL_ENV) : ''
   let host_prog_var = pyname.'_host_prog'
-  let loaded_var = 'g:loaded_'.pyname.'_provider'
   let python_multiple = []
 
-  if exists(loaded_var) && !exists('*provider#'.pyname.'#Call')
-    call health#report_info('Disabled ('.loaded_var.'='.eval(loaded_var).').  This might be due to some previous error.')
+  if s:disabled_via_loaded_var(pyname)
+    return
   endif
 
   let [pyenv, pyenv_root] = s:check_for_pyenv()
@@ -294,7 +309,7 @@ function! s:check_python(version) abort
     let python_exe = pyname
   endif
 
-  " No Python executable could `import neovim`.
+  " No Python executable could `import neovim`, or host_prog_var was used.
   if !empty(pythonx_errors)
     call health#report_error('Python provider error:', pythonx_errors)
 
@@ -484,9 +499,7 @@ endfunction
 function! s:check_ruby() abort
   call health#report_start('Ruby provider (optional)')
 
-  let loaded_var = 'g:loaded_ruby_provider'
-  if exists(loaded_var) && !exists('*provider#ruby#Call')
-    call health#report_info('Disabled. '.loaded_var.'='.eval(loaded_var))
+  if s:disabled_via_loaded_var('ruby')
     return
   endif
 
@@ -540,9 +553,7 @@ endfunction
 function! s:check_node() abort
   call health#report_start('Node.js provider (optional)')
 
-  let loaded_var = 'g:loaded_node_provider'
-  if exists(loaded_var) && !exists('*provider#node#Call')
-    call health#report_info('Disabled. '.loaded_var.'='.eval(loaded_var))
+  if s:disabled_via_loaded_var('node')
     return
   endif
 

@@ -566,7 +566,6 @@ describe('TUI', function()
     feed_data('\027[200~'..expected..'\027[201~')
     feed_data(' end')
     expected = expected..' end'
-    expect_child_buf_lines({expected})
     screen:expect([[
       zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz|
       zzzzzzzzzzzzzz end{1: }                               |
@@ -576,6 +575,24 @@ describe('TUI', function()
       {3:-- INSERT --}                                      |
       {3:-- TERMINAL --}                                    |
     ]])
+    expect_child_buf_lines({expected})
+  end)
+
+  it('paste: less-than sign in cmdline  #11088', function()
+    local expected = '<'
+    feed_data(':')
+    wait_for_mode('c')
+    -- "bracketed paste"
+    feed_data('\027[200~'..expected..'\027[201~')
+    screen:expect{grid=[[
+                                                        |
+      {4:~                                                 }|
+      {4:~                                                 }|
+      {4:~                                                 }|
+      {5:[No Name]                                         }|
+      :<{1: }                                               |
+      {3:-- TERMINAL --}                                    |
+    ]]}
   end)
 
   it('paste: big burst of input', function()
@@ -922,7 +939,7 @@ describe('TUI FocusGained/FocusLost', function()
                                                         |
       gained                                            |
       {3:-- TERMINAL --}                                    |
-    ]], timeout=(3 * screen.timeout)}
+    ]], timeout=(4 * screen.timeout)}
 
     feed_data('\027[O')
     screen:expect([[
@@ -1328,125 +1345,26 @@ describe("TUI", function()
 
 end)
 
-describe('TUI background color', function()
-  local screen
+it('TUI bg color triggers OptionSet event on terminal-response', function()
+  -- Only single integration test.
+  -- See test/unit/tui_spec.lua for unit tests.
+  clear()
+  local screen = thelpers.screen_setup(0, '["'..nvim_prog
+    ..'", "-u", "NONE", "-i", "NONE", "--cmd", "set noswapfile", '
+    ..'"-c", "autocmd OptionSet background echo \\"did OptionSet, yay!\\""]')
 
-  before_each(function()
-    clear()
-    screen = thelpers.screen_setup(0, '["'..nvim_prog
-      ..'", "-u", "NONE", "-i", "NONE", "--cmd", "set noswapfile"]')
-  end)
+  screen:expect([[
+    {1: }                                                 |
+    {4:~                                                 }|
+    {4:~                                                 }|
+    {4:~                                                 }|
+    {5:[No Name]                       0,0-1          All}|
+                                                      |
+    {3:-- TERMINAL --}                                    |
+  ]])
+  feed_data('\027]11;rgb:ffff/ffff/ffff\007')
+  screen:expect{any='did OptionSet, yay!'}
 
-  it("triggers OptionSet event on terminal-response", function()
-    feed_data('\027:autocmd OptionSet background echo "did OptionSet, yay!"\n')
-
-    -- Wait for the child Nvim to register the OptionSet handler.
-    feed_data('\027:autocmd OptionSet\n')
-    screen:expect({any='--- Autocommands ---'})
-
-    feed_data('\012')  -- CTRL-L: clear the screen
-    screen:expect([[
-      {1: }                                                 |
-      {4:~                                                 }|
-      {4:~                                                 }|
-      {4:~                                                 }|
-      {5:[No Name]                       0,0-1          All}|
-                                                        |
-      {3:-- TERMINAL --}                                    |
-    ]])
-    feed_data('\027]11;rgb:ffff/ffff/ffff\007')
-    screen:expect{any='did OptionSet, yay!'}
-  end)
-
-  it("handles deferred background color", function()
-    local last_bg = 'dark'
-    local function wait_for_bg(bg)
-      -- Retry until the terminal response is handled.
-      retry(100, nil, function()
-        feed_data(':echo &background\n')
-        screen:expect({
-          timeout=40,
-          grid=string.format([[
-            {1: }                                                 |
-            {4:~                                                 }|
-            {4:~                                                 }|
-            {4:~                                                 }|
-            {5:[No Name]                       0,0-1          All}|
-            %-5s                                             |
-            {3:-- TERMINAL --}                                    |
-          ]], bg)
-        })
-      end)
-      last_bg = bg
-    end
-
-    local function assert_bg(colorspace, color, bg)
-      -- Ensure the opposite of the expected bg is active.
-      local other_bg = (bg == 'dark' and 'light' or 'dark')
-      if last_bg ~= other_bg then
-        feed_data(other_bg == 'light' and '\027]11;rgb:f/f/f\007'
-                                      or  '\027]11;rgb:0/0/0\007')
-        wait_for_bg(other_bg)
-      end
-
-      feed_data('\027]11;'..colorspace..':'..color..'\007')
-      wait_for_bg(bg)
-    end
-
-    assert_bg('rgb', '0000/0000/0000', 'dark')
-    assert_bg('rgb', 'ffff/ffff/ffff', 'light')
-    assert_bg('rgb', '000/000/000', 'dark')
-    assert_bg('rgb', 'fff/fff/fff', 'light')
-    assert_bg('rgb', '00/00/00', 'dark')
-    assert_bg('rgb', 'ff/ff/ff', 'light')
-    assert_bg('rgb', '0/0/0', 'dark')
-    assert_bg('rgb', 'f/f/f', 'light')
-
-    assert_bg('rgb', 'f/0/0', 'dark')
-    assert_bg('rgb', '0/f/0', 'light')
-    assert_bg('rgb', '0/0/f', 'dark')
-
-    assert_bg('rgb', '1/1/1', 'dark')
-    assert_bg('rgb', '2/2/2', 'dark')
-    assert_bg('rgb', '3/3/3', 'dark')
-    assert_bg('rgb', '4/4/4', 'dark')
-    assert_bg('rgb', '5/5/5', 'dark')
-    assert_bg('rgb', '6/6/6', 'dark')
-    assert_bg('rgb', '7/7/7', 'dark')
-    assert_bg('rgb', '8/8/8', 'light')
-    assert_bg('rgb', '9/9/9', 'light')
-    assert_bg('rgb', 'a/a/a', 'light')
-    assert_bg('rgb', 'b/b/b', 'light')
-    assert_bg('rgb', 'c/c/c', 'light')
-    assert_bg('rgb', 'd/d/d', 'light')
-    assert_bg('rgb', 'e/e/e', 'light')
-
-    assert_bg('rgb', '0/e/0', 'light')
-    assert_bg('rgb', '0/d/0', 'light')
-    assert_bg('rgb', '0/c/0', 'dark')
-    assert_bg('rgb', '0/b/0', 'dark')
-
-    assert_bg('rgb', 'f/0/f', 'dark')
-    assert_bg('rgb', 'f/1/f', 'dark')
-    assert_bg('rgb', 'f/2/f', 'dark')
-    assert_bg('rgb', 'f/3/f', 'light')
-    assert_bg('rgb', 'f/4/f', 'light')
-
-    assert_bg('rgba', '0000/0000/0000/0000', 'dark')
-    assert_bg('rgba', '0000/0000/0000/ffff', 'dark')
-    assert_bg('rgba', 'ffff/ffff/ffff/0000', 'light')
-    assert_bg('rgba', 'ffff/ffff/ffff/ffff', 'light')
-    assert_bg('rgba', '000/000/000/000', 'dark')
-    assert_bg('rgba', '000/000/000/fff', 'dark')
-    assert_bg('rgba', 'fff/fff/fff/000', 'light')
-    assert_bg('rgba', 'fff/fff/fff/fff', 'light')
-    assert_bg('rgba', '00/00/00/00', 'dark')
-    assert_bg('rgba', '00/00/00/ff', 'dark')
-    assert_bg('rgba', 'ff/ff/ff/00', 'light')
-    assert_bg('rgba', 'ff/ff/ff/ff', 'light')
-    assert_bg('rgba', '0/0/0/0', 'dark')
-    assert_bg('rgba', '0/0/0/f', 'dark')
-    assert_bg('rgba', 'f/f/f/0', 'light')
-    assert_bg('rgba', 'f/f/f/f', 'light')
-  end)
+  feed_data(':echo "new_bg=".&background\n')
+  screen:expect{any='new_bg=light'}
 end)

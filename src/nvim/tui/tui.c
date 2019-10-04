@@ -93,7 +93,7 @@ typedef struct {
   int out_fd;
   bool scroll_region_is_full_screen;
   bool can_change_scroll_region;
-  bool can_set_lr_margin;
+  bool can_set_lr_margin;  // smglr
   bool can_set_left_right_margin;
   bool can_scroll;
   bool can_erase_chars;
@@ -296,6 +296,7 @@ static void terminfo_start(UI *ui)
   unibi_out(ui, unibi_keypad_xmit);
   unibi_out(ui, unibi_clear_screen);
   // Ask the terminal to send us the background color.
+  data->input.waiting_for_bg_response = 5;
   unibi_out_ext(ui, data->unibi_ext.get_bg);
   // Enable bracketed paste
   unibi_out_ext(ui, data->unibi_ext.enable_bracketed_paste);
@@ -312,6 +313,7 @@ static void terminfo_start(UI *ui)
     uv_pipe_init(&data->write_loop, &data->output_handle.pipe, 0);
     uv_pipe_open(&data->output_handle.pipe, data->out_fd);
   }
+  flush_buf(ui);
 }
 
 static void terminfo_stop(UI *ui)
@@ -363,6 +365,7 @@ static void tui_terminal_after_startup(UI *ui)
   // Emit this after Nvim startup, not during.  This works around a tmux
   // 2.3 bug(?) which caused slow drawing during startup.  #7649
   unibi_out_ext(ui, data->unibi_ext.enable_focus_reporting);
+  flush_buf(ui);
 }
 
 static void tui_terminal_stop(UI *ui)
@@ -430,9 +433,6 @@ static void tui_main(UIBridgeData *bridge, UI *ui)
   }
   if (!tui_is_stopped(ui)) {
     tui_terminal_after_startup(ui);
-    // Tickle `main_loop` with a dummy event, else the initial "focus-gained"
-    // terminal response may not get processed until user hits a key.
-    loop_schedule_deferred(&main_loop, event_create(loop_dummy_event, 0));
   }
   // "Passive" (I/O-driven) loop: TUI thread "main loop".
   while (!tui_is_stopped(ui)) {
@@ -1598,6 +1598,12 @@ static void patch_terminfo_bugs(TUIData *data, const char *term,
       unibi_set_if_empty(ut, unibi_set_lr_margin, "\x1b[%i%p1%d;%p2%ds");
       unibi_set_if_empty(ut, unibi_set_left_margin_parm, "\x1b[%i%p1%ds");
       unibi_set_if_empty(ut, unibi_set_right_margin_parm, "\x1b[%i;%p2%ds");
+    } else {
+      // Fix things advertised via TERM=xterm, for non-xterm.
+      if (unibi_get_str(ut, unibi_set_lr_margin)) {
+        ILOG("Disabling smglr with TERM=xterm for non-xterm.");
+        unibi_set_str(ut, unibi_set_lr_margin, NULL);
+      }
     }
 
 #ifdef WIN32
