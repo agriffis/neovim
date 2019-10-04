@@ -1,0 +1,13 @@
+#!/bin/bash
+
+function git_revision {
+    output "$@"
+}
+
+function git_changelog_date {
+    output "$(date +'%a %b %d %Y')"
+}
+
+function git_changelog_version {
+    output "$(cached git_version)-$(cached git_revision)"
+}
