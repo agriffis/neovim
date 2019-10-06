@@ -1,7 +1,18 @@
 %bcond_with jemalloc
+%ifarch %{arm} %{ix86} x86_64 %{mips}
+%bcond_without luajit
+%else
+%bcond_with luajit
+%endif
+
+%if %{with luajit}
+%global luaver 5.1
+%else
+%global luaver 5.3
+%endif
 
 Name:           neovim
-Version:        0.3.3
+Version:        0.4.2
 Release:        1%{?dist}
 
 License:        ASL 2.0
@@ -20,16 +31,28 @@ BuildRequires:  fdupes
 BuildRequires:  gettext
 BuildRequires:  gperf
 BuildRequires:  gcc
+%if %{with luajit}
+# luajit implements version 5.1 of the lua language spec, so it needs the
+# compat versions of libs.
+BuildRequires:  luajit-devel
+BuildRequires:  compat-lua-lpeg
+BuildRequires:  compat-lua-mpack
+BuildRequires:  lua5.1-luv-devel
+Requires:       lua5.1-luv
+%else
 BuildRequires:  lua-devel
 BuildRequires:  lua-lpeg
 BuildRequires:  lua-mpack
+BuildRequires:  lua-luv-devel
+Requires:       lua-luv
+%endif
 %if %{with jemalloc}
 BuildRequires:  jemalloc-devel
 %endif
-BuildRequires:  msgpack-devel >= 1.2.0
+BuildRequires:  msgpack-devel >= 3.1.0
 BuildRequires:  libtermkey-devel
-BuildRequires:  libuv-devel
-BuildRequires:  libvterm-devel
+BuildRequires:  libuv-devel >= 1.30
+BuildRequires:  libvterm-devel => 0.1.1
 BuildRequires:  unibilium-devel
 %if 0%{?el7}
 BuildRequires:  lua-bit32
@@ -39,8 +62,6 @@ Suggests:       (python2-neovim if python2)
 Suggests:       (python3-neovim if python3)
 # XSel provides access to the system clipboard
 Recommends:     xsel
-# Needed to run nvim with the desktop file
-Recommends:     xterm
 %endif
 
 %description
@@ -54,15 +75,21 @@ excisions, Neovim is Vim. It is built for users who want the good
 parts of Vim, without compromise, and more.
 
 %prep
-%autosetup -p1
+%setup -q
+
+%if %{without luajit}
+%patch0 -p1 -b .bitop
+%endif
 
 %build
 mkdir -p build
 pushd build
 %cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-       -DPREFER_LUA=ON \
-       -DLUA_PRG=%{_bindir}/lua \
+       -DPREFER_LUA=%{?with_luajit:OFF}%{!?with_luajit:ON} \
+       -DLUA_PRG=%{_bindir}/%{?with_luajit:luajit}%{!?with_luajit:lua} \
        -DENABLE_JEMALLOC=%{?with_jemalloc:ON}%{!?with_jemalloc:OFF} \
+       -DLIBLUV_INCLUDE_DIR=%{_includedir}/lua-%{luaver} \
+       -DLIBLUV_LIBRARY=%{_libdir}/lua/%{luaver}/luv.so \
        ..
 
 %make_build VERBOSE=1
@@ -291,7 +318,6 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/doc/digraph.txt
 %{_datadir}/nvim/runtime/doc/editing.txt
 %{_datadir}/nvim/runtime/doc/eval.txt
-%{_datadir}/nvim/runtime/doc/farsi.txt
 %{_datadir}/nvim/runtime/doc/filetype.txt
 %{_datadir}/nvim/runtime/doc/fold.txt
 %{_datadir}/nvim/runtime/doc/ft_ada.txt
@@ -324,7 +350,6 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/doc/pattern.txt
 %{_datadir}/nvim/runtime/doc/pi_gzip.txt
 %{_datadir}/nvim/runtime/doc/pi_health.txt
-%{_datadir}/nvim/runtime/doc/pi_matchit.txt
 %{_datadir}/nvim/runtime/doc/pi_msgpack.txt
 %{_datadir}/nvim/runtime/doc/pi_netrw.txt
 %{_datadir}/nvim/runtime/doc/pi_paren.txt
@@ -394,6 +419,7 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/doc/windows.txt
 
 %dir %{_datadir}/nvim/runtime/ftplugin
+%{_datadir}/nvim/runtime/ftplugin/8th.vim
 %{_datadir}/nvim/runtime/ftplugin/a2ps.vim
 %{_datadir}/nvim/runtime/ftplugin/aap.vim
 %{_datadir}/nvim/runtime/ftplugin/abap.vim
@@ -406,6 +432,7 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/ftplugin/aspvbs.vim
 %{_datadir}/nvim/runtime/ftplugin/automake.vim
 %{_datadir}/nvim/runtime/ftplugin/awk.vim
+%{_datadir}/nvim/runtime/ftplugin/bash.vim
 %{_datadir}/nvim/runtime/ftplugin/bdf.vim
 %{_datadir}/nvim/runtime/ftplugin/bst.vim
 %{_datadir}/nvim/runtime/ftplugin/btm.vim
@@ -413,6 +440,7 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/ftplugin/c.vim
 %{_datadir}/nvim/runtime/ftplugin/calendar.vim
 %{_datadir}/nvim/runtime/ftplugin/cdrdaoconf.vim
+%{_datadir}/nvim/runtime/ftplugin/cfg.vim
 %{_datadir}/nvim/runtime/ftplugin/ch.vim
 %{_datadir}/nvim/runtime/ftplugin/changelog.vim
 %{_datadir}/nvim/runtime/ftplugin/chicken.vim
@@ -443,6 +471,7 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/ftplugin/dosini.vim
 %{_datadir}/nvim/runtime/ftplugin/dtd.vim
 %{_datadir}/nvim/runtime/ftplugin/dtrace.vim
+%{_datadir}/nvim/runtime/ftplugin/dune.vim
 %{_datadir}/nvim/runtime/ftplugin/eiffel.vim
 %{_datadir}/nvim/runtime/ftplugin/elinks.vim
 %{_datadir}/nvim/runtime/ftplugin/erlang.vim
@@ -482,6 +511,7 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/ftplugin/j.vim
 %{_datadir}/nvim/runtime/ftplugin/java.vim
 %{_datadir}/nvim/runtime/ftplugin/javascript.vim
+%{_datadir}/nvim/runtime/ftplugin/javascriptreact.vim
 %{_datadir}/nvim/runtime/ftplugin/jproperties.vim
 %{_datadir}/nvim/runtime/ftplugin/json.vim
 %{_datadir}/nvim/runtime/ftplugin/jsp.vim
@@ -512,6 +542,7 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/ftplugin/matlab.vim
 %{_datadir}/nvim/runtime/ftplugin/mf.vim
 %{_datadir}/nvim/runtime/ftplugin/modconf.vim
+%{_datadir}/nvim/runtime/ftplugin/mma.vim
 %{_datadir}/nvim/runtime/ftplugin/mp.vim
 %{_datadir}/nvim/runtime/ftplugin/mplayerconf.vim
 %{_datadir}/nvim/runtime/ftplugin/mrxvtrc.vim
@@ -520,6 +551,7 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/ftplugin/nanorc.vim
 %{_datadir}/nvim/runtime/ftplugin/neomuttrc.vim
 %{_datadir}/nvim/runtime/ftplugin/netrc.vim
+%{_datadir}/nvim/runtime/ftplugin/nroff.vim
 %{_datadir}/nvim/runtime/ftplugin/nsis.vim
 %{_datadir}/nvim/runtime/ftplugin/objc.vim
 %{_datadir}/nvim/runtime/ftplugin/ocaml.vim
@@ -663,6 +695,7 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/indent/j.vim
 %{_datadir}/nvim/runtime/indent/java.vim
 %{_datadir}/nvim/runtime/indent/javascript.vim
+%{_datadir}/nvim/runtime/indent/javascriptreact.vim
 %{_datadir}/nvim/runtime/indent/json.vim
 %{_datadir}/nvim/runtime/indent/jsp.vim
 %{_datadir}/nvim/runtime/indent/ld.vim
@@ -692,6 +725,7 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/indent/pyrex.vim
 %{_datadir}/nvim/runtime/indent/python.vim
 %{_datadir}/nvim/runtime/indent/r.vim
+%{_datadir}/nvim/runtime/indent/raml.vim
 %{_datadir}/nvim/runtime/indent/readline.vim
 %{_datadir}/nvim/runtime/indent/rhelp.vim
 %{_datadir}/nvim/runtime/indent/rmd.vim
@@ -720,6 +754,7 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/indent/tf.vim
 %{_datadir}/nvim/runtime/indent/tilde.vim
 %{_datadir}/nvim/runtime/indent/treetop.vim
+%{_datadir}/nvim/runtime/indent/typescript.vim
 %{_datadir}/nvim/runtime/indent/vb.vim
 %{_datadir}/nvim/runtime/indent/verilog.vim
 %{_datadir}/nvim/runtime/indent/vhdl.vim
@@ -817,6 +852,8 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 
 %dir %{_datadir}/nvim/runtime/lua/vim
 %{_datadir}/nvim/runtime/lua/vim/compat.lua
+%{_datadir}/nvim/runtime/lua/vim/inspect.lua
+%{_datadir}/nvim/runtime/lua/vim/shared.lua
 
 %dir %{_datadir}/nvim/runtime/macros
 %{_datadir}/nvim/runtime/macros/editexisting.vim
@@ -843,6 +880,15 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %dir %{_datadir}/nvim/runtime/pack/dist/opt/shellmenu
 %dir %{_datadir}/nvim/runtime/pack/dist/opt/shellmenu/plugin
 %{_datadir}/nvim/runtime/pack/dist/opt/shellmenu/plugin/shellmenu.vim
+
+%dir %{_datadir}/nvim/runtime/pack/dist/opt/matchit
+%dir %{_datadir}/nvim/runtime/pack/dist/opt/matchit/autoload
+%{_datadir}/nvim/runtime/pack/dist/opt/matchit/autoload/matchit.vim
+%dir %{_datadir}/nvim/runtime/pack/dist/opt/matchit/doc
+%{_datadir}/nvim/runtime/pack/dist/opt/matchit/doc/matchit.txt
+%{_datadir}/nvim/runtime/pack/dist/opt/matchit/doc/tags
+%dir %{_datadir}/nvim/runtime/pack/dist/opt/matchit/plugin
+%{_datadir}/nvim/runtime/pack/dist/opt/matchit/plugin/matchit.vim
 
 %dir %{_datadir}/nvim/runtime/pack/dist/opt/swapmouse
 %dir %{_datadir}/nvim/runtime/pack/dist/opt/swapmouse/plugin
@@ -916,6 +962,7 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 
 %dir %{_datadir}/nvim/runtime/syntax
 %{_datadir}/nvim/runtime/syntax/2html.vim
+%{_datadir}/nvim/runtime/syntax/8th.vim
 %{_datadir}/nvim/runtime/syntax/a2ps.vim
 %{_datadir}/nvim/runtime/syntax/a65.vim
 %{_datadir}/nvim/runtime/syntax/aap.vim
@@ -1056,6 +1103,7 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/syntax/dtml.vim
 %{_datadir}/nvim/runtime/syntax/dtrace.vim
 %{_datadir}/nvim/runtime/syntax/dts.vim
+%{_datadir}/nvim/runtime/syntax/dune.vim
 %{_datadir}/nvim/runtime/syntax/dylan.vim
 %{_datadir}/nvim/runtime/syntax/dylanintr.vim
 %{_datadir}/nvim/runtime/syntax/dylanlid.vim
@@ -1131,6 +1179,7 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/syntax/hgcommit.vim
 %{_datadir}/nvim/runtime/syntax/hitest.vim
 %{_datadir}/nvim/runtime/syntax/hog.vim
+%{_datadir}/nvim/runtime/syntax/hollywood.vim
 %{_datadir}/nvim/runtime/syntax/hostconf.vim
 %{_datadir}/nvim/runtime/syntax/hostsaccess.vim
 %{_datadir}/nvim/runtime/syntax/html.vim
@@ -1160,6 +1209,7 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/syntax/java.vim
 %{_datadir}/nvim/runtime/syntax/javacc.vim
 %{_datadir}/nvim/runtime/syntax/javascript.vim
+%{_datadir}/nvim/runtime/syntax/javascriptreact.vim
 %{_datadir}/nvim/runtime/syntax/jess.vim
 %{_datadir}/nvim/runtime/syntax/jgraph.vim
 %{_datadir}/nvim/runtime/syntax/jovial.vim
@@ -1316,6 +1366,7 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/syntax/r.vim
 %{_datadir}/nvim/runtime/syntax/racc.vim
 %{_datadir}/nvim/runtime/syntax/radiance.vim
+%{_datadir}/nvim/runtime/syntax/raml.vim
 %{_datadir}/nvim/runtime/syntax/ratpoison.vim
 %{_datadir}/nvim/runtime/syntax/rc.vim
 %{_datadir}/nvim/runtime/syntax/rcs.vim
@@ -1434,6 +1485,7 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/syntax/tasm.vim
 %{_datadir}/nvim/runtime/syntax/tcl.vim
 %{_datadir}/nvim/runtime/syntax/tcsh.vim
+%{_datadir}/nvim/runtime/syntax/template.vim
 %{_datadir}/nvim/runtime/syntax/teraterm.vim
 %{_datadir}/nvim/runtime/syntax/terminfo.vim
 %{_datadir}/nvim/runtime/syntax/tex.vim
@@ -1456,6 +1508,7 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/syntax/tt2html.vim
 %{_datadir}/nvim/runtime/syntax/tt2js.vim
 %{_datadir}/nvim/runtime/syntax/tutor.vim
+%{_datadir}/nvim/runtime/syntax/typescript.vim
 %{_datadir}/nvim/runtime/syntax/uc.vim
 %{_datadir}/nvim/runtime/syntax/udevconf.vim
 %{_datadir}/nvim/runtime/syntax/udevperm.vim
@@ -1485,6 +1538,7 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/syntax/vrml.vim
 %{_datadir}/nvim/runtime/syntax/vroom.vim
 %{_datadir}/nvim/runtime/syntax/vsejcl.vim
+%{_datadir}/nvim/runtime/syntax/vue.vim
 %{_datadir}/nvim/runtime/syntax/wast.vim
 %{_datadir}/nvim/runtime/syntax/wdiff.vim
 %{_datadir}/nvim/runtime/syntax/web.vim
@@ -1533,6 +1587,33 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %{_datadir}/nvim/runtime/tutor/en/vim-01-beginner.tutor.json
 
 %changelog
+* Thu Oct 03 2019 Andreas Schneider <asn@redhat.com> - 0.4.2-1
+- Update to version 0.4.2
+
+* Thu Jul 25 2019 Fedora Release Engineering <releng@fedoraproject.org> - 0.3.8-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_31_Mass_Rebuild
+
+* Fri Jul 05 2019 Andreas Schneider <asn@redhat.com> - 0.3.8-1
+- Update to version 0.3.8
+
+* Wed May 29 2019 Andreas Schneider <asn@redhat.com> - 0.3.7-1
+- Update to version 0.3.7
+
+* Wed May 29 2019 Andreas Schneider <asn@redhat.com> - 0.3.6-1
+- resolves: #1714849 - Update to version 0.3.6
+
+* Tue May 07 2019 Andreas Schneider <asn@redhat.com> - 0.3.5-1
+- resolves: #1703867 - Update to version 0.3.5
+
+* Wed Mar 06 2019 Aron Griffis <aron@scampersand.com> - 0.3.4-1
+- Update to version 0.3.4 with luajit, rhbz #1685781
+
+* Fri Feb 01 2019 Fedora Release Engineering <releng@fedoraproject.org> - 0.3.3-3
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_30_Mass_Rebuild
+
+* Mon Jan 07 2019 Igor Gnatenko <ignatenkobrain@fedoraproject.org> - 0.3.3-2
+- Remove Recommends: xterm
+
 * Sun Jan 06 2019 Andreas Schneider <asn@redhat.com> - 0.3.3-1
 - Update to version 0.3.3
 

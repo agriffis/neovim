@@ -36,23 +36,26 @@ BuildRequires:  gcc
 # compat versions of libs.
 BuildRequires:  luajit-devel
 BuildRequires:  compat-lua-lpeg
-BuildRequires:  lua5.1-luv-devel
 BuildRequires:  compat-lua-mpack
+BuildRequires:  lua5.1-luv-devel
+Requires:       lua5.1-luv
 %else
 BuildRequires:  lua-devel
 BuildRequires:  lua-lpeg
-BuildRequires:  lua-luv
 BuildRequires:  lua-mpack
+BuildRequires:  lua-luv-devel
+Requires:       lua-luv
 %endif
 %if %{with jemalloc}
 BuildRequires:  jemalloc-devel
 %endif
-BuildRequires:  msgpack-devel >= 1.2.0
+BuildRequires:  msgpack-devel >= 3.1.0
 BuildRequires:  libtermkey-devel
-BuildRequires:  libuv-devel
+BuildRequires:  libuv-devel >= 1.30
 BuildRequires:  libvterm-devel >= 0.1.1
 BuildRequires:  unibilium-devel
 BuildRequires:  utf8proc-devel
+Requires: utf8proc
 %if 0%{?el7}
 BuildRequires:  lua-bit32
 Requires:       lua-bit32
@@ -86,9 +89,9 @@ pushd build
 %cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
        -DPREFER_LUA=%{?with_luajit:OFF}%{!?with_luajit:ON} \
        -DLUA_PRG=%{_bindir}/%{?with_luajit:luajit}%{!?with_luajit:lua} \
-       -DLIBLUV_LIBRARY=%{_libdir}/lua/%{luaver}/luv.so \
-       -DLIBLUV_INCLUDE_DIR:PATH=%{_includedir}/lua-%{luaver} \
        -DENABLE_JEMALLOC=%{?with_jemalloc:ON}%{!?with_jemalloc:OFF} \
+       -DLIBLUV_INCLUDE_DIR:PATH=%{_includedir}/lua-%{luaver} \
+       -DLIBLUV_LIBRARY=%{_libdir}/lua/%{luaver}/luv.so \
        ..
 
 %make_build
@@ -123,6 +126,15 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %changelog
 * {{{git_changelog_date}}} Aron Griffis <aron@scampersand.com> - {{{git_changelog_version}}}
 - Nightly build from git master
+
+* Thu Oct 03 2019 Andreas Schneider <asn@redhat.com> - 0.4.2-1
+- Update to version 0.4.2
+
+* Thu Jul 25 2019 Fedora Release Engineering <releng@fedoraproject.org> - 0.3.8-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_31_Mass_Rebuild
+
+* Fri Jul 05 2019 Andreas Schneider <asn@redhat.com> - 0.3.8-1
+- Update to version 0.3.8
 
 * Wed May 29 2019 Andreas Schneider <asn@redhat.com> - 0.3.7-1
 - Update to version 0.3.7
