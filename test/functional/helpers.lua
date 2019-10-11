@@ -501,9 +501,16 @@ function module.source(code)
 end
 
 function module.set_shell_powershell()
+  local shell = iswin() and 'powershell' or 'pwsh'
+  assert(module.eval('executable("'..shell..'")'))
+  local cmd = 'Remove-Item -Force '..table.concat(iswin()
+    and {'alias:cat', 'alias:echo', 'alias:sleep'}
+    or  {'alias:echo'}, ',')..';'
   module.source([[
-    set shell=powershell shellquote=( shellpipe=\| shellredir=> shellxquote=
-    let &shellcmdflag = '-NoLogo -NoProfile -ExecutionPolicy RemoteSigned -Command Remove-Item -Force alias:sleep; Remove-Item -Force alias:cat;'
+    let &shell = ']]..shell..[['
+    set shellquote= shellpipe=\| shellxquote=
+    let &shellredir = '| Out-File -Encoding UTF8'
+    let &shellcmdflag = '-NoLogo -NoProfile -ExecutionPolicy RemoteSigned -Command ]]..cmd..[['
   ]])
 end
 
