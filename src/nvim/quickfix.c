@@ -2463,7 +2463,7 @@ static void qf_jump_goto_line(linenr_T qf_lnum, int qf_col, char_u qf_viscol,
     // Move the cursor to the first line in the buffer
     pos_T save_cursor = curwin->w_cursor;
     curwin->w_cursor.lnum = 0;
-    if (!do_search(NULL, '/', qf_pattern, (long)1, SEARCH_KEEP, NULL, NULL)) {
+    if (!do_search(NULL, '/', qf_pattern, (long)1, SEARCH_KEEP, NULL)) {
       curwin->w_cursor = save_cursor;
     }
   }
@@ -4152,10 +4152,15 @@ void ex_cfile(exarg_T *eap)
   case CMD_laddfile:  au_name = (char_u *)"laddfile"; break;
   default: break;
   }
-  if (au_name != NULL)
-    apply_autocmds(EVENT_QUICKFIXCMDPRE, au_name, NULL, FALSE, curbuf);
-  if (*eap->arg != NUL)
+  if (au_name != NULL
+      && apply_autocmds(EVENT_QUICKFIXCMDPRE, au_name, NULL, false, curbuf)) {
+    if (aborting()) {
+      return;
+    }
+  }
+  if (*eap->arg != NUL) {
     set_string_option_direct((char_u *)"ef", -1, eap->arg, OPT_FREE, 0);
+  }
 
   char_u *enc = (*curbuf->b_p_menc != NUL) ? curbuf->b_p_menc : p_menc;
 
