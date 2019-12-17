@@ -12961,7 +12961,7 @@ static void libcall_common(typval_T *argvars, typval_T *rettv, int out_type)
   const char *libname = (char *) argvars[0].vval.v_string;
   const char *funcname = (char *) argvars[1].vval.v_string;
 
-  int in_type = argvars[2].v_type;
+  VarType in_type = argvars[2].v_type;
 
   // input variables
   char *str_in = (in_type == VAR_STRING)
@@ -12970,8 +12970,8 @@ static void libcall_common(typval_T *argvars, typval_T *rettv, int out_type)
 
   // output variables
   char **str_out = (out_type == VAR_STRING)
-      ? (char **) &rettv->vval.v_string : NULL;
-  int64_t int_out = 0;
+      ? (char **)&rettv->vval.v_string : NULL;
+  int int_out = 0;
 
   bool success = os_libcall(libname, funcname,
                             str_in, int_in,
@@ -12983,7 +12983,7 @@ static void libcall_common(typval_T *argvars, typval_T *rettv, int out_type)
   }
 
   if (out_type == VAR_NUMBER) {
-     rettv->vval.v_number = (int) int_out;
+     rettv->vval.v_number = (varnumber_T)int_out;
   }
 }
 
@@ -13970,6 +13970,13 @@ static void f_printf(typval_T *argvars, typval_T *rettv, FunPtr fptr)
     }
     did_emsg |= saved_did_emsg;
   }
+}
+
+// "pum_getpos()" function
+static void f_pum_getpos(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+{
+  tv_dict_alloc_ret(rettv);
+  pum_set_event_info(rettv->vval.v_dict);
 }
 
 /*
@@ -23645,7 +23652,7 @@ void ex_return(exarg_T *eap)
 int do_return(exarg_T *eap, int reanimate, int is_cmd, void *rettv)
 {
   int idx;
-  struct condstack *cstack = eap->cstack;
+  cstack_T *const cstack = eap->cstack;
 
   if (reanimate)
     /* Undo the return. */
