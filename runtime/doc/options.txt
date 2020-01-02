@@ -4543,15 +4543,15 @@ A jump table for the options with a short description can be found at |Q_op|.
 						*'pumheight'* *'ph'*
 'pumheight' 'ph'	number	(default 0)
 			global
-	Determines the maximum number of items to show in the popup menu for
-	Insert mode completion.  When zero as much space as available is used.
-	|ins-completion-menu|.
+	Maximum number of items to show in the popup menu
+	(|ins-completion-menu|). Zero means "use available screen space".
 
 						*'pumwidth'* *'pw'*
 'pumwidth' 'pw'		number	(default 15)
 			global
-	Determines the minium width to use for the popup menu for Insert mode
-	completion.  |ins-completion-menu|.
+	Minimum width for the popup menu (|ins-completion-menu|).  If the
+	cursor column + 'pumwidth' exceeds screen width, the popup menu is
+	nudged to fit on the screen.
 
 						*'pyxversion'* *'pyx'*
 'pyxversion' 'pyx'	number	(default depends on the build)
@@ -5202,8 +5202,9 @@ A jump table for the options with a short description can be found at |Q_op|.
 	Note that such processing is done after |:set| did its own round of 
 	unescaping, so to keep yourself sane use |:let-&| like shown above.
 							*shell-powershell*
-	To use powershell (on Windows): >
-		set shell=powershell shellquote= shellpipe=\| shellxquote=
+	To use powershell: >
+		let &shell = has('win32') ? 'powershell' : 'pwsh'
+		set shellquote= shellpipe=\| shellxquote=
 		set shellcmdflag=-NoLogo\ -NoProfile\ -ExecutionPolicy\ RemoteSigned\ -Command
 		set shellredir=\|\ Out-File\ -Encoding\ UTF8
 
