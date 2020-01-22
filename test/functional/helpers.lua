@@ -597,6 +597,19 @@ function module.assert_alive()
   assert(2 == module.eval('1+1'), 'crash? request failed')
 end
 
+-- Asserts that buffer is loaded and visible in the current tabpage.
+function module.assert_visible(bufnr, visible)
+  assert(type(visible) == 'boolean')
+  eq(visible, module.bufmeths.is_loaded(bufnr))
+  if visible then
+    assert(-1 ~= module.funcs.bufwinnr(bufnr),
+      'expected buffer to be visible in current tabpage: '..tostring(bufnr))
+  else
+    assert(-1 == module.funcs.bufwinnr(bufnr),
+      'expected buffer NOT visible in current tabpage: '..tostring(bufnr))
+  end
+end
+
 local function do_rmdir(path)
   local mode, errmsg, errcode = lfs.attributes(path, 'mode')
   if mode == nil then
@@ -755,7 +768,7 @@ function module.new_pipename()
 end
 
 function module.missing_provider(provider)
-  if provider == 'ruby' or provider == 'node' then
+  if provider == 'ruby' or provider == 'node' or provider == 'perl' then
     local prog = module.funcs['provider#' .. provider .. '#Detect']()
     return prog == '' and (provider .. ' not detected') or false
   elseif provider == 'python' or provider == 'python3' then

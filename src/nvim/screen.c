@@ -87,7 +87,7 @@
 #include "nvim/highlight.h"
 #include "nvim/main.h"
 #include "nvim/mark.h"
-#include "nvim/mark_extended.h"
+#include "nvim/extmark.h"
 #include "nvim/mbyte.h"
 #include "nvim/memline.h"
 #include "nvim/memory.h"
@@ -2130,11 +2130,11 @@ fill_foldcolumn(
 
   if (closed) {
     if (symbol != 0) {
-      // rollback length
+      // rollback previous write
       char_counter -= len;
+      memset(&p[char_counter], ' ', len);
     }
-    symbol = wp->w_p_fcs_chars.foldclosed;
-    len = utf_char2bytes(symbol, &p[char_counter]);
+    len = utf_char2bytes(wp->w_p_fcs_chars.foldclosed, &p[char_counter]);
     char_counter += len;
   }
 
@@ -3868,6 +3868,7 @@ win_line (
       }
       wp->w_wrow = row;
       did_wcol = true;
+      curwin->w_valid |= VALID_WCOL|VALID_WROW|VALID_VIRTCOL;
     }
 
     // Don't override visual selection highlighting.

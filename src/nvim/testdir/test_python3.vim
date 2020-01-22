@@ -1,5 +1,5 @@
 " Test for python 3 commands.
-" TODO: move tests from test88.in here.
+" TODO: move tests from test87.in here.
 
 if !has('python3')
   finish
@@ -175,9 +175,7 @@ endfunc
 
 func Test_unicode()
   " this crashed Vim once
-  if &tenc != ''
-    throw "Skipped: 'termencoding' is not empty"
-  endif
+  throw "Skipped: nvim does not support changing 'encoding'"
 
   set encoding=utf32
   py3 print('hello')
