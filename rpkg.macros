@@ -1,7 +1,22 @@
 #!/bin/bash
 
+eval "function _git_version() $(type git_version | sed 1,2d)"
+
+function git_version {
+    declare v="$(_git_version "$@")"
+
+    if [[ $v =~ \.git\.[0-9]+\.[0-9a-f]+$ ]]; then
+        # The git revision tacked on the end is from our branch. Replace it with
+        # the last git revision from master, so that builds correspond with
+        # upstream commits.
+        v=${v%.*}.$(git rev-parse --short master)
+    fi
+
+    output "$v"
+}
+
 function git_revision {
-    output "$@"
+    output "$*"
 }
 
 function git_changelog_date {
