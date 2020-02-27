@@ -33,6 +33,7 @@ M['textDocument/publishDiagnostics'] = function(_, _, result)
   util.buf_diagnostics_underline(bufnr, result.diagnostics)
   util.buf_diagnostics_virtual_text(bufnr, result.diagnostics)
   -- util.set_loclist(result.diagnostics)
+  vim.api.nvim_command("doautocmd User LspDiagnosticsChanged")
 end
 
 M['textDocument/references'] = function(_, _, result)
@@ -194,6 +195,12 @@ M['textDocument/peekDefinition'] = function(_, _, result, _)
   })
   -- TODO(ashkan) change highlight group?
   api.nvim_buf_add_highlight(headbuf, -1, 'Keyword', 0, -1)
+end
+
+M['textDocument/documentHighlight'] = function(_, _, result, _)
+  if not result then return end
+  local bufnr = api.nvim_get_current_buf()
+  util.buf_highlight_references(bufnr, result)
 end
 
 local function log_message(_, _, result, client_id)
