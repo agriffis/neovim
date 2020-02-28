@@ -570,7 +570,7 @@ do
 
   local diagnostic_ns = api.nvim_create_namespace("vim_lsp_diagnostics")
   local reference_ns = api.nvim_create_namespace("vim_lsp_references")
-
+  local sign_ns = 'vim_lsp_signs'
   local underline_highlight_name = "LspDiagnosticsUnderline"
   vim.cmd(string.format("highlight default %s gui=underline cterm=underline", underline_highlight_name))
   for kind, _ in pairs(protocol.DiagnosticSeverity) do
@@ -603,6 +603,12 @@ do
 
   function M.buf_clear_diagnostics(bufnr)
     validate { bufnr = {bufnr, 'n', true} }
+    bufnr = bufnr == 0 and api.nvim_get_current_buf() or bufnr
+
+    -- clear sign group
+    vim.fn.sign_unplace(sign_ns, {buffer=bufnr})
+
+    -- clear virtual text namespace
     api.nvim_buf_clear_namespace(bufnr, diagnostic_ns, 0, -1)
   end
 
@@ -755,6 +761,22 @@ do
     end
     return count
   end
+  function M.buf_diagnostics_signs(bufnr, diagnostics)
+    vim.fn.sign_define('LspDiagnosticsErrorSign', {text=vim.g['LspDiagnosticsErrorSign'] or 'E', texthl='LspDiagnosticsError', linehl='', numhl=''})
+    vim.fn.sign_define('LspDiagnosticsWarningSign', {text=vim.g['LspDiagnosticsWarningSign'] or 'W', texthl='LspDiagnosticsWarning', linehl='', numhl=''})
+    vim.fn.sign_define('LspDiagnosticsInformationSign', {text=vim.g['LspDiagnosticsInformationSign'] or 'I', texthl='LspDiagnosticsInformation', linehl='', numhl=''})
+    vim.fn.sign_define('LspDiagnosticsHintSign', {text=vim.g['LspDiagnosticsHintSign'] or 'H', texthl='LspDiagnosticsHint', linehl='', numhl=''})
+
+    for _, diagnostic in ipairs(diagnostics) do
+      local diagnostic_severity_map = {
+        [protocol.DiagnosticSeverity.Error] = "LspDiagnosticsErrorSign";
+        [protocol.DiagnosticSeverity.Warning] = "LspDiagnosticsWarningSign";
+        [protocol.DiagnosticSeverity.Information] = "LspDiagnosticsInformationSign";
+        [protocol.DiagnosticSeverity.Hint] = "LspDiagnosticsHintSign";
+      }
+      vim.fn.sign_place(0, sign_ns, diagnostic_severity_map[diagnostic.severity], bufnr, {lnum=(diagnostic.range.start.line+1)})
+    end
+  end
 end
 
 local position_sort = sort_by_key(function(v)
@@ -775,7 +797,7 @@ function M.locations_to_items(locations)
   for _, d in ipairs(locations) do
     local start = d.range.start
     local fname = assert(vim.uri_to_fname(d.uri))
-    table.insert(grouped[fname], {start = start, msg= d.message })
+    table.insert(grouped[fname], {start = start})
   end
 
 
@@ -802,7 +824,7 @@ function M.locations_to_items(locations)
             filename = fname,
             lnum = row + 1,
             col = col + 1;
-            text = temp.msg;
+            text = line;
           })
         end
       end
