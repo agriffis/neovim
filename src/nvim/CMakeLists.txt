@@ -220,7 +220,7 @@ set(gen_cflags ${gen_cflags} ${C_FLAGS_${build_type}_ARRAY} ${C_FLAGS_ARRAY})
 
 function(get_preproc_output varname iname)
   if(MSVC)
-    set(${varname} /P /Fi${iname} PARENT_SCOPE)
+    set(${varname} /P /Fi${iname} /nologo PARENT_SCOPE)
   else()
     set(${varname} -E -o ${iname} PARENT_SCOPE)
   endif()
@@ -573,7 +573,6 @@ set_target_properties(
   libnvim
   PROPERTIES
     POSITION_INDEPENDENT_CODE ON
-    OUTPUT_NAME nvim
 )
 set_property(
   TARGET libnvim
