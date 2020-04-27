@@ -24,7 +24,7 @@
 #include "nvim/diff.h"
 #include "nvim/digraph.h"
 #include "nvim/edit.h"
-#include "nvim/eval.h"
+#include "nvim/eval/userfunc.h"
 #include "nvim/ex_cmds.h"
 #include "nvim/ex_cmds2.h"
 #include "nvim/ex_docmd.h"
@@ -1259,6 +1259,8 @@ static void normal_redraw(NormalState *s)
   if (need_maketitle) {
     maketitle();
   }
+
+  curbuf->b_last_used = time(NULL);
 
   // Display message after redraw. If an external message is still visible,
   // it contains the kept message already.

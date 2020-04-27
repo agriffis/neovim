@@ -159,7 +159,8 @@ end
 function M.apply_text_document_edit(text_document_edit)
   local text_document = text_document_edit.textDocument
   local bufnr = vim.uri_to_bufnr(text_document.uri)
-  if M.buf_versions[bufnr] > text_document.version then
+  -- `VersionedTextDocumentIdentifier`s version may be nil https://microsoft.github.io/language-server-protocol/specification#versionedTextDocumentIdentifier
+  if text_document.version ~= nil and M.buf_versions[bufnr] > text_document.version then
     print("Buffer ", text_document.uri, " newer than edits.")
     return
   end
@@ -695,7 +696,7 @@ do
 
     local buffer_diagnostics = M.diagnostics_by_buf[bufnr]
     if not buffer_diagnostics then return end
-    local line_diagnostics = M.diagnostics_group_by_line(buffer_diagnostics[line])
+    local line_diagnostics = M.diagnostics_group_by_line(buffer_diagnostics)[line]
     if not line_diagnostics then return end
 
     for i, diagnostic in ipairs(line_diagnostics) do
@@ -706,6 +707,7 @@ do
       -- TODO(ashkan) make format configurable?
       local prefix = string.format("%d. ", i)
       local hiname = severity_highlights[diagnostic.severity]
+      assert(hiname, 'unknown severity: ' .. tostring(diagnostic.severity))
       local message_lines = split_lines(diagnostic.message)
       table.insert(lines, prefix..message_lines[1])
       table.insert(highlights, {#prefix + 1, hiname})
@@ -816,6 +818,7 @@ do
       api.nvim_buf_set_virtual_text(bufnr, diagnostic_ns, line, virt_texts, {})
     end
   end
+
   function M.buf_diagnostics_count(kind)
     local bufnr = vim.api.nvim_get_current_buf()
     local diagnostics = M.diagnostics_by_buf[bufnr]
@@ -828,19 +831,16 @@ do
     end
     return count
   end
-  function M.buf_diagnostics_signs(bufnr, diagnostics)
-    vim.fn.sign_define('LspDiagnosticsErrorSign', {text=vim.g['LspDiagnosticsErrorSign'] or 'E', texthl='LspDiagnosticsError', linehl='', numhl=''})
-    vim.fn.sign_define('LspDiagnosticsWarningSign', {text=vim.g['LspDiagnosticsWarningSign'] or 'W', texthl='LspDiagnosticsWarning', linehl='', numhl=''})
-    vim.fn.sign_define('LspDiagnosticsInformationSign', {text=vim.g['LspDiagnosticsInformationSign'] or 'I', texthl='LspDiagnosticsInformation', linehl='', numhl=''})
-    vim.fn.sign_define('LspDiagnosticsHintSign', {text=vim.g['LspDiagnosticsHintSign'] or 'H', texthl='LspDiagnosticsHint', linehl='', numhl=''})
 
+  local diagnostic_severity_map = {
+    [protocol.DiagnosticSeverity.Error] = "LspDiagnosticsErrorSign";
+    [protocol.DiagnosticSeverity.Warning] = "LspDiagnosticsWarningSign";
+    [protocol.DiagnosticSeverity.Information] = "LspDiagnosticsInformationSign";
+    [protocol.DiagnosticSeverity.Hint] = "LspDiagnosticsHintSign";
+  }
+
+  function M.buf_diagnostics_signs(bufnr, diagnostics)
     for _, diagnostic in ipairs(diagnostics) do
-      local diagnostic_severity_map = {
-        [protocol.DiagnosticSeverity.Error] = "LspDiagnosticsErrorSign";
-        [protocol.DiagnosticSeverity.Warning] = "LspDiagnosticsWarningSign";
-        [protocol.DiagnosticSeverity.Information] = "LspDiagnosticsInformationSign";
-        [protocol.DiagnosticSeverity.Hint] = "LspDiagnosticsHintSign";
-      }
       vim.fn.sign_place(0, sign_ns, diagnostic_severity_map[diagnostic.severity], bufnr, {lnum=(diagnostic.range.start.line+1)})
     end
   end
