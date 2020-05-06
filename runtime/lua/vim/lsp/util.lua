@@ -160,7 +160,7 @@ function M.apply_text_document_edit(text_document_edit)
   local text_document = text_document_edit.textDocument
   local bufnr = vim.uri_to_bufnr(text_document.uri)
   -- `VersionedTextDocumentIdentifier`s version may be nil https://microsoft.github.io/language-server-protocol/specification#versionedTextDocumentIdentifier
-  if text_document.version ~= nil and M.buf_versions[bufnr] > text_document.version then
+  if text_document.version ~= vim.NIL and M.buf_versions[bufnr] > text_document.version then
     print("Buffer ", text_document.uri, " newer than edits.")
     return
   end
@@ -432,9 +432,9 @@ function M.jump_to_location(location)
   vim.cmd "normal! m'"
 
   -- Push a new item into tagstack
-  local items = {}
-  table.insert(items, {tagname=vim.fn.expand("<cword>"), from=vim.fn.getpos('.')})
-  vim.fn.settagstack(vim.fn.bufnr('%'), {items=items}, 't')
+  local from = {vim.fn.bufnr('%'), vim.fn.line('.'), vim.fn.col('.'), 0}
+  local items = {{tagname=vim.fn.expand('<cword>'), from=from}}
+  vim.fn.settagstack(vim.fn.win_getid(), {items=items}, 't')
 
   --- Jump to new location
   api.nvim_set_current_buf(bufnr)
