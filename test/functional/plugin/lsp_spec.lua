@@ -800,13 +800,14 @@ describe('LSP', function()
         make_edit(0, 0, 0, 0, {"123"});
         make_edit(1, 0, 1, 1, {"2"});
         make_edit(2, 0, 2, 2, {"3"});
+        make_edit(3, 2, 3, 4, {""});
       }
       exec_lua('vim.lsp.util.apply_text_edits(...)', edits, 1)
       eq({
         '123First line of text';
         '2econd line of text';
         '3ird line of text';
-        'Fourth line of text';
+        'Foth line of text';
         'å å ɧ 汉语 ↥ 🤦 🦄';
       }, buf_lines(1))
     end)
@@ -1377,5 +1378,15 @@ describe('LSP', function()
       eq(4, pos.col)
       eq('å', exec_lua[[return vim.fn.expand('<cword>')]])
     end)
+  end)
+
+  describe('lsp.util._make_floating_popup_size', function()
+    exec_lua [[ contents =
+    {"text tαxt txtα tex",
+    "text tααt tααt text",
+    "text tαxt tαxt"}
+    ]]
+    eq({19,3}, exec_lua[[ return {vim.lsp.util._make_floating_popup_size(contents)} ]])
+    eq({15,5}, exec_lua[[ return {vim.lsp.util._make_floating_popup_size(contents,{width = 15, wrap_at = 14})} ]])
   end)
 end)
