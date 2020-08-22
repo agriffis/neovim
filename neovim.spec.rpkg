@@ -13,6 +13,10 @@
 
 %global luv_min_ver 1.30.0
 
+# This enables cmake to work consistently between pre-f33 and after.
+# https://docs.fedoraproject.org/en-US/packaging-guidelines/CMake/#_notes
+%undefine __cmake_in_source_build
+
 Name:           {{{git_name name="neovim"}}}
 Version:        {{{git_version lead="$(git tag | sed -n 's/^v//p' | sort --version-sort -r | head -n1)"}}}
 Release:        {{{git_revision 1}}}%{?dist}
