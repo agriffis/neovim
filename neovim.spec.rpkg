@@ -11,18 +11,21 @@
 %global luaver 5.3
 %endif
 
+%global luv_min_ver 1.30.0
+
 Name:           {{{git_name name="neovim"}}}
 Version:        {{{git_version lead="$(git tag | sed -n 's/^v//p' | sort --version-sort -r | head -n1)"}}}
 Release:        {{{git_revision 1}}}%{?dist}
 
 License:        ASL 2.0
 Summary:        Vim-fork focused on extensibility and agility
-Url:            http://neovim.io
+Url:            https://neovim.io
 
 Source0:        {{{git_pack}}}
 Source1:        sysinit.vim
 Source2:        spec-template
-Patch0:         neovim-0.1.7-bitop.patch
+
+Patch1000:      neovim-0.1.7-bitop.patch
 
 BuildRequires:  gcc-c++
 BuildRequires:  cmake
@@ -35,27 +38,25 @@ BuildRequires:  gcc
 # luajit implements version 5.1 of the lua language spec, so it needs the
 # compat versions of libs.
 BuildRequires:  luajit-devel
-BuildRequires:  compat-lua-lpeg
-BuildRequires:  compat-lua-mpack
-BuildRequires:  lua5.1-luv-devel
-Requires:       lua5.1-luv
+BuildRequires:  lua5.1-lpeg
+BuildRequires:  lua5.1-mpack
+BuildRequires:  lua5.1-luv-devel >= %{luv_min_ver}
+Requires:       lua5.1-luv >= %{luv_min_ver}
 %else
 BuildRequires:  lua-devel
 BuildRequires:  lua-lpeg
 BuildRequires:  lua-mpack
-BuildRequires:  lua-luv-devel
-Requires:       lua-luv
+BuildRequires:  lua-luv-devel >= %{luv_min_ver}
+Requires:       lua-luv >= %{luv_min_ver}
 %endif
 %if %{with jemalloc}
 BuildRequires:  jemalloc-devel
 %endif
 BuildRequires:  msgpack-devel >= 3.1.0
 BuildRequires:  libtermkey-devel
-BuildRequires:  libuv-devel >= 1.30
+BuildRequires:  libuv-devel >= 1.28.0
 BuildRequires:  libvterm-devel >= 0.1.1
 BuildRequires:  unibilium-devel
-BuildRequires:  utf8proc-devel
-Requires: utf8proc
 %if 0%{?el7}
 BuildRequires:  lua-bit32
 Requires:       lua-bit32
@@ -80,27 +81,21 @@ parts of Vim, without compromise, and more.
 {{{git_setup_macro}}}
 
 %if %{without luajit}
-%patch0 -p1 -b .bitop
+%patch1000 -p1 -b .bitop
 %endif
 
 %build
-mkdir -p build
-pushd build
 %cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
        -DPREFER_LUA=%{?with_luajit:OFF}%{!?with_luajit:ON} \
        -DLUA_PRG=%{_bindir}/%{?with_luajit:luajit}%{!?with_luajit:lua} \
        -DENABLE_JEMALLOC=%{?with_jemalloc:ON}%{!?with_jemalloc:OFF} \
-       -DLIBLUV_INCLUDE_DIR:PATH=%{_includedir}/lua-%{luaver} \
-       -DLIBLUV_LIBRARY=%{_libdir}/lua/%{luaver}/luv.so \
-       ..
+       -DLIBLUV_INCLUDE_DIR=%{_includedir}/lua-%{luaver} \
+       -DLIBLUV_LIBRARY=%{_libdir}/lua/%{luaver}/luv.so
 
-%make_build
-popd
+%cmake_build
 
 %install
-pushd build
-%make_install
-popd
+%cmake_install
 
 install -p -m 644 %SOURCE1 %{buildroot}%{_datadir}/nvim/sysinit.vim
 install -p -m 644 %SOURCE2 %{buildroot}%{_datadir}/nvim/template.spec
@@ -126,6 +121,38 @@ install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 %changelog
 * {{{git_changelog_date}}} Aron Griffis <aron@scampersand.com> - {{{git_changelog_version}}}
 - Nightly build from git master
+
+* Wed Aug 05 2020 Andreas Schneider <asn@redhat.com> - 0.4.4-1
+- Update to version 0.4.4
+- Use new cmake macros
+
+* Sat Aug 01 2020 Fedora Release Engineering <releng@fedoraproject.org> - 0.4.3-8
+- Second attempt - Rebuilt for
+  https://fedoraproject.org/wiki/Fedora_33_Mass_Rebuild
+
+* Tue Jul 28 2020 Fedora Release Engineering <releng@fedoraproject.org> - 0.4.3-7
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_33_Mass_Rebuild
+
+* Sun Mar 22 2020 Michel Alexandre Salim <salimma@fedoraproject.org> - 0.4.3-6
+- Update build requirements
+
+* Sun Feb 23 2020 Andreas Schneider <asn@redhat.com> - 0.4.3-5
+- Update to upstream patchset for -fno-common
+
+* Mon Feb 17 2020 Andreas Schneider <asn@redhat.com> - 0.4.3-4
+- Update patchset for -fno-common
+
+* Mon Feb 17 2020 Andreas Schneider <asn@redhat.com> - 0.4.3-3
+- resolves: #1799680 - Fix -fno-common issues
+
+* Wed Jan 29 2020 Fedora Release Engineering <releng@fedoraproject.org> - 0.4.3-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_32_Mass_Rebuild
+
+* Thu Nov 07 2019 Andreas Schneider <asn@redhat.com> - 0.4.3-1
+- Update to version 0.4.3
+
+* Mon Oct 28 2019 Igor Gnatenko <ignatenkobrain@fedoraproject.org> - 0.4.2-2
+- Fix glitches for terminals sayin xterm but not xterm
 
 * Thu Oct 03 2019 Andreas Schneider <asn@redhat.com> - 0.4.2-1
 - Update to version 0.4.2
