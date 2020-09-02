@@ -127,6 +127,58 @@ void ui_refresh(void)
   }
 }]]
 
+  it('allows to iterate over nodes children', function()
+    if not check_parser() then return end
+
+    insert(test_text);
+
+    local res = exec_lua([[
+      parser = vim.treesitter.get_parser(0, "c")
+
+      func_node = parser:parse():root():child(0)
+
+      res = {}
+      for node, field in func_node:iter_children() do
+        table.insert(res, {node:type(), field})
+      end
+      return res
+    ]])
+
+    eq({
+      {"primitive_type", "type"},
+      {"function_declarator", "declarator"},
+      {"compound_statement", "body"}
+    }, res)
+  end)
+
+  it('allows to get a child by field', function()
+    if not check_parser() then return end
+
+    insert(test_text);
+
+    local res = exec_lua([[
+      parser = vim.treesitter.get_parser(0, "c")
+
+      func_node = parser:parse():root():child(0)
+
+      local res = {}
+      for _, node in ipairs(func_node:field("type")) do
+        table.insert(res, {node:type(), node:range()})
+      end
+      return res
+    ]])
+
+    eq({{ "primitive_type", 0, 0, 0, 4 }}, res)
+
+    local res_fail = exec_lua([[
+      parser = vim.treesitter.get_parser(0, "c")
+
+      return #func_node:field("foo") == 0
+    ]])
+
+    assert(res_fail)
+  end)
+
   local query = [[
     ((call_expression function: (identifier) @minfunc (argument_list (identifier) @min_id)) (eq? @minfunc "MIN"))
     "for" @keyword
@@ -195,6 +247,35 @@ void ui_refresh(void)
       { 4, { { "fieldarg", "identifier", 12, 17, 12, 19 } } },
       { 1, { { "minfunc", "identifier", 12, 13, 12, 16 }, { "min_id", "identifier", 12, 29, 12, 35 } } },
       { 4, { { "fieldarg", "identifier", 13, 14, 13, 16 } } }
+    }, res)
+  end)
+
+  it('allow loading query with escaped quotes and capture them with `match?` and `vim-match?`', function()
+    if not check_parser() then return end
+
+    insert('char* astring = "Hello World!";')
+
+    local res = exec_lua([[
+      cquery = vim.treesitter.parse_query("c", '((_) @quote (vim-match? @quote "^\\"$")) ((_) @quote (match? @quote "^\\"$"))')
+      parser = vim.treesitter.get_parser(0, "c")
+      tree = parser:parse()
+      res = {}
+      for pattern, match in cquery:iter_matches(tree:root(), 0, 0, 1) do
+        -- can't transmit node over RPC. just check the name and range
+        local mrepr = {}
+        for cid,node in pairs(match) do
+          table.insert(mrepr, {cquery.captures[cid], node:type(), node:range()})
+        end
+        table.insert(res, {pattern, mrepr})
+      end
+      return res
+    ]])
+
+    eq({
+      { 1, { { "quote", '"', 0, 16, 0, 17 } } },
+      { 2, { { "quote", '"', 0, 16, 0, 17 } } },
+      { 1, { { "quote", '"', 0, 29, 0, 30 } } },
+      { 2, { { "quote", '"', 0, 29, 0, 30 } } },
     }, res)
   end)
 
