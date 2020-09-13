@@ -353,9 +353,11 @@ EXTERN int t_colors INIT(= 256);                // int value of T_CCO
 // position.  Search_match_lines is the number of lines after the match (0 for
 // a match within one line), search_match_endcol the column number of the
 // character just after the match in the last line.
-EXTERN int highlight_match INIT(= false);       // show search match pos
-EXTERN linenr_T search_match_lines;             // lines of of matched string
-EXTERN colnr_T search_match_endcol;             // col nr of match end
+EXTERN bool highlight_match INIT(= false);         // show search match pos
+EXTERN linenr_T search_match_lines;                // lines of of matched string
+EXTERN colnr_T search_match_endcol;                // col nr of match end
+EXTERN linenr_T search_first_line INIT(= 0);       // for :{FIRST},{last}s/pat
+EXTERN linenr_T search_last_line INIT(= MAXLNUM);  // for :{first},{LAST}s/pat
 
 EXTERN int no_smartcase INIT(= false);          // don't use 'smartcase' once
 
@@ -402,6 +404,12 @@ EXTERN int sys_menu INIT(= false);
 // While redrawing the screen this flag is set.  It means the screen size
 // ('lines' and 'rows') must not be changed.
 EXTERN int updating_screen INIT(= 0);
+
+EXTERN bool luahl_active INIT(= false);
+EXTERN LuaRef luahl_start INIT(= LUA_NOREF);
+EXTERN LuaRef luahl_win INIT(= LUA_NOREF);
+EXTERN LuaRef luahl_line INIT(= LUA_NOREF);
+EXTERN LuaRef luahl_end INIT(= LUA_NOREF);
 
 // All windows are linked in a list. firstwin points to the first entry,
 // lastwin to the last entry (can be the same as firstwin) and curwin to the
