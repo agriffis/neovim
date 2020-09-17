@@ -5,6 +5,7 @@ local inspect = require'vim.inspect'
 
 local command = helpers.command
 local meths = helpers.meths
+local funcs = helpers.funcs
 local clear = helpers.clear
 local eq = helpers.eq
 local fail = helpers.fail
@@ -256,9 +257,9 @@ describe('lua: nvim_buf_attach on_bytes', function()
   -- assert the wrong thing), but masks errors with unflushed lines (as
   -- nvim_buf_get_offset forces a flush of the memline). To be safe run the
   -- test both ways.
-  local function setup_eventcheck(verify)
-    meths.buf_set_lines(0, 0, -1, true, origlines)
-    local shadow = deepcopy(origlines)
+  local function setup_eventcheck(verify, start_txt)
+    meths.buf_set_lines(0, 0, -1, true, start_txt)
+    local shadow = deepcopy(start_txt)
     local shadowbytes = table.concat(shadow, '\n') .. '\n'
     -- TODO: while we are brewing the real strong coffe,
     -- verify should check buf_get_offset after every check_events
@@ -273,7 +274,7 @@ describe('lua: nvim_buf_attach on_bytes', function()
       local events = exec_lua("return get_events(...)" )
 
       if not pcall(eq, expected, events) then
-        local msg = 'unexpected byte updates received.\n\nBABBLA MER \n\n'
+        local msg = 'unexpected byte updates received.\n\n'
 
         msg = msg .. 'received events:\n'
         for _, e in ipairs(events) do
@@ -300,7 +301,7 @@ describe('lua: nvim_buf_attach on_bytes', function()
         end
         local text = meths.buf_get_lines(0, 0, -1, true)
         local bytes = table.concat(text, '\n') .. '\n'
-        eq(string.len(bytes), string.len(shadowbytes), shadowbytes)
+        eq(string.len(bytes), string.len(shadowbytes), '\non_bytes: total bytecount of buffer is wrong')
         for i = 1, string.len(shadowbytes) do
           local shadowbyte = string.sub(shadowbytes, i, i)
           if shadowbyte ~= '\255' then
@@ -316,7 +317,7 @@ describe('lua: nvim_buf_attach on_bytes', function()
   -- Yes, we can do both
   local function do_both(verify)
     it('single and multiple join', function()
-        local check_events = setup_eventcheck(verify)
+        local check_events = setup_eventcheck(verify, origlines)
         feed 'ggJ'
         check_events {
           {'test1', 'bytes', 1, 3, 0, 15, 15, 1, 0, 1, 0, 1, 1};
@@ -330,7 +331,7 @@ describe('lua: nvim_buf_attach on_bytes', function()
     end)
 
     it('opening lines', function()
-        local check_events = setup_eventcheck(verify)
+        local check_events = setup_eventcheck(verify, origlines)
         -- meths.buf_set_option(0, 'autoindent', true)
         feed 'Go'
         check_events {
@@ -343,7 +344,7 @@ describe('lua: nvim_buf_attach on_bytes', function()
     end)
 
     it('opening lines with autoindent', function()
-        local check_events = setup_eventcheck(verify)
+        local check_events = setup_eventcheck(verify, origlines)
         meths.buf_set_option(0, 'autoindent', true)
         feed 'Go'
         check_events {
@@ -354,6 +355,52 @@ describe('lua: nvim_buf_attach on_bytes', function()
           { "test1", "bytes", 1, 4, 8, 0, 115, 0, 4, 4, 0, 0, 0 };
           { "test1", "bytes", 1, 5, 7, 4, 118, 0, 0, 0, 1, 4, 5 };
         }
+    end)
+
+    it('setline(num, line)', function()
+      local check_events = setup_eventcheck(verify, origlines)
+      funcs.setline(2, "babla")
+      check_events {
+        { "test1", "bytes", 1, 3, 1, 0, 16, 0, 15, 15, 0, 5, 5 };
+      }
+
+      funcs.setline(2, {"foo", "bar"})
+      check_events {
+        { "test1", "bytes", 1, 4, 1, 0, 16, 0, 5, 5, 0, 3, 3 };
+        { "test1", "bytes", 1, 5, 2, 0, 20, 0, 15, 15, 0, 3, 3 };
+      }
+
+      local buf_len = meths.buf_line_count(0)
+      funcs.setline(buf_len + 1, "baz")
+      check_events {
+        { "test1", "bytes", 1, 6, 7, 0, 90, 0, 0, 0, 1, 0, 4 };
+      }
+    end)
+
+    it('continuing comments with fo=or', function()
+      local check_events = setup_eventcheck(verify, {'// Comment'})
+      meths.buf_set_option(0, 'formatoptions', 'ro')
+      meths.buf_set_option(0, 'filetype', 'c')
+      feed 'A<CR>'
+      check_events {
+        { "test1", "bytes", 1, 4, 0, 10, 10, 0, 0, 0, 1, 3, 4 };
+      }
+
+      feed '<ESC>'
+      check_events {
+        { "test1", "bytes", 1, 4, 1, 2, 13, 0, 1, 1, 0, 0, 0 };
+      }
+
+      feed 'ggo' -- goto first line to continue testing
+      check_events {
+        { "test1", "bytes", 1, 6, 1, 0, 11, 0, 0, 0, 1, 0, 4 };
+      }
+
+      feed '<CR>'
+      check_events {
+        { "test1", "bytes", 1, 6, 2, 2, 16, 0, 1, 1, 0, 0, 0 };
+        { "test1", "bytes", 1, 7, 1, 3, 14, 0, 0, 0, 1, 3, 4 };
+      }
     end)
   end
 
