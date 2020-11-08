@@ -568,7 +568,7 @@ struct file_buffer {
                                 // negative when lines were deleted
   wininfo_T   *b_wininfo;       // list of last used info for each window
   int b_mod_tick_syn;           // last display tick syntax was updated
-  int b_mod_tick_deco;          // last display tick decoration providers
+  int b_mod_tick_decor;         // last display tick decoration providers
                                 // where invoked
 
   long b_mtime;                 // last change time of original file
@@ -1229,6 +1229,13 @@ struct window_S {
                                     // 'wrap' is off
   colnr_T w_skipcol;                // starting column when a single line
                                     // doesn't fit in the window
+
+  // "w_last_topline" and "w_last_leftcol" are used to determine if
+  // a Scroll autocommand should be emitted.
+  linenr_T w_last_topline;          ///< last known value for topline
+  colnr_T w_last_leftcol;          ///< last known value for leftcol
+  int w_last_width;                 ///< last known value for width
+  int w_last_height;                ///< last known value for height
 
   //
   // Layout of the window in the screen.
