@@ -38,6 +38,8 @@ BuildRequires:  fdupes
 BuildRequires:  gettext
 BuildRequires:  gperf
 BuildRequires:  gcc
+BuildRequires:  tree-sitter-devel
+Requires:       tree-sitter
 %if %{with luajit}
 # luajit implements version 5.1 of the lua language spec, so it needs the
 # compat versions of libs.
