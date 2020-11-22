@@ -1847,13 +1847,12 @@ void do_pending_operator(cmdarg_T *cap, int old_col, bool gui_yank)
         CancelRedo();
       } else {
         (void)op_delete(oap);
-        if (oap->motion_type == kMTLineWise && has_format_option(FO_AUTO)) {
-          // cursor line wasn't saved yet
-          if (u_save_cursor() == FAIL) {
-            break;
-          }
+        // save cursor line for undo if it wasn't saved yet
+        if (oap->motion_type == kMTLineWise
+            && has_format_option(FO_AUTO)
+            && u_save_cursor() == OK) {
+          auto_format(false, true);
         }
-        auto_format(false, true);
       }
       break;
 
@@ -2600,11 +2599,6 @@ do_mouse (
   jump_flags = jump_to_mouse(jump_flags,
                              oap == NULL ? NULL : &(oap->inclusive),
                              which_button);
-
-  // A click in the window toolbar has no side effects.
-  if (jump_flags & MOUSE_WINBAR) {
-    return false;
-  }
 
   moved = (jump_flags & CURSOR_MOVED);
   in_status_line = (jump_flags & IN_STATUS_LINE);
