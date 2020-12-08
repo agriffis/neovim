@@ -20,6 +20,8 @@ jobs:
       release: ${{ steps.build.outputs.release }}
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -29,7 +31,7 @@ jobs:
         run: |
           make CMAKE_BUILD_TYPE=RelWithDebinfo CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX:PATH="
           printf '::set-output name=version::%s\n' "$(./build/bin/nvim --version | head -n 3 | sed -z 's/\n/%0A/g')"
-          printf '::set-output name=release::%s\n' "$(./build/bin/nvim --version | head -n 1 | sed 's/-.*//')"
+          printf '::set-output name=release::%s\n' "$(./build/bin/nvim --version | head -n 1)"
           make DESTDIR="$GITHUB_WORKSPACE/build/release/nvim-linux64" install
           cd "$GITHUB_WORKSPACE/build/release"
           tar cfz nvim-linux64.tar.gz nvim-linux64
@@ -44,13 +46,15 @@ jobs:
     runs-on: ubuntu-16.04
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y autoconf automake build-essential cmake gcc-multilib gettext gperf libtool-bin locales ninja-build pkg-config unzip
       - if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name != 'nightly')
         run: make appimage-latest
-      - if: github.event_name == 'scheduled' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name == 'nightly')
+      - if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name == 'nightly')
         run: make appimage-nightly
       - uses: actions/upload-artifact@v2
         with:
@@ -67,6 +71,8 @@ jobs:
     runs-on: macos-10.15
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - name: Install brew packages
         run: |
           brew update >/dev/null
@@ -78,9 +84,7 @@ jobs:
       - name: Create package
         run: |
           cd "$GITHUB_WORKSPACE/build/release"
-          mkdir -p bundle/nvim/libs
-          mkdir -p bundle/nvim/bin
-          cp nvim-osx64/bin/nvim bundle/nvim/bin/
+          mkdir -p nvim-osx64/libs
           libs=($(otool -L nvim-osx64/bin/nvim | sed 1d | sed -E -e 's|^[[:space:]]*||' -e 's| .*||'))
           echo "libs:"
           for lib in "${libs[@]}"; do
@@ -89,15 +93,15 @@ jobs:
             else
               echo "  $lib"
               relname="libs/${lib##*/}"
-              cp -L "$lib" "bundle/nvim/$relname"
-              install_name_tool -change "$lib" "@executable_path/../$relname" bundle/nvim/bin/nvim
+              cp -L "$lib" "nvim-osx64/$relname"
+              install_name_tool -change "$lib" "@executable_path/../$relname" nvim-osx64/bin/nvim
             fi
           done
-          tar cjSf nvim-macos.tar.bz2 -C bundle nvim
+          tar cfz nvim-macos.tar.gz nvim-osx64
       - uses: actions/upload-artifact@v2
         with:
           name: nvim-macos
-          path: build/release/nvim-macos.tar.bz2
+          path: build/release/nvim-macos.tar.gz
           retention-days: 1
 
   publish:
@@ -107,7 +111,7 @@ jobs:
       - uses: actions/download-artifact@v2
       - if: github.event_name == 'workflow_dispatch'
         run: echo "TAG_NAME=${{ github.event.inputs.tag_name }}" >> $GITHUB_ENV
-      - if: github.event_name == 'scheduled'
+      - if: github.event_name == 'schedule'
         run: echo 'TAG_NAME=nightly' >> $GITHUB_ENV
       - if: github.event_name == 'push'
         run: |
@@ -134,7 +138,7 @@ jobs:
           gzip: false
           allow_override: ${{ env.TAG_NAME == 'nightly' }}
           files: |
-            nvim-macos.tar.bz2:./nvim-macos/nvim-macos.tar.bz2
+            nvim-macos.tar.gz:./nvim-macos/nvim-macos.tar.gz
             nvim-linux64.tar.gz:./nvim-linux64/nvim-linux64.tar.gz
             nvim.appimage:./appimage/nvim.appimage
             nvim.appimage.zsync:./appimage/nvim.appimage.zsync
