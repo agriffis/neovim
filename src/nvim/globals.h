@@ -935,6 +935,7 @@ EXTERN char_u e_readonly[] INIT(= N_(
     "E45: 'readonly' option is set (add ! to override)"));
 EXTERN char_u e_readonlyvar[] INIT(= N_(
     "E46: Cannot change read-only variable \"%.*s\""));
+EXTERN char_u e_stringreq[] INIT(= N_("E928: String required"));
 EXTERN char_u e_dictreq[] INIT(= N_("E715: Dictionary required"));
 EXTERN char_u e_toomanyarg[] INIT(= N_(
     "E118: Too many arguments for function: %s"));
@@ -1051,5 +1052,8 @@ typedef enum {
 
 #define MIN_CD_SCOPE  kCdScopeWindow
 #define MAX_CD_SCOPE  kCdScopeGlobal
+
+// Only filled for Win32.
+EXTERN char windowsVersion[20] INIT(= { 0 });
 
 #endif  // NVIM_GLOBALS_H
