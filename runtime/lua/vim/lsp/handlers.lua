@@ -63,7 +63,43 @@ local function progress_callback(_, _, params, client_id)
   vim.api.nvim_command("doautocmd <nomodeline> User LspProgressUpdate")
 end
 
+--@see https://microsoft.github.io/language-server-protocol/specifications/specification-current/#progress
 M['$/progress'] = progress_callback
+
+--@see https://microsoft.github.io/language-server-protocol/specifications/specification-current/#window_workDoneProgress_create
+M['window/workDoneProgress/create'] =  function(_, _, params, client_id)
+  local client = vim.lsp.get_client_by_id(client_id)
+  local token = params.token  -- string or number
+  if not client then
+    err_message("LSP[", client_id, "] client has shut down after sending the message")
+  end
+  client.messages.progress[token] = {}
+  return vim.NIL
+end
+
+--@see https://microsoft.github.io/language-server-protocol/specifications/specification-current/#window_showMessageRequest
+M['window/showMessageRequest'] = function(_, _, params)
+
+  local actions = params.actions
+  print(params.message)
+  local option_strings = {params.message, "\nRequest Actions:"}
+  for i, action in ipairs(actions) do
+    local title = action.title:gsub('\r\n', '\\r\\n')
+    title = title:gsub('\n', '\\n')
+    table.insert(option_strings, string.format("%d. %s", i, title))
+  end
+
+  -- window/showMessageRequest can return either MessageActionItem[] or null.
+  local choice = vim.fn.inputlist(option_strings)
+  if choice < 1 or choice > #actions then
+      return vim.NIL
+  else
+    local action_chosen = actions[choice]
+    return {
+      title = action_chosen;
+    }
+  end
+end
 
 --@see https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_codeAction
 M['textDocument/codeAction'] = function(_, _, actions)
