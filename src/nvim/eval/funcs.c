@@ -726,7 +726,7 @@ buf_T *tv_get_buf(typval_T *tv, int curtab_only)
   p_cpo = (char_u *)"";
 
   buf = buflist_findnr(buflist_findpat(name, name + STRLEN(name),
-                                       TRUE, FALSE, curtab_only));
+                                       true, false, curtab_only));
 
   p_magic = save_magic;
   p_cpo = save_cpo;
@@ -2165,7 +2165,7 @@ static void f_expandcmd(typval_T *argvars, typval_T *rettv, FunPtr fptr)
     .nextcmd = NULL,
     .cmdidx = CMD_USER,
   };
-  eap.argt |= NOSPC;
+  eap.argt |= EX_NOSPC;
 
   expand_filename(&eap, &cmdstr, &errormsg);
   if (errormsg != NULL && *errormsg != NUL) {
@@ -3481,6 +3481,25 @@ static void f_getloclist(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
   win_T *wp = find_win_by_nr_or_id(&argvars[0]);
   get_qf_loc_list(false, wp, &argvars[1], rettv);
+}
+
+
+/// "getmarklist()" function
+static void f_getmarklist(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+{
+  tv_list_alloc_ret(rettv, kListLenMayKnow);
+
+  if (argvars[0].v_type == VAR_UNKNOWN) {
+    get_global_marks(rettv->vval.v_list);
+    return;
+  }
+
+  buf_T *buf = tv_get_buf(&argvars[0], false);
+  if (buf == NULL) {
+    return;
+  }
+
+  get_buf_local_marks(buf, rettv->vval.v_list);
 }
 
 /*
