@@ -69,6 +69,14 @@ static bool log_path_init(void)
       || log_file_path[0] == '\0'
       || os_isdir((char_u *)log_file_path)
       || !log_try_create(log_file_path)) {
+    // Make kXDGCacheHome if it does not exist.
+    char *cachehome = get_xdg_home(kXDGCacheHome);
+    char *failed_dir = NULL;
+    bool log_dir_failure = false;
+    if (!os_isdir((char_u *)cachehome)) {
+      log_dir_failure = (os_mkdir_recurse(cachehome, 0700, &failed_dir) != 0);
+    }
+    XFREE_CLEAR(cachehome);
     // Invalid $NVIM_LOG_FILE or failed to expand; fall back to default.
     char *defaultpath = stdpaths_user_cache_subpath("log");
     size_t len = xstrlcpy(log_file_path, defaultpath, size);
@@ -83,6 +91,11 @@ static bool log_path_init(void)
       return false;
     }
     os_setenv(LOG_FILE_ENV, log_file_path, true);
+    if (log_dir_failure) {
+      WLOG("Failed to create directory %s for writing logs: %s",
+           failed_dir, os_strerror(log_dir_failure));
+    }
+    XFREE_CLEAR(failed_dir);
   }
   return true;
 }
@@ -323,4 +336,3 @@ static bool v_do_log_to_file(FILE *log_file, int log_level,
 
   return true;
 }
-
