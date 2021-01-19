@@ -97,6 +97,18 @@ M['window/showMessageRequest'] = function(_, _, params)
   end
 end
 
+--@see https://microsoft.github.io/language-server-protocol/specifications/specification-current/#client_registerCapability
+M['client/registerCapability'] = function(_, _, _, client_id)
+  local warning_tpl = "The language server %s triggers a registerCapability "..
+                      "handler despite dynamicRegistration set to false. "..
+                      "Report upstream, this warning is harmless"
+  local client = vim.lsp.get_client_by_id(client_id)
+  local client_name = client and client.name or string.format("id=%d", client_id)
+  local warning = string.format(warning_tpl, client_name)
+  log.warn(warning)
+  return vim.NIL
+end
+
 --@see https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_codeAction
 M['textDocument/codeAction'] = function(_, _, actions)
   if actions == nil or vim.tbl_isempty(actions) then
@@ -150,6 +162,7 @@ M['workspace/configuration'] = function(err, _, params, client_id)
   local client = vim.lsp.get_client_by_id(client_id)
   if not client then
     err_message("LSP[id=", client_id, "] client has shut down after sending the message")
+    return
   end
   if err then error(vim.inspect(err)) end
   if not params.items then
