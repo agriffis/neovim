@@ -5264,7 +5264,7 @@ void ex_vimgrep(exarg_T *eap)
     qf_new_list(qi, title);
   }
 
-  // parse the list of arguments
+  // Parse the list of arguments, wildcards have already been expanded.
   if (get_arglist_exp(p, &fcount, &fnames, true) == FAIL) {
     goto theend;
   }
@@ -5648,7 +5648,7 @@ static int get_qfline_items(qfline_T *qfp, list_T *list)
           == FAIL)) {
     // tv_dict_add* fail only if key already exist, but this is a newly
     // allocated dictionary which is thus guaranteed to have no existing keys.
-    assert(false);
+    abort();
   }
 
   return OK;
