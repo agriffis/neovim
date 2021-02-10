@@ -19,7 +19,7 @@
 
 Name:           {{{git_name name="neovim"}}}
 Version:        {{{git_version}}}
-Release:        {{{git_release}}}%{?dist}
+Release:        {{{git_revision}}}%{?dist}
 
 License:        ASL 2.0
 Summary:        Vim-fork focused on extensibility and agility

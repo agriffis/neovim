@@ -24,7 +24,7 @@ function git_version {
     output "$major.$minor.$patch~${pre#-}.${master_commits}.${master_hash}"
 }
 
-function git_release {
+function git_revision {
     # count commits not on master
     output "$(git log --oneline origin/master.. | wc -l)"
 }
