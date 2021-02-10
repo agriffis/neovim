@@ -18,8 +18,8 @@
 %undefine __cmake_in_source_build
 
 Name:           {{{git_name name="neovim"}}}
-Version:        {{{git_version lead="$(git tag | sed -n 's/^v//p' | sort --version-sort -r | head -n1)"}}}
-Release:        {{{git_revision 1}}}%{?dist}
+Version:        {{{git_version}}}
+Release:        {{{git_release}}}%{?dist}
 
 License:        ASL 2.0
 Summary:        Vim-fork focused on extensibility and agility
@@ -96,7 +96,8 @@ parts of Vim, without compromise, and more.
        -DLUA_PRG=%{_bindir}/%{?with_luajit:luajit}%{!?with_luajit:lua} \
        -DENABLE_JEMALLOC=%{?with_jemalloc:ON}%{!?with_jemalloc:OFF} \
        -DLIBLUV_INCLUDE_DIR=%{_includedir}/lua-%{luaver} \
-       -DLIBLUV_LIBRARY=%{_libdir}/lua/%{luaver}/luv.so
+       -DLIBLUV_LIBRARY=%{_libdir}/lua/%{luaver}/luv.so \
+       -DNVIM_VERSION_MEDIUM=%{version}
 
 %cmake_build
 

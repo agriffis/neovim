@@ -1,22 +1,32 @@
 #!/bin/bash
 
-eval "function _git_version() $(type git_version | sed 1,2d)"
-
-function git_version {
-    declare v="$(_git_version "$@")"
-
-    if [[ $v =~ \.git\.[0-9]+\.[0-9a-f]+$ ]]; then
-        # The git revision tacked on the end is from our branch. Replace it with
-        # the last git revision from master, so that builds correspond with
-        # upstream commits.
-        v=${v%.*}.$(git rev-parse --short origin/master)
-    fi
-
-    output "$v"
+function get_cmake_var {
+    declare v
+    v=$(grep -m1 "^set($1\\s" < CMakeLists.txt)
+    v=$(sed -E 's/^\S+\s+"?//; s/[")].*//' <<<"$v")
+    [[ -n $v ]] && echo "$v" || die "can't get $1"
 }
 
-function git_revision {
-    output "$*"
+function git_version {
+    declare major minor patch pre
+    major=$(get_cmake_var NVIM_VERSION_MAJOR) || exit
+    minor=$(get_cmake_var NVIM_VERSION_MINOR) || exit
+    patch=$(get_cmake_var NVIM_VERSION_PATCH) || exit
+    pre=$(get_cmake_var NVIM_VERSION_PRERELEASE) || exit
+
+    # git describe --first-parent origin/master
+    # v0.4.0-1080-g971e0ca90
+    declare master_describe master_tag master_commits master_hash
+    master_describe=$(git describe --first-parent origin/master)
+    read master_tag master_commits master_hash <<<"${master_describe//-/ }"
+    [[ $master_tag == v* && $master_commits -gt 0 && -n $master_hash ]] || die "failed git describe"
+
+    output "$major.$minor.$patch~${pre#-}.${master_commits}.${master_hash}"
+}
+
+function git_release {
+    # count commits not on master
+    output "$(git log --oneline origin/master.. | wc -l)"
 }
 
 function git_changelog_date {
