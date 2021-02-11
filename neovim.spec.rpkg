@@ -97,7 +97,7 @@ parts of Vim, without compromise, and more.
        -DENABLE_JEMALLOC=%{?with_jemalloc:ON}%{!?with_jemalloc:OFF} \
        -DLIBLUV_INCLUDE_DIR=%{_includedir}/lua-%{luaver} \
        -DLIBLUV_LIBRARY=%{_libdir}/lua/%{luaver}/luv.so \
-       -DNVIM_VERSION_MEDIUM=%{version}
+       -DNVIM_VERSION_MEDIUM="{{{neovim_dev_version}}}"
 
 %cmake_build
 

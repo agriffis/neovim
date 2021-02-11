@@ -7,26 +7,53 @@ function get_cmake_var {
     [[ -n $v ]] && echo "$v" || die "can't get $1"
 }
 
+function neovim_dev_version {
+    declare v=$(cached neovim_dev_version)
+
+    if [[ -z $v ]]; then
+        declare major minor patch pre
+        major=$(get_cmake_var NVIM_VERSION_MAJOR) || exit
+        minor=$(get_cmake_var NVIM_VERSION_MINOR) || exit
+        patch=$(get_cmake_var NVIM_VERSION_PATCH) || exit
+        pre=$(get_cmake_var NVIM_VERSION_PRERELEASE) || exit
+
+        # git describe --first-parent origin/master
+        # v0.4.0-1080-g971e0ca90
+        declare master_describe master_tag master_commits master_hash
+        master_describe=$(git describe --first-parent origin/master)
+        read master_tag master_commits master_hash <<<"${master_describe//-/ }"
+        [[ $master_tag == v* && $master_commits -gt 0 && -n $master_hash ]] || die "failed git describe"
+
+        v="v$major.$minor.$patch${pre}+${master_commits}-${master_hash}"
+    fi
+
+    output "$v"
+}
+
 function git_version {
-    declare major minor patch pre
-    major=$(get_cmake_var NVIM_VERSION_MAJOR) || exit
-    minor=$(get_cmake_var NVIM_VERSION_MINOR) || exit
-    patch=$(get_cmake_var NVIM_VERSION_PATCH) || exit
-    pre=$(get_cmake_var NVIM_VERSION_PRERELEASE) || exit
+    declare v=$(cached git_version)
 
-    # git describe --first-parent origin/master
-    # v0.4.0-1080-g971e0ca90
-    declare master_describe master_tag master_commits master_hash
-    master_describe=$(git describe --first-parent origin/master)
-    read master_tag master_commits master_hash <<<"${master_describe//-/ }"
-    [[ $master_tag == v* && $master_commits -gt 0 && -n $master_hash ]] || die "failed git describe"
+    if [[ -z $v ]]; then
+        neovim_dev_version &> /dev/null  # preload cache w/o command subst
 
-    output "$major.$minor.$patch~${pre#-}.${master_commits}.${master_hash}"
+        v=$(neovim_dev_version) # v0.5.0-dev+1080-g971e0ca90
+        v=${v#v}                # 0.5.0-dev+1080-g971e0ca90
+        v=${v/-/\~}             # 0.5.0~dev+1080-g971e0ca90
+        v=${v//[+-]/.}          # 0.5.0~dev.1080.g971e0ca90
+    fi
+
+    output "$v"
 }
 
 function git_revision {
-    # count commits not on master
-    output "$(git log --oneline origin/master.. | wc -l)"
+    declare v=$(cached git_revision)
+
+    if [[ -z $v ]]; then
+        # count commits not on master
+        v=$(git log --oneline origin/master.. | wc -l)
+    fi
+
+    output "$v"
 }
 
 function git_changelog_date {
@@ -34,5 +61,5 @@ function git_changelog_date {
 }
 
 function git_changelog_version {
-    output "$(cached git_version)-$(cached git_revision)"
+    output "$(git_version)-$(git_revision)"
 }
