@@ -29,7 +29,7 @@ Source0:        {{{git_pack}}}
 Source1:        sysinit.vim
 Source2:        spec-template
 
-Patch1000:      neovim-0.1.7-bitop.patch
+Patch1000:      neovim-0.5.0-bitop.patch
 
 BuildRequires:  gcc-c++
 BuildRequires:  cmake
