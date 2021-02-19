@@ -11,34 +11,6 @@ index e3c67c55c..3b405ddc7 100644
  if(NOT LUA_PRG)
    foreach(CURRENT_LUA_PRG luajit lua5.1 lua5.2 lua)
      unset(_CHECK_LUA_PRG CACHE)
-diff --git a/neovim-0.1.7-bitop.patch b/neovim-0.1.7-bitop.patch
-index 26b8e2236..e69de29bb 100644
---- a/neovim-0.1.7-bitop.patch
-+++ b/neovim-0.1.7-bitop.patch
-@@ -1,23 +0,0 @@
--Index: neovim-0.2.1/CMakeLists.txt
--===================================================================
----- neovim-0.2.1.orig/CMakeLists.txt
--+++ neovim-0.2.1/CMakeLists.txt
--@@ -433,7 +433,7 @@ endforeach()
-- 
-- # Find Lua interpreter
-- include(LuaHelpers)
---set(LUA_DEPENDENCIES lpeg mpack bit)
--+set(LUA_DEPENDENCIES lpeg mpack bit32)
-- if(NOT LUA_PRG)
--   foreach(CURRENT_LUA_PRG luajit lua5.1 lua5.2 lua)
--     # If LUA_PRG is set find_program() will not search
--Index: neovim-0.2.1/src/nvim/ex_cmds.lua
--===================================================================
----- neovim-0.2.1.orig/src/nvim/ex_cmds.lua
--+++ neovim-0.2.1/src/nvim/ex_cmds.lua
--@@ -1,4 +1,4 @@
---local bit = require 'bit'
--+local bit = require 'bit32'
-- 
-- -- Description of the values below is contained in ex_cmds_defs.h file.
-- local RANGE      =    0x001
 diff --git a/src/nvim/ex_cmds.lua b/src/nvim/ex_cmds.lua
 index 2965ea749..ab405cdc3 100644
 --- a/src/nvim/ex_cmds.lua
