@@ -1,5 +1,5 @@
 %bcond_with jemalloc
-%ifarch %{arm} %{ix86} x86_64 %{mips}
+%ifarch %{arm64} %{ix86} x86_64 %{mips}
 %bcond_without luajit
 %else
 %bcond_with luajit
