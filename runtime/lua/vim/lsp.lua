@@ -42,6 +42,8 @@ lsp._request_name_to_capability = {
   ['textDocument/prepareCallHierarchy'] = 'call_hierarchy';
   ['textDocument/rename'] = 'rename';
   ['textDocument/codeAction'] = 'code_action';
+  ['textDocument/codeLens'] = 'code_lens';
+  ['codeLens/resolve'] = 'code_lens_resolve';
   ['workspace/executeCommand'] = 'execute_command';
   ['textDocument/references'] = 'find_references';
   ['textDocument/rangeFormatting'] = 'document_range_formatting';
@@ -228,6 +230,7 @@ local function validate_client_config(config)
     before_init     = { config.before_init, "f", true };
     offset_encoding = { config.offset_encoding, "s", true };
     flags           = { config.flags, "t", true };
+    get_language_id = { config.get_language_id, "f", true };
   }
 
   local cmd, cmd_args = lsp._cmd_parts(config.cmd)
@@ -275,12 +278,13 @@ local function text_document_did_open_handler(bufnr, client)
   if not vim.api.nvim_buf_is_loaded(bufnr) then
     return
   end
+  local filetype = nvim_buf_get_option(bufnr, 'filetype')
+
   local params = {
     textDocument = {
       version = 0;
       uri = vim.uri_from_bufnr(bufnr);
-      -- TODO make sure our filetypes are compatible with languageId names.
-      languageId = nvim_buf_get_option(bufnr, 'filetype');
+      languageId = client.config.get_language_id(bufnr, filetype);
       text = buf_get_full_text(bufnr);
     }
   }
@@ -407,6 +411,9 @@ end
 ---
 --@param name (string, default=client-id) Name in log messages.
 ---
+--@param get_language_id function(bufnr, filetype) -> language ID as string.
+--- Defaults to the filetype.
+---
 --@param offset_encoding (default="utf-16") One of "utf-8", "utf-16",
 --- or "utf-32" which is the encoding that the LSP server expects. Client does
 --- not verify this is correct.
@@ -465,6 +472,11 @@ function lsp.start_client(config)
 
   config.flags = config.flags or {}
   config.settings = config.settings or {}
+
+  -- By default, get_language_id just returns the exact filetype it is passed.
+  --    It is possible to pass in something that will calculate a different filetype,
+  --    to be sent by the client.
+  config.get_language_id = config.get_language_id or function(_, filetype) return filetype end
 
   local client_id = next_client_id()
 
@@ -835,7 +847,7 @@ do
     local incremental_changes = once(function(client)
       local lines = nvim_buf_get_lines(bufnr, 0, -1, true)
       local startline =  math.min(firstline + 1, math.min(#client._cached_buffers[bufnr], #lines))
-      local endline =  math.min(-(#lines - new_lastline), 0)
+      local endline =  math.min(-(#lines - new_lastline), -1)
       local incremental_change = vim.lsp.util.compute_diff(client._cached_buffers[bufnr], lines, startline, endline)
       client._cached_buffers[bufnr] = lines
       return incremental_change
