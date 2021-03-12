@@ -749,15 +749,6 @@ start_client({config})                                *vim.lsp.start_client()*
 
                 The following parameters describe fields in the {config}
                 table.
->
-
-    -- In init function for the client, you can do:
-    local custom_init = function(client)
-      if client.config.flags then
-        client.config.flags.allow_incremental_sync = true
-      end
-    end
-<
 
                 Parameters: ~
                     {root_dir}         (required, string) Directory where the
@@ -856,8 +847,8 @@ start_client({config})                                *vim.lsp.start_client()*
                     {flags}            A table with flags for the client. The
                                        current (experimental) flags are:
                                        • allow_incremental_sync (bool, default
-                                         false): Allow using on_line callbacks
-                                         for lsp
+                                         true): Allow using incremental sync
+                                         for buffer edits
 
                 Return: ~
                     Client id. |vim.lsp.get_client_by_id()| Note: client may
@@ -1471,8 +1462,8 @@ show_line_diagnostics({opts}, {bufnr}, {line_nr}, {client_id})
 ==============================================================================
 Lua module: vim.lsp.handlers                                    *lsp-handlers*
 
-                                        *vim.lsp.handlers.progress_callback()*
-progress_callback({_}, {_}, {params}, {client_id})
+                                         *vim.lsp.handlers.progress_handler()*
+progress_handler({_}, {_}, {params}, {client_id})
                 See also: ~
                     https://microsoft.github.io/language-server-protocol/specifications/specification-current/#workspace_executeCommand
 
@@ -1548,6 +1539,18 @@ close_preview_autocmd({events}, {winnr})
 
                 See also: ~
                     |autocmd-events|
+
+                                                 *vim.lsp.util.compute_diff()*
+compute_diff({old_lines}, {new_lines}, {start_line_idx}, {end_line_idx})
+                Returns the range table for the difference between old and new
+                lines
+
+                Parameters: ~
+                    {old_lines}  table list of lines
+                    {new_lines}  table list of lines
+
+                Return: ~
+                    table start_line_idx and start_col_idx of range
 
                               *vim.lsp.util.convert_input_to_markdown_lines()*
 convert_input_to_markdown_lines({input}, {contents})
