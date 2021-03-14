@@ -710,7 +710,7 @@ int win_fdccol_count(win_T *wp)
 }
 
 
-static void ui_ext_win_position(win_T *wp)
+void ui_ext_win_position(win_T *wp)
 {
   if (!wp->w_floating) {
     ui_call_win_pos(wp->w_grid.handle, wp->handle, wp->w_winrow,
@@ -5501,8 +5501,8 @@ void win_setminheight(void)
 
   // loop until there is a 'winminheight' that is possible
   while (p_wmh > 0) {
-    const int room = Rows - p_ch - tabline_height();
-    const int needed = frame_minheight(topframe, NULL);
+    const int room = Rows - p_ch;
+    const int needed = min_rows() - 1;  // 1 was added for the cmdline
     if (room >= needed) {
       break;
     }

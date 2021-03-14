@@ -230,6 +230,13 @@ func Test_set_completion()
   call feedkeys(":set tags=./\\\\ dif\<C-A>\<C-B>\"\<CR>", 'tx')
   call assert_equal('"set tags=./\\ diff diffexpr diffopt', @:)
   set tags&
+
+  " Expand values for 'filetype'
+  call feedkeys(":set filetype=sshdconfi\<Tab>\<C-B>\"\<CR>", 'xt')
+  call assert_equal('"set filetype=sshdconfig', @:)
+  call feedkeys(":set filetype=a\<C-A>\<C-B>\"\<CR>", 'xt')
+  " call assert_equal('"set filetype=' .. getcompletion('a*', 'filetype')->join(), @:)
+  call assert_equal('"set filetype=' .. join(getcompletion('a*', 'filetype')), @:)
 endfunc
 
 func Test_set_errors()
@@ -617,6 +624,28 @@ func Test_opt_winminheight_term()
     below sp | wincmd _
     below sp | wincmd _
     below sp
+  END
+  call writefile(lines, 'Xwinminheight')
+  let buf = RunVimInTerminal('-S Xwinminheight', #{rows: 11})
+  call term_sendkeys(buf, ":set wmh=1\n")
+  call WaitForAssert({-> assert_match('E36: Not enough room', term_getline(buf, 11))})
+
+  call StopVimInTerminal(buf)
+  call delete('Xwinminheight')
+endfunc
+
+func Test_opt_winminheight_term_tabs()
+  " See test/functional/legacy/options_spec.lua
+  CheckRunVimInTerminal
+
+  " The tabline should be taken into account.
+  let lines =<< trim END
+    set wmh=0 stal=2
+    split
+    split
+    split
+    split
+    tabnew
   END
   call writefile(lines, 'Xwinminheight')
   let buf = RunVimInTerminal('-S Xwinminheight', #{rows: 11})
