@@ -2084,6 +2084,8 @@ static int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow,
   colnr_T trailcol = MAXCOL;            // start of trailing spaces
   colnr_T leadcol = 0;                  // start of leading spaces
   bool need_showbreak = false;          // overlong line, skip first x chars
+  sign_attrs_T sattrs[SIGN_SHOW_MAX];   // attributes for signs
+  int num_signs;                        // number of signs for line
   int line_attr = 0;                    // attribute for the whole line
   int line_attr_lowprio = 0;            // low-priority attribute for the line
   matchitem_T *cur;                     // points to the match list
@@ -2375,11 +2377,14 @@ static int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow,
     wp->w_last_cursorline = wp->w_cursor.lnum;
   }
 
+  memset(sattrs, 0, sizeof(sattrs));
+  num_signs = buf_get_signattrs(wp->w_buffer, lnum, sattrs);
+
   // If this line has a sign with line highlighting set line_attr.
   // TODO(bfredl, vigoux): this should not take priority over decoration!
-  v = buf_getsigntype(wp->w_buffer, lnum, SIGN_LINEHL, 0, 1);
-  if (v != 0) {
-    line_attr = sign_get_attr((int)v, SIGN_LINEHL);
+  sign_attrs_T * sattr = sign_get_attr(SIGN_LINEHL, sattrs, 0, 1);
+  if (sattr != NULL) {
+    line_attr = sattr->linehl;
   }
 
   // Highlight the current line in the quickfix window.
@@ -2696,7 +2701,7 @@ static int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow,
           int count = win_signcol_count(wp);
           if (count > 0) {
               get_sign_display_info(
-                  false, wp, lnum, row,
+                  false, wp, sattrs, row,
                   startrow, filler_lines, filler_todo, count,
                   &c_extra, &c_final, extra, sizeof(extra),
                   &p_extra, &n_extra,
@@ -2715,10 +2720,10 @@ static int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow,
           // in 'lnum', then display the sign instead of the line
           // number.
           if (*wp->w_p_scl == 'n' && *(wp->w_p_scl + 1) == 'u'
-              && buf_findsign_id(wp->w_buffer, lnum, (char_u *)"*") != 0) {
+              && num_signs > 0) {
             int count = win_signcol_count(wp);
             get_sign_display_info(
-                true, wp, lnum, row,
+                true, wp, sattrs, row,
                 startrow, filler_lines, filler_todo, count,
                 &c_extra, &c_final, extra, sizeof(extra),
                 &p_extra, &n_extra,
@@ -2768,11 +2773,10 @@ static int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow,
             n_extra = number_width(wp) + 1;
             char_attr = win_hl_attr(wp, HLF_N);
 
-            int num_sign = buf_getsigntype(
-                wp->w_buffer, lnum, SIGN_NUMHL, 0, 1);
-            if (num_sign != 0) {
+            sign_attrs_T *num_sattr = sign_get_attr(SIGN_NUMHL, sattrs, 0, 1);
+            if (num_sattr != NULL) {
               // :sign defined with "numhl" highlight.
-              char_attr = sign_get_attr(num_sign, SIGN_NUMHL);
+              char_attr = num_sattr->numhl;
             } else if ((wp->w_p_cul || wp->w_p_rnu)
                        && lnum == wp->w_cursor.lnum
                        && filler_todo == 0) {
@@ -4451,7 +4455,7 @@ void screen_adjust_grid(ScreenGrid **grid, int *row_off, int *col_off)
 static void get_sign_display_info(
     bool nrcol,
     win_T *wp,
-    linenr_T lnum,
+    sign_attrs_T sattrs[],
     int row,
     int startrow,
     int filler_lines,
@@ -4468,8 +4472,6 @@ static void get_sign_display_info(
     int *sign_idxp
 )
 {
-  int text_sign;
-
   // Draw cells with the sign value or blank.
   *c_extrap = ' ';
   *c_finalp = NUL;
@@ -4481,10 +4483,9 @@ static void get_sign_display_info(
   }
 
   if (row == startrow + filler_lines && filler_todo <= 0) {
-    text_sign = buf_getsigntype(wp->w_buffer, lnum, SIGN_TEXT,
-                                *sign_idxp, count);
-    if (text_sign != 0) {
-      *pp_extra = sign_get_text(text_sign);
+    sign_attrs_T *sattr = sign_get_attr(SIGN_TEXT, sattrs, *sign_idxp, count);
+    if (sattr != NULL) {
+      *pp_extra = sattr->text;
       if (*pp_extra != NULL) {
         *c_extrap = NUL;
         *c_finalp = NUL;
@@ -4517,7 +4518,7 @@ static void get_sign_display_info(
           (*pp_extra)[*n_extrap] = NUL;
         }
       }
-      *char_attrp = sign_get_attr(text_sign, SIGN_TEXT);
+      *char_attrp = sattr->texthl;
     }
   }
 
@@ -5453,32 +5454,50 @@ static void win_redr_border(win_T *wp)
   schar_T *chars = wp->w_float_config.border_chars;
   int *attrs = wp->w_float_config.border_attr;
 
-  int endrow = grid->Rows-1, endcol = grid->Columns-1;
 
-  grid_puts_line_start(grid, 0);
-  grid_put_schar(grid, 0, 0, chars[0], attrs[0]);
-  for (int i = 1; i < endcol; i++) {
-    grid_put_schar(grid, 0, i, chars[1], attrs[1]);
-  }
-  grid_put_schar(grid, 0, endcol, chars[2], attrs[2]);
-  grid_puts_line_flush(false);
+  int *adj = wp->w_border_adj;
+  int irow = wp->w_height_inner, icol = wp->w_width_inner;
 
-  for (int i = 1; i < endrow; i++) {
-    grid_puts_line_start(grid, i);
-    grid_put_schar(grid, i, 0, chars[7], attrs[7]);
+  if (adj[0]) {
+    grid_puts_line_start(grid, 0);
+    if (adj[3]) {
+      grid_put_schar(grid, 0, 0, chars[0], attrs[0]);
+    }
+    for (int i = 0; i < icol; i++) {
+      grid_put_schar(grid, 0, i+adj[3], chars[1], attrs[1]);
+    }
+    if (adj[1]) {
+      grid_put_schar(grid, 0, icol+adj[3], chars[2], attrs[2]);
+    }
     grid_puts_line_flush(false);
-    grid_puts_line_start(grid, i);
-    grid_put_schar(grid, i, endcol, chars[3], attrs[3]);
-    grid_puts_line_flush(false);
   }
 
-  grid_puts_line_start(grid, endrow);
-  grid_put_schar(grid, endrow, 0, chars[6], attrs[6]);
-  for (int i = 1; i < endcol; i++) {
-    grid_put_schar(grid, endrow, i, chars[5], attrs[5]);
+  for (int i = 0; i < irow; i++) {
+    if (adj[3]) {
+      grid_puts_line_start(grid, i+adj[0]);
+      grid_put_schar(grid, i+adj[0], 0, chars[7], attrs[7]);
+      grid_puts_line_flush(false);
+    }
+    if (adj[1]) {
+      int ic = (i == 0 && !adj[0] && chars[2][0]) ? 2 : 3;
+      grid_puts_line_start(grid, i+adj[0]);
+      grid_put_schar(grid, i+adj[0], icol+adj[3], chars[ic], attrs[ic]);
+      grid_puts_line_flush(false);
+    }
   }
-  grid_put_schar(grid, endrow, endcol, chars[4], attrs[4]);
-  grid_puts_line_flush(false);
+
+  if (adj[2]) {
+    grid_puts_line_start(grid, irow+adj[0]);
+    if (adj[3]) {
+      grid_put_schar(grid, irow+adj[0], 0, chars[6], attrs[6]);
+    }
+    for (int i = 0; i < icol; i++) {
+      int ic = (i == 0 && !adj[3] && chars[6][0]) ? 6 : 5;
+      grid_put_schar(grid, irow+adj[0], i+adj[3], chars[ic], attrs[ic]);
+    }
+    grid_put_schar(grid, irow+adj[0], icol+adj[3], chars[4], attrs[4]);
+    grid_puts_line_flush(false);
+  }
 }
 
 // Low-level functions to manipulate invidual character cells on the
@@ -6246,7 +6265,7 @@ void win_grid_alloc(win_T *wp)
     grid_alloc(grid_allocated, total_rows, total_cols,
                wp->w_grid_alloc.valid, false);
     grid_allocated->valid = true;
-    if (wp->w_border_adj) {
+    if (wp->w_floating && wp->w_float_config.border) {
       wp->w_redr_border = true;
     }
     was_resized = true;
@@ -6266,8 +6285,8 @@ void win_grid_alloc(win_T *wp)
 
   if (want_allocation) {
     grid->target = grid_allocated;
-    grid->row_offset = wp->w_border_adj;
-    grid->col_offset = wp->w_border_adj;
+    grid->row_offset = wp->w_border_adj[0];
+    grid->col_offset = wp->w_border_adj[3];
   } else {
     grid->target = &default_grid;
     grid->row_offset = wp->w_winrow;
