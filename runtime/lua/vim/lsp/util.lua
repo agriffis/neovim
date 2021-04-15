@@ -470,6 +470,7 @@ function M.apply_text_document_edit(text_document_edit, index)
   -- `VersionedTextDocumentIdentifier`s version may be null
   --  https://microsoft.github.io/language-server-protocol/specification#versionedTextDocumentIdentifier
   if should_check_version and (text_document.version
+      and text_document.version > 0
       and M.buf_versions[bufnr]
       and M.buf_versions[bufnr] > text_document.version) then
     print("Buffer ", text_document.uri, " newer than edits.")
@@ -1220,7 +1221,7 @@ function M._make_floating_popup_size(contents, opts)
     width = width - (width + border_width - screen_width)
   end
 
-  if wrap_at > width then
+  if wrap_at and wrap_at > width then
     wrap_at = width
   end
 
