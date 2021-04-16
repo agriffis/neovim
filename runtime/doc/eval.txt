@@ -5361,9 +5361,8 @@ input({opts})
 		prompt        ""       Same as {prompt} in the first form.
 		default       ""       Same as {text} in the first form.
 		completion    nothing  Same as {completion} in the first form.
-		cancelreturn  ""       Same as {cancelreturn} from
-		                       |inputdialog()|. Also works with
-		                       input().
+		cancelreturn  ""       The value returned when the dialog is
+		                       cancelled.
 		highlight     nothing  Highlight handler: |Funcref|.
 
 		The highlighting set with |:echohl| is used for the prompt.
@@ -10099,6 +10098,8 @@ This function can then be called with: >
 The recursiveness of user functions is restricted with the |'maxfuncdepth'|
 option.
 
+It is also possible to use `:eval`.  It does not support a range.
+
 
 AUTOMATICALLY LOADING FUNCTIONS ~
 							*autoload-functions*
@@ -10531,6 +10532,20 @@ text...
 :unlo[ckvar][!] [depth] {name} ...			*:unlockvar* *:unlo*
 			Unlock the internal variable {name}.  Does the
 			opposite of |:lockvar|.
+
+                                                       *:eval*
+:eval {expr}           Evaluate {expr} and discard the result.  Example: >
+                               :eval append(Filter(Getlist()), '$')
+
+<                      The expression is supposed to have a side effect,
+                       since the resulting value is not used.  In the example
+                       the `append()` call appends the List with text to the
+                       buffer.  This is similar to `:call` but works with any
+                       expression.
+
+                       The command can be shortened to `:ev` or `:eva`, but
+                       these are hard to recognize and therefore not to be
+                       used.
 
 
 :if {expr1}			*:if* *:end* *:endif* *:en* *E171* *E579* *E580*
