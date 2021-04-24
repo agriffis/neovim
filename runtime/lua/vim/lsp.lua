@@ -916,7 +916,7 @@ function lsp.start_client(config)
 
   -- Track this so that we can escalate automatically if we've alredy tried a
   -- graceful shutdown
-  local tried_graceful_shutdown = false
+  local graceful_shutdown_failed = false
   --@private
   --- Stops a client, optionally with force.
   ---
@@ -938,11 +938,10 @@ function lsp.start_client(config)
     if handle:is_closing() then
       return
     end
-    if force or (not client.initialized) or tried_graceful_shutdown then
+    if force or (not client.initialized) or graceful_shutdown_failed then
       handle:kill(15)
       return
     end
-    tried_graceful_shutdown = true
     -- Sending a signal after a process has exited is acceptable.
     rpc.request('shutdown', nil, function(err, _)
       if err == nil then
@@ -950,6 +949,7 @@ function lsp.start_client(config)
       else
         -- If there was an error in the shutdown request, then term to be safe.
         handle:kill(15)
+        graceful_shutdown_failed = true
       end
     end)
   end
@@ -1179,38 +1179,11 @@ function lsp._vim_exit_handler()
     client.stop()
   end
 
-  local function wait_async(timeout, ms, predicate, cb)
-    local timer = uv.new_timer()
-    local time = 0
-
-    local function done(in_time)
-      timer:stop()
-      timer:close()
-      cb(in_time)
+  if not vim.wait(500, function() return tbl_isempty(active_clients) end, 50) then
+    for _, client in pairs(active_clients) do
+      client.stop(true)
     end
-
-    timer:start(0, ms, function()
-      if predicate() == true then
-        done(true)
-        return
-      end
-
-      if time == timeout then
-        done(false)
-        return
-      end
-
-      time = time + ms
-    end)
   end
-
-  wait_async(500, 50, function() return tbl_isempty(active_clients) end, function(in_time)
-    if not in_time then
-      for _, client in pairs(active_clients) do
-        client.stop(true)
-      end
-    end
-  end)
 end
 
 nvim_command("autocmd VimLeavePre * lua vim.lsp._vim_exit_handler()")
