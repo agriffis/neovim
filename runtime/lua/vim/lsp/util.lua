@@ -40,9 +40,12 @@ local function get_border_size(opts)
   local width = 0
 
   if type(border) == 'string' then
-    -- 'single', 'double', etc.
-    height = 2
-    width = 2
+    local border_size = {none = {0, 0}, single = {2, 2}, double = {2, 2}, shadow = {1, 1}}
+    if border_size[border] == nil then
+      error("floating preview border is not correct. Please refer to the docs |vim.api.nvim_open_win()|"
+              .. vim.inspect(border))
+    end
+    height, width = unpack(border_size[border])
   else
     local function border_width(id)
       if type(border[id]) == "table" then
@@ -1595,12 +1598,13 @@ function M.locations_to_items(locations)
   return items
 end
 
---- Fills current window's location list with given list of items.
+--- Fills target window's location list with given list of items.
 --- Can be obtained with e.g. |vim.lsp.util.locations_to_items()|.
+--- Defaults to current window.
 ---
 --@param items (table) list of items
-function M.set_loclist(items)
-  vim.fn.setloclist(0, {}, ' ', {
+function M.set_loclist(items, win_id)
+  vim.fn.setloclist(win_id or 0, {}, ' ', {
     title = 'Language Server';
     items = items;
   })
