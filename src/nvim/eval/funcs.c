@@ -3095,7 +3095,7 @@ static void getchar_common(typval_T *argvars, typval_T *rettv)
     } else {
       i += utf_char2bytes(n, temp + i);
     }
-    assert(i < 10);
+    // assert(i < 10);
     temp[i++] = NUL;
     rettv->v_type = VAR_STRING;
     rettv->vval.v_string = vim_strsave(temp);
@@ -3137,20 +3137,20 @@ static void f_getchar(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 static void f_getcharstr(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
   getchar_common(argvars, rettv);
-
-  if (rettv->v_type == VAR_NUMBER) {
-    char_u temp[7];   // mbyte-char: 6, NUL: 1
-    const varnumber_T n = rettv->vval.v_number;
-    int i = 0;
-
-    if (n != 0) {
-      i += utf_char2bytes(n, temp);
-    }
-    assert(i < 7);
-    temp[i++] = NUL;
-    rettv->v_type = VAR_STRING;
-    rettv->vval.v_string = vim_strsave(temp);
-  }
+  // 
+  // if (rettv->v_type == VAR_NUMBER) {
+  //   char_u temp[7];   // mbyte-char: 6, NUL: 1
+  //   const varnumber_T n = rettv->vval.v_number;
+  //   int i = 0;
+  // 
+  //   if (n != 0) {
+  //     i += utf_char2bytes(n, temp);
+  //   }
+  //   assert(i < 7);
+  //   temp[i++] = NUL;
+  //   rettv->v_type = VAR_STRING;
+  //   rettv->vval.v_string = vim_strsave(temp);
+  // }
 }
 
 /*
