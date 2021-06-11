@@ -6,19 +6,21 @@
 #include <stdlib.h>
 #include <limits.h>
 
-#include "nvim/ascii.h"
-#include "nvim/globals.h"
-#include "nvim/api/window.h"
 #include "nvim/api/private/defs.h"
 #include "nvim/api/private/helpers.h"
+#include "nvim/lua/executor.h"
 #include "nvim/ex_docmd.h"
 #include "nvim/vim.h"
+#include "nvim/api/window.h"
+#include "nvim/ascii.h"
 #include "nvim/buffer.h"
 #include "nvim/cursor.h"
-#include "nvim/option.h"
-#include "nvim/window.h"
-#include "nvim/screen.h"
+#include "nvim/globals.h"
 #include "nvim/move.h"
+#include "nvim/option.h"
+#include "nvim/screen.h"
+#include "nvim/syntax.h"
+#include "nvim/window.h"
 
 /// Gets the current buffer in a window
 ///
@@ -455,6 +457,26 @@ Dictionary nvim_win_get_config(Window window, Error *err)
       PUT(rv, "row", FLOAT_OBJ(config->row));
       PUT(rv, "col", FLOAT_OBJ(config->col));
     }
+    if (config->border) {
+      Array border = ARRAY_DICT_INIT;
+      for (size_t i = 0; i < 8; i++) {
+        Array tuple = ARRAY_DICT_INIT;
+
+        String s = cstrn_to_string(
+            (const char *)config->border_chars[i], sizeof(schar_T));
+
+        int hi_id = config->border_hl_ids[i];
+        char_u *hi_name = syn_id2name(hi_id);
+        if (hi_name[0]) {
+          ADD(tuple, STRING_OBJ(s));
+          ADD(tuple, STRING_OBJ(cstr_to_string((const char *)hi_name)));
+          ADD(border, ARRAY_OBJ(tuple));
+        } else {
+          ADD(border, STRING_OBJ(s));
+        }
+      }
+      PUT(rv, "border", ARRAY_OBJ(border));
+    }
   }
 
   const char *rel = (wp->w_floating && !config->external
@@ -523,4 +545,40 @@ void nvim_win_close(Window window, Boolean force, Error *err)
   try_enter(&tstate);
   ex_win_close(force, win, tabpage == curtab ? NULL : tabpage);
   vim_ignored = try_leave(&tstate, err);
+}
+
+/// Calls a function with window as temporary current window.
+///
+/// @see |win_execute()|
+/// @see |nvim_buf_call()|
+///
+/// @param window     Window handle, or 0 for current window
+/// @param fun        Function to call inside the window (currently lua callable
+///                   only)
+/// @param[out] err   Error details, if any
+/// @return           Return value of function. NB: will deepcopy lua values
+///                   currently, use upvalues to send lua references in and out.
+Object nvim_win_call(Window window, LuaRef fun, Error *err)
+  FUNC_API_SINCE(7)
+  FUNC_API_LUA_ONLY
+{
+  win_T *win = find_window_by_handle(window, err);
+  if (!win) {
+    return NIL;
+  }
+  tabpage_T *tabpage = win_find_tabpage(win);
+
+  win_T *save_curwin;
+  tabpage_T *save_curtab;
+
+  try_start();
+  Object res = OBJECT_INIT;
+  if (switch_win_noblock(&save_curwin, &save_curtab, win, tabpage, true) ==
+      OK) {
+    Array args = ARRAY_DICT_INIT;
+    res = nlua_call_ref(fun, NULL, args, true, err);
+  }
+  restore_win_noblock(save_curwin, save_curtab, true);
+  try_end(err);
+  return res;
 }
