@@ -271,12 +271,12 @@ local function set_diagnostic_cache(diagnostics, bufnr, client_id)
     end
     -- Account for servers that place diagnostics on terminating newline
     if buf_line_count > 0 then
-      diagnostic.range.start.line = math.min(
+      diagnostic.range.start.line = math.max(math.min(
         diagnostic.range.start.line, buf_line_count - 1
-      )
-      diagnostic.range["end"].line = math.min(
+      ), 0)
+      diagnostic.range["end"].line = math.max(math.min(
         diagnostic.range["end"].line, buf_line_count - 1
-      )
+      ), 0)
     end
   end
 
@@ -321,9 +321,9 @@ function M.save(diagnostics, bufnr, client_id)
 
     -- Clean up our data when the buffer unloads.
     api.nvim_buf_attach(bufnr, false, {
-      on_detach = function(b)
+      on_detach = function(_, b)
         clear_diagnostic_cache(b, client_id)
-        _diagnostic_cleanup[bufnr][client_id] = nil
+        _diagnostic_cleanup[b][client_id] = nil
       end
     })
   end
