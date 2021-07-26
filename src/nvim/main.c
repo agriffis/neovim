@@ -318,7 +318,8 @@ int main(int argc, char **argv)
   debug_break_level = params.use_debug_break_level;
 
   // Read ex-commands if invoked with "-es".
-  if (!params.input_isatty && silent_mode && exmode_active == EXMODE_NORMAL) {
+  if (!params.input_isatty && !params.input_neverscript
+      && silent_mode && exmode_active) {
     input_start(STDIN_FILENO);
   }
 
@@ -366,19 +367,16 @@ int main(int argc, char **argv)
   // Execute --cmd arguments.
   exe_pre_commands(&params);
 
-  // If using the runtime (-u is not NONE), enable syntax & filetype plugins.
-  bool enable_syntax =
-    (params.use_vimrc == NULL || !strequal(params.use_vimrc, "NONE"));
-
-  // Source syncolor.vim to set up default UI highlights
-  if (enable_syntax) {
-    source_runtime((char_u *)"syntax/syncolor.vim", DIP_ALL);
-  }
-
   // Source startup scripts.
   source_startup_scripts(&params);
 
-  if (enable_syntax) {
+  // If using the runtime (-u is not NONE), enable syntax & filetype plugins.
+  if (params.use_vimrc == NULL || !strequal(params.use_vimrc, "NONE")) {
+    // Source syncolor.vim to set up default UI highlights if the user didn't
+    // already enable a colorscheme
+    if (!get_var_value("g:colors_name")) {
+      source_runtime((char_u *)"syntax/syncolor.vim", DIP_ALL);
+    }
     // Does ":filetype plugin indent on".
     filetype_maybe_enable();
     // Sources syntax/syntax.vim, which calls `:filetype on`.
@@ -772,7 +770,7 @@ static bool edit_stdin(bool explicit, mparm_T *parmp)
 {
   bool implicit = !headless_mode
     && !embedded_mode
-    && exmode_active != EXMODE_NORMAL  // -E/-Es but not -e/-es.
+    && (!exmode_active || parmp->input_neverscript)
     && !parmp->input_isatty
     && scriptin[0] == NULL;  // `-s -` was not given.
   return explicit || implicit;
@@ -915,11 +913,12 @@ static void command_line_scan(mparm_T *parmp)
           break;
         }
         case 'e': {  // "-e" Ex mode
-          exmode_active = EXMODE_NORMAL;
+          exmode_active = true;
           break;
         }
         case 'E': {  // "-E" Ex mode
-          exmode_active = EXMODE_VIM;
+          exmode_active = true;
+          parmp->input_neverscript = true;
           break;
         }
         case 'f': {  // "-f"  GUI: run in foreground.
