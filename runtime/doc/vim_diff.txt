@@ -56,12 +56,13 @@ the differences.
 - 'sidescroll' defaults to 1
 - 'smarttab' is enabled
 - 'startofline' is disabled
+- 'switchbuf' defaults to "uselast"
 - 'tabpagemax' defaults to 50
 - 'tags' defaults to "./tags;,tags"
 - 'ttimeoutlen' defaults to 50
 - 'ttyfast' is always set
-- 'viewoptions' includes "unix,slash"
 - 'undodir' defaults to ~/.local/share/nvim/undo (|xdg|), auto-created
+- 'viewoptions' includes "unix,slash", excludes "options"
 - 'viminfo' includes "!"
 - 'wildmenu' is enabled
 - 'wildoptions' defaults to "pum,tagfile"
@@ -74,7 +75,11 @@ the differences.
 
 
 Default Mappings:					*default-mappings*
-  nnoremap Y y$
+
+nnoremap Y y$
+nnoremap <C-L> <Cmd>nohlsearch<Bar>diffupdate<CR><C-L>
+inoremap <C-U> <C-G>u<C-U>
+inoremap <C-W> <C-G>u<C-W>
 
 ==============================================================================
 3. New Features						       *nvim-features*

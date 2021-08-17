@@ -42,7 +42,12 @@ module.nvim_set = (
 module.nvim_argv = {
   module.nvim_prog, '-u', 'NONE', '-i', 'NONE',
   '--cmd', module.nvim_set,
-  '--cmd', 'unmap Y', '--embed'}
+  '--cmd', 'unmap Y',
+  '--cmd', 'unmap <C-L>',
+  '--cmd', 'iunmap <C-U>',
+  '--cmd', 'iunmap <C-W>',
+  '--embed'}
+
 -- Directory containing nvim.
 module.nvim_dir = module.nvim_prog:gsub("[/\\][^/\\]+$", "")
 if module.nvim_dir == module.nvim_prog then

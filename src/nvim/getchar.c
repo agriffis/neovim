@@ -841,6 +841,14 @@ static void init_typebuf(void)
   }
 }
 
+void init_default_mappings(void)
+{
+  add_map((char_u *)"Y y$", NORMAL, true);
+  add_map((char_u *)"<C-L> <Cmd>nohlsearch<Bar>diffupdate<CR><C-L>", NORMAL, true);
+  add_map((char_u *)"<C-U> <C-G>u<C-U>", INSERT, true);
+  add_map((char_u *)"<C-W> <C-G>u<C-W>", INSERT, true);
+}
+
 // Insert a string in position 'offset' in the typeahead buffer (for "@r"
 // and ":normal" command, vgetorpeek() and check_termcode())
 //
@@ -4357,18 +4365,23 @@ check_map (
 }
 
 
-/*
- * Add a mapping "map" for mode "mode".
- * Need to put string in allocated memory, because do_map() will modify it.
- */
-void add_map(char_u *map, int mode)
+/// Add a mapping. Unlike @ref do_map this copies the {map} argument, so
+/// static or read-only strings can be used.
+///
+/// @param map  C-string containing the arguments of the map/abbrev command,
+///             i.e. everything except the initial `:[X][nore]map`.
+/// @param mode  Bitflags representing the mode in which to set the mapping.
+///              See @ref get_map_mode.
+/// @param nore  If true, make a non-recursive mapping.
+void add_map(char_u *map, int mode, bool nore)
 {
   char_u      *s;
   char_u      *cpo_save = p_cpo;
 
   p_cpo = (char_u *)"";         // Allow <> notation
+  // Need to put string in allocated memory, because do_map() will modify it.
   s = vim_strsave(map);
-  (void)do_map(0, s, mode, FALSE);
+  (void)do_map(nore ? 2 : 0, s, mode, false);
   xfree(s);
   p_cpo = cpo_save;
 }
