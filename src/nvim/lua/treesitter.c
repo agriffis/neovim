@@ -18,7 +18,7 @@
 #include "tree_sitter/api.h"
 
 #include "nvim/lua/treesitter.h"
-#include "nvim/api/private/handle.h"
+#include "nvim/api/private/helpers.h"
 #include "nvim/memline.h"
 #include "nvim/buffer.h"
 
@@ -80,6 +80,10 @@ static struct luaL_Reg node_meta[] = {
   { "parent", node_parent },
   { "iter_children", node_iter_children },
   { "_rawquery", node_rawquery },
+  { "next_sibling", node_next_sibling },
+  { "prev_sibling", node_prev_sibling },
+  { "next_named_sibling", node_next_named_sibling },
+  { "prev_named_sibling", node_prev_named_sibling },
   { NULL, NULL }
 };
 
@@ -101,7 +105,7 @@ static struct luaL_Reg treecursor_meta[] = {
   { NULL, NULL }
 };
 
-static PMap(cstr_t) *langs;
+static PMap(cstr_t) langs = MAP_INIT;
 
 static void build_meta(lua_State *L, const char *tname, const luaL_Reg *meta)
 {
@@ -119,8 +123,6 @@ static void build_meta(lua_State *L, const char *tname, const luaL_Reg *meta)
 /// all global state is stored in the regirstry of the lua_State
 void tslua_init(lua_State *L)
 {
-  langs = pmap_new(cstr_t)();
-
   // type metatables
   build_meta(L, TS_META_PARSER, parser_meta);
   build_meta(L, TS_META_TREE, tree_meta);
@@ -133,7 +135,7 @@ void tslua_init(lua_State *L)
 int tslua_has_language(lua_State *L)
 {
   const char *lang_name = luaL_checkstring(L, 1);
-  lua_pushboolean(L, pmap_has(cstr_t)(langs, lang_name));
+  lua_pushboolean(L, pmap_has(cstr_t)(&langs, lang_name));
   return 1;
 }
 
@@ -142,7 +144,7 @@ int tslua_add_language(lua_State *L)
   const char *path = luaL_checkstring(L, 1);
   const char *lang_name = luaL_checkstring(L, 2);
 
-  if (pmap_has(cstr_t)(langs, lang_name)) {
+  if (pmap_has(cstr_t)(&langs, lang_name)) {
     return 0;
   }
 
@@ -185,7 +187,7 @@ int tslua_add_language(lua_State *L)
         TREE_SITTER_LANGUAGE_VERSION, lang_version);
   }
 
-  pmap_put(cstr_t)(langs, xstrdup(lang_name), lang);
+  pmap_put(cstr_t)(&langs, xstrdup(lang_name), lang);
 
   lua_pushboolean(L, true);
   return 1;
@@ -195,7 +197,7 @@ int tslua_inspect_lang(lua_State *L)
 {
   const char *lang_name = luaL_checkstring(L, 1);
 
-  TSLanguage *lang = pmap_get(cstr_t)(langs, lang_name);
+  TSLanguage *lang = pmap_get(cstr_t)(&langs, lang_name);
   if (!lang) {
     return luaL_error(L, "no such language: %s", lang_name);
   }
@@ -243,7 +245,7 @@ int tslua_push_parser(lua_State *L)
   // Gather language name
   const char *lang_name = luaL_checkstring(L, 1);
 
-  TSLanguage *lang = pmap_get(cstr_t)(langs, lang_name);
+  TSLanguage *lang = pmap_get(cstr_t)(&langs, lang_name);
   if (!lang) {
     return luaL_error(L, "no such language: %s", lang_name);
   }
@@ -992,6 +994,50 @@ static int node_parent(lua_State *L)
   return 1;
 }
 
+static int node_next_sibling(lua_State *L)
+{
+  TSNode node;
+  if (!node_check(L, 1, &node)) {
+    return 0;
+  }
+  TSNode sibling = ts_node_next_sibling(node);
+  push_node(L, sibling, 1);
+  return 1;
+}
+
+static int node_prev_sibling(lua_State *L)
+{
+  TSNode node;
+  if (!node_check(L, 1, &node)) {
+    return 0;
+  }
+  TSNode sibling = ts_node_prev_sibling(node);
+  push_node(L, sibling, 1);
+  return 1;
+}
+
+static int node_next_named_sibling(lua_State *L)
+{
+  TSNode node;
+  if (!node_check(L, 1, &node)) {
+    return 0;
+  }
+  TSNode sibling = ts_node_next_named_sibling(node);
+  push_node(L, sibling, 1);
+  return 1;
+}
+
+static int node_prev_named_sibling(lua_State *L)
+{
+  TSNode node;
+  if (!node_check(L, 1, &node)) {
+    return 0;
+  }
+  TSNode sibling = ts_node_prev_named_sibling(node);
+  push_node(L, sibling, 1);
+  return 1;
+}
+
 /// assumes the match table being on top of the stack
 static void set_match(lua_State *L, TSQueryMatch *match, int nodeidx)
 {
@@ -1127,7 +1173,7 @@ int tslua_parse_query(lua_State *L)
   }
 
   const char *lang_name = lua_tostring(L, 1);
-  TSLanguage *lang = pmap_get(cstr_t)(langs, lang_name);
+  TSLanguage *lang = pmap_get(cstr_t)(&langs, lang_name);
   if (!lang) {
     return luaL_error(L, "no such language: %s", lang_name);
   }
