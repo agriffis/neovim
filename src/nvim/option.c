@@ -260,15 +260,13 @@ typedef struct vimoption {
 #define P_MLE          0x80000000U  ///< under control of 'modelineexpr'
 
 #define HIGHLIGHT_INIT \
-  "8:SpecialKey,~:EndOfBuffer,z:TermCursor,Z:TermCursorNC,@:NonText," \
-  "d:Directory,e:ErrorMsg,i:IncSearch,l:Search,m:MoreMsg,M:ModeMsg,n:LineNr," \
-  "N:CursorLineNr,r:Question,s:StatusLine,S:StatusLineNC,c:VertSplit,t:Title," \
-  "v:Visual,V:VisualNOS,w:WarningMsg,W:WildMenu,f:Folded,F:FoldColumn," \
-  "A:DiffAdd,C:DiffChange,D:DiffDelete,T:DiffText,>:SignColumn,-:Conceal," \
-  "B:SpellBad,P:SpellCap,R:SpellRare,L:SpellLocal,+:Pmenu,=:PmenuSel," \
-  "x:PmenuSbar,X:PmenuThumb,*:TabLine,#:TabLineSel,_:TabLineFill," \
-  "!:CursorColumn,.:CursorLine,o:ColorColumn,q:QuickFixLine," \
-  "0:Whitespace,I:NormalNC"
+  "8:SpecialKey,~:EndOfBuffer,z:TermCursor,Z:TermCursorNC,@:NonText,d:Directory,e:ErrorMsg," \
+  "i:IncSearch,l:Search,m:MoreMsg,M:ModeMsg,n:LineNr,a:LineNrAbove,b:LineNrBelow,N:CursorLineNr," \
+  "r:Question,s:StatusLine,S:StatusLineNC,c:VertSplit,t:Title,v:Visual,V:VisualNOS,w:WarningMsg," \
+  "W:WildMenu,f:Folded,F:FoldColumn,A:DiffAdd,C:DiffChange,D:DiffDelete,T:DiffText,>:SignColumn," \
+  "-:Conceal,B:SpellBad,P:SpellCap,R:SpellRare,L:SpellLocal,+:Pmenu,=:PmenuSel,x:PmenuSbar," \
+  "X:PmenuThumb,*:TabLine,#:TabLineSel,_:TabLineFill,!:CursorColumn,.:CursorLine,o:ColorColumn," \
+  "q:QuickFixLine,0:Whitespace,I:NormalNC"
 
 /*
  * options[] is initialized here.
@@ -485,17 +483,17 @@ void set_init_1(bool clean_arg)
 #endif
                      false);
 
-  char *backupdir = stdpaths_user_data_subpath("backup", 0, true);
+  char *backupdir = stdpaths_user_data_subpath("backup", 2, true);
   const size_t backupdir_len = strlen(backupdir);
   backupdir = xrealloc(backupdir, backupdir_len + 3);
   memmove(backupdir + 2, backupdir, backupdir_len + 1);
   memmove(backupdir, ".,", 2);
-  set_string_default("viewdir", stdpaths_user_data_subpath("view", 0, true),
-                     true);
   set_string_default("backupdir", backupdir, true);
+  set_string_default("viewdir", stdpaths_user_data_subpath("view", 2, true),
+                     true);
   set_string_default("directory", stdpaths_user_data_subpath("swap", 2, true),
                      true);
-  set_string_default("undodir", stdpaths_user_data_subpath("undo", 0, true),
+  set_string_default("undodir", stdpaths_user_data_subpath("undo", 2, true),
                      true);
   // Set default for &runtimepath. All necessary expansions are performed in
   // this function.
