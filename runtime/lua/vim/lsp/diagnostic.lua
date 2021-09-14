@@ -449,7 +449,7 @@ end
 ---   endif
 ---   return sl
 --- endfunction
---- let &l:statusline = '%#MyStatuslineLSP#LSP '.LspStatus()
+--- autocmd BufWinEnter * let &l:statusline = '%#MyStatuslineLSP#LSP '.LspStatus()
 --- </pre>
 ---
 ---@param bufnr number The buffer number
@@ -1020,15 +1020,16 @@ end
 ---         - Update diagnostics in InsertMode or wait until InsertLeave
 ---     - severity_sort:    (default=false)
 ---         - Sort diagnostics (and thus signs and virtual text)
-function M.on_publish_diagnostics(_, _, params, client_id, _, config)
-  local uri = params.uri
+function M.on_publish_diagnostics(_, result, ctx, config)
+  local client_id = ctx.client_id
+  local uri = result.uri
   local bufnr = vim.uri_to_bufnr(uri)
 
   if not bufnr then
     return
   end
 
-  local diagnostics = params.diagnostics
+  local diagnostics = result.diagnostics
 
   if config and if_nil(config.severity_sort, false) then
     table.sort(diagnostics, function(a, b) return a.severity > b.severity end)
@@ -1204,19 +1205,20 @@ function M.redraw(bufnr, client_id)
   -- the user may have set with vim.lsp.with.
   vim.lsp.handlers["textDocument/publishDiagnostics"](
     nil,
-    "textDocument/publishDiagnostics",
     {
       uri = vim.uri_from_bufnr(bufnr),
       diagnostics = M.get(bufnr, client_id),
     },
-    client_id,
-    bufnr
-  )
-end
+    {
+      method = "textDocument/publishDiagnostics",
+      client_id = client_id,
+      bufnr = bufnr,
+    }
+    )
+  end
 
--- }}}
--- Diagnostic User Functions {{{
 
+---@private
 --- Open a floating window with the provided diagnostics
 ---
 --- The floating window can be customized with the following highlight groups:
@@ -1265,8 +1267,11 @@ local function show_diagnostics(opts, diagnostics)
   return popup_bufnr, winnr
 end
 
---- Open a floating window with the diagnostics from {position}
 
+-- }}}
+-- Diagnostic User Functions {{{
+
+--- Open a floating window with the diagnostics from {position}
 ---@param opts table|nil Configuration keys
 ---         - severity: (DiagnosticSeverity, default nil)
 ---             - Only return diagnostics with this severity. Overrides severity_limit
@@ -1334,6 +1339,7 @@ function M.reset(client_id, buffer_client_map)
   end)
 end
 
+---@private
 --- Gets diagnostics, converts them to quickfix/location list items, and applies the item_handler callback to the items.
 ---@param item_handler function Callback to apply to the diagnostic items
 ---@param command string|nil Command to execute after applying the item_handler

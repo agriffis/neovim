@@ -5404,14 +5404,19 @@ static void f_jobwait(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   TV_LIST_ITER_CONST(args, arg, {
     Channel *chan = NULL;
     if (TV_LIST_ITEM_TV(arg)->v_type != VAR_NUMBER
-        || !(chan = find_job(TV_LIST_ITEM_TV(arg)->vval.v_number, false))) {
+        || !(chan = find_channel(TV_LIST_ITEM_TV(arg)->vval.v_number))
+        || chan->streamtype != kChannelStreamProc) {
+      jobs[i] = NULL;  // Invalid job.
+    } else if (process_is_stopped(&chan->stream.proc)) {
+      // Job is stopped but not fully destroyed.
+      // Ensure all callbacks on its event queue are executed. #15402
+      process_wait(&chan->stream.proc, -1, NULL);
       jobs[i] = NULL;  // Invalid job.
     } else {
       jobs[i] = chan;
       channel_incref(chan);
       if (chan->stream.proc.status < 0) {
-        // Process any pending events on the job's queue before temporarily
-        // replacing it.
+        // Flush any events in the job's queue before temporarily replacing it.
         multiqueue_process_events(chan->events);
         multiqueue_replace_parent(chan->events, waiting_jobs);
       }
@@ -9993,13 +9998,16 @@ static void f_str2nr(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
   int base = 10;
   varnumber_T n;
-  int what;
+  int what = 0;
 
   if (argvars[1].v_type != VAR_UNKNOWN) {
     base = tv_get_number(&argvars[1]);
     if (base != 2 && base != 8 && base != 10 && base != 16) {
       EMSG(_(e_invarg));
       return;
+    }
+    if (argvars[2].v_type != VAR_UNKNOWN && tv_get_number(&argvars[2])) {
+      what |= STR2NR_QUOTE;
     }
   }
 
@@ -10010,22 +10018,20 @@ static void f_str2nr(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   }
   switch (base) {
     case 2: {
-      what = STR2NR_BIN | STR2NR_FORCE;
+      what |= STR2NR_BIN | STR2NR_FORCE;
       break;
     }
     case 8: {
-      what = STR2NR_OCT | STR2NR_FORCE;
+      what |= STR2NR_OCT | STR2NR_OOCT | STR2NR_FORCE;
       break;
     }
     case 16: {
-      what = STR2NR_HEX | STR2NR_FORCE;
+      what |= STR2NR_HEX | STR2NR_FORCE;
       break;
     }
-    default: {
-      what = 0;
-    }
   }
-  vim_str2nr(p, NULL, NULL, what, &n, NULL, 0);
+  vim_str2nr(p, NULL, NULL, what, &n, NULL, 0, false);
+  // Text after the number is silently ignored.
   if (isneg) {
     rettv->vval.v_number = -n;
   } else {

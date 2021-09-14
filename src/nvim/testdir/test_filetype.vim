@@ -295,6 +295,7 @@ let s:filename_checks = {
     \ 'lss': ['file.lss'],
     \ 'lua': ['file.lua', 'file.rockspec', 'file.nse'],
     \ 'lynx': ['lynx.cfg'],
+    \ 'matlab': ['file.m'],
     \ 'm3build': ['m3makefile', 'm3overrides'],
     \ 'm3quake': ['file.quake', 'cm3.cfg'],
     \ 'm4': ['file.at'],
@@ -350,6 +351,7 @@ let s:filename_checks = {
     \ 'obj': ['file.obj'],
     \ 'ocaml': ['file.ml', 'file.mli', 'file.mll', 'file.mly', '.ocamlinit', 'file.mlt', 'file.mlp', 'file.mlip', 'file.mli.cppo', 'file.ml.cppo'],
     \ 'occam': ['file.occ'],
+    \ 'octave': ['octaverc', '.octaverc', 'octave.conf'],
     \ 'omnimark': ['file.xom', 'file.xin'],
     \ 'opam': ['opam', 'file.opam', 'file.opam.template'],
     \ 'openroad': ['file.or'],
@@ -396,6 +398,7 @@ let s:filename_checks = {
     \ 'psf': ['file.psf'],
     \ 'psl': ['file.psl'],
     \ 'puppet': ['file.pp'],
+    \ 'pyret': ['file.arr'],
     \ 'pyrex': ['file.pyx', 'file.pxd'],
     \ 'python': ['file.py', 'file.pyw', '.pythonstartup', '.pythonrc', 'file.ptl', 'file.pyi', 'SConstruct'],
     \ 'quake': ['anybaseq2/file.cfg', 'anyid1/file.cfg', 'quake3/file.cfg', 'baseq2/file.cfg', 'id1/file.cfg', 'quake1/file.cfg', 'some-baseq2/file.cfg', 'some-id1/file.cfg', 'some-quake1/file.cfg'],
@@ -427,7 +430,7 @@ let s:filename_checks = {
     \ 'sather': ['file.sa'],
     \ 'sbt': ['file.sbt'],
     \ 'scala': ['file.scala', 'file.sc'],
-    \ 'scheme': ['file.scm', 'file.ss', 'file.rkt'],
+    \ 'scheme': ['file.scm', 'file.ss', 'file.rkt', 'file.rktd', 'file.rktl'],
     \ 'scilab': ['file.sci', 'file.sce'],
     \ 'screen': ['.screenrc', 'screenrc'],
     \ 'sexplib': ['file.sexp'],
@@ -825,4 +828,93 @@ func Test_dsl_file()
   filetype off
 endfunc
 
+func Test_m_file()
+  filetype on
+
+  call writefile(['looks like Matlab'], 'Xfile.m')
+  split Xfile.m
+  call assert_equal('matlab', &filetype)
+  bwipe!
+
+  let g:filetype_m = 'octave'
+  split Xfile.m
+  call assert_equal('octave', &filetype)
+  bwipe!
+  unlet g:filetype_m
+
+  " Test dist#ft#FTm()
+
+  " Objective-C
+
+  call writefile(['// Objective-C line comment'], 'Xfile.m')
+  split Xfile.m
+  call assert_equal('objc', &filetype)
+  bwipe!
+
+  call writefile(['/* Objective-C block comment */'], 'Xfile.m')
+  split Xfile.m
+  call assert_equal('objc', &filetype)
+  bwipe!
+
+  call writefile(['#import "test.m"'], 'Xfile.m')
+  split Xfile.m
+  call assert_equal('objc', &filetype)
+  bwipe!
+
+  " Octave
+
+  call writefile(['# Octave line comment'], 'Xfile.m')
+  split Xfile.m
+  call assert_equal('octave', &filetype)
+  bwipe!
+
+  call writefile(['%!test "Octave test"'], 'Xfile.m')
+  split Xfile.m
+  call assert_equal('octave', &filetype)
+  bwipe!
+
+  call writefile(['unwind_protect'], 'Xfile.m')
+  split Xfile.m
+  call assert_equal('octave', &filetype)
+  bwipe!
+
+  call writefile(['try; 42; end_try_catch'], 'Xfile.m')
+  split Xfile.m
+  call assert_equal('octave', &filetype)
+  bwipe!
+
+  " Mathematica
+
+  call writefile(['(* Mathematica comment'], 'Xfile.m')
+  split Xfile.m
+  call assert_equal('mma', &filetype)
+  bwipe!
+
+  " MATLAB
+
+  call writefile(['% MATLAB line comment'], 'Xfile.m')
+  split Xfile.m
+  call assert_equal('matlab', &filetype)
+  bwipe!
+
+  " Murphi
+
+  call writefile(['-- Murphi comment'], 'Xfile.m')
+  split Xfile.m
+  call assert_equal('murphi', &filetype)
+  bwipe!
+
+  call writefile(['/* Murphi block comment */', 'Type'], 'Xfile.m')
+  split Xfile.m
+  call assert_equal('murphi', &filetype)
+  bwipe!
+
+  call writefile(['Type'], 'Xfile.m')
+  split Xfile.m
+  call assert_equal('murphi', &filetype)
+  bwipe!
+
+  call delete('Xfile.m')
+  filetype off
+endfunc
 " vim: shiftwidth=2 sts=2 expandtab

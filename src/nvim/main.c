@@ -309,9 +309,6 @@ int main(int argc, char **argv)
   init_highlight(true, false);  // Default highlight groups.
   TIME_MSG("init highlight");
 
-  init_default_mappings();  // Default mappings.
-  TIME_MSG("init default mappings");
-
   // Set the break level after the terminal is initialized.
   debug_break_level = params.use_debug_break_level;
 
@@ -337,24 +334,14 @@ int main(int argc, char **argv)
     // prepare screen now, so external UIs can display messages
     starting = NO_BUFFERS;
     screenclear();
-    TIME_MSG("initialized screen early for UI");
+    TIME_MSG("init screen for UI");
   }
 
-  // open terminals when opening files that start with term://
-#define PROTO "term://"
-  do_cmdline_cmd("augroup nvim_terminal");
-  do_cmdline_cmd("autocmd!");
-  do_cmdline_cmd("autocmd BufReadCmd " PROTO "* nested "
-                 ":if !exists('b:term_title')|call termopen( "
-                 // Capture the command string
-                 "matchstr(expand(\"<amatch>\"), "
-                 "'\\c\\m" PROTO "\\%(.\\{-}//\\%(\\d\\+:\\)\\?\\)\\?\\zs.*'), "
-                 // capture the working directory
-                 "{'cwd': expand(get(matchlist(expand(\"<amatch>\"), "
-                 "'\\c\\m" PROTO "\\(.\\{-}\\)//'), 1, ''))})"
-                 "|endif");
-  do_cmdline_cmd("augroup END");
-#undef PROTO
+  init_default_mappings();  // Default mappings.
+  TIME_MSG("init default mappings");
+
+  init_default_autocmds();
+  TIME_MSG("init default autocommands");
 
   // Reset 'loadplugins' for "-u NONE" before "--cmd" arguments.
   // Allows for setting 'loadplugins' there.
@@ -472,7 +459,7 @@ int main(int argc, char **argv)
     curwin->w_cursor.lnum = curbuf->b_ml.ml_line_count;
   }
 
-  apply_autocmds(EVENT_BUFENTER, NULL, NULL, FALSE, curbuf);
+  apply_autocmds(EVENT_BUFENTER, NULL, NULL, false, curbuf);
   TIME_MSG("BufEnter autocommands");
   setpcmark();
 

@@ -1,7 +1,7 @@
 " Vim support file to detect file types
 "
 " Maintainer:	Bram Moolenaar <Bram@vim.org>
-" Last Change:	2021 Apr 17
+" Last Change:	2021 Aug 23
 
 " Listen very carefully, I will say this only once
 if exists("did_load_filetypes")
@@ -1025,7 +1025,7 @@ au BufNewFile,BufRead *.markdown,*.mdown,*.mkd,*.mkdn,*.mdwn,*.md  setf markdown
 " Mason
 au BufNewFile,BufRead *.mason,*.mhtml,*.comp	setf mason
 
-" Mathematica, Matlab, Murphi or Objective C
+" Mathematica, Matlab, Murphi, Objective C or Octave
 au BufNewFile,BufRead *.m			call dist#ft#FTm()
 
 " Mathematica notebook
@@ -1170,6 +1170,9 @@ au BufNewFile,BufRead *.ml,*.mli,*.mll,*.mly,.ocamlinit,*.mlt,*.mlp,*.mlip,*.mli
 
 " Occam
 au BufNewFile,BufRead *.occ			setf occam
+
+" Octave
+au BufNewFile,BufRead octave.conf,.octaverc,octaverc	setf octave
 
 " Omnimark
 au BufNewFile,BufRead *.xom,*.xin		setf omnimark
@@ -1379,6 +1382,9 @@ au BufNewFile,BufRead *.pk			setf poke
 " Protocols
 au BufNewFile,BufRead */etc/protocols		setf protocols
 
+" Pyret
+au BufNewFile,BufRead *.arr			setf pyret
+
 " Pyrex
 au BufNewFile,BufRead *.pyx,*.pxd		setf pyrex
 
@@ -1390,7 +1396,7 @@ au BufNewFile,BufRead *.ptl,*.pyi,SConstruct		   setf python
 " Radiance
 au BufNewFile,BufRead *.rad,*.mat		setf radiance
 
-" Raku (formelly Perl6)
+" Raku (formerly Perl6)
 au BufNewFile,BufRead *.pm6,*.p6,*.t6,*.pod6,*.raku,*.rakumod,*.rakudoc,*.rakutest  setf raku
 
 " Ratpoison config/command files
@@ -1619,7 +1625,7 @@ au BufNewFile,BufRead .zshrc,.zshenv,.zlogin,.zlogout,.zcompdump setf zsh
 au BufNewFile,BufRead *.zsh			setf zsh
 
 " Scheme
-au BufNewFile,BufRead *.scm,*.ss,*.rkt		setf scheme
+au BufNewFile,BufRead *.scm,*.ss,*.rkt,*.rktd,*.rktl 	setf scheme
 
 " Screen RC
 au BufNewFile,BufRead .screenrc,screenrc	setf screen

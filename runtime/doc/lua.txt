@@ -576,11 +576,11 @@ If you want to exclude visual selections from highlighting on yank, use
 vim.highlight.on_yank({opts})                         *vim.highlight.on_yank()*
         Highlights the yanked text. The fields of the optional dict {opts}
         control the highlight:
-          - {higroup} highlight group for yanked region (default `"IncSearch"`)
+          - {higroup} highlight group for yanked region (default |hl-IncSearch|)
           - {timeout} time in ms before highlight is cleared (default `150`)
           - {on_macro} highlight when executing macro (default `false`)
           - {on_visual} highlight when yanking visual selection (default `true`)
-          - {event} event structure (default `vim.v.event`)
+          - {event} event structure (default |v:event|)
 
 vim.highlight.range({bufnr}, {ns}, {higroup}, {start}, {finish}, {rtype}, {inclusive})
                                                        *vim.highlight.range()*
@@ -685,6 +685,19 @@ vim.diff({a}, {b}, {opts})                                        *vim.diff()*
 
                 Return: ~
                     See {opts.result_type}. nil if {opts.on_hunk} is given.
+
+------------------------------------------------------------------------------
+VIM.MPACK                                                          *lua-mpack*
+
+The *vim.mpack* module provides packing and unpacking of lua objects to
+msgpack encoded strings. |vim.NIL| and |vim.empty_dict()| are supported.
+
+vim.mpack.pack({obj})					*vim.mpack.pack*
+        Packs a lua object {obj} and returns the msgpack representation as
+        a string
+
+vim.mpack.unpack({str})					*vim.mpack.unpack*
+        Unpacks the msgpack encoded {str} and returns a lua object
 
 ------------------------------------------------------------------------------
 VIM							*lua-builtin*
@@ -894,7 +907,7 @@ vim.fn.{func}({...})					*vim.fn*
         To call autoload functions, use the syntax: >
             vim.fn['some#function']({...})
 <
-        Unlike vim.api.|nvim_call_function| this converts directly between Vim
+        Unlike vim.api.|nvim_call_function()| this converts directly between Vim
         objects and Lua objects. If the Vim function returns a float, it will
         be represented directly as a Lua number. Empty lists and dictionaries
         both are represented by an empty table.
@@ -1243,37 +1256,6 @@ region({bufnr}, {pos1}, {pos2}, {regtype}, {inclusive})         *vim.region()*
                 Return: ~
                     region lua table of the form {linenr = {startcol,endcol}}
 
-                                           *vim.register_keystroke_callback()*
-register_keystroke_callback({fn}, {ns_id})
-                Register a lua {fn} with an {id} to be run after every
-                keystroke.
-
-                If {fn} is nil, it removes the callback for the associated
-                {ns_id}
-                Note:
-                    {fn} will not be cleared from |nvim_buf_clear_namespace()|
-
-                Note:
-                    {fn} will receive the keystrokes after mappings have been
-                    evaluated
-
-                Parameters: ~
-                    {fn}     function: Function to call. It should take one
-                          argument, which is a string. The string will contain
-                          the literal keys typed. See |i_CTRL-V|
-                    {ns_id}  number? Namespace ID. If not passed or 0, will
-                             generate and return a new namespace ID from
-                             |nvim_create_namesapce()|
-
-                Return: ~
-                    number Namespace ID associated with {fn}
-
-                Note:
-                    {fn} will be automatically removed if an error occurs
-                    while calling. This is to prevent the annoying situation
-                    of every keystroke erroring while trying to remove a
-                    broken callback.
-
 schedule_wrap({cb})                                      *vim.schedule_wrap()*
                 Defers callback `cb` until the Nvim API is safe to call.
 
@@ -1286,7 +1268,17 @@ schedule_wrap({cb})                                      *vim.schedule_wrap()*
 
 
 deep_equal({a}, {b})                                        *vim.deep_equal()*
-                TODO: Documentation
+                Deep compare values for equality
+
+                Tables are compared recursively unless they both provide the `eq` methamethod.
+                All other types are compared using the equality `==` operator.
+
+                Parameters: ~
+                    {a}  first value
+                    {b}  second value
+
+                Return: ~
+                    `true` if values are equals, else `false` .
 
 deepcopy({orig})                                              *vim.deepcopy()*
                 Returns a deep copy of the given object. Non-table objects are
@@ -1581,14 +1573,12 @@ validate({opt})                                               *vim.validate()*
 
                   vim.validate{arg1={{'foo'}, 'table'}, arg2={'foo', 'string'}}
                      => NOP (success)
-<
->
-    vim.validate{arg1={1, 'table'}}
-       => error('arg1: expected table, got number')
-<
->
-    vim.validate{arg1={3, function(a) return (a % 2) == 0 end, 'even number'}}
-       => error('arg1: expected even number, got 3')
+
+                  vim.validate{arg1={1, 'table'}}
+                     => error('arg1: expected table, got number')
+
+                  vim.validate{arg1={3, function(a) return (a % 2) == 0 end, 'even number'}}
+                     => error('arg1: expected even number, got 3')
 <
 
                 Parameters: ~

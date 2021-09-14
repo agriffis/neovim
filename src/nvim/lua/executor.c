@@ -33,6 +33,7 @@
 #include "nvim/eval/userfunc.h"
 #include "nvim/event/time.h"
 #include "nvim/event/loop.h"
+#include "mpack/lmpack.h"
 
 #include "nvim/os/os.h"
 
@@ -506,6 +507,8 @@ static int nlua_state_init(lua_State *const lstate) FUNC_ATTR_NONNULL_ALL
   lua_setfield(lstate, -2, "__tostring");
   lua_setmetatable(lstate, -2);
   nlua_nil_ref = nlua_ref(lstate, -1);
+  lua_pushvalue(lstate, -1);
+  lua_setfield(lstate, LUA_REGISTRYINDEX, "mpack.NIL");
   lua_setfield(lstate, -2, "NIL");
 
   // vim._empty_dict_mt
@@ -513,7 +516,22 @@ static int nlua_state_init(lua_State *const lstate) FUNC_ATTR_NONNULL_ALL
   lua_pushcfunction(lstate, &nlua_empty_dict_tostring);
   lua_setfield(lstate, -2, "__tostring");
   nlua_empty_dict_ref = nlua_ref(lstate, -1);
+  lua_pushvalue(lstate, -1);
+  lua_setfield(lstate, LUA_REGISTRYINDEX, "mpack.empty_dict");
   lua_setfield(lstate, -2, "_empty_dict_mt");
+
+  // vim.mpack
+  luaopen_mpack(lstate);
+  lua_pushvalue(lstate, -1);
+  lua_setfield(lstate, -3, "mpack");
+
+  // package.loaded.mpack = vim.mpack
+  // otherwise luv will be reinitialized when require'mpack'
+  lua_getglobal(lstate, "package");
+  lua_getfield(lstate, -1, "loaded");
+  lua_pushvalue(lstate, -3);
+  lua_setfield(lstate, -2, "mpack");
+  lua_pop(lstate, 3);
 
   // internal vim._treesitter... API
   nlua_add_treesitter(lstate);
@@ -1499,7 +1517,7 @@ int nlua_expand_pat(expand_T *xp,
   lua_getfield(lstate, -1, "_expand_pat");
   luaL_checktype(lstate, -1, LUA_TFUNCTION);
 
-  // [ vim, vim._log_keystroke, buf ]
+  // [ vim, vim._on_key, buf ]
   lua_pushlstring(lstate, (const char *)pat, STRLEN(pat));
 
   if (lua_pcall(lstate, 1, 2, 0) != 0) {
@@ -1773,7 +1791,7 @@ char_u *nlua_register_table_as_callable(typval_T *const arg)
   return name;
 }
 
-void nlua_execute_log_keystroke(int c)
+void nlua_execute_on_key(int c)
 {
   char_u buf[NUMBUFLEN];
   size_t buf_len = special_to_buf(c, mod_mask, false, buf);
@@ -1787,17 +1805,17 @@ void nlua_execute_log_keystroke(int c)
   // [ vim ]
   lua_getglobal(lstate, "vim");
 
-  // [ vim, vim._log_keystroke ]
-  lua_getfield(lstate, -1, "_log_keystroke");
+  // [ vim, vim._on_key]
+  lua_getfield(lstate, -1, "_on_key");
   luaL_checktype(lstate, -1, LUA_TFUNCTION);
 
-  // [ vim, vim._log_keystroke, buf ]
+  // [ vim, vim._on_key, buf ]
   lua_pushlstring(lstate, (const char *)buf, buf_len);
 
   if (lua_pcall(lstate, 1, 0, 0)) {
     nlua_error(
         lstate,
-        _("Error executing vim.log_keystroke lua callback: %.*s"));
+        _("Error executing  vim.on_key Lua callback: %.*s"));
   }
 
   // [ vim ]

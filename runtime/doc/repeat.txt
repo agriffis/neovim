@@ -201,10 +201,12 @@ For writing a Vim script, see chapter 41 of the user manual |usr_41.txt|.
 			When [!] is included, all found files are sourced.
 			Else only the first found file is sourced.
 
-			When [where] is omitted only 'runtimepath' is used.
+			When [where] is omitted, first 'runtimepath' is
+			searched, then directories under "start" in 'packpath'
+			are searched.
 			Other values:
-				START	search under "start" in 'packpath'
-				OPT 	search under "opt" in 'packpath'
+				START	search only under "start" in 'packpath'
+				OPT 	search only under "opt" in 'packpath'
 				PACK	search under "start" and "opt" in
 					'packpath'
 				ALL	first use 'runtimepath', then search
@@ -255,7 +257,9 @@ For writing a Vim script, see chapter 41 of the user manual |usr_41.txt|.
 			ftdetect scripts are loaded, only the matching
 			directories are added to 'runtimepath'.  This is
 			useful in your .vimrc.  The plugins will then be
-			loaded during initialization, see |load-plugins|.
+			loaded during initialization, see |load-plugins| (note
+			that the loading order will be reversed, because each
+			directory is inserted before others).
 			Note that for ftdetect scripts to be loaded
 			you will need to write `filetype plugin indent on`
 			AFTER all `packadd!` commands.
@@ -819,8 +823,12 @@ DEFINING BREAKPOINTS
 		Sets a breakpoint, that will break whenever the {expression}
 		evaluates to a different value. Example: >
 			:breakadd expr g:lnum
-
 <		Will break, whenever the global variable lnum changes.
+
+		Errors in evaluation are suppressed, you can use the name of a
+		variable that does not exist yet.  This also means you will
+		not notice anything if the expression has a mistake.
+
 		Note if you watch a |script-variable| this will break
 		when switching scripts, since the script variable is only
 		valid in the script where it has been defined and if that

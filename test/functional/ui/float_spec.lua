@@ -153,6 +153,132 @@ describe('float window', function()
     eq(10, width)
   end)
 
+  it('opened with correct position', function()
+    local pos = exec_lua([[
+      local bufnr = vim.api.nvim_create_buf(false, true)
+
+      local opts = {
+        width = 10,
+        height = 10,
+        col = 7,
+        row = 9,
+        relative = 'editor',
+        style = 'minimal'
+      }
+
+      local win_id = vim.api.nvim_open_win(bufnr, false, opts)
+
+      return vim.api.nvim_win_get_position(win_id)
+    ]])
+
+    eq(9, pos[1])
+    eq(7, pos[2])
+  end)
+
+  it('opened with correct position relative to the cursor', function()
+    local pos = exec_lua([[
+      local bufnr = vim.api.nvim_create_buf(false, true)
+
+      local opts = {
+        width = 10,
+        height = 10,
+        col = 7,
+        row = 9,
+        relative = 'cursor',
+        style = 'minimal'
+      }
+
+      local win_id = vim.api.nvim_open_win(bufnr, false, opts)
+
+      return vim.api.nvim_win_get_position(win_id)
+    ]])
+
+    eq(9, pos[1])
+    eq(7, pos[2])
+  end)
+
+  it('opened with correct position relative to another window', function()
+    local pos = exec_lua([[
+      local bufnr = vim.api.nvim_create_buf(false, true)
+
+      local par_opts = {
+        width = 50,
+        height = 50,
+        col = 7,
+        row = 9,
+        relative = 'editor',
+        style = 'minimal'
+      }
+
+      local par_win_id = vim.api.nvim_open_win(bufnr, false, par_opts)
+
+      local opts = {
+        width = 10,
+        height = 10,
+        col = 7,
+        row = 9,
+        relative = 'win',
+        style = 'minimal',
+        win = par_win_id
+      }
+
+      local win_id = vim.api.nvim_open_win(bufnr, false, opts)
+
+      return vim.api.nvim_win_get_position(win_id)
+    ]])
+
+    eq(18, pos[1])
+    eq(14, pos[2])
+  end)
+
+
+  it('opened with correct position relative to another relative window', function()
+    local pos = exec_lua([[
+      local bufnr = vim.api.nvim_create_buf(false, true)
+
+      local root_opts = {
+        width = 50,
+        height = 50,
+        col = 7,
+        row = 9,
+        relative = 'editor',
+        style = 'minimal'
+      }
+
+      local root_win_id = vim.api.nvim_open_win(bufnr, false, root_opts)
+
+      local par_opts = {
+        width = 20,
+        height = 20,
+        col = 2,
+        row = 3,
+        relative = 'win',
+        win = root_win_id,
+        style = 'minimal'
+      }
+
+      local par_win_id = vim.api.nvim_open_win(bufnr, false, par_opts)
+
+      local opts = {
+        width = 10,
+        height = 10,
+        col = 3,
+        row = 2,
+        relative = 'win',
+        win = par_win_id,
+        style = 'minimal'
+      }
+
+      local win_id = vim.api.nvim_open_win(bufnr, false, opts)
+
+      return vim.api.nvim_win_get_position(win_id)
+    ]])
+
+    eq(14, pos[1])
+    eq(12, pos[2])
+  end)
+
+
   local function with_ext_multigrid(multigrid)
     local screen
     before_each(function()
@@ -782,8 +908,8 @@ describe('float window', function()
         ]], float_pos={
           [5] = { { id = 1002 }, "NW", 1, 2, 5, true }
         }, win_viewport={
-          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0};
+          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
+          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 2};
         }}
       else
         screen:expect{grid=[[
@@ -825,8 +951,8 @@ describe('float window', function()
         ]], float_pos={
           [5] = { { id = 1002 }, "NW", 1, 2, 5, true }
         }, win_viewport={
-          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0};
+          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
+          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 2};
         }}
       else
         screen:expect{grid=[[
@@ -868,8 +994,8 @@ describe('float window', function()
         ]], float_pos={
           [5] = { { id = 1002 }, "NW", 1, 2, 5, true }
         }, win_viewport={
-          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0};
+          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
+          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 2};
         }}
       else
         screen:expect{grid=[[
@@ -911,8 +1037,8 @@ describe('float window', function()
         ]], float_pos={
           [5] = { { id = 1002 }, "NW", 1, 2, 5, true }
         }, win_viewport={
-          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0};
+          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
+          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 2};
         }}
       else
         screen:expect{grid=[[
@@ -955,8 +1081,8 @@ describe('float window', function()
         ]], float_pos={
           [5] = { { id = 1002 }, "NW", 1, 2, 5, true }
         }, win_viewport={
-          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0};
+          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
+          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 2};
         }}
       else
         screen:expect{grid=[[
@@ -996,8 +1122,8 @@ describe('float window', function()
         ]], float_pos={
           [5] = { { id = 1002 }, "NW", 1, 2, 5, true }
         }, win_viewport={
-          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0};
+          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
+          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 2};
         }}
       else
         screen:expect{grid=[[
@@ -1037,8 +1163,8 @@ describe('float window', function()
         ]], float_pos={
           [5] = { { id = 1002 }, "NW", 1, 2, 5, true }
         }, win_viewport={
-          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0};
+          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
+          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 2};
         }}
       else
         screen:expect{grid=[[
@@ -1087,8 +1213,8 @@ describe('float window', function()
         ]], float_pos={
           [5] = { { id = 1002 }, "NW", 1, 2, 5, true }
         }, win_viewport={
-          [2] = {win = {id = 1000}, topline = 0, botline = 6, curline = 5, curcol = 0};
-          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0};
+          [2] = {win = {id = 1000}, topline = 0, botline = 6, curline = 5, curcol = 0, linecount = 6};
+          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 2};
         }}
       else
         screen:expect{grid=[[
@@ -1138,8 +1264,8 @@ describe('float window', function()
         ]], float_pos={
           [4] = { { id = 1001 }, "NW", 1, 0, 0, true }
         }, win_viewport={
-          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [4] = {win = {id = 1001}, topline = 0, botline = 2, curline = 0, curcol = 0};
+          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
+          [4] = {win = {id = 1001}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
         }}
       else
         screen:expect{grid=[[
@@ -1196,8 +1322,8 @@ describe('float window', function()
         ]], float_pos={
           [5] = { { id = 1002 }, "NW", 1, 0, 5, true }
         }, win_viewport={
-          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [5] = {win = {id = 1002}, topline = 0, botline = 3, curline = 2, curcol = 0};
+          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
+          [5] = {win = {id = 1002}, topline = 0, botline = 3, curline = 2, curcol = 0, linecount = 3};
         }}
       else
         screen:expect{grid=[[
@@ -1255,8 +1381,8 @@ describe('float window', function()
           [5] = { { id = 1002 }, "NW", 1, 0, 5, true, 50 },
           [6] = { { id = -1 }, "NW", 5, 4, 0, false, 100 }
         }, win_viewport={
-          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [5] = {win = {id = 1002}, topline = 0, botline = 3, curline = 2, curcol = 3};
+          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount=1};
+          [5] = {win = {id = 1002}, topline = 0, botline = 3, curline = 2, curcol = 3, linecount=3};
         }}
       else
         screen:expect{grid=[[
@@ -1705,6 +1831,7 @@ describe('float window', function()
               botline = 3,
               curline = 0,
               curcol = 3,
+              linecount = 2,
               win = { id = 1000 }
           },
           [4] = {
@@ -1712,6 +1839,7 @@ describe('float window', function()
               botline = 3,
               curline = 0,
               curcol = 3,
+              linecount = 2,
               win = { id = 1001 }
           },
           [5] = {
@@ -1719,6 +1847,7 @@ describe('float window', function()
             botline = 2,
             curline = 0,
             curcol = 0,
+            linecount = 1,
             win = { id = 1002 }
           }
         }}
@@ -5036,7 +5165,7 @@ describe('float window', function()
           ]])
         end
 
-        eq(2, eval('1+1'))
+        assert_alive()
       end)
 
       it("o (:only) non-float", function()
@@ -6339,8 +6468,8 @@ describe('float window', function()
         ]], float_pos={
           [4] = { { id = 1001 }, "NW", 1, 2, 5, true };
         }, win_viewport={
-          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [4] = {win = {id = 1001}, topline = 0, botline = 2, curline = 0, curcol = 0};
+          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
+          [4] = {win = {id = 1001}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
         }}
       else
         screen:expect{grid=[[
@@ -6396,10 +6525,10 @@ describe('float window', function()
           [5] = { { id = 1002 }, "NW", 1, 3, 8, true };
           [6] = { { id = 1003 }, "NW", 1, 4, 10, true };
         }, win_viewport={
-          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [4] = {win = {id = 1001}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [6] = {win = {id = 1003}, topline = 0, botline = 2, curline = 0, curcol = 0};
+          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount=1};
+          [4] = {win = {id = 1001}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount=1};
+          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount=1};
+          [6] = {win = {id = 1003}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount=1};
         }}
       else
         screen:expect{grid=[[
@@ -6444,8 +6573,8 @@ describe('float window', function()
         ]], float_pos={
           [4] = { { id = 1001 }, "NW", 1, 2, 5, true };
         }, win_viewport={
-          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [4] = {win = {id = 1001}, topline = 0, botline = 2, curline = 0, curcol = 0};
+          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
+          [4] = {win = {id = 1001}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
         }}
       else
         screen:expect{grid=[[
@@ -6501,10 +6630,10 @@ describe('float window', function()
           [5] = { { id = 1002 }, "NW", 1, 4, 10, true };
           [6] = { { id = 1003 }, "NW", 1, 3, 8, true };
         }, win_viewport={
-          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [4] = {win = {id = 1001}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [6] = {win = {id = 1003}, topline = 0, botline = 2, curline = 0, curcol = 0};
+          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
+          [4] = {win = {id = 1001}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
+          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
+          [6] = {win = {id = 1003}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
         }}
       else
         screen:expect{grid=[[
@@ -6564,10 +6693,10 @@ describe('float window', function()
           [5] = {{id = 1002}, "NW", 1, 2, 6, true, 50};
           [6] = {{id = 1003}, "NW", 1, 3, 7, true, 40};
         }, win_viewport={
-          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [4] = {win = {id = 1001}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0};
-          [6] = {win = {id = 1003}, topline = 0, botline = 2, curline = 0, curcol = 0};
+          [2] = {win = {id = 1000}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
+          [4] = {win = {id = 1001}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
+          [5] = {win = {id = 1002}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
+          [6] = {win = {id = 1003}, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1};
         }}
       else
         screen:expect{grid=[[

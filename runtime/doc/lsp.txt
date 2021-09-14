@@ -202,23 +202,28 @@ responses and notifications from LSP servers.
 
 For |lsp-request|, each |lsp-handler| has this signature: >
 
-  function(err, method, result, client_id, bufnr, config)
+  function(err, result, ctx, config)
 <
         Parameters: ~
             {err}       (table|nil)
                             When the language server is unable to complete a
                             request, a table with information about the error
                             is sent. Otherwise, it is `nil`. See |lsp-response|.
-            {method}    (string)
-                            The |lsp-method| name.
             {result}    (Result | Params | nil)
                             When the language server is able to succesfully
                             complete a request, this contains the `result` key
                             of the response. See |lsp-response|.
-            {client_id} (number)
-                            The ID of the |vim.lsp.client|.
-            {bufnr}     (Buffer)
-                            Buffer handle, or 0 for current.
+            {ctx}       (table)
+                            Context describes additional calling state
+                            associated with the handler. It consists of the
+                            following key, value pairs:
+
+                            {method}    (string)
+                                            The |lsp-method| name.
+                            {client_id} (number)
+                                            The ID of the |vim.lsp.client|.
+                            {bufnr}     (Buffer)
+                                           Buffer handle, or 0 for current.
             {config}    (table)
                             Configuration for the handler.
 
@@ -238,21 +243,24 @@ For |lsp-request|, each |lsp-handler| has this signature: >
 
 For |lsp-notification|, each |lsp-handler| has this signature: >
 
-  function(err, method, params, client_id, bufnr, config)
+  function(err, result, ctx, config)
 <
         Parameters: ~
             {err}       (nil)
                             This is always `nil`.
                             See |lsp-notification|
-            {method}    (string)
-                            The |lsp-method| name.
-            {params}    (Params)
+            {result}    (Result)
                             This contains the `params` key of the notification.
                             See |lsp-notification|
-            {client_id} (number)
-                            The ID of the |vim.lsp.client|
-            {bufnr}     (nil)
-                            `nil`, as the server doesn't have an associated buffer.
+            {ctx}       (table)
+                            Context describes additional calling state
+                            associated with the handler. It consists of the
+                            following key, value pairs:
+
+                            {method}    (string)
+                                            The |lsp-method| name.
+                            {client_id} (number)
+                                            The ID of the |vim.lsp.client|.
             {config}    (table)
                             Configuration for the handler.
 
@@ -1199,34 +1207,6 @@ workspace_symbol({query})                     *vim.lsp.buf.workspace_symbol()*
 ==============================================================================
 Lua module: vim.lsp.diagnostic                                *lsp-diagnostic*
 
-                              *vim.lsp.diagnostic.apply_to_diagnostic_items()*
-apply_to_diagnostic_items({item_handler}, {command}, {opts})
-                Gets diagnostics, converts them to quickfix/location list
-                items, and applies the item_handler callback to the items.
-
-                Parameters: ~
-                    {item_handler}  function Callback to apply to the
-                                    diagnostic items
-                    {command}       string|nil Command to execute after
-                                    applying the item_handler
-                    {opts}          table|nil Configuration table. Keys:
-                                    • {client_id}: (number)
-                                      • If nil, will consider all clients
-                                        attached to buffer.
-
-                                    • {severity}: (DiagnosticSeverity)
-                                      • Exclusive severity to consider.
-                                        Overrides {severity_limit}
-
-                                    • {severity_limit}: (DiagnosticSeverity)
-                                      • Limit severity of diagnostics found.
-                                        E.g. "Warning" means { "Error",
-                                        "Warning" } will be valid.
-
-                                    • {workspace}: (boolean, default false)
-                                      • Set the list with workspace
-                                        diagnostics
-
                                                   *vim.lsp.diagnostic.clear()*
 clear({bufnr}, {client_id}, {diagnostic_ns}, {sign_ns})
                 Clears the currently displayed diagnostics
@@ -1431,7 +1411,7 @@ goto_prev({opts})                             *vim.lsp.diagnostic.goto_prev()*
                     {opts}  table See |vim.lsp.diagnostic.goto_next()|
 
                                  *vim.lsp.diagnostic.on_publish_diagnostics()*
-on_publish_diagnostics({_}, {_}, {params}, {client_id}, {_}, {config})
+on_publish_diagnostics({_}, {result}, {ctx}, {config})
                 |lsp-handler| for the method "textDocument/publishDiagnostics"
 
                 Note:
@@ -1649,31 +1629,6 @@ set_virtual_text({diagnostics}, {bufnr}, {client_id}, {diagnostic_ns}, {opts})
                                          E.g. "Warning" means { "Error",
                                          "Warning" } will be valid.
 
-                                       *vim.lsp.diagnostic.show_diagnostics()*
-show_diagnostics({opts}, {diagnostics})
-                Open a floating window with the provided diagnostics
-
-                The floating window can be customized with the following
-                highlight groups: >
-
-                 LspDiagnosticsFloatingError
-                 LspDiagnosticsFloatingWarning
-                 LspDiagnosticsFloatingInformation
-                 LspDiagnosticsFloatingHint
-<
-
-                Parameters: ~
-                    {opts}         table Configuration table
-                                   • show_header (boolean, default true): Show
-                                     "Diagnostics:" header
-                                   • all opts for
-                                     |vim.lsp.util.open_floating_preview()|
-                                     can be used here
-                    {diagnostics}  table: The diagnostics to display
-
-                Return: ~
-                    table {popup_bufnr, win_id}
-
                                   *vim.lsp.diagnostic.show_line_diagnostics()*
 show_line_diagnostics({opts}, {buf_nr}, {line_nr}, {client_id})
                 Parameters: ~
@@ -1690,6 +1645,8 @@ show_line_diagnostics({opts}, {buf_nr}, {line_nr}, {client_id})
 
                               *vim.lsp.diagnostic.show_position_diagnostics()*
 show_position_diagnostics({opts}, {buf_nr}, {position})
+                Open a floating window with the diagnostics from {position}
+
                 Parameters: ~
                     {opts}      table|nil Configuration keys
                                 • severity: (DiagnosticSeverity, default nil)
@@ -1725,11 +1682,15 @@ display({lenses}, {bufnr}, {client_id})           *vim.lsp.codelens.display()*
 get({bufnr})                                          *vim.lsp.codelens.get()*
                 Return all lenses for the given buffer
 
+                Parameters: ~
+                    {bufnr}  number Buffer number. 0 can be used for the
+                             current buffer.
+
                 Return: ~
                     table ( `CodeLens[]` )
 
                                               *vim.lsp.codelens.on_codelens()*
-on_codelens({err}, {_}, {result}, {client_id}, {bufnr})
+on_codelens({err}, {result}, {ctx}, {_})
                 |lsp-handler| for the method `textDocument/codeLens`
 
 refresh()                                         *vim.lsp.codelens.refresh()*
@@ -1757,8 +1718,7 @@ save({lenses}, {bufnr}, {client_id})                 *vim.lsp.codelens.save()*
 ==============================================================================
 Lua module: vim.lsp.handlers                                    *lsp-handlers*
 
-                                                    *vim.lsp.handlers.hover()*
-hover({_}, {method}, {result}, {_}, {_}, {config})
+hover({_}, {result}, {ctx}, {config})               *vim.lsp.handlers.hover()*
                 |lsp-handler| for the method "textDocument/hover" >
 
                  vim.lsp.handlers["textDocument/hover"] = vim.lsp.with(
@@ -1776,7 +1736,7 @@ hover({_}, {method}, {result}, {_}, {_}, {config})
                                 • See |vim.api.nvim_open_win()|
 
                                            *vim.lsp.handlers.signature_help()*
-signature_help({_}, {method}, {result}, {client_id}, {bufnr}, {config})
+signature_help({_}, {result}, {ctx}, {config})
                 |lsp-handler| for the method "textDocument/signatureHelp". The
                 active parameter is highlighted with
                 |hl-LspSignatureActiveParameter|. >

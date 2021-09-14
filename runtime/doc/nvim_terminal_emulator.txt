@@ -13,7 +13,7 @@ from the connected program.
 Terminal buffers behave like normal buffers, except:
 - With 'modifiable', lines can be edited but not deleted.
 - 'scrollback' controls how many lines are kept.
-- Output is followed if the cursor is on the last line.
+- Output is followed ("tailed") if cursor is on the last line.
 - 'modified' is the default. You can set 'nomodified' to avoid a warning when
   closing the terminal buffer.
 - 'bufhidden' defaults to "hide".
@@ -47,8 +47,9 @@ Input						*terminal-input*
 
 To send input, enter |Terminal-mode| using any command that would enter "insert
 mode" in a normal buffer, such as |i| or |:startinsert|. In this mode all keys
-except <C-\><C-N> are sent to the underlying program. Use <C-\><C-N> to return
-to normal-mode. |CTRL-\_CTRL-N|
+except <C-\> are sent to the underlying program. If <C-\> is pressed, the
+next key is sent unless it is <C-N>. Use <C-\><C-N> to return to normal-mode.
+|CTRL-\_CTRL-N|
 
 Terminal-mode forces these local options:
 
@@ -318,6 +319,34 @@ Other commands ~
 	     isn't one
  *:Asm*	     jump to the window with the disassembly, create it if there
 	     isn't one
+
+
+Events ~
+							*termdebug-events*
+Four autocommands can be used: >
+	au User TermdebugStartPre  echomsg 'debugging starting'
+	au User TermdebugStartPost echomsg 'debugging started'
+	au User TermdebugStopPre   echomsg 'debugging stopping'
+	au User TermdebugStopPost  echomsg 'debugging stopped'
+<
+						*TermdebugStartPre*
+TermdebugStartPre		Before starting debugging.
+				Not triggered if the debugger is already
+				running or |g:termdebugger| cannot be
+				executed.
+						*TermdebugStartPost*
+TermdebugStartPost		After debugging has initialized.
+				If a "!" bang is passed to `:Termdebug` or
+				`:TermdebugCommand` the event is triggered
+				before running the provided command in gdb.
+						*TermdebugStopPre*
+TermdebugStopPre		Before debugging ends, when gdb is terminated,
+				most likely after issuing a "quit" command in
+				the gdb window.
+						*TermdebugStopPost*
+TermdebugStopPost		After debugging has ended, gdb-related windows
+				are closed, debug buffers wiped out and
+				the state before the debugging was restored.
 
 
 Prompt mode ~
