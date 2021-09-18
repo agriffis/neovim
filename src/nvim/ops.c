@@ -765,9 +765,9 @@ char_u *get_expr_line(void)
     return expr_copy;
   }
 
-  ++nested;
-  rv = eval_to_string(expr_copy, NULL, TRUE);
-  --nested;
+  nested++;
+  rv = eval_to_string(expr_copy, NULL, true);
+  nested--;
   xfree(expr_copy);
   return rv;
 }
@@ -1237,16 +1237,14 @@ int insert_reg(int regname, bool literally_arg)
   return retval;
 }
 
-/*
- * Stuff a string into the typeahead buffer, such that edit() will insert it
- * literally ("literally" TRUE) or interpret is as typed characters.
- */
-static void stuffescaped(const char *arg, int literally)
+/// Stuff a string into the typeahead buffer, such that edit() will insert it
+/// literally ("literally" true) or interpret is as typed characters.
+static void stuffescaped(const char *arg, bool literally)
 {
   while (*arg != NUL) {
     // Stuff a sequence of normal ASCII characters, that's fast.  Also
     // stuff K_SPECIAL to get the effect of a special key when "literally"
-    // is TRUE.
+    // is true.
     const char *const start = arg;
     while ((*arg >= ' ' && *arg < DEL) || ((uint8_t)(*arg) == K_SPECIAL
                                            && !literally)) {
@@ -1725,7 +1723,9 @@ int op_delete(oparg_T *oap)
                      (int)oap->line_count-1, n, deleted_bytes,
                      0, 0, 0, kExtmarkUndo);
     }
-    auto_format(false, true);
+    if (oap->op_type == OP_DELETE) {
+      auto_format(false, true);
+    }
   }
 
   msgmore(curbuf->b_ml.ml_line_count - old_lcount);
@@ -2486,6 +2486,7 @@ int op_change(oparg_T *oap)
       xfree(ins_text);
     }
   }
+  auto_format(false, true);
 
   return retval;
 }
@@ -2622,64 +2623,64 @@ static void op_yank_reg(oparg_T *oap, bool message, yankreg_T *reg, bool append)
       break;
 
     case kMTCharWise: {
-        colnr_T startcol = 0, endcol = MAXCOL;
-        int is_oneChar = false;
-        colnr_T cs, ce;
-        p = ml_get(lnum);
-        bd.startspaces = 0;
-        bd.endspaces = 0;
+      colnr_T startcol = 0, endcol = MAXCOL;
+      int is_oneChar = false;
+      colnr_T cs, ce;
+      p = ml_get(lnum);
+      bd.startspaces = 0;
+      bd.endspaces = 0;
 
-        if (lnum == oap->start.lnum) {
-          startcol = oap->start.col;
-          if (virtual_op) {
-            getvcol(curwin, &oap->start, &cs, NULL, &ce);
-            if (ce != cs && oap->start.coladd > 0) {
-              /* Part of a tab selected -- but don't
-               * double-count it. */
-              bd.startspaces = (ce - cs + 1)
-                               - oap->start.coladd;
-              startcol++;
-            }
+      if (lnum == oap->start.lnum) {
+        startcol = oap->start.col;
+        if (virtual_op) {
+          getvcol(curwin, &oap->start, &cs, NULL, &ce);
+          if (ce != cs && oap->start.coladd > 0) {
+            /* Part of a tab selected -- but don't
+             * double-count it. */
+            bd.startspaces = (ce - cs + 1)
+                             - oap->start.coladd;
+            startcol++;
           }
         }
-
-        if (lnum == oap->end.lnum) {
-          endcol = oap->end.col;
-          if (virtual_op) {
-            getvcol(curwin, &oap->end, &cs, NULL, &ce);
-            if (p[endcol] == NUL || (cs + oap->end.coladd < ce
-                                     // Don't add space for double-wide
-                                     // char; endcol will be on last byte
-                                     // of multi-byte char.
-                                     && utf_head_off(p, p + endcol) == 0)) {
-              if (oap->start.lnum == oap->end.lnum
-                  && oap->start.col == oap->end.col) {
-                // Special case: inside a single char
-                is_oneChar = true;
-                bd.startspaces = oap->end.coladd
-                                 - oap->start.coladd + oap->inclusive;
-                endcol = startcol;
-              } else {
-                bd.endspaces = oap->end.coladd
-                               + oap->inclusive;
-                endcol -= oap->inclusive;
-              }
-            }
-          }
-        }
-        if (endcol == MAXCOL) {
-          endcol = (colnr_T)STRLEN(p);
-        }
-        if (startcol > endcol
-            || is_oneChar) {
-          bd.textlen = 0;
-        } else {
-          bd.textlen = endcol - startcol + oap->inclusive;
-        }
-        bd.textstart = p + startcol;
-        yank_copy_line(reg, &bd, y_idx, false);
-        break;
       }
+
+      if (lnum == oap->end.lnum) {
+        endcol = oap->end.col;
+        if (virtual_op) {
+          getvcol(curwin, &oap->end, &cs, NULL, &ce);
+          if (p[endcol] == NUL || (cs + oap->end.coladd < ce
+                                   // Don't add space for double-wide
+                                   // char; endcol will be on last byte
+                                   // of multi-byte char.
+                                   && utf_head_off(p, p + endcol) == 0)) {
+            if (oap->start.lnum == oap->end.lnum
+                && oap->start.col == oap->end.col) {
+              // Special case: inside a single char
+              is_oneChar = true;
+              bd.startspaces = oap->end.coladd
+                               - oap->start.coladd + oap->inclusive;
+              endcol = startcol;
+            } else {
+              bd.endspaces = oap->end.coladd
+                             + oap->inclusive;
+              endcol -= oap->inclusive;
+            }
+          }
+        }
+      }
+      if (endcol == MAXCOL) {
+        endcol = (colnr_T)STRLEN(p);
+      }
+      if (startcol > endcol
+          || is_oneChar) {
+        bd.textlen = 0;
+      } else {
+        bd.textlen = endcol - startcol + oap->inclusive;
+      }
+      bd.textstart = p + startcol;
+      yank_copy_line(reg, &bd, y_idx, false);
+      break;
+    }
     // NOTREACHED
     case kMTUnknown:
       abort();
@@ -2887,7 +2888,7 @@ void do_put(int regname, yankreg_T *reg, int dir, long count, int flags)
   int indent;
   int orig_indent = 0;                  // init for gcc
   int indent_diff = 0;                  // init for gcc
-  int first_indent = TRUE;
+  bool first_indent = true;
   int lendiff = 0;
   pos_T old_pos;
   char_u *insert_string = NULL;
@@ -3484,7 +3485,7 @@ void do_put(int regname, yankreg_T *reg, int dir, long count, int flags)
             } else if (first_indent) {
               indent_diff = orig_indent - get_indent();
               indent = orig_indent;
-              first_indent = FALSE;
+              first_indent = false;
             } else if ((indent = get_indent() + indent_diff) < 0) {
               indent = 0;
             }
@@ -5781,15 +5782,15 @@ void cursor_pos_info(dict_T *dict)
           len = MAXCOL;
           break;
         case 'v': {
-            colnr_T start_col = (lnum == min_pos.lnum)
+          colnr_T start_col = (lnum == min_pos.lnum)
                               ? min_pos.col : 0;
-            colnr_T end_col = (lnum == max_pos.lnum)
+          colnr_T end_col = (lnum == max_pos.lnum)
                             ? max_pos.col - start_col + 1 : MAXCOL;
 
-            s = ml_get(lnum) + start_col;
-            len = end_col;
-          }
-          break;
+          s = ml_get(lnum) + start_col;
+          len = end_col;
+        }
+        break;
         }
         if (s != NULL) {
           byte_count_cursor += line_count_info(s, &word_count_cursor,
@@ -6221,23 +6222,19 @@ static void set_clipboard(int name, yankreg_T *reg)
 
   char regtype;
   switch (reg->y_type) {
-  case kMTLineWise: {
-      regtype = 'V';
-      tv_list_append_string(lines, NULL, 0);
-      break;
-    }
-  case kMTCharWise: {
-      regtype = 'v';
-      break;
-    }
-  case kMTBlockWise: {
-      regtype = 'b';
-      tv_list_append_string(lines, NULL, 0);
-      break;
-    }
-  case kMTUnknown: {
-      abort();
-    }
+  case kMTLineWise:
+    regtype = 'V';
+    tv_list_append_string(lines, NULL, 0);
+    break;
+  case kMTCharWise:
+    regtype = 'v';
+    break;
+  case kMTBlockWise:
+    regtype = 'b';
+    tv_list_append_string(lines, NULL, 0);
+    break;
+  case kMTUnknown:
+    abort();
   }
 
   list_T *args = tv_list_alloc(3);
