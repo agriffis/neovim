@@ -540,11 +540,11 @@ describe('vim.diagnostic', function()
     end)
 
     it('allows sorting by severity', function()
-      local result = exec_lua([[
+      exec_lua [[
         vim.diagnostic.config({
-          underline = true,
-          virtual_text = false,
-          severity_sort = false,
+          underline = false,
+          signs = true,
+          virtual_text = true,
         })
 
         vim.diagnostic.set(diagnostic_ns, diagnostic_bufnr, {
@@ -553,31 +553,41 @@ describe('vim.diagnostic', function()
           make_info('Info', 4, 4, 4, 4),
         })
 
-        local extmarks = vim.api.nvim_buf_get_extmarks(diagnostic_bufnr, diagnostic_ns, 0, -1, {details = true})
+        function get_virt_text_and_signs(severity_sort)
+          vim.diagnostic.config({
+            severity_sort = severity_sort,
+          })
 
-        local warn_highlight = extmarks[1][4].hl_group
+          local virt_text = vim.api.nvim_buf_get_extmarks(diagnostic_bufnr, diagnostic_ns, 0, -1, {details = true})[1][4].virt_text
 
-        vim.diagnostic.config({
-          severity_sort = true,
-        })
+          local virt_texts = {}
+          for i = 2, #virt_text do
+            table.insert(virt_texts, (string.gsub(virt_text[i][2], "DiagnosticVirtualText", "")))
+          end
 
-        extmarks = vim.api.nvim_buf_get_extmarks(diagnostic_bufnr, diagnostic_ns, 0, -1, {details = true})
+          local signs = {}
+          for _, v in ipairs(vim.fn.sign_getplaced(diagnostic_bufnr, {group = "*"})[1].signs) do
+            table.insert(signs, (string.gsub(v.name, "DiagnosticSign", "")))
+          end
 
-        local err_highlight = extmarks[1][4].hl_group
+          return {virt_texts, signs}
+        end
+      ]]
 
-        vim.diagnostic.config({
-          severity_sort = { reverse = true },
-        })
+      local result = exec_lua [[return get_virt_text_and_signs(false)]]
 
-        extmarks = vim.api.nvim_buf_get_extmarks(diagnostic_bufnr, diagnostic_ns, 0, -1, {details = true})
+      -- Virt texts are defined lowest priority to highest, signs from
+      -- highest to lowest
+      eq({'Warn', 'Error', 'Info'}, result[1])
+      eq({'Info', 'Error', 'Warn'}, result[2])
 
-        local info_highlight = extmarks[1][4].hl_group
+      result = exec_lua [[return get_virt_text_and_signs(true)]]
+      eq({'Info', 'Warn', 'Error'}, result[1])
+      eq({'Error', 'Warn', 'Info'}, result[2])
 
-        return { warn_highlight, err_highlight, info_highlight }
-      ]])
-      eq('DiagnosticUnderlineWarn', result[1])
-      eq('DiagnosticUnderlineError', result[2])
-      eq('DiagnosticUnderlineInfo', result[3])
+      result = exec_lua [[return get_virt_text_and_signs({ reverse = true })]]
+      eq({'Error', 'Warn', 'Info'}, result[1])
+      eq({'Info', 'Warn', 'Error'}, result[2])
     end)
   end)
 
@@ -781,6 +791,39 @@ describe('vim.diagnostic', function()
         vim.api.nvim_win_set_buf(0, diagnostic_bufnr)
         vim.diagnostic.set(diagnostic_ns, diagnostic_bufnr, diagnostics)
         local popup_bufnr, winnr = vim.diagnostic.show_line_diagnostics()
+        return #vim.api.nvim_buf_get_lines(popup_bufnr, 0, -1, false)
+      ]])
+    end)
+
+    it('only reports diagnostics from the current buffer when bufnr is omitted #15710', function()
+      eq(2, exec_lua [[
+        local other_bufnr = vim.api.nvim_create_buf(true, false)
+        local buf_1_diagnostics = {
+          make_error("Syntax error", 0, 1, 0, 3),
+        }
+        local buf_2_diagnostics = {
+          make_warning("Some warning", 0, 1, 0, 3),
+        }
+        vim.api.nvim_win_set_buf(0, diagnostic_bufnr)
+        vim.diagnostic.set(diagnostic_ns, diagnostic_bufnr, buf_1_diagnostics)
+        vim.diagnostic.set(other_ns, other_bufnr, buf_2_diagnostics)
+        local popup_bufnr, winnr = vim.diagnostic.show_line_diagnostics()
+        return #vim.api.nvim_buf_get_lines(popup_bufnr, 0, -1, false)
+      ]])
+    end)
+
+    it('allows filtering by namespace', function()
+      eq(2, exec_lua [[
+        local ns_1_diagnostics = {
+          make_error("Syntax error", 0, 1, 0, 3),
+        }
+        local ns_2_diagnostics = {
+          make_warning("Some warning", 0, 1, 0, 3),
+        }
+        vim.api.nvim_win_set_buf(0, diagnostic_bufnr)
+        vim.diagnostic.set(diagnostic_ns, diagnostic_bufnr, ns_1_diagnostics)
+        vim.diagnostic.set(other_ns, diagnostic_bufnr, ns_2_diagnostics)
+        local popup_bufnr, winnr = vim.diagnostic.show_line_diagnostics({namespace = diagnostic_ns})
         return #vim.api.nvim_buf_get_lines(popup_bufnr, 0, -1, false)
       ]])
     end)

@@ -426,6 +426,70 @@ local function set_list(loclist, opts)
   end
 end
 
+---@private
+local function next_diagnostic(position, search_forward, bufnr, opts, namespace)
+  position[1] = position[1] - 1
+  bufnr = bufnr or vim.api.nvim_get_current_buf()
+  local wrap = vim.F.if_nil(opts.wrap, true)
+  local line_count = vim.api.nvim_buf_line_count(bufnr)
+  opts.namespace = namespace
+  for i = 0, line_count do
+    local offset = i * (search_forward and 1 or -1)
+    local lnum = position[1] + offset
+    if lnum < 0 or lnum >= line_count then
+      if not wrap then
+        return
+      end
+      lnum = (lnum + line_count) % line_count
+    end
+    opts.lnum = lnum
+    local line_diagnostics = M.get(bufnr, opts)
+    if line_diagnostics and not vim.tbl_isempty(line_diagnostics) then
+      local sort_diagnostics, is_next
+      if search_forward then
+        sort_diagnostics = function(a, b) return a.col < b.col end
+        is_next = function(diagnostic) return diagnostic.col > position[2] end
+      else
+        sort_diagnostics = function(a, b) return a.col > b.col end
+        is_next = function(diagnostic) return diagnostic.col < position[2] end
+      end
+      table.sort(line_diagnostics, sort_diagnostics)
+      if i == 0 then
+        for _, v in pairs(line_diagnostics) do
+          if is_next(v) then
+            return v
+          end
+        end
+      else
+        return line_diagnostics[1]
+      end
+    end
+  end
+end
+
+---@private
+local function diagnostic_move_pos(opts, pos)
+  opts = opts or {}
+
+  local enable_popup = vim.F.if_nil(opts.enable_popup, true)
+  local win_id = opts.win_id or vim.api.nvim_get_current_win()
+
+  if not pos then
+    vim.api.nvim_echo({{"No more valid diagnostics to move to", "WarningMsg"}}, true, {})
+    return
+  end
+
+  vim.api.nvim_win_set_cursor(win_id, {pos[1] + 1, pos[2]})
+
+  if enable_popup then
+    -- This is a bit weird... I'm surprised that we need to wait til the next tick to do this.
+    vim.schedule(function()
+      M.show_position_diagnostics(opts.popup_opts, vim.api.nvim_win_get_buf(win_id))
+    end)
+  end
+end
+
+
 -- }}}
 
 -- Public API {{{
@@ -452,7 +516,9 @@ end
 ---       - update_in_insert: (default false) Update diagnostics in Insert mode (if false,
 ---                           diagnostics are updated on InsertLeave)
 ---       - severity_sort: (default false) Sort diagnostics by severity. This affects the order in
----                         which signs and virtual text are displayed. Options:
+---                         which signs and virtual text are displayed. When true, higher severities
+---                         are displayed before lower severities (e.g. ERROR is displayed before WARN).
+---                         Options:
 ---                         * reverse: (boolean) Reverse sort order
 ---@param namespace number|nil Update the options for the given namespace. When omitted, update the
 ---                            global diagnostic options.
@@ -478,14 +544,16 @@ function M.config(opts, namespace)
 
   if namespace then
     for bufnr, v in pairs(diagnostic_cache) do
-      if v[namespace] then
+      if vim.api.nvim_buf_is_loaded(bufnr) and v[namespace] then
         M.show(namespace, bufnr)
       end
     end
   else
     for bufnr, v in pairs(diagnostic_cache) do
-      for ns in pairs(v) do
-        M.show(ns, bufnr)
+      if vim.api.nvim_buf_is_loaded(bufnr) then
+        for ns in pairs(v) do
+          M.show(ns, bufnr)
+        end
       end
     end
   end
@@ -523,12 +591,10 @@ function M.set(namespace, bufnr, diagnostics, opts)
 
   set_diagnostic_cache(namespace, diagnostics, bufnr)
 
-  if opts then
-    M.config(opts, namespace)
-  end
-
   if vim.api.nvim_buf_is_loaded(bufnr) then
-    M.show(namespace, bufnr)
+    M.show(namespace, bufnr, diagnostics, opts)
+  elseif opts then
+    M.config(opts, namespace)
   end
 
   vim.api.nvim_command("doautocmd <nomodeline> User DiagnosticsChanged")
@@ -592,70 +658,6 @@ function M.get(bufnr, opts)
   end
 
   return diagnostics
-end
-
--- Diagnostic Movements {{{
-
-local next_diagnostic = function(position, search_forward, bufnr, opts, namespace)
-  position[1] = position[1] - 1
-  bufnr = bufnr or vim.api.nvim_get_current_buf()
-  local wrap = vim.F.if_nil(opts.wrap, true)
-  local line_count = vim.api.nvim_buf_line_count(bufnr)
-  opts.namespace = namespace
-  for i = 0, line_count do
-    local offset = i * (search_forward and 1 or -1)
-    local lnum = position[1] + offset
-    if lnum < 0 or lnum >= line_count then
-      if not wrap then
-        return
-      end
-      lnum = (lnum + line_count) % line_count
-    end
-    opts.lnum = lnum
-    local line_diagnostics = M.get(bufnr, opts)
-    if line_diagnostics and not vim.tbl_isempty(line_diagnostics) then
-      local sort_diagnostics, is_next
-      if search_forward then
-        sort_diagnostics = function(a, b) return a.col < b.col end
-        is_next = function(diagnostic) return diagnostic.col > position[2] end
-      else
-        sort_diagnostics = function(a, b) return a.col > b.col end
-        is_next = function(diagnostic) return diagnostic.col < position[2] end
-      end
-      table.sort(line_diagnostics, sort_diagnostics)
-      if i == 0 then
-        for _, v in pairs(line_diagnostics) do
-          if is_next(v) then
-            return v
-          end
-        end
-      else
-        return line_diagnostics[1]
-      end
-    end
-  end
-end
-
----@private
-local function diagnostic_move_pos(opts, pos)
-  opts = opts or {}
-
-  local enable_popup = vim.F.if_nil(opts.enable_popup, true)
-  local win_id = opts.win_id or vim.api.nvim_get_current_win()
-
-  if not pos then
-    vim.api.nvim_echo({{"No more valid diagnostics to move to", "WarningMsg"}}, true, {})
-    return
-  end
-
-  vim.api.nvim_win_set_cursor(win_id, {pos[1] + 1, pos[2]})
-
-  if enable_popup then
-    -- This is a bit weird... I'm surprised that we need to wait til the next tick to do this.
-    vim.schedule(function()
-      M.show_position_diagnostics(opts.popup_opts, vim.api.nvim_win_get_buf(win_id))
-    end)
-  end
 end
 
 --- Get the previous diagnostic closest to the cursor position.
@@ -998,9 +1000,9 @@ function M.show(namespace, bufnr, diagnostics, opts)
 
   if vim.F.if_nil(opts.severity_sort, false) then
     if type(opts.severity_sort) == "table" and opts.severity_sort.reverse then
-      table.sort(diagnostics, function(a, b) return a.severity > b.severity end)
-    else
       table.sort(diagnostics, function(a, b) return a.severity < b.severity end)
+    else
+      table.sort(diagnostics, function(a, b) return a.severity > b.severity end)
     end
   end
 
@@ -1071,6 +1073,7 @@ function M.show_line_diagnostics(opts, bufnr, lnum)
   opts = opts or {}
   opts.focus_id = "line_diagnostics"
   opts.lnum = lnum or (vim.api.nvim_win_get_cursor(0)[1] - 1)
+  bufnr = get_bufnr(bufnr)
   local line_diagnostics = M.get(bufnr, opts)
   return show_diagnostics(opts, line_diagnostics)
 end
