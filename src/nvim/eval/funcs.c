@@ -4251,8 +4251,8 @@ static void f_glob(typval_T *argvars, typval_T *rettv, FunPtr fptr)
       options += WILD_ICASE;
     }
     if (rettv->v_type == VAR_STRING) {
-      rettv->vval.v_string = ExpandOne(&xpc, (char_u *)tv_get_string(
-                                       &argvars[0]), NULL, options, WILD_ALL);
+      rettv->vval.v_string = ExpandOne(&xpc, (char_u *)tv_get_string(&argvars[0]), NULL, options,
+                                       WILD_ALL);
     } else {
       ExpandOne(&xpc, (char_u *)tv_get_string(&argvars[0]), NULL, options,
                 WILD_ALL_KEEP);
@@ -6564,8 +6564,8 @@ static void msgpackparse_unpack_list(const list_T *const list, list_T *const ret
       goto end;
     }
     size_t read_bytes;
-    const int rlret = encode_read_from_list(&lrstate, msgpack_unpacker_buffer(
-                                         unpacker), IOSIZE, &read_bytes);
+    const int rlret = encode_read_from_list(&lrstate, msgpack_unpacker_buffer(unpacker), IOSIZE,
+                                            &read_bytes);
     if (rlret == FAIL) {
       EMSG2(_(e_invarg2), "List item is not a string");
       goto end;
@@ -8108,9 +8108,7 @@ static void f_rpcstop(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   }
 }
 
-/*
- * "screenattr()" function
- */
+// "screenattr()" function
 static void f_screenattr(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
   int c;
@@ -8128,9 +8126,7 @@ static void f_screenattr(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   rettv->vval.v_number = c;
 }
 
-/*
- * "screenchar()" function
- */
+// "screenchar()" function
 static void f_screenchar(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
   int c;
@@ -8148,11 +8144,34 @@ static void f_screenchar(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   rettv->vval.v_number = c;
 }
 
-/*
- * "screencol()" function
- *
- * First column is 1 to be consistent with virtcol().
- */
+// "screenchars()" function
+static void f_screenchars(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+{
+  int row = tv_get_number_chk(&argvars[0], NULL) - 1;
+  int col = tv_get_number_chk(&argvars[1], NULL) - 1;
+  if (row < 0 || row >= default_grid.Rows
+      || col < 0 || col >= default_grid.Columns) {
+    tv_list_alloc_ret(rettv, 0);
+    return;
+  }
+  ScreenGrid *grid = &default_grid;
+  screenchar_adjust_grid(&grid, &row, &col);
+  int pcc[MAX_MCO];
+  int c = utfc_ptr2char(grid->chars[grid->line_offset[row] + col], pcc);
+  int composing_len = 0;
+  while (pcc[composing_len] != 0) {
+    composing_len++;
+  }
+  tv_list_alloc_ret(rettv, composing_len + 1);
+  tv_list_append_number(rettv->vval.v_list, c);
+  for (int i = 0; i < composing_len; i++) {
+    tv_list_append_number(rettv->vval.v_list, pcc[i]);
+  }
+}
+
+// "screencol()" function
+//
+// First column is 1 to be consistent with virtcol().
 static void f_screencol(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
   rettv->vval.v_number = ui_current_col() + 1;
@@ -8184,17 +8203,29 @@ static void f_screenpos(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   tv_dict_add_nr(dict, S_LEN("endcol"), ecol);
 }
 
-/*
- * "screenrow()" function
- */
+// "screenrow()" function
 static void f_screenrow(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
   rettv->vval.v_number = ui_current_row() + 1;
 }
 
-/*
- * "search()" function
- */
+// "screenstring()" function
+static void f_screenstring(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+{
+  rettv->vval.v_string = NULL;
+  rettv->v_type = VAR_STRING;
+  int row = tv_get_number_chk(&argvars[0], NULL) - 1;
+  int col = tv_get_number_chk(&argvars[1], NULL) - 1;
+  if (row < 0 || row >= default_grid.Rows
+      || col < 0 || col >= default_grid.Columns) {
+    return;
+  }
+  ScreenGrid *grid = &default_grid;
+  screenchar_adjust_grid(&grid, &row, &col);
+  rettv->vval.v_string = vim_strsave(grid->chars[grid->line_offset[row] + col]);
+}
+
+// "search()" function
 static void f_search(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
   int flags = 0;
@@ -9244,7 +9275,8 @@ static void f_shellescape(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   const bool do_special = non_zero_arg(&argvars[1]);
 
   rettv->vval.v_string = vim_strsave_shellescape((const char_u *)tv_get_string(
-                                   &argvars[0]), do_special, do_special);
+                                                                              &argvars[0]), do_special,
+                                                 do_special);
   rettv->v_type = VAR_STRING;
 }
 
