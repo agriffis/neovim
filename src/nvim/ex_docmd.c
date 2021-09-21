@@ -304,6 +304,7 @@ int do_cmdline_cmd(const char *cmd)
 ///   DOCMD_KEYTYPED - Don't reset KeyTyped.
 ///   DOCMD_EXCRESET - Reset the exception environment (used for debugging).
 ///   DOCMD_KEEPLINE - Store first typed line (for repeating with ".").
+///   DOCMD_PREVIEW  - During 'inccommand' preview.
 ///
 /// @param cookie  argument for fgetline()
 ///
@@ -606,7 +607,7 @@ int do_cmdline(char_u *cmdline, LineGetter fgetline, void *cookie, int flags)
     recursive--;
 
     // Ignore trailing '|'-separated commands in preview-mode ('inccommand').
-    if (State & CMDPREVIEW) {
+    if ((State & CMDPREVIEW) && (flags & DOCMD_PREVIEW)) {
       next_cmdline = NULL;
     }
 
@@ -1029,7 +1030,7 @@ int getline_equal(LineGetter fgetline, void *cookie, LineGetter func)
 /// getline function.  Otherwise return "cookie".
 ///
 /// @param cookie  argument for fgetline()
-void * getline_cookie(LineGetter fgetline, void *cookie)
+void *getline_cookie(LineGetter fgetline, void *cookie)
 {
   LineGetter gp;
   struct loop_cookie *cp;
@@ -1249,8 +1250,8 @@ static char_u *skip_colon_white(const char_u *p, bool skipleadingwhite)
 /// This function may be called recursively!
 ///
 /// @param cookie  argument for fgetline()
-static char_u * do_one_cmd(char_u **cmdlinep, int flags, cstack_T *cstack, LineGetter fgetline,
-                           void *cookie)
+static char_u *do_one_cmd(char_u **cmdlinep, int flags, cstack_T *cstack, LineGetter fgetline,
+                          void *cookie)
 {
   char_u *p;
   linenr_T lnum;
@@ -2904,7 +2905,7 @@ int cmd_exists(const char *const name)
 /// probably won't change that much -- webb.
 ///
 /// @param buff  buffer for command string
-const char * set_one_cmd_context(expand_T *xp, const char *buff)
+const char *set_one_cmd_context(expand_T *xp, const char *buff)
 {
   size_t len = 0;
   exarg_T ea;
