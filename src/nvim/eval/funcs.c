@@ -80,16 +80,16 @@ KHASH_MAP_INIT_STR(functions, VimLFuncDef)
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "eval/funcs.c.generated.h"
 
-#ifdef _MSC_VER
+# ifdef _MSC_VER
 // This prevents MSVC from replacing the functions with intrinsics,
 // and causing errors when trying to get their addresses in funcs.generated.h
-#pragma function(ceil)
-#pragma function(floor)
-#endif
+#  pragma function(ceil)
+#  pragma function(floor)
+# endif
 
 PRAGMA_DIAG_PUSH_IGNORE_MISSING_PROTOTYPES
 PRAGMA_DIAG_PUSH_IGNORE_IMPLICIT_FALLTHROUGH
-#include "funcs.generated.h"
+# include "funcs.generated.h"
 PRAGMA_DIAG_POP
 PRAGMA_DIAG_POP
 #endif
@@ -3748,6 +3748,59 @@ static void f_getmatches(typval_T *argvars, typval_T *rettv, FunPtr fptr)
     tv_list_append_dict(rettv->vval.v_list, dict);
     cur = cur->next;
   }
+}
+
+// "getmousepos()" function
+void f_getmousepos(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+{
+  dict_T *d;
+  win_T *wp;
+  int row = mouse_row;
+  int col = mouse_col;
+  int grid = mouse_grid;
+  varnumber_T winid = 0;
+  varnumber_T winrow = 0;
+  varnumber_T wincol = 0;
+  linenr_T line = 0;
+  varnumber_T column = 0;
+
+  tv_dict_alloc_ret(rettv);
+  d = rettv->vval.v_dict;
+
+  tv_dict_add_nr(d, S_LEN("screenrow"), (varnumber_T)mouse_row + 1);
+  tv_dict_add_nr(d, S_LEN("screencol"), (varnumber_T)mouse_col + 1);
+
+  wp = mouse_find_win(&grid, &row, &col);
+  if (wp != NULL) {
+    int height = wp->w_height + wp->w_status_height;
+    // The height is adjusted by 1 when there is a bottom border. This is not
+    // necessary for a top border since `row` starts at -1 in that case.
+    if (row < height + wp->w_border_adj[2]) {
+      winid = wp->handle;
+      winrow = row + 1 + wp->w_border_adj[0];  // Adjust by 1 for top border
+      wincol = col + 1 + wp->w_border_adj[3];  // Adjust by 1 for left border
+      if (row >= 0 && row < wp->w_height && col >= 0 && col < wp->w_width) {
+        char_u *p;
+        int count;
+
+        mouse_comp_pos(wp, &row, &col, &line);
+
+        // limit to text length plus one
+        p = ml_get_buf(wp->w_buffer, line, false);
+        count = (int)STRLEN(p);
+        if (col > count) {
+          col = count;
+        }
+
+        column = col + 1;
+      }
+    }
+  }
+  tv_dict_add_nr(d, S_LEN("winid"), winid);
+  tv_dict_add_nr(d, S_LEN("winrow"), winrow);
+  tv_dict_add_nr(d, S_LEN("wincol"), wincol);
+  tv_dict_add_nr(d, S_LEN("line"), (varnumber_T)line);
+  tv_dict_add_nr(d, S_LEN("column"), column);
 }
 
 /*
