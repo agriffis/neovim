@@ -556,6 +556,9 @@ end
 ---       - signs: (default true) Use signs for diagnostics. Options:
 ---                * severity: Only show signs for diagnostics matching the given severity
 ---                |diagnostic-severity|
+---                * priority: (number, default 10) Base priority to use for signs. When
+---                {severity_sort} is used, the priority of a sign is adjusted based on
+---                its severity. Otherwise, all signs use the same priority.
 ---       - update_in_insert: (default false) Update diagnostics in Insert mode (if false,
 ---                           diagnostics are updated on InsertLeave)
 ---       - severity_sort: (default false) Sort diagnostics by severity. This affects the order in
@@ -641,6 +644,13 @@ function M.set(namespace, bufnr, diagnostics, opts)
   end
 
   vim.api.nvim_command("doautocmd <nomodeline> User DiagnosticsChanged")
+end
+
+--- Get current diagnostic namespaces.
+---
+---@return table A list of active diagnostic namespaces |vim.diagnostic|.
+function M.get_namespaces()
+  return vim.deepcopy(all_namespaces)
 end
 
 --- Get current diagnostics.
