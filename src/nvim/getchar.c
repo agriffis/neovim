@@ -1000,6 +1000,18 @@ void ins_char_typebuf(int c)
     buf[3] = NUL;
   } else {
     buf[utf_char2bytes(c, buf)] = NUL;
+    char_u *p = buf;
+    while (*p) {
+      if ((uint8_t)(*p) == CSI || (uint8_t)(*p) == K_SPECIAL) {
+        bool is_csi = (uint8_t)(*p) == CSI;
+        memmove(p + 3, p + 1, STRLEN(p + 1) + 1);
+        *p++ = K_SPECIAL;
+        *p++ = is_csi ? KS_EXTRA : KS_SPECIAL;
+        *p++ = is_csi ? KE_CSI : KE_FILLER;
+      } else {
+        p++;
+      }
+    }
   }
   (void)ins_typebuf(buf, KeyNoremap, 0, !KeyTyped, cmd_silent);
 }
@@ -1558,7 +1570,7 @@ int vgetc(void)
             // a CSI (0x9B),
             // of a K_SPECIAL - KS_EXTRA - KE_CSI, which is CSI too.
             c = vgetorpeek(true);
-            if (vgetorpeek(true) == (int)KE_CSI && c == KS_EXTRA) {
+            if (vgetorpeek(true) == KE_CSI && c == KS_EXTRA) {
               buf[i] = CSI;
             }
           }
@@ -1573,9 +1585,9 @@ int vgetc(void)
       if (!no_mapping && KeyTyped
           && (mod_mask == MOD_MASK_ALT || mod_mask == MOD_MASK_META)) {
         mod_mask = 0;
-        stuffcharReadbuff(c);
-        u_sync(false);
-        c = ESC;
+        ins_char_typebuf(c);
+        ins_char_typebuf(ESC);
+        continue;
       }
 
       break;
@@ -1934,7 +1946,7 @@ static int vgetorpeek(bool advance)
                       && (mp->m_keys[0] != K_SPECIAL
                           || mp->m_keys[1] != KS_EXTRA
                           || mp->m_keys[2]
-                          != (int)KE_SNR)) {
+                          != KE_SNR)) {
                     continue;
                   }
                   /*
@@ -2216,7 +2228,7 @@ static int vgetorpeek(bool advance)
                   if (!ascii_iswhite(ptr[col])) {
                     curwin->w_wcol = vcol;
                   }
-                  vcol += lbr_chartabsize(ptr, ptr + col, (colnr_T)vcol);
+                  vcol += lbr_chartabsize(ptr, ptr + col, vcol);
                   col += utfc_ptr2len(ptr + col);
                 }
                 curwin->w_wrow = curwin->w_cline_row

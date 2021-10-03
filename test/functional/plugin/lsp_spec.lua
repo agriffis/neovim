@@ -132,37 +132,38 @@ local function test_rpc_server(config)
 end
 
 describe('LSP', function()
+  before_each(function()
+    clear_notrace()
+
+    -- Run an instance of nvim on the file which contains our "scripts".
+    -- Pass TEST_NAME to pick the script.
+    local test_name = "basic_init"
+    exec_lua([=[
+      lsp = require('vim.lsp')
+      local test_name, fixture_filename, logfile = ...
+      function test__start_client()
+        return lsp.start_client {
+          cmd_env = {
+            NVIM_LOG_FILE = logfile;
+          };
+          cmd = {
+            vim.v.progpath, '-Es', '-u', 'NONE', '--headless',
+            "-c", string.format("lua TEST_NAME = %q", test_name),
+            "-c", "luafile "..fixture_filename;
+          };
+          root_dir = vim.loop.cwd();
+        }
+      end
+      TEST_CLIENT1 = test__start_client()
+    ]=], test_name, fake_lsp_code, fake_lsp_logfile)
+  end)
+
+  after_each(function()
+    exec_lua("lsp._vim_exit_handler()")
+   -- exec_lua("lsp.stop_all_clients(true)")
+  end)
+
   describe('server_name specified', function()
-    before_each(function()
-      clear_notrace()
-      -- Run an instance of nvim on the file which contains our "scripts".
-      -- Pass TEST_NAME to pick the script.
-      local test_name = "basic_init"
-      exec_lua([=[
-        lsp = require('vim.lsp')
-        local test_name, fixture_filename, logfile = ...
-        function test__start_client()
-          return lsp.start_client {
-            cmd_env = {
-              NVIM_LOG_FILE = logfile;
-            };
-            cmd = {
-              vim.v.progpath, '-Es', '-u', 'NONE', '--headless',
-              "-c", string.format("lua TEST_NAME = %q", test_name),
-              "-c", "luafile "..fixture_filename;
-            };
-            root_dir = vim.loop.cwd();
-          }
-        end
-        TEST_CLIENT1 = test__start_client()
-      ]=], test_name, fake_lsp_code, fake_lsp_logfile)
-    end)
-
-    after_each(function()
-      exec_lua("lsp._vim_exit_handler()")
-     -- exec_lua("lsp.stop_all_clients(true)")
-    end)
-
     it('start_client(), stop_client()', function()
       retry(nil, 4000, function()
         eq(1, exec_lua('return #lsp.get_active_clients()'))
@@ -334,7 +335,6 @@ describe('LSP', function()
       }
     end)
     it('workspace/configuration returns NIL per section if client was started without config.settings', function()
-      clear_notrace()
       fake_lsp_server_setup('workspace/configuration no settings')
       eq({ NIL, NIL, }, exec_lua [[
         local result = {
@@ -2019,83 +2019,6 @@ describe('LSP', function()
 
       mark = funcs.nvim_buf_get_mark(target_bufnr, "'")
       eq({ 2, 3 }, mark)
-    end)
-  end)
-
-  describe('lsp.util.make_floating_popup_options', function()
-    before_each(function()
-      exec_lua [[
-        local bufnr = vim.uri_to_bufnr("file:///fake/uri")
-        local winheight = vim.fn.winheight(0)
-        for i = 1, winheight do
-          vim.api.nvim_buf_set_lines(bufnr, 0, 0, false, {''})
-        end
-        vim.api.nvim_win_set_buf(0, bufnr)
-        vim.api.nvim_win_set_cursor(0, {winheight, 0})
-      ]]
-    end)
-
-    local function popup_row(opts)
-      return exec_lua([[
-        return vim.lsp.util.make_floating_popup_options(...).row
-      ]], 2, 2, opts)
-    end
-
-    local err_pattern = "^Error executing lua: %.%.%./util%.lua:0: invalid floating preview border: .*%. :help vim%.api%.nvim_open_win%(%)$"
-
-    it('calculates default border height correctly', function()
-      eq(0, popup_row())
-    end)
-
-    it('calculates string border height correctly', function()
-      eq(0, popup_row({border = 'none'}))
-      eq(-2, popup_row({border = 'single'}))
-      eq(-2, popup_row({border = 'double'}))
-      eq(-2, popup_row({border = 'rounded'}))
-      eq(-2, popup_row({border = 'solid'}))
-      eq(-1, popup_row({border = 'shadow'}))
-    end)
-
-    it('error on invalid string border', function()
-      matches(err_pattern, pcall_err(popup_row, {border = ''}))
-      matches(err_pattern, pcall_err(popup_row, {border = 'invalid'}))
-    end)
-
-    it('error on invalid array border length', function()
-      matches(err_pattern, pcall_err(popup_row, {border = {}}))
-      matches(err_pattern, pcall_err(popup_row, {border = {'', '', ''}}))
-      matches(err_pattern, pcall_err(popup_row, {border = {'', '', '', '', ''}}))
-    end)
-
-    it('error on invalid array border member type', function()
-      matches(err_pattern, pcall_err(popup_row, {border = {0}}))
-    end)
-
-    it('calculates 8-array border height correctly', function()
-      eq(0, popup_row({border = {'', '', '', '', '', '', '', ''}}))
-      eq(-2, popup_row({border = {'', '~', '', '~', '', '~', '', '~'}}))
-      eq(-1, popup_row({border = {'', '', '', '~', '', '~', '', ''}}))
-      eq(0, popup_row({border = {'', '', '', {'~', 'NormalFloat'}, '', '', '', {'~', 'NormalFloat'}}}))
-      eq(-2, popup_row({border = {'', {'~', 'NormalFloat'}, '', '', '', {'~', 'NormalFloat'}, '', ''}}))
-    end)
-
-    it('calculates 4-array border height correctly', function()
-      eq(0, popup_row({border = {'', '', '', ''}}))
-      eq(-2, popup_row({border = {'', '~', '', '~'}}))
-      eq(0, popup_row({border = {'', '', '', {'~', 'NormalFloat'}}}))
-      eq(-2, popup_row({border = {'', {'~', 'NormalFloat'}, '', ''}}))
-    end)
-
-    it('calculates 2-array border height correctly', function()
-      eq(0, popup_row({border = {'', ''}}))
-      eq(-2, popup_row({border = {'', '~'}}))
-      eq(-2, popup_row({border = {'', {'~', 'NormalFloat'}}}))
-    end)
-
-    it('calculates 1-array border height correctly', function()
-      eq(0, popup_row({border = {''}}))
-      eq(-2, popup_row({border = {'~'}}))
-      eq(-2, popup_row({border = {{'~', 'NormalFloat'}}}))
     end)
   end)
 
