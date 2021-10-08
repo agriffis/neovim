@@ -418,7 +418,7 @@ void nvim_buf_set_lines(uint64_t channel_id, Buffer buffer, Integer start, Integ
 
   try_start();
   aco_save_T aco;
-  aucmd_prepbuf(&aco, (buf_T *)buf);
+  aucmd_prepbuf(&aco, buf);
 
   if (!MODIFIABLE(buf)) {
     api_set_error(err, kErrorTypeException, "Buffer is not 'modifiable'");
@@ -624,7 +624,8 @@ void nvim_buf_set_text(uint64_t channel_id, Buffer buffer, Integer start_row, In
   if (replacement.size == 1) {
     firstlen += last_part_len;
   }
-  char *first = xmallocz(firstlen), *last = NULL;
+  char *first = xmallocz(firstlen);
+  char *last = NULL;
   memcpy(first, str_at_start, (size_t)start_col);
   memcpy(first+start_col, first_item.data, first_item.size);
   memchrsub(first+start_col, NUL, NL, first_item.size);
@@ -637,7 +638,7 @@ void nvim_buf_set_text(uint64_t channel_id, Buffer buffer, Integer start_row, In
     memcpy(last+last_item.size, str_at_end+end_col, last_part_len);
   }
 
-  char **lines = (new_len != 0) ? xcalloc(new_len, sizeof(char *)) : NULL;
+  char **lines = xcalloc(new_len, sizeof(char *));
   lines[0] = first;
   new_byte += (bcount_t)(first_item.size);
   for (size_t i = 1; i < new_len-1; i++) {
@@ -656,7 +657,7 @@ void nvim_buf_set_text(uint64_t channel_id, Buffer buffer, Integer start_row, In
 
   try_start();
   aco_save_T aco;
-  aucmd_prepbuf(&aco, (buf_T *)buf);
+  aucmd_prepbuf(&aco, buf);
 
   if (!MODIFIABLE(buf)) {
     api_set_error(err, kErrorTypeException, "Buffer is not 'modifiable'");
@@ -1340,7 +1341,7 @@ ArrayOf(Integer) nvim_buf_get_extmark_by_id(Buffer buffer, Integer ns_id,
   if (extmark.row < 0) {
     return rv;
   }
-  return extmark_to_array(extmark, false, (bool)details);
+  return extmark_to_array(extmark, false, details);
 }
 
 /// Gets extmarks in "traversal order" from a |charwise| region defined by
@@ -1561,16 +1562,17 @@ Integer nvim_buf_set_extmark(Buffer buffer, Integer ns_id, Integer line, Integer
                              Dict(set_extmark) *opts, Error *err)
   FUNC_API_SINCE(7)
 {
+  Decoration decor = DECORATION_INIT;
+
   buf_T *buf = find_buffer_by_handle(buffer, err);
   if (!buf) {
-    return 0;
+    goto error;
   }
 
   if (!ns_initialized((uint64_t)ns_id)) {
     api_set_error(err, kErrorTypeValidation, "Invalid ns_id");
-    return 0;
+    goto error;
   }
-
 
   uint64_t id = 0;
   if (opts->id.type == kObjectTypeInteger && opts->id.data.integer > 0) {
@@ -1607,8 +1609,6 @@ Integer nvim_buf_set_extmark(Buffer buffer, Integer ns_id, Integer line, Integer
     api_set_error(err, kErrorTypeValidation, "end_col is not an integer");
     goto error;
   }
-
-  Decoration decor = DECORATION_INIT;
 
   if (HAS_KEY(opts->hl_group)) {
     decor.hl_id = object_to_hl_id(opts->hl_group, "hl_group", err);
@@ -1741,7 +1741,7 @@ Integer nvim_buf_set_extmark(Buffer buffer, Integer ns_id, Integer line, Integer
 
   if (line < 0 || line > buf->b_ml.ml_line_count) {
     api_set_error(err, kErrorTypeValidation, "line value outside range");
-    return 0;
+    goto error;
   } else if (line < buf->b_ml.ml_line_count) {
     len = ephemeral ? MAXCOL : STRLEN(ml_get_buf(buf, (linenr_T)line+1, false));
   }
@@ -1750,7 +1750,7 @@ Integer nvim_buf_set_extmark(Buffer buffer, Integer ns_id, Integer line, Integer
     col = (Integer)len;
   } else if (col < -1 || col > (Integer)len) {
     api_set_error(err, kErrorTypeValidation, "col value outside range");
-    return 0;
+    goto error;
   }
 
   if (col2 >= 0) {
@@ -1983,7 +1983,7 @@ Object nvim_buf_call(Buffer buffer, LuaRef fun, Error *err)
   }
   try_start();
   aco_save_T aco;
-  aucmd_prepbuf(&aco, (buf_T *)buf);
+  aucmd_prepbuf(&aco, buf);
 
   Array args = ARRAY_DICT_INIT;
   Object res = nlua_call_ref(fun, NULL, args, true, err);

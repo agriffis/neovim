@@ -125,9 +125,7 @@ local function get_namespace(ns)
       end
     end
 
-    if not name then
-      return vim.notify("namespace does not exist or is anonymous", vim.log.levels.ERROR)
-    end
+    assert(name, "namespace does not exist or is anonymous")
 
     all_namespaces[ns] = {
       name = name,
@@ -398,6 +396,17 @@ local function show_diagnostics(opts, diagnostics)
     diagnostics = prefix_source(opts.source, diagnostics)
   end
 
+  -- Use global setting for severity_sort since 'show_diagnostics' is namespace
+  -- independent
+  local severity_sort = global_diagnostic_options.severity_sort
+  if severity_sort then
+    if type(severity_sort) == "table" and severity_sort.reverse then
+      table.sort(diagnostics, function(a, b) return a.severity > b.severity end)
+    else
+      table.sort(diagnostics, function(a, b) return a.severity < b.severity end)
+    end
+  end
+
   for i, diagnostic in ipairs(diagnostics) do
     local prefix = string.format("%d. ", i)
     local hiname = floating_highlight_map[diagnostic.severity]
@@ -509,6 +518,9 @@ local function diagnostic_move_pos(opts, pos)
     vim.api.nvim_echo({{"No more valid diagnostics to move to", "WarningMsg"}}, true, {})
     return
   end
+
+  -- Save position in the window's jumplist
+  vim.api.nvim_win_call(win_id, function() vim.cmd("normal! m'") end)
 
   vim.api.nvim_win_set_cursor(win_id, {pos[1] + 1, pos[2]})
 
@@ -1140,7 +1152,6 @@ function M.show_position_diagnostics(opts, bufnr, position)
   local diagnostics = M.get(bufnr, opts)
   clamp_line_numbers(bufnr, diagnostics)
   local position_diagnostics = vim.tbl_filter(match_position_predicate, diagnostics)
-  table.sort(position_diagnostics, function(a, b) return a.severity < b.severity end)
   return show_diagnostics(opts, position_diagnostics)
 end
 
