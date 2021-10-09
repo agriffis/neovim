@@ -246,6 +246,35 @@ function tests.capabilities_for_client_supports_method()
   }
 end
 
+function tests.check_forward_request_cancelled()
+  skeleton {
+    on_init = function(_)
+      return { capabilities = {} }
+    end;
+    body = function()
+      expect_request("error_code_test", function()
+        return {code = -32800}, nil, {method = "error_code_test", client_id=1}
+      end)
+      notify('finish')
+    end;
+  }
+end
+
+function tests.check_forward_content_modified()
+  skeleton {
+    on_init = function(_)
+      return { capabilities = {} }
+    end;
+    body = function()
+      expect_request("error_code_test", function()
+        return {code = -32801}, nil, {method = "error_code_test", client_id=1}
+      end)
+      expect_notification('finish')
+      notify('finish')
+    end;
+  }
+end
+
 function tests.basic_finish()
   skeleton {
     on_init = function(params)
