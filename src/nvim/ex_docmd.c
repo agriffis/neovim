@@ -197,8 +197,8 @@ void do_exmode(void)
   exmode_active = true;
   State = NORMAL;
 
-  /* When using ":global /pat/ visual" and then "Q" we return to continue
-   * the :global command. */
+  // When using ":global /pat/ visual" and then "Q" we return to continue
+  // the :global command.
   if (global_busy) {
     return;
   }
@@ -231,8 +231,8 @@ void do_exmode(void)
         EMSG(_(e_emptybuf));
       } else {
         if (ex_pressedreturn) {
-          /* go up one line, to overwrite the ":<CR>" line, so the
-           * output doesn't contain empty lines. */
+          // go up one line, to overwrite the ":<CR>" line, so the
+          // output doesn't contain empty lines.
           msg_row = prev_msg_row;
           if (prev_msg_row == Rows - 1) {
             msg_row--;
@@ -374,8 +374,8 @@ int do_cmdline(char_u *cmdline, LineGetter fgetline, void *cookie, int flags)
     ++ex_nesting_level;
   }
 
-  /* Get the function or script name and the address where the next breakpoint
-   * line and the debug tick for a function or script are stored. */
+  // Get the function or script name and the address where the next breakpoint
+  // line and the debug tick for a function or script are stored.
   if (getline_is_func) {
     fname = func_name(real_cookie);
     breakpoint = func_breakpoint(real_cookie);
@@ -500,11 +500,11 @@ int do_cmdline(char_u *cmdline, LineGetter fgetline, void *cookie, int flags)
     }
 
     if (cstack.cs_looplevel > 0) {
-      /* Inside a while/for loop we need to store the lines and use them
-       * again.  Pass a different "fgetline" function to do_one_cmd()
-       * below, so that it stores lines in or reads them from
-       * "lines_ga".  Makes it possible to define a function inside a
-       * while/for loop. */
+      // Inside a while/for loop we need to store the lines and use them
+      // again.  Pass a different "fgetline" function to do_one_cmd()
+      // below, so that it stores lines in or reads them from
+      // "lines_ga".  Makes it possible to define a function inside a
+      // while/for loop.
       cmd_getline = get_loop_line;
       cmd_cookie = (void *)&cmd_loop_cookie;
       cmd_loop_cookie.lines_gap = &lines_ga;
@@ -612,8 +612,8 @@ int do_cmdline(char_u *cmdline, LineGetter fgetline, void *cookie, int flags)
     }
 
     if (cmd_cookie == (void *)&cmd_loop_cookie) {
-      /* Use "current_line" from "cmd_loop_cookie", it may have been
-       * incremented when defining a function. */
+      // Use "current_line" from "cmd_loop_cookie", it may have been
+      // incremented when defining a function.
       current_line = cmd_loop_cookie.current_line;
     }
 
@@ -671,8 +671,8 @@ int do_cmdline(char_u *cmdline, LineGetter fgetline, void *cookie, int flags)
           cstack.cs_lflags |= CSL_HAD_LOOP;
           line_breakcheck();                    // check if CTRL-C typed
 
-          /* Check for the next breakpoint at or after the ":while"
-           * or ":for". */
+          // Check for the next breakpoint at or after the ":while"
+          // or ":for".
           if (breakpoint != NULL) {
             *breakpoint = dbg_find_breakpoint(getline_equal(fgetline, cookie, getsourceline),
                                               fname,
@@ -724,8 +724,8 @@ int do_cmdline(char_u *cmdline, LineGetter fgetline, void *cookie, int flags)
       cstack.cs_flags[cstack.cs_idx] |= CSF_ACTIVE | CSF_FINALLY;
     }
 
-    /* Update global "trylevel" for recursive calls to do_cmdline() from
-     * within this loop. */
+    // Update global "trylevel" for recursive calls to do_cmdline() from
+    // within this loop.
     trylevel = initial_trylevel + cstack.cs_trylevel;
 
     // If the outermost try conditional (across function calls and sourced
@@ -806,9 +806,9 @@ int do_cmdline(char_u *cmdline, LineGetter fgetline, void *cookie, int flags)
     trylevel = initial_trylevel;
   }
 
-  /* If a missing ":endtry", ":endwhile", ":endfor", or ":endif" or a memory
-   * lack was reported above and the error message is to be converted to an
-   * exception, do this now after rewinding the cstack. */
+  // If a missing ":endtry", ":endwhile", ":endfor", or ":endif" or a memory
+  // lack was reported above and the error message is to be converted to an
+  // exception, do this now after rewinding the cstack.
   do_errthrow(&cstack, getline_equal(fgetline, cookie, get_func_line)
       ? (char_u *)"endfunction" : (char_u *)NULL);
 
@@ -1014,9 +1014,9 @@ int getline_equal(LineGetter fgetline, void *cookie, LineGetter func)
   LineGetter gp;
   struct loop_cookie *cp;
 
-  /* When "fgetline" is "get_loop_line()" use the "cookie" to find the
-   * function that's originally used to obtain the lines.  This may be
-   * nested several levels. */
+  // When "fgetline" is "get_loop_line()" use the "cookie" to find the
+  // function that's originally used to obtain the lines.  This may be
+  // nested several levels.
   gp = fgetline;
   cp = (struct loop_cookie *)cookie;
   while (gp == get_loop_line) {
@@ -1035,9 +1035,9 @@ void *getline_cookie(LineGetter fgetline, void *cookie)
   LineGetter gp;
   struct loop_cookie *cp;
 
-  /* When "fgetline" is "get_loop_line()" use the "cookie" to find the
-   * cookie that's originally used to obtain the lines.  This may be nested
-   * several levels. */
+  // When "fgetline" is "get_loop_line()" use the "cookie" to find the
+  // cookie that's originally used to obtain the lines.  This may be nested
+  // several levels.
   gp = fgetline;
   cp = (struct loop_cookie *)cookie;
   while (gp == get_loop_line) {
@@ -2625,9 +2625,9 @@ static char_u *find_command(exarg_T *eap, int *full)
     }
     len = (int)(p - eap->cmd);
     if (*eap->cmd == 'd' && (p[-1] == 'l' || p[-1] == 'p')) {
-      /* Check for ":dl", ":dell", etc. to ":deletel": that's
-       * :delete with the 'l' flag.  Same for 'p'. */
-      for (i = 0; i < len; ++i) {
+      // Check for ":dl", ":dell", etc. to ":deletel": that's
+      // :delete with the 'l' flag.  Same for 'p'.
+      for (i = 0; i < len; i++) {
         if (eap->cmd[i] != ((char_u *)"delete")[i]) {
           break;
         }
@@ -4435,8 +4435,8 @@ int expand_filename(exarg_T *eap, char_u **cmdlinep, char_u **errormsgp)
       continue;
     }
 
-    /* Wildcards won't be expanded below, the replacement is taken
-     * literally.  But do expand "~/file", "~user/file" and "$HOME/file". */
+    // Wildcards won't be expanded below, the replacement is taken
+    // literally.  But do expand "~/file", "~user/file" and "$HOME/file".
     if (vim_strchr(repl, '$') != NULL || vim_strchr(repl, '~') != NULL) {
       char_u *l = repl;
 
@@ -4463,8 +4463,8 @@ int expand_filename(exarg_T *eap, char_u **cmdlinep, char_u **errormsgp)
         && !(eap->argt & EX_NOSPC)) {
       char_u *l;
 #ifdef BACKSLASH_IN_FILENAME
-      /* Don't escape a backslash here, because rem_backslash() doesn't
-       * remove it later. */
+      // Don't escape a backslash here, because rem_backslash() doesn't
+      // remove it later.
       static char_u *nobslash = (char_u *)" \t\"|";
 # define ESCAPE_CHARS nobslash
 #else
@@ -7205,8 +7205,8 @@ void ex_splitview(exarg_T *eap)
     }
   } else if (win_split(eap->addr_count > 0 ? (int)eap->line2 : 0,
                        *eap->cmd == 'v' ? WSP_VERT : 0) != FAIL) {
-    /* Reset 'scrollbind' when editing another file, but keep it when
-     * doing ":split" without arguments. */
+    // Reset 'scrollbind' when editing another file, but keep it when
+    // doing ":split" without arguments.
     if (*eap->arg != NUL
         ) {
       RESET_BINDING(curwin);
@@ -7402,8 +7402,8 @@ static void ex_find(exarg_T *eap)
   fname = find_file_in_path(eap->arg, STRLEN(eap->arg),
                             FNAME_MESS, TRUE, curbuf->b_ffname);
   if (eap->addr_count > 0) {
-    /* Repeat finding the file "count" times.  This matters when it
-     * appears several times in the path. */
+    // Repeat finding the file "count" times.  This matters when it
+    // appears several times in the path.
     count = eap->line2;
     while (fname != NULL && --count > 0) {
       xfree(fname);
@@ -7509,8 +7509,8 @@ void do_exedit(exarg_T *eap, win_T *old_curwin)
         if (!need_hide || buf_hide(curbuf)) {
           cleanup_T cs;
 
-          /* Reset the error/interrupt/exception state here so that
-           * aborting() returns FALSE when closing a window. */
+          // Reset the error/interrupt/exception state here so that
+          // aborting() returns FALSE when closing a window.
           enter_cleanup(&cs);
           win_close(curwin, !need_hide && !buf_hide(curbuf));
 
@@ -7675,8 +7675,8 @@ static void ex_read(exarg_T *eap)
       }
     } else {
       if (empty && exmode_active) {
-        /* Delete the empty line that remains.  Historically ex does
-         * this but vi doesn't. */
+        // Delete the empty line that remains.  Historically ex does
+        // this but vi doesn't.
         if (eap->line2 == 0) {
           lnum = curbuf->b_ml.ml_line_count;
         } else {
@@ -7707,6 +7707,21 @@ void free_cd_dir(void)
 
 #endif
 
+// Get the previous directory for the given chdir scope.
+static char_u *get_prevdir(CdScope scope)
+{
+  switch (scope) {
+  case kCdScopeTabpage:
+    return curtab->tp_prevdir;
+    break;
+  case kCdScopeWindow:
+    return curwin->w_prevdir;
+    break;
+  default:
+    return prev_dir;
+  }
+}
+
 /// Deal with the side effects of changing the current directory.
 ///
 /// @param scope  Scope of the function call (global, tab or window).
@@ -7716,14 +7731,15 @@ void post_chdir(CdScope scope, bool trigger_dirchanged)
   XFREE_CLEAR(curwin->w_localdir);
 
   // Overwrite the tab-local CWD for :cd, :tcd.
-  if (scope >= kCdScopeTab) {
+  if (scope >= kCdScopeTabpage) {
     XFREE_CLEAR(curtab->tp_localdir);
   }
 
   if (scope < kCdScopeGlobal) {
+    char_u *pdir = get_prevdir(scope);
     // If still in global directory, set CWD as the global directory.
-    if (globaldir == NULL && prev_dir != NULL) {
-      globaldir = vim_strsave(prev_dir);
+    if (globaldir == NULL && pdir != NULL) {
+      globaldir = vim_strsave(pdir);
     }
   }
 
@@ -7736,7 +7752,7 @@ void post_chdir(CdScope scope, bool trigger_dirchanged)
     // We are now in the global directory, no need to remember its name.
     XFREE_CLEAR(globaldir);
     break;
-  case kCdScopeTab:
+  case kCdScopeTabpage:
     curtab->tp_localdir = (char_u *)xstrdup(cwd);
     break;
   case kCdScopeWindow:
@@ -7749,59 +7765,92 @@ void post_chdir(CdScope scope, bool trigger_dirchanged)
   shorten_fnames(true);
 
   if (trigger_dirchanged) {
-    do_autocmd_dirchanged(cwd, scope, false);
+    do_autocmd_dirchanged(cwd, scope, kCdCauseManual);
   }
 }
 
-/// `:cd`, `:tcd`, `:lcd`, `:chdir`, `:tchdir` and `:lchdir`.
+/// Change directory function used by :cd/:tcd/:lcd Ex commands and the chdir() function.
+/// @param new_dir  The directory to change to.
+/// @param scope    Scope of the function call (global, tab or window).
+/// @return true if the directory is successfully changed.
+bool changedir_func(char_u *new_dir, CdScope scope)
+{
+  char_u *tofree;
+  char_u *pdir = NULL;
+  bool retval = false;
+
+  if (new_dir == NULL || allbuf_locked()) {
+    return false;
+  }
+
+  // ":cd -": Change to previous directory
+  if (STRCMP(new_dir, "-") == 0) {
+    pdir = get_prevdir(scope);
+    if (pdir == NULL) {
+      EMSG(_("E186: No previous directory"));
+      return false;
+    }
+    new_dir = pdir;
+  }
+
+  // Free the previous directory
+  tofree = get_prevdir(scope);
+
+  if (os_dirname(NameBuff, MAXPATHL) == OK) {
+    pdir = vim_strsave(NameBuff);
+  } else {
+    pdir = NULL;
+  }
+
+  switch (scope) {
+  case kCdScopeTabpage:
+    curtab->tp_prevdir = pdir;
+    break;
+  case kCdScopeWindow:
+    curwin->w_prevdir = pdir;
+    break;
+  default:
+    prev_dir = pdir;
+  }
+
+#if defined(UNIX)
+  // On Unix ":cd" means: go to home directory.
+  if (*new_dir == NUL) {
+    // Use NameBuff for home directory name.
+    expand_env((char_u *)"$HOME", NameBuff, MAXPATHL);
+    new_dir = NameBuff;
+  }
+#endif
+
+  if (vim_chdir(new_dir) == 0) {
+    bool dir_differs = pdir == NULL || pathcmp((char *)pdir, (char *)new_dir, -1) != 0;
+    post_chdir(scope, dir_differs);
+    retval = true;
+  } else {
+    EMSG(_(e_failed));
+  }
+  xfree(tofree);
+
+  return retval;
+}
+
+/// ":cd", ":tcd", ":lcd", ":chdir", "tchdir" and ":lchdir".
 void ex_cd(exarg_T *eap)
 {
   char_u *new_dir;
-  char_u *tofree;
-
   new_dir = eap->arg;
-#if !defined(UNIX)
+#if !defined(UNIX) && !defined(VMS)
   // for non-UNIX ":cd" means: print current directory
   if (*new_dir == NUL) {
     ex_pwd(NULL);
   } else
 #endif
   {
-    if (allbuf_locked()) {
-      return;
-    }
-
-    // ":cd -": Change to previous directory
-    if (STRCMP(new_dir, "-") == 0) {
-      if (prev_dir == NULL) {
-        EMSG(_("E186: No previous directory"));
-        return;
-      }
-      new_dir = prev_dir;
-    }
-
-    // Save current directory for next ":cd -"
-    tofree = prev_dir;
-    if (os_dirname(NameBuff, MAXPATHL) == OK) {
-      prev_dir = vim_strsave(NameBuff);
-    } else {
-      prev_dir = NULL;
-    }
-
-#if defined(UNIX)
-    // On Unix ":cd" means: go to home directory.
-    if (*new_dir == NUL) {
-      // Use NameBuff for home directory name.
-      expand_env((char_u *)"$HOME", NameBuff, MAXPATHL);
-      new_dir = NameBuff;
-    }
-#endif
-    CdScope scope = kCdScopeGlobal;  // Depends on command invoked
-
+    CdScope scope = kCdScopeGlobal;
     switch (eap->cmdidx) {
     case CMD_tcd:
     case CMD_tchdir:
-      scope = kCdScopeTab;
+      scope = kCdScopeTabpage;
       break;
     case CMD_lcd:
     case CMD_lchdir:
@@ -7810,18 +7859,12 @@ void ex_cd(exarg_T *eap)
     default:
       break;
     }
-
-    if (vim_chdir(new_dir)) {
-      EMSG(_(e_failed));
-    } else {
-      post_chdir(scope, true);
+    if (changedir_func(new_dir, scope)) {
       // Echo the new current directory if the command was typed.
       if (KeyTyped || p_verbose >= 5) {
         ex_pwd(eap);
       }
     }
-
-    xfree(tofree);
   }
 }
 
@@ -7834,7 +7877,17 @@ static void ex_pwd(exarg_T *eap)
 #ifdef BACKSLASH_IN_FILENAME
     slash_adjust(NameBuff);
 #endif
-    msg(NameBuff);
+    if (p_verbose > 0) {
+      char *context = "global";
+      if (curwin->w_localdir != NULL) {
+        context = "window";
+      } else if (curtab->tp_localdir != NULL) {
+        context = "tabpage";
+      }
+      smsg("[%s] %s", context, (char *)NameBuff);
+    } else {
+      msg(NameBuff);
+    }
   } else {
     EMSG(_("E187: Unknown"));
   }
@@ -8298,8 +8351,8 @@ static void ex_redir(exarg_T *eap)
     }
   }
 
-  /* Make sure redirection is not off.  Can happen for cmdline completion
-   * that indirectly invokes a command to catch its output. */
+  // Make sure redirection is not off.  Can happen for cmdline completion
+  // that indirectly invokes a command to catch its output.
   if (redir_fd != NULL
       || redir_reg || redir_vname) {
     redir_off = false;

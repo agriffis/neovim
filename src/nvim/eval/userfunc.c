@@ -402,15 +402,15 @@ void emsg_funcname(char *ermsg, const char_u *name)
   }
 }
 
-/*
- * Allocate a variable for the result of a function.
- * Return OK or FAIL.
- */
-int get_func_tv(const char_u *name,     // name of the function
-                int len,                // length of "name" or -1 to use strlen()
-                typval_T *rettv, char_u **arg,           // argument, pointing to the '('
-                funcexe_T *funcexe      // various values
-                )
+/// Allocate a variable for the result of a function.
+///
+/// @param name  name of the function
+/// @param len  length of "name" or -1 to use strlen()
+/// @param arg  argument, pointing to the '('
+/// @param funcexe  various values
+///
+/// @return  OK or FAIL.
+int get_func_tv(const char_u *name, int len, typval_T *rettv, char_u **arg, funcexe_T *funcexe)
 {
   char_u *argp;
   int ret = OK;
@@ -1436,17 +1436,18 @@ static void argv_add_base(typval_T *const basetv, typval_T **const argvars, int 
 
 /// Call a function with its resolved parameters
 ///
+/// @param funcname  name of the function
+/// @param len  length of "name" or -1 to use strlen()
+/// @param rettv  [out] value goes here
+/// @param argcount_in  number of "argvars"
+/// @param argvars_in  vars for arguments, must have "argcount" PLUS ONE elements!
+/// @param funcexe  more arguments
+///
 /// @return FAIL if function cannot be called, else OK (even if an error
 ///         occurred while executing the function! Set `msg_list` to capture
 ///         the error, see do_cmdline()).
-int call_func(const char_u *funcname,         // name of the function
-              int len,                        // length of "name" or -1 to use strlen()
-              typval_T *rettv,                // [out] value goes here
-              int argcount_in,                // number of "argvars"
-              typval_T *argvars_in,           // vars for arguments, must have "argcount"
-                                              // PLUS ONE elements!
-              funcexe_T *funcexe              // more arguments
-              )
+int call_func(const char_u *funcname, int len, typval_T *rettv, int argcount_in,
+              typval_T *argvars_in, funcexe_T *funcexe)
   FUNC_ATTR_NONNULL_ARG(1, 3, 5, 6)
 {
   int ret = FAIL;
@@ -1690,11 +1691,12 @@ static void list_func_head(ufunc_T *fp, int indent, bool force)
 /// TFN_NO_DEREF:    do not dereference a Funcref
 /// Advances "pp" to just after the function name (if no error).
 ///
+/// @param skip  only find the end, don't evaluate
+/// @param fdp  return: info about dictionary used
+/// @param partial  return: partial of a FuncRef
+///
 /// @return the function name in allocated memory, or NULL for failure.
-char_u *trans_function_name(char_u **pp, bool skip,                     // only find the end, don't evaluate
-                            int flags, funcdict_T *fdp,               // return: info about dictionary used
-                            partial_T **partial            // return: partial of a FuncRef
-                            )
+char_u *trans_function_name(char_u **pp, bool skip, int flags, funcdict_T *fdp, partial_T **partial)
   FUNC_ATTR_NONNULL_ARG(1)
 {
   char_u *name = NULL;
@@ -1709,8 +1711,8 @@ char_u *trans_function_name(char_u **pp, bool skip,                     // only 
   }
   start = *pp;
 
-  /* Check for hard coded <SNR>: already translated function ID (from a user
-   * command). */
+  // Check for hard coded <SNR>: already translated function ID (from a user
+  // command).
   if ((*pp)[0] == K_SPECIAL && (*pp)[1] == KS_EXTRA
       && (*pp)[2] == (int)KE_SNR) {
     *pp += 3;
@@ -2032,8 +2034,8 @@ void ex_function(exarg_T *eap)
     }
   }
 
-  /* An error in a function call during evaluation of an expression in magic
-   * braces should not cause the function not to be defined. */
+  // An error in a function call during evaluation of an expression in magic
+  // braces should not cause the function not to be defined.
   saved_did_emsg = did_emsg;
   did_emsg = FALSE;
 
@@ -2105,8 +2107,8 @@ void ex_function(exarg_T *eap)
   ga_init(&newlines, (int)sizeof(char_u *), 3);
 
   if (!eap->skip) {
-    /* Check the name of the function.  Unless it's a dictionary function
-     * (that we are overwriting). */
+    // Check the name of the function.  Unless it's a dictionary function
+    // (that we are overwriting).
     if (name != NULL) {
       arg = name;
     } else {
@@ -2164,8 +2166,8 @@ void ex_function(exarg_T *eap)
     }
   }
 
-  /* When there is a line break use what follows for the function body.
-   * Makes 'exe "func Test()\n...\nendfunc"' work. */
+  // When there is a line break use what follows for the function body.
+  // Makes 'exe "func Test()\n...\nendfunc"' work.
   if (*p == '\n') {
     line_arg = p + 1;
   } else if (*p != NUL && *p != '"' && !eap->skip && !did_emsg) {
@@ -2176,9 +2178,9 @@ void ex_function(exarg_T *eap)
    * Read the body of the function, until ":endfunction" is found.
    */
   if (KeyTyped) {
-    /* Check if the function already exists, don't let the user type the
-     * whole function before telling him it doesn't work!  For a script we
-     * need to skip the body to be able to find what follows. */
+    // Check if the function already exists, don't let the user type the
+    // whole function before telling him it doesn't work!  For a script we
+    // need to skip the body to be able to find what follows.
     if (!eap->skip && !eap->forceit) {
       if (fudi.fd_dict != NULL && fudi.fd_newkey == NULL) {
         EMSG(_(e_funcdict));
@@ -2305,8 +2307,8 @@ void ex_function(exarg_T *eap)
         break;
       }
 
-      /* Increase indent inside "if", "while", "for" and "try", decrease
-       * at "end". */
+      // Increase indent inside "if", "while", "for" and "try", decrease
+      // at "end".
       if (indent > 2 && STRNCMP(p, "end", 3) == 0) {
         indent -= 2;
       } else if (STRNCMP(p, "if", 2) == 0
@@ -2421,8 +2423,8 @@ void ex_function(exarg_T *eap)
     }
   }
 
-  /* Don't define the function when skipping commands or when an error was
-   * detected. */
+  // Don't define the function when skipping commands or when an error was
+  // detected.
   if (eap->skip || did_emsg) {
     goto erret;
   }
@@ -2640,8 +2642,8 @@ bool function_exists(const char *const name, bool no_deref)
                                               NULL);
   nm = skipwhite(nm);
 
-  /* Only accept "funcname", "funcname ", "funcname (..." and
-   * "funcname(...", not "funcname!...". */
+  // Only accept "funcname", "funcname ", "funcname (..." and
+  // "funcname(...", not "funcname!...".
   if (p != NULL && (*nm == NUL || *nm == '(')) {
     n = translated_function_exists(p);
   }
@@ -2903,9 +2905,9 @@ void ex_return(exarg_T *eap)
     }
   }
 
-  /* When skipping or the return gets pending, advance to the next command
-   * in this line (!returning).  Otherwise, ignore the rest of the line.
-   * Following lines will be ignored by get_func_line(). */
+  // When skipping or the return gets pending, advance to the next command
+  // in this line (!returning).  Otherwise, ignore the rest of the line.
+  // Following lines will be ignored by get_func_line().
   if (returning) {
     eap->nextcmd = NULL;
   } else if (eap->nextcmd == NULL) {          // no argument
@@ -3098,9 +3100,9 @@ int do_return(exarg_T *eap, int reanimate, int is_cmd, void *rettv)
       }
 
       if (reanimate) {
-        /* The pending return value could be overwritten by a ":return"
-         * without argument in a finally clause; reset the default
-         * return value. */
+        // The pending return value could be overwritten by a ":return"
+        // without argument in a finally clause; reset the default
+        // return value.
         current_funccal->rettv->v_type = VAR_NUMBER;
         current_funccal->rettv->vval.v_number = 0;
       }
@@ -3109,9 +3111,9 @@ int do_return(exarg_T *eap, int reanimate, int is_cmd, void *rettv)
   } else {
     current_funccal->returned = TRUE;
 
-    /* If the return is carried out now, store the return value.  For
-     * a return immediately after reanimation, the value is already
-     * there. */
+    // If the return is carried out now, store the return value.  For
+    // a return immediately after reanimation, the value is already
+    // there.
     if (!reanimate && rettv != NULL) {
       tv_clear(current_funccal->rettv);
       *current_funccal->rettv = *(typval_T *)rettv;

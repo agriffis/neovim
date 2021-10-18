@@ -28,6 +28,7 @@
 #include "nvim/file_search.h"
 #include "nvim/fileio.h"
 #include "nvim/fold.h"
+#include "nvim/globals.h"
 #include "nvim/if_cscope.h"
 #include "nvim/indent.h"
 #include "nvim/indent_c.h"
@@ -1060,6 +1061,45 @@ static void f_charidx(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   }
 
   rettv->vval.v_number = len > 0 ? len - 1 : 0;
+}
+
+// "chdir(dir)" function
+static void f_chdir(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+{
+  char_u *cwd;
+  CdScope scope = kCdScopeGlobal;
+
+  rettv->v_type = VAR_STRING;
+  rettv->vval.v_string = NULL;
+
+  if (argvars[0].v_type != VAR_STRING) {
+    // Returning an empty string means it failed.
+    // No error message, for historic reasons.
+    return;
+  }
+
+  // Return the current directory
+  cwd = xmalloc(MAXPATHL);
+  if (cwd != NULL) {
+    if (os_dirname(cwd, MAXPATHL) != FAIL) {
+#ifdef BACKSLASH_IN_FILENAME
+      slash_adjust(cwd);
+#endif
+      rettv->vval.v_string = vim_strsave(cwd);
+    }
+    xfree(cwd);
+  }
+
+  if (curwin->w_localdir != NULL) {
+    scope = kCdScopeWindow;
+  } else if (curtab->tp_localdir != NULL) {
+    scope = kCdScopeTabpage;
+  }
+
+  if (!changedir_func(argvars[0].vval.v_string, scope)) {
+    // Directory change failed
+    XFREE_CLEAR(rettv->vval.v_string);
+  }
 }
 
 /*
@@ -3405,8 +3445,8 @@ static void f_getcwd(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   // Numbers of the scope objects (window, tab) we want the working directory
   // of. A `-1` means to skip this scope, a `0` means the current object.
   int scope_number[] = {
-    [kCdScopeWindow] = 0,  // Number of window to look at.
-    [kCdScopeTab   ] = 0,  // Number of tab to look at.
+    [kCdScopeWindow ] = 0,  // Number of window to look at.
+    [kCdScopeTabpage] = 0,  // Number of tab to look at.
   };
 
   char_u *cwd  = NULL;  // Current working directory to print
@@ -3449,8 +3489,8 @@ static void f_getcwd(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   }
 
   // Find the tabpage by number
-  if (scope_number[kCdScopeTab] > 0) {
-    tp = find_tabpage(scope_number[kCdScopeTab]);
+  if (scope_number[kCdScopeTabpage] > 0) {
+    tp = find_tabpage(scope_number[kCdScopeTabpage]);
     if (!tp) {
       EMSG(_("E5000: Cannot find tab number."));
       return;
@@ -3459,7 +3499,7 @@ static void f_getcwd(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 
   // Find the window in `tp` by number, `NULL` if none.
   if (scope_number[kCdScopeWindow] >= 0) {
-    if (scope_number[kCdScopeTab] < 0) {
+    if (scope_number[kCdScopeTabpage] < 0) {
       EMSG(_("E5001: Higher scope cannot be -1 if lower scope is >= 0."));
       return;
     }
@@ -3483,7 +3523,7 @@ static void f_getcwd(typval_T *argvars, typval_T *rettv, FunPtr fptr)
       break;
     }
     FALLTHROUGH;
-  case kCdScopeTab:
+  case kCdScopeTabpage:
     assert(tp);
     from = tp->tp_localdir;
     if (from) {
@@ -4612,8 +4652,8 @@ static void f_haslocaldir(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   // Numbers of the scope objects (window, tab) we want the working directory
   // of. A `-1` means to skip this scope, a `0` means the current object.
   int scope_number[] = {
-    [kCdScopeWindow] = 0,  // Number of window to look at.
-    [kCdScopeTab   ] = 0,  // Number of tab to look at.
+    [kCdScopeWindow ] = 0,  // Number of window to look at.
+    [kCdScopeTabpage] = 0,  // Number of tab to look at.
   };
 
   tabpage_T *tp  = curtab;  // The tabpage to look at.
@@ -4651,8 +4691,8 @@ static void f_haslocaldir(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   }
 
   // Find the tabpage by number
-  if (scope_number[kCdScopeTab] > 0) {
-    tp = find_tabpage(scope_number[kCdScopeTab]);
+  if (scope_number[kCdScopeTabpage] > 0) {
+    tp = find_tabpage(scope_number[kCdScopeTabpage]);
     if (!tp) {
       EMSG(_("E5000: Cannot find tab number."));
       return;
@@ -4661,7 +4701,7 @@ static void f_haslocaldir(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 
   // Find the window in `tp` by number, `NULL` if none.
   if (scope_number[kCdScopeWindow] >= 0) {
-    if (scope_number[kCdScopeTab] < 0) {
+    if (scope_number[kCdScopeTabpage] < 0) {
       EMSG(_("E5001: Higher scope cannot be -1 if lower scope is >= 0."));
       return;
     }
@@ -4680,7 +4720,7 @@ static void f_haslocaldir(typval_T *argvars, typval_T *rettv, FunPtr fptr)
     assert(win);
     rettv->vval.v_number = win->w_localdir ? 1 : 0;
     break;
-  case kCdScopeTab:
+  case kCdScopeTabpage:
     assert(tp);
     rettv->vval.v_number = tp->tp_localdir ? 1 : 0;
     break;
@@ -8480,20 +8520,22 @@ static void f_searchpairpos(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   tv_list_append_number(rettv->vval.v_list, (varnumber_T)col);
 }
 
-/*
- * Search for a start/middle/end thing.
- * Used by searchpair(), see its documentation for the details.
- * Returns 0 or -1 for no match,
- */
-long do_searchpair(const char *spat,      // start pattern
-                   const char *mpat,      // middle pattern
-                   const char *epat,      // end pattern
-                   int dir,               // BACKWARD or FORWARD
-                   const typval_T *skip,  // skip expression
-                   int flags,             // SP_SETPCMARK and other SP_ values
-                   pos_T *match_pos, linenr_T lnum_stop,    // stop at this line if not zero
-                   long time_limit        // stop after this many msec
-                   )
+/// Search for a start/middle/end thing.
+/// Used by searchpair(), see its documentation for the details.
+///
+/// @param spat  start pattern
+/// @param mpat  middle pattern
+/// @param epat  end pattern
+/// @param dir  BACKWARD or FORWARD
+/// @param skip  skip expression
+/// @param flags  SP_SETPCMARK and other SP_ values
+/// @param lnum_stop  stop at this line if not zero
+/// @param time_limit  stop after this many msec
+///
+/// @returns  0 or -1 for no match,
+long do_searchpair(const char *spat, const char *mpat, const char *epat, int dir,
+                   const typval_T *skip, int flags, pos_T *match_pos, linenr_T lnum_stop,
+                   long time_limit)
   FUNC_ATTR_NONNULL_ARG(1, 2, 3)
 {
   char_u *save_cpo;

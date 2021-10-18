@@ -335,7 +335,7 @@ EXTERN int garbage_collect_at_exit INIT(= false);
 #define SID_WINLAYOUT   -7      // changing window size
 #define SID_LUA         -8      // for Lua scripts/chunks
 #define SID_API_CLIENT  -9      // for API clients
-#define SID_STR         -10     // for sourcing a string
+#define SID_STR         -10     // for sourcing a string with no script item
 
 // Script CTX being sourced or was sourced to define the current function.
 EXTERN sctx_T current_sctx INIT(= { 0 COMMA 0 COMMA 0 });
@@ -1034,13 +1034,21 @@ typedef enum {
 /// directly, use `MIN_CD_SCOPE` and `MAX_CD_SCOPE` instead.
 typedef enum {
   kCdScopeInvalid = -1,
-  kCdScopeWindow,  ///< Affects one window.
-  kCdScopeTab,     ///< Affects one tab page.
-  kCdScopeGlobal,  ///< Affects the entire Nvim instance.
+  kCdScopeWindow,   ///< Affects one window.
+  kCdScopeTabpage,  ///< Affects one tab page.
+  kCdScopeGlobal,   ///< Affects the entire Nvim instance.
 } CdScope;
 
 #define MIN_CD_SCOPE  kCdScopeWindow
 #define MAX_CD_SCOPE  kCdScopeGlobal
+
+/// What caused the current directory to change.
+typedef enum {
+  kCdCauseOther = -1,
+  kCdCauseManual,  ///< Using `:cd`, `:tcd`, `:lcd` or `chdir()`.
+  kCdCauseWindow,  ///< Switching to another window.
+  kCdCauseAuto,    ///< On 'autochdir'.
+} CdCause;
 
 // Only filled for Win32.
 EXTERN char windowsVersion[20] INIT(= { 0 });
