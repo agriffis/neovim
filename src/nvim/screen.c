@@ -694,7 +694,7 @@ void conceal_check_cursor_line(void)
   if (curwin->w_p_cole > 0 && (conceal_cursor_used != should_conceal)) {
     redrawWinline(curwin, curwin->w_cursor.lnum);
     // Need to recompute cursor column, e.g., when starting Visual mode
-    // without concealing. */
+    // without concealing.
     curs_columns(curwin, true);
   }
 }
@@ -2372,11 +2372,12 @@ static int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool noc
     filler_lines = 0;
     area_highlighting = true;
   }
-  int virtual_lines = decor_virtual_lines(wp, lnum);
-  filler_lines += virtual_lines;
+  VirtLines virt_lines = KV_INITIAL_VALUE;
+  int n_virt_lines = decor_virt_lines(wp, lnum, &virt_lines);
+  filler_lines += n_virt_lines;
   if (lnum == wp->w_topline) {
     filler_lines = wp->w_topfill;
-    virtual_lines = MIN(virtual_lines, filler_lines);
+    n_virt_lines = MIN(n_virt_lines, filler_lines);
   }
   filler_todo = filler_lines;
 
@@ -2904,7 +2905,7 @@ static int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool noc
 
       if (draw_state == WL_SBR - 1 && n_extra == 0) {
         draw_state = WL_SBR;
-        if (filler_todo > filler_lines - virtual_lines) {
+        if (filler_todo > filler_lines - n_virt_lines) {
           // TODO(bfredl): check this doesn't inhibit TUI-style
           //               clear-to-end-of-line.
           c_extra = ' ';
@@ -4423,12 +4424,12 @@ static int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool noc
 
       int draw_col = col - boguscols;
       if (filler_todo > 0) {
-        int index = filler_todo - (filler_lines - virtual_lines);
+        int index = filler_todo - (filler_lines - n_virt_lines);
         if (index > 0) {
-          int fpos = kv_size(buf->b_virt_lines) - index;
-          assert(fpos >= 0);
-          int offset = buf->b_virt_line_leftcol ? 0 : win_col_offset;
-          draw_virt_text_item(buf, offset, kv_A(buf->b_virt_lines, fpos),
+          int i = kv_size(virt_lines) - index;
+          assert(i >= 0);
+          int offset = kv_A(virt_lines, i).left_col ? 0 : win_col_offset;
+          draw_virt_text_item(buf, offset, kv_A(virt_lines, i).line,
                               kHlModeReplace, grid->Columns, offset);
         }
       } else {
@@ -4506,6 +4507,7 @@ static int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool noc
     cap_col = 0;
   }
 
+  kv_destroy(virt_lines);
   xfree(p_extra_free);
   return row;
 }
@@ -4827,8 +4829,8 @@ static void grid_put_linebuf(ScreenGrid *grid, int row, int coloff, int endcol, 
   }
 
   if (clear_next) {
-    /* Clear the second half of a double-wide character of which the left
-     * half was overwritten with a single-wide character. */
+    // Clear the second half of a double-wide character of which the left
+    // half was overwritten with a single-wide character.
     schar_from_ascii(grid->chars[off_to], ' ');
     end_dirty++;
   }
@@ -5175,9 +5177,9 @@ void win_redr_status_matches(expand_T *xp, int num_matches, char_u **matches, in
         }
         wild_menu_showing = WM_SCROLLED;
       } else {
-        /* Create status line if needed by setting 'laststatus' to 2.
-         * Set 'winminheight' to zero to avoid that the window is
-         * resized. */
+        // Create status line if needed by setting 'laststatus' to 2.
+        // Set 'winminheight' to zero to avoid that the window is
+        // resized.
         if (lastwin->w_status_height == 0) {
           save_p_ls = p_ls;
           save_p_wmh = p_wmh;
@@ -7324,8 +7326,8 @@ void draw_tabline(void)
     }
   }
 
-  /* Reset the flag here again, in case evaluating 'tabline' causes it to be
-   * set. */
+  // Reset the flag here again, in case evaluating 'tabline' causes it to be
+  // set.
   redraw_tabline = false;
 }
 
@@ -7390,9 +7392,9 @@ int fillchar_status(int *attr, win_T *wp)
     *attr = win_hl_attr(wp, HLF_SNC);
     fill = wp->w_p_fcs_chars.stlnc;
   }
-  /* Use fill when there is highlighting, and highlighting of current
-   * window differs, or the fillchars differ, or this is not the
-   * current window */
+  // Use fill when there is highlighting, and highlighting of current
+  // window differs, or the fillchars differ, or this is not the
+  // current window
   if (*attr != 0 && ((win_hl_attr(wp, HLF_S) != win_hl_attr(wp, HLF_SNC)
                       || !is_curwin || ONE_WINDOW)
                      || (wp->w_p_fcs_chars.stl != wp->w_p_fcs_chars.stlnc))) {

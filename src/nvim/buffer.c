@@ -109,11 +109,9 @@ static int read_buffer(int read_stdin, exarg_T *eap, int flags)
   int retval = OK;
   linenr_T line_count;
 
-  //
   // Read from the buffer which the text is already filled in and append at
   // the end.  This makes it possible to retry when 'fileformat' or
   // 'fileencoding' was guessed wrong.
-  //
   line_count = curbuf->b_ml.ml_line_count;
   retval = readfile(read_stdin ? NULL : curbuf->b_ffname,
                     read_stdin ? NULL : curbuf->b_fname,
@@ -164,21 +162,17 @@ int open_buffer(int read_stdin, exarg_T *eap, int flags)
   long old_tw = curbuf->b_p_tw;
   int read_fifo = false;
 
-  /*
-   * The 'readonly' flag is only set when BF_NEVERLOADED is being reset.
-   * When re-entering the same buffer, it should not change, because the
-   * user may have reset the flag by hand.
-   */
+  // The 'readonly' flag is only set when BF_NEVERLOADED is being reset.
+  // When re-entering the same buffer, it should not change, because the
+  // user may have reset the flag by hand.
   if (readonlymode && curbuf->b_ffname != NULL
       && (curbuf->b_flags & BF_NEVERLOADED)) {
     curbuf->b_p_ro = true;
   }
 
   if (ml_open(curbuf) == FAIL) {
-    /*
-     * There MUST be a memfile, otherwise we can't do anything
-     * If we can't create one for the current buffer, take another buffer
-     */
+    // There MUST be a memfile, otherwise we can't do anything
+    // If we can't create one for the current buffer, take another buffer
     close_buffer(NULL, curbuf, 0, false);
 
     curbuf = NULL;
@@ -260,12 +254,10 @@ int open_buffer(int read_stdin, exarg_T *eap, int flags)
   } else if (read_stdin) {
     int save_bin = curbuf->b_p_bin;
 
-    /*
-     * First read the text in binary mode into the buffer.
-     * Then read from that same buffer and append at the end.  This makes
-     * it possible to retry when 'fileformat' or 'fileencoding' was
-     * guessed wrong.
-     */
+    // First read the text in binary mode into the buffer.
+    // Then read from that same buffer and append at the end.  This makes
+    // it possible to retry when 'fileformat' or 'fileencoding' was
+    // guessed wrong.
     curbuf->b_p_bin = true;
     retval = readfile(NULL, NULL, (linenr_T)0,
                       (linenr_T)0, (linenr_T)MAXLNUM, NULL,
@@ -308,8 +300,8 @@ int open_buffer(int read_stdin, exarg_T *eap, int flags)
     curbuf->b_flags |= BF_READERR;
   }
 
-  /* Need to update automatic folding.  Do this before the autocommands,
-   * they may use the fold info. */
+  // Need to update automatic folding.  Do this before the autocommands,
+  // they may use the fold info.
   foldUpdateAll(curwin);
 
   // need to set w_topline, unless some autocommand already did that.
@@ -323,10 +315,8 @@ int open_buffer(int read_stdin, exarg_T *eap, int flags)
     return FAIL;
   }
 
-  /*
-   * The autocommands may have changed the current buffer.  Apply the
-   * modelines to the correct buffer, if it still exists and is loaded.
-   */
+  // The autocommands may have changed the current buffer.  Apply the
+  // modelines to the correct buffer, if it still exists and is loaded.
   if (bufref_valid(&old_curbuf) && old_curbuf.br_buf->b_ml.ml_mfp != NULL) {
     aco_save_T aco;
 
@@ -335,8 +325,10 @@ int open_buffer(int read_stdin, exarg_T *eap, int flags)
     do_modelines(0);
     curbuf->b_flags &= ~(BF_CHECK_RO | BF_NEVERLOADED);
 
-    apply_autocmds_retval(EVENT_BUFWINENTER, NULL, NULL, false, curbuf,
-                          &retval);
+    if ((flags & READ_NOWINENTER) == 0) {
+      apply_autocmds_retval(EVENT_BUFWINENTER, NULL, NULL, false, curbuf,
+                            &retval);
+    }
 
     // restore curwin/curbuf and a few other things
     aucmd_restbuf(&aco);
@@ -570,13 +562,11 @@ bool close_buffer(win_T *win, buf_T *buf, int action, bool abort_if_last)
     return false;
   }
 
-  /*
-   * It's possible that autocommands change curbuf to the one being deleted.
-   * This might cause the previous curbuf to be deleted unexpectedly.  But
-   * in some cases it's OK to delete the curbuf, because a new one is
-   * obtained anyway.  Therefore only return if curbuf changed to the
-   * deleted buffer.
-   */
+  // It's possible that autocommands change curbuf to the one being deleted.
+  // This might cause the previous curbuf to be deleted unexpectedly.  But
+  // in some cases it's OK to delete the curbuf, because a new one is
+  // obtained anyway.  Therefore only return if curbuf changed to the
+  // deleted buffer.
   if (buf == curbuf && !is_curbuf) {
     return false;
   }
@@ -717,12 +707,10 @@ void buf_freeall(buf_T *buf, int flags)
     return;
   }
 
-  /*
-   * It's possible that autocommands change curbuf to the one being deleted.
-   * This might cause curbuf to be deleted unexpectedly.  But in some cases
-   * it's OK to delete the curbuf, because a new one is obtained anyway.
-   * Therefore only return if curbuf changed to the deleted buffer.
-   */
+  // It's possible that autocommands change curbuf to the one being deleted.
+  // This might cause curbuf to be deleted unexpectedly.  But in some cases
+  // it's OK to delete the curbuf, because a new one is obtained anyway.
+  // Therefore only return if curbuf changed to the deleted buffer.
   if (buf == curbuf && !is_curbuf) {
     return;
   }
@@ -818,7 +806,6 @@ static void free_buffer_stuff(buf_T *buf, int free_flags)
   uc_clear(&buf->b_ucmds);               // clear local user commands
   buf_delete_signs(buf, (char_u *)"*");  // delete any signs
   extmark_free_all(buf);                 // delete any extmarks
-  clear_virt_lines(buf, -1);
   map_clear_int(buf, MAP_ALL_MODES, true, false);    // clear local mappings
   map_clear_int(buf, MAP_ALL_MODES, true, true);     // clear local abbrevs
   XFREE_CLEAR(buf->b_start_fenc);
@@ -864,8 +851,8 @@ void goto_buffer(exarg_T *eap, int start, int dir, int count)
     swap_exists_action = SEA_NONE;
     swap_exists_did_quit = true;
 
-    /* Restore the error/interrupt/exception state if not discarded by a
-     * new aborting error, interrupt, or uncaught exception. */
+    // Restore the error/interrupt/exception state if not discarded by a
+    // new aborting error, interrupt, or uncaught exception.
     leave_cleanup(&cs);
   } else {
     handle_swap_exists(&old_curbuf);
@@ -920,8 +907,8 @@ void handle_swap_exists(bufref_T *old_curbuf)
     }
     // If "old_curbuf" is NULL we are in big trouble here...
 
-    /* Restore the error/interrupt/exception state if not discarded by a
-     * new aborting error, interrupt, or uncaught exception. */
+    // Restore the error/interrupt/exception state if not discarded by a
+    // new aborting error, interrupt, or uncaught exception.
     leave_cleanup(&cs);
   } else if (swap_exists_action == SEA_RECOVER) {
     // Reset the error/interrupt/exception state here so that
@@ -935,8 +922,8 @@ void handle_swap_exists(bufref_T *old_curbuf)
     cmdline_row = msg_row;
     do_modelines(0);
 
-    /* Restore the error/interrupt/exception state if not discarded by a
-     * new aborting error, interrupt, or uncaught exception. */
+    // Restore the error/interrupt/exception state if not discarded by a
+    // new aborting error, interrupt, or uncaught exception.
     leave_cleanup(&cs);
   }
   swap_exists_action = SEA_NONE;  // -V519
@@ -978,12 +965,10 @@ char_u *do_bufdel(int command, char_u *arg, int addr_count, int start_bnr, int e
     }
 
     for (; !got_int; os_breakcheck()) {
-      /*
-       * delete the current buffer last, otherwise when the
-       * current buffer is deleted, the next buffer becomes
-       * the current one and will be loaded, which may then
-       * also be deleted, etc.
-       */
+      // delete the current buffer last, otherwise when the
+      // current buffer is deleted, the next buffer becomes
+      // the current one and will be loaded, which may then
+      // also be deleted, etc.
       if (bnr == curbuf->b_fnum) {
         do_current = bnr;
       } else if (do_buffer(command, DOBUF_FIRST, FORWARD, bnr,
@@ -991,9 +976,7 @@ char_u *do_bufdel(int command, char_u *arg, int addr_count, int start_bnr, int e
         deleted++;
       }
 
-      /*
-       * find next buffer number to delete/unload
-       */
+      // find next buffer number to delete/unload
       if (addr_count == 2) {
         if (++bnr > end_bnr) {
           break;
@@ -1153,8 +1136,8 @@ int do_buffer(int action, int start, int dir, int count, int forceit)
   } else {
     bp = NULL;
     while (count > 0 || (!unload && !buf->b_p_bl && bp != buf)) {
-      /* remember the buffer where we start, we come back there when all
-       * buffers are unlisted. */
+      // remember the buffer where we start, we come back there when all
+      // buffers are unlisted.
       if (bp == NULL) {
         bp = buf;
       }
@@ -1197,16 +1180,14 @@ int do_buffer(int action, int start, int dir, int count, int forceit)
   }
 
 
-  /*
-   * delete buffer buf from memory and/or the list
-   */
+  // delete buffer "buf" from memory and/or the list
   if (unload) {
     int forward;
     bufref_T bufref;
     set_bufref(&bufref, buf);
 
-    /* When unloading or deleting a buffer that's already unloaded and
-     * unlisted: fail silently. */
+    // When unloading or deleting a buffer that's already unloaded and
+    // unlisted: fail silently.
     if (action != DOBUF_WIPE && buf->b_ml.ml_mfp == NULL && !buf->b_p_bl) {
       return FAIL;
     }
@@ -1248,10 +1229,8 @@ int do_buffer(int action, int start, int dir, int count, int forceit)
       end_visual_mode();
     }
 
-    /*
-     * If deleting the last (listed) buffer, make it empty.
-     * The last (listed) buffer cannot be unloaded.
-     */
+    // If deleting the last (listed) buffer, make it empty.
+    // The last (listed) buffer cannot be unloaded.
     bp = NULL;
     FOR_ALL_BUFFERS(bp2) {
       if (bp2->b_p_bl && bp2 != buf) {
@@ -1263,11 +1242,9 @@ int do_buffer(int action, int start, int dir, int count, int forceit)
       return empty_curbuf(true, forceit, action);
     }
 
-    /*
-     * If the deleted buffer is the current one, close the current window
-     * (unless it's the only window).  Repeat this so long as we end up in
-     * a window with this buffer.
-     */
+    // If the deleted buffer is the current one, close the current window
+    // (unless it's the only window).  Repeat this so long as we end up in
+    // a window with this buffer.
     while (buf == curbuf
            && !(curwin->w_closing || curwin->w_buffer->b_locked > 0)
            && (!ONE_WINDOW || first_tabpage->tp_next != NULL)) {
@@ -1276,9 +1253,7 @@ int do_buffer(int action, int start, int dir, int count, int forceit)
       }
     }
 
-    /*
-     * If the buffer to be deleted is not the current one, delete it here.
-     */
+    // If the buffer to be deleted is not the current one, delete it here.
     if (buf != curbuf) {
       close_windows(buf, false);
       if (buf != curbuf && bufref_valid(&bufref) && buf->b_nwindows <= 0) {
@@ -1386,14 +1361,12 @@ int do_buffer(int action, int start, int dir, int count, int forceit)
   }
 
   if (buf == NULL) {
-    /* Autocommands must have wiped out all other buffers.  Only option
-     * now is to make the current buffer empty. */
+    // Autocommands must have wiped out all other buffers.  Only option
+    // now is to make the current buffer empty.
     return empty_curbuf(false, forceit, action);
   }
 
-  /*
-   * make buf current buffer
-   */
+  // make "buf" the current buffer
   if (action == DOBUF_SPLIT) {      // split window first
     // If 'switchbuf' contains "useopen": jump to first window containing
     // "buf" if one exists
@@ -1415,9 +1388,7 @@ int do_buffer(int action, int start, int dir, int count, int forceit)
     return OK;
   }
 
-  /*
-   * Check if the current buffer may be abandoned.
-   */
+  // Check if the current buffer may be abandoned.
   if (action == DOBUF_GOTO && !can_abandon(curbuf, forceit)) {
     if ((p_confirm || cmdmod.confirm) && p_write) {
       bufref_T bufref;
@@ -1510,9 +1481,9 @@ void set_curbuf(buf_T *buf, int action)
       }
     }
   }
-  /* An autocommand may have deleted "buf", already entered it (e.g., when
-   * it did ":bunload") or aborted the script processing!
-   * If curwin->w_buffer is null, enter_buffer() will make it valid again */
+  // An autocommand may have deleted "buf", already entered it (e.g., when
+  // it did ":bunload") or aborted the script processing!
+  // If curwin->w_buffer is null, enter_buffer() will make it valid again
   if ((buf_valid(buf) && buf != curbuf
        && !aborting()
        ) || curwin->w_buffer == NULL) {
@@ -1705,11 +1676,10 @@ buf_T *buflist_new(char_u *ffname_arg, char_u *sfname_arg, linenr_T lnum, int fl
 
   fname_expand(curbuf, &ffname, &sfname);       // will allocate ffname
 
-  /*
-   * If file name already exists in the list, update the entry.
-   */
-  /* We can use inode numbers when the file exists.  Works better
-   * for hard links. */
+  // If the file name already exists in the list, update the entry.
+
+  // We can use inode numbers when the file exists.  Works better
+  // for hard links.
   FileID file_id;
   bool file_id_valid = (sfname != NULL
                         && os_fileid((char *)sfname, &file_id));
@@ -1841,9 +1811,7 @@ buf_T *buflist_new(char_u *ffname_arg, char_u *sfname_arg, linenr_T lnum, int fl
       top_file_num = 1;
     }
 
-    /*
-     * Always copy the options from the current buffer.
-     */
+    // Always copy the options from the current buffer.
     buf_copy_options(buf, BCO_ALWAYS);
   }
 
@@ -2227,8 +2195,8 @@ int buflist_findpat(const char_u *pattern, const char_u *pattern_end, bool unlis
               && (!diffmode || diff_mode_buf(buf))
               && buflist_match(&regmatch, buf, false) != NULL) {
             if (curtab_only) {
-              /* Ignore the match if the buffer is not open in
-               * the current tab. */
+              // Ignore the match if the buffer is not open in
+              // the current tab.
               bool found_window = false;
               FOR_ALL_WINDOWS_IN_TAB(wp, curtab) {
                 if (wp->w_buffer == buf) {
@@ -2320,10 +2288,8 @@ int ExpandBufnames(char_u *pat, int *num_file, char_u ***file, int options)
     patc = pat;
   }
 
-  /*
-   * attempt == 0: try match with    '\<', match at start of word
-   * attempt == 1: try match without '\<', match anywhere
-   */
+  // attempt == 0: try match with    '\<', match at start of word
+  // attempt == 1: try match without '\<', match anywhere
   for (attempt = 0; attempt <= 1; attempt++) {
     if (attempt > 0 && patc == pat) {
       break;            // there was no anchor, no need to try again
@@ -2338,10 +2304,8 @@ int ExpandBufnames(char_u *pat, int *num_file, char_u ***file, int options)
       return FAIL;
     }
 
-    /*
-     * round == 1: Count the matches.
-     * round == 2: Build the array to keep the matches.
-     */
+    // round == 1: Count the matches.
+    // round == 2: Build the array to keep the matches.
     for (round = 1; round <= 2; round++) {
       count = 0;
       FOR_ALL_BUFFERS(buf) {
@@ -2831,11 +2795,9 @@ int setfname(buf_T *buf, char_u *ffname_arg, char_u *sfname_arg, bool message)
       return FAIL;
     }
 
-    /*
-     * if the file name is already used in another buffer:
-     * - if the buffer is loaded, fail
-     * - if the buffer is not loaded, delete it from the list
-     */
+    // If the file name is already used in another buffer:
+    // - if the buffer is loaded, fail
+    // - if the buffer is not loaded, delete it from the list
     file_id_valid = os_fileid((char *)ffname, &file_id);
     if (!(buf->b_flags & BF_DUMMY)) {
       obuf = buflist_findname_file_id(ffname, &file_id, file_id_valid);
@@ -5160,9 +5122,9 @@ void ex_buffer_all(exarg_T *eap)
         swap_exists_action = SEA_NONE;
         swap_exists_did_quit = true;
 
-        /* Restore the error/interrupt/exception state if not
-         * discarded by a new aborting error, interrupt, or uncaught
-         * exception. */
+        // Restore the error/interrupt/exception state if not
+        // discarded by a new aborting error, interrupt, or uncaught
+        // exception.
         leave_cleanup(&cs);
       } else {
         handle_swap_exists(NULL);
