@@ -386,7 +386,7 @@ bool pat_has_uppercase(char_u *pat)
   char_u *p = pat;
 
   while (*p != NUL) {
-    const int l = mb_ptr2len(p);
+    const int l = utfc_ptr2len(p);
 
     if (l > 1) {
       if (mb_isupper(utf_ptr2char(p))) {
@@ -797,7 +797,7 @@ int searchit(win_T *win, buf_T *buf, pos_T *pos, pos_T *end_pos, Direction dir, 
                 // for empty match: advance one char
                 if (matchcol == matchpos.col
                     && ptr[matchcol] != NUL) {
-                  matchcol += mb_ptr2len(ptr + matchcol);
+                  matchcol += utfc_ptr2len(ptr + matchcol);
                 }
               } else {
                 // Stop when the match is in a next line.
@@ -806,7 +806,7 @@ int searchit(win_T *win, buf_T *buf, pos_T *pos, pos_T *end_pos, Direction dir, 
                 }
                 matchcol = matchpos.col;
                 if (ptr[matchcol] != NUL) {
-                  matchcol += mb_ptr2len(ptr + matchcol);
+                  matchcol += utfc_ptr2len(ptr + matchcol);
                 }
               }
               if (ptr[matchcol] == NUL
@@ -1871,7 +1871,7 @@ pos_T *findmatchlimit(oparg_T *oap, int initc, int flags, int64_t maxtravel)
           --pos.col;
         }
         for (;; ) {
-          initc = PTR2CHAR(linep + pos.col);
+          initc = utf_ptr2char(linep + pos.col);
           if (initc == NUL) {
             break;
           }
@@ -2197,7 +2197,7 @@ pos_T *findmatchlimit(oparg_T *oap, int initc, int flags, int64_t maxtravel)
      *   inquote if the number of quotes in a line is even, unless this
      *   line or the previous one ends in a '\'.  Complicated, isn't it?
      */
-    const int c = PTR2CHAR(linep + pos.col);
+    const int c = utf_ptr2char(linep + pos.col);
     switch (c) {
     case NUL:
       // at end of line without trailing backslash, reset inquote
@@ -2378,12 +2378,12 @@ void showmatch(int c)
    * Only show match for chars in the 'matchpairs' option.
    */
   // 'matchpairs' is "x:y,x:y"
-  for (p = curbuf->b_p_mps; *p != NUL; ++p) {
-    if (PTR2CHAR(p) == c && (curwin->w_p_rl ^ p_ri)) {
+  for (p = curbuf->b_p_mps; *p != NUL; p++) {
+    if (utf_ptr2char(p) == c && (curwin->w_p_rl ^ p_ri)) {
       break;
     }
     p += utfc_ptr2len(p) + 1;
-    if (PTR2CHAR(p) == c && !(curwin->w_p_rl ^ p_ri)) {
+    if (utf_ptr2char(p) == c && !(curwin->w_p_rl ^ p_ri)) {
       break;
     }
     p += utfc_ptr2len(p);
@@ -3955,7 +3955,7 @@ static int find_next_quote(char_u *line, int col, int quotechar, char_u *escape)
     } else if (c == quotechar) {
       break;
     }
-    col += mb_ptr2len(line + col);
+    col += utfc_ptr2len(line + col);
   }
   return col;
 }

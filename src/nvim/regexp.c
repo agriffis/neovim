@@ -783,7 +783,7 @@ static int get_equi_class(char_u **pp)
   char_u      *p = *pp;
 
   if (p[1] == '=' && p[2] != NUL) {
-    l = (*mb_ptr2len)(p + 2);
+    l = utfc_ptr2len(p + 2);
     if (p[l + 2] == '=' && p[l + 3] == ']') {
       c = utf_ptr2char(p + 2);
       *pp += l + 4;
@@ -1144,7 +1144,7 @@ static char_u *skip_anyof(char_u *p)
   if (*p == ']' || *p == '-')
     ++p;
   while (*p != NUL && *p != ']') {
-    if ((l = (*mb_ptr2len)(p)) > 1) {
+    if ((l = utfc_ptr2len(p)) > 1) {
       p += l;
     } else if (*p == '-')  {
       p++;
@@ -2255,8 +2255,8 @@ collection:
               if (startc > endc) {
                 EMSG_RET_NULL(_(e_reverse_range));
               }
-              if ((*mb_char2len)(startc) > 1
-                  || (*mb_char2len)(endc) > 1) {
+              if (utf_char2len(startc) > 1
+                  || utf_char2len(endc) > 1) {
                 // Limit to a range of 256 chars
                 if (endc > startc + 256) {
                   EMSG_RET_NULL(_(e_large_class));
@@ -2509,8 +2509,9 @@ do_multibyte:
           /* Need to get composing character too. */
           for (;; ) {
             l = utf_ptr2len(regparse);
-            if (!UTF_COMPOSINGLIKE(regparse, regparse + l))
+            if (!utf_composinglike(regparse, regparse + l)) {
               break;
+            }
             regmbc(utf_ptr2char(regparse));
             skipchr();
           }
@@ -3585,7 +3586,7 @@ static long bt_regexec_both(char_u *line,
       if (rex.line[col] == NUL) {
         break;
       }
-      col += (*mb_ptr2len)(rex.line + col);
+      col += utfc_ptr2len(rex.line + col);
       // Check for timeout once in a twenty times to avoid overhead.
       if (tm != NULL && ++tm_count == 20) {
         tm_count = 0;
@@ -4127,7 +4128,7 @@ static bool regmatch(
           break;
 
         case PRINT:
-          if (!vim_isprintc(PTR2CHAR(rex.input))) {
+          if (!vim_isprintc(utf_ptr2char(rex.input))) {
             status = RA_NOMATCH;
           } else {
             ADVANCE_REGINPUT();
@@ -4135,7 +4136,7 @@ static bool regmatch(
           break;
 
         case SPRINT:
-          if (ascii_isdigit(*rex.input) || !vim_isprintc(PTR2CHAR(rex.input))) {
+          if (ascii_isdigit(*rex.input) || !vim_isprintc(utf_ptr2char(rex.input))) {
             status = RA_NOMATCH;
           } else {
             ADVANCE_REGINPUT();
@@ -4294,7 +4295,7 @@ static bool regmatch(
             // Check for following composing character, unless %C
             // follows (skips over all composing chars).
             if (status != RA_NOMATCH
-                && UTF_COMPOSINGLIKE(rex.input, rex.input + len)
+                && utf_composinglike(rex.input, rex.input + len)
                 && !rex.reg_icombine
                 && OP(next) != RE_COMPOSING) {
               // raaron: This code makes a composing character get
@@ -4326,7 +4327,7 @@ static bool regmatch(
             const char_u *opnd = OPERAND(scan);
             // Safety check (just in case 'encoding' was changed since
             // compiling the program).
-            if ((len = (*mb_ptr2len)(opnd)) < 2) {
+            if ((len = utfc_ptr2len(opnd)) < 2) {
               status = RA_NOMATCH;
               break;
             }
@@ -5269,7 +5270,7 @@ regrepeat (
   case SIDENT:
   case SIDENT + ADD_NL:
     while (count < maxcount) {
-      if (vim_isIDc(PTR2CHAR(scan)) && (testval || !ascii_isdigit(*scan))) {
+      if (vim_isIDc(utf_ptr2char(scan)) && (testval || !ascii_isdigit(*scan))) {
         MB_PTR_ADV(scan);
       } else if (*scan == NUL) {
         if (!REG_MULTI || !WITH_NL(OP(p)) || rex.lnum > rex.reg_maxline
@@ -5326,7 +5327,7 @@ regrepeat (
   case SFNAME:
   case SFNAME + ADD_NL:
     while (count < maxcount) {
-      if (vim_isfilec(PTR2CHAR(scan)) && (testval || !ascii_isdigit(*scan))) {
+      if (vim_isfilec(utf_ptr2char(scan)) && (testval || !ascii_isdigit(*scan))) {
         MB_PTR_ADV(scan);
       } else if (*scan == NUL) {
         if (!REG_MULTI || !WITH_NL(OP(p)) || rex.lnum > rex.reg_maxline
@@ -5364,7 +5365,7 @@ regrepeat (
         if (got_int) {
           break;
         }
-      } else if (vim_isprintc(PTR2CHAR(scan)) == 1
+      } else if (vim_isprintc(utf_ptr2char(scan)) == 1
                  && (testval || !ascii_isdigit(*scan))) {
         MB_PTR_ADV(scan);
       } else if (rex.reg_line_lbr && *scan == '\n' && WITH_NL(OP(p))) {
@@ -5392,7 +5393,7 @@ do_class:
         if (got_int) {
           break;
         }
-      } else if ((l = (*mb_ptr2len)(scan)) > 1) {
+      } else if ((l = utfc_ptr2len(scan)) > 1) {
         if (testval != 0) {
           break;
         }
@@ -5507,12 +5508,12 @@ do_class:
 
     /* Safety check (just in case 'encoding' was changed since
      * compiling the program). */
-    if ((len = (*mb_ptr2len)(opnd)) > 1) {
+    if ((len = utfc_ptr2len(opnd)) > 1) {
       if (rex.reg_ic) {
         cf = utf_fold(utf_ptr2char(opnd));
       }
-      while (count < maxcount && (*mb_ptr2len)(scan) >= len) {
-        for (i = 0; i < len; ++i) {
+      while (count < maxcount && utfc_ptr2len(scan) >= len) {
+        for (i = 0; i < len; i++) {
           if (opnd[i] != scan[i]) {
             break;
           }
@@ -6532,7 +6533,7 @@ char_u *regtilde(char_u *source, int magic)
       if (*p == '\\' && p[1]) {         // skip escaped characters
         p++;
       }
-      p += (*mb_ptr2len)(p) - 1;
+      p += utfc_ptr2len(p) - 1;
     }
   }
 

@@ -564,7 +564,7 @@ size_t mb_string2cells(const char_u *str)
 {
   size_t clen = 0;
 
-  for (const char_u *p = str; *p != NUL; p += (*mb_ptr2len)(p)) {
+  for (const char_u *p = str; *p != NUL; p += utfc_ptr2len(p)) {
     clen += utf_ptr2cells(p);
   }
 
@@ -705,7 +705,7 @@ int mb_ptr2char_adv(const char_u **const pp)
   int c;
 
   c = utf_ptr2char(*pp);
-  *pp += (*mb_ptr2len)(*pp);
+  *pp += utfc_ptr2len(*pp);
   return c;
 }
 
@@ -762,7 +762,7 @@ int utfc_ptr2char(const char_u *p, int *pcc)
   // Only accept a composing char when the first char isn't illegal.
   if ((len > 1 || *p < 0x80)
       && p[len] >= 0x80
-      && UTF_COMPOSINGLIKE(p, p + len)) {
+      && utf_composinglike(p, p + len)) {
     cc = utf_ptr2char(p + len);
     for (;; ) {
       pcc[i++] = cc;
@@ -791,9 +791,6 @@ int utfc_ptr2char(const char_u *p, int *pcc)
  */
 int utfc_ptr2char_len(const char_u *p, int *pcc, int maxlen)
 {
-#define IS_COMPOSING(s1, s2, s3) \
-  (i == 0 ? UTF_COMPOSINGLIKE((s1), (s2)) : utf_iscomposing((s3)))
-
   assert(maxlen > 0);
 
   int i = 0;
@@ -809,7 +806,7 @@ int utfc_ptr2char_len(const char_u *p, int *pcc, int maxlen)
       int len_cc = utf_ptr2len_len(p + len, maxlen - len);
       safe = len_cc > 1 && len_cc <= maxlen - len;
       if (!safe || (pcc[i] = utf_ptr2char(p + len)) < 0x80
-          || !IS_COMPOSING(p, p + len, pcc[i])) {
+          || !(i == 0 ? utf_composinglike(p, p+len) : utf_iscomposing(pcc[i]))) {
         break;
       }
       len += len_cc;
@@ -914,7 +911,7 @@ int utfc_ptr2len(const char_u *const p)
   // skip all of them (otherwise the cursor would get stuck).
   int prevlen = 0;
   for (;;) {
-    if (p[len] < 0x80 || !UTF_COMPOSINGLIKE(p + prevlen, p + len)) {
+    if (p[len] < 0x80 || !utf_composinglike(p + prevlen, p + len)) {
       return len;
     }
 
@@ -964,14 +961,14 @@ int utfc_ptr2len_len(const char_u *p, int size)
 
     /*
      * Next character length should not go beyond size to ensure that
-     * UTF_COMPOSINGLIKE(...) does not read beyond size.
+     * utf_composinglike(...) does not read beyond size.
      */
     len_next_char = utf_ptr2len_len(p + len, size - len);
     if (len_next_char > size - len) {
       break;
     }
 
-    if (!UTF_COMPOSINGLIKE(p + prevlen, p + len)) {
+    if (!utf_composinglike(p + prevlen, p + len)) {
       break;
     }
 
@@ -2054,7 +2051,7 @@ int mb_charlen(char_u *str)
   }
 
   for (count = 0; *p != NUL; count++) {
-    p += (*mb_ptr2len)(p);
+    p += utfc_ptr2len(p);
   }
 
   return count;
@@ -2069,7 +2066,7 @@ int mb_charlen_len(char_u *str, int len)
   int count;
 
   for (count = 0; *p != NUL && p < str + len; count++) {
-    p += (*mb_ptr2len)(p);
+    p += utfc_ptr2len(p);
   }
 
   return count;

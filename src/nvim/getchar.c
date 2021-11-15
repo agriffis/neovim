@@ -2888,7 +2888,7 @@ int buf_do_map(int maptype, MapArguments *args, int mode, bool is_abbrev, buf_T 
         if (same == -1 && last != first) {
           same = n - 1;                       // count of same char type
         }
-        p += (*mb_ptr2len)(p);
+        p += utfc_ptr2len(p);
       }
       if (last && n > 2 && same >= 0 && same < n - 1) {
         retval = 1;
@@ -3812,7 +3812,7 @@ bool check_abbr(int c, char_u *ptr, int col, int mincol)
     while (p > ptr + mincol) {
       p = mb_prevptr(ptr, p);
       if (ascii_isspace(*p) || (!vim_abbr && is_id != vim_iswordp(p))) {
-        p += (*mb_ptr2len)(p);
+        p += utfc_ptr2len(p);
         break;
       }
       ++clen;
@@ -3996,8 +3996,8 @@ char_u *vim_strsave_escape_csi(char_u *p)
     } else {
       // Add character, possibly multi-byte to destination, escaping
       // CSI and K_SPECIAL. Be careful, it can be an illegal byte!
-      d = add_char2buf(PTR2CHAR(s), d);
-      s += MB_CPTR2LEN(s);
+      d = add_char2buf(utf_ptr2char(s), d);
+      s += utf_ptr2len(s);
     }
   }
   *d = NUL;

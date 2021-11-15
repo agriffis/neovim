@@ -2504,19 +2504,19 @@ static afffile_T *spell_read_aff(spellinfo_T *spin, char_u *fname)
             // be empty or start with the same letter.
             if (aff_entry->ae_chop != NULL
                 && aff_entry->ae_add != NULL
-                && aff_entry->ae_chop[(*mb_ptr2len)(aff_entry->ae_chop)] ==
+                && aff_entry->ae_chop[utfc_ptr2len(aff_entry->ae_chop)] ==
                 NUL) {
               int c, c_up;
 
-              c = PTR2CHAR(aff_entry->ae_chop);
+              c = utf_ptr2char(aff_entry->ae_chop);
               c_up = SPELL_TOUPPER(c);
               if (c_up != c
                   && (aff_entry->ae_cond == NULL
-                      || PTR2CHAR(aff_entry->ae_cond) == c)) {
+                      || utf_ptr2char(aff_entry->ae_cond) == c)) {
                 p = aff_entry->ae_add
                     + STRLEN(aff_entry->ae_add);
                 MB_PTR_BACK(aff_entry->ae_add, p);
-                if (PTR2CHAR(p) == c_up) {
+                if (utf_ptr2char(p) == c_up) {
                   upper = true;
                   aff_entry->ae_chop = NULL;
                   *p = NUL;
@@ -3501,7 +3501,7 @@ static int store_aff_word(spellinfo_T *spin, char_u *word, char_u *afflist, afff
               if (ae->ae_chop != NULL) {
                 // Remove chop string.
                 p = newword + STRLEN(newword);
-                i = (int)MB_CHARLEN(ae->ae_chop);
+                i = mb_charlen(ae->ae_chop);
                 for (; i > 0; i--) {
                   MB_PTR_BACK(newword, p);
                 }
@@ -5858,8 +5858,8 @@ static void set_map_str(slang_T *lp, char_u *map)
       // the hash table.  Each entry is the char, a NUL the headchar and
       // a NUL.
       if (c >= 256) {
-        int cl = mb_char2len(c);
-        int headcl = mb_char2len(headc);
+        int cl = utf_char2len(c);
+        int headcl = utf_char2len(headc);
         char_u *b;
         hash_T hash;
         hashitem_T *hi;

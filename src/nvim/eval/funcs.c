@@ -1180,7 +1180,7 @@ static void f_col(typval_T *argvars, typval_T *rettv, FunPtr fptr)
                                          - curwin->w_cursor.coladd))) {
           int l;
 
-          if (*p != NUL && p[(l = (*mb_ptr2len)(p))] == NUL) {
+          if (*p != NUL && p[(l = utfc_ptr2len(p))] == NUL) {
             col += l;
           }
         }
@@ -6211,7 +6211,7 @@ static void find_some_match(typval_T *const argvars, typval_T *const rettv,
         idx++;
       } else {
         startcol = (colnr_T)(regmatch.startp[0]
-                             + (*mb_ptr2len)(regmatch.startp[0]) - str);
+                             + utfc_ptr2len(regmatch.startp[0]) - str);
         if (startcol > (colnr_T)len || str + startcol <= regmatch.startp[0]) {
           match = false;
           break;
@@ -10440,7 +10440,7 @@ static void f_split(typval_T *argvars, typval_T *rettv, FunPtr fptr)
         col = 0;
       } else {
         // Don't get stuck at the same match.
-        col = (*mb_ptr2len)(regmatch.endp[0]);
+        col = utfc_ptr2len(regmatch.endp[0]);
       }
       str = (const char *)regmatch.endp[0];
     }
@@ -10628,7 +10628,7 @@ static void f_strgetchar(typval_T *argvars, typval_T *rettv, FunPtr fptr)
       break;
     }
     charidx--;
-    byteidx += MB_CPTR2LEN((const char_u *)str + byteidx);
+    byteidx += utf_ptr2len((const char_u *)str + byteidx);
   }
 }
 
@@ -10745,7 +10745,7 @@ static void f_strcharpart(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   if (!error) {
     if (nchar > 0) {
       while (nchar > 0 && (size_t)nbyte < slen) {
-        nbyte += MB_CPTR2LEN((const char_u *)p + nbyte);
+        nbyte += utf_ptr2len((const char_u *)p + nbyte);
         nchar--;
       }
     } else {
@@ -10761,7 +10761,7 @@ static void f_strcharpart(typval_T *argvars, typval_T *rettv, FunPtr fptr)
       if (off < 0) {
         len += 1;
       } else {
-        len += (size_t)MB_CPTR2LEN((const char_u *)p + off);
+        len += utf_ptr2len((const char_u *)p + off);
       }
       charlen--;
     }
@@ -11739,14 +11739,14 @@ static void f_trim(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   if (dir == 0 || dir == 1) {
     // Trim leading characters
     while (*head != NUL) {
-      c1 = PTR2CHAR(head);
+      c1 = utf_ptr2char(head);
       if (mask == NULL) {
         if (c1 > ' ' && c1 != 0xa0) {
           break;
         }
       } else {
         for (p = mask; *p != NUL; MB_PTR_ADV(p)) {
-          if (c1 == PTR2CHAR(p)) {
+          if (c1 == utf_ptr2char(p)) {
             break;
           }
         }
@@ -11764,14 +11764,14 @@ static void f_trim(typval_T *argvars, typval_T *rettv, FunPtr fptr)
     for (; tail > head; tail = prev) {
       prev = tail;
       MB_PTR_BACK(head, prev);
-      c1 = PTR2CHAR(prev);
+      c1 = utf_ptr2char(prev);
       if (mask == NULL) {
         if (c1 > ' ' && c1 != 0xa0) {
           break;
         }
       } else {
         for (p = mask; *p != NUL; MB_PTR_ADV(p)) {
-          if (c1 == PTR2CHAR(p)) {
+          if (c1 == utf_ptr2char(p)) {
             break;
           }
         }

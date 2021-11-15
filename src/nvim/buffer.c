@@ -1925,6 +1925,7 @@ void free_buf_options(buf_T *buf, int free_p_ff)
   clear_string_option(&buf->b_p_cpt);
   clear_string_option(&buf->b_p_cfu);
   clear_string_option(&buf->b_p_ofu);
+  clear_string_option(&buf->b_p_tsrfu);
   clear_string_option(&buf->b_p_gp);
   clear_string_option(&buf->b_p_mp);
   clear_string_option(&buf->b_p_efm);
@@ -3461,7 +3462,7 @@ int build_stl_str_hl(win_T *wp, char_u *out, size_t outlen, char_u *fmt, int use
 
   if (fillchar == 0) {
     fillchar = ' ';
-  } else if (mb_char2len(fillchar) > 1) {
+  } else if (utf_char2len(fillchar) > 1) {
     // Can't handle a multi-byte fill character yet.
     fillchar = '-';
   }
@@ -3649,7 +3650,7 @@ int build_stl_str_hl(win_T *wp, char_u *out, size_t outlen, char_u *fmt, int use
         long n = 0;
         while (group_len >= stl_items[stl_groupitems[groupdepth]].maxwid) {
           group_len -= ptr2cells(t + n);
-          n += (*mb_ptr2len)(t + n);
+          n += utfc_ptr2len(t + n);
         }
         // }
 

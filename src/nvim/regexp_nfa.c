@@ -543,7 +543,7 @@ static char_u *nfa_get_match_text(nfa_state_T *start)
     return NULL;     /* just in case */
   p = p->out;
   while (p->c > 0) {
-    len += MB_CHAR2LEN(p->c);
+    len += utf_char2len(p->c);
     p = p->out;
   }
   if (p->c != NFA_MCLOSE || p->out->c != NFA_MATCH)
@@ -1310,9 +1310,10 @@ static int nfa_regatom(void)
       return FAIL;
     }
     for (lp = reg_prev_sub; *lp != NUL; MB_CPTR_ADV(lp)) {
-      EMIT(PTR2CHAR(lp));
-      if (lp != reg_prev_sub)
+      EMIT(utf_ptr2char(lp));
+      if (lp != reg_prev_sub) {
         EMIT(NFA_CONCAT);
+      }
     }
     EMIT(NFA_NOPEN);
     break;
@@ -1722,9 +1723,10 @@ collection:
           }
         }
 
-        /* Normal printable char */
-        if (startc == -1)
-          startc = PTR2CHAR(regparse);
+        // Normal printable char
+        if (startc == -1) {
+          startc = utf_ptr2char(regparse);
+        }
 
         /* Previous char was '-', so this char is end of range. */
         if (emit_range) {
@@ -1746,8 +1748,8 @@ collection:
             EMIT(endc);
             EMIT(NFA_RANGE);
             EMIT(NFA_CONCAT);
-          } else if ((*mb_char2len)(startc) > 1
-                     || (*mb_char2len)(endc) > 1) {
+          } else if (utf_char2len(startc) > 1
+                     || utf_char2len(endc) > 1) {
             // Emit the characters in the range.
             // "startc" was already emitted, so skip it.
             for (c = startc + 1; c <= endc; c++) {
@@ -1828,7 +1830,7 @@ collection:
 
 nfa_do_multibyte:
     // plen is length of current char with composing chars
-    if ((*mb_char2len)(c) != (plen = utfc_ptr2len(old_regparse))
+    if (utf_char2len(c) != (plen = utfc_ptr2len(old_regparse))
         || utf_iscomposing(c)) {
       int i = 0;
 
@@ -2972,8 +2974,8 @@ static int nfa_max_width(nfa_state_T *startstate, int depth)
       if (state->c < 0)
         /* don't know what this is */
         return -1;
-      /* normal character */
-      len += MB_CHAR2LEN(state->c);
+      // normal character
+      len += utf_char2len(state->c);
       break;
     }
 
@@ -4996,9 +4998,9 @@ static long find_match_text(colnr_T startcol, int regstart, char_u *match_text)
     char_u *s2 = rex.line + col + regstart_len;  // skip regstart
     while (*s1) {
       int c1_len = PTR2LEN(s1);
-      int c1 = PTR2CHAR(s1);
+      int c1 = utf_ptr2char(s1);
       int c2_len = PTR2LEN(s2);
-      int c2 = PTR2CHAR(s2);
+      int c2 = utf_ptr2char(s2);
 
       if ((c1 != c2 && (!rex.reg_ic || utf_fold(c1) != utf_fold(c2)))
           || c1_len != c2_len) {
@@ -5010,7 +5012,7 @@ static long find_match_text(colnr_T startcol, int regstart, char_u *match_text)
     }
     if (match
         // check that no composing char follows
-        && !utf_iscomposing(PTR2CHAR(s2))) {
+        && !utf_iscomposing(utf_ptr2char(s2))) {
       cleanup_subexpr();
       if (REG_MULTI) {
         rex.reg_startpos[0].lnum = rex.lnum;
@@ -5620,7 +5622,7 @@ static int nfa_regmatch(nfa_regprog_T *prog, nfa_state_T *start,
           // Only match composing character(s), ignore base
           // character.  Used for ".{composing}" and "{composing}"
           // (no preceding character).
-          len += mb_char2len(mc);
+          len += utf_char2len(mc);
         }
         if (rex.reg_icombine && len == 0) {
           // If \Z was present, then ignore composing characters.
@@ -5636,7 +5638,7 @@ static int nfa_regmatch(nfa_regprog_T *prog, nfa_state_T *start,
         } else if (len > 0 || mc == sta->c) {
           // Check base character matches first, unless ignored.
           if (len == 0) {
-            len += mb_char2len(mc);
+            len += utf_char2len(mc);
             sta = sta->out;
           }
 
@@ -5645,9 +5647,10 @@ static int nfa_regmatch(nfa_regprog_T *prog, nfa_state_T *start,
           while (len < clen) {
             mc = utf_ptr2char(rex.input + len);
             cchars[ccount++] = mc;
-            len += mb_char2len(mc);
-            if (ccount == MAX_MCO)
+            len += utf_char2len(mc);
+            if (ccount == MAX_MCO) {
               break;
+            }
           }
 
           // Check that each composing char in the pattern matches a
@@ -5807,12 +5810,12 @@ static int nfa_regmatch(nfa_regprog_T *prog, nfa_state_T *start,
         break;
 
       case NFA_PRINT:           //  \p
-        result = vim_isprintc(PTR2CHAR(rex.input));
+        result = vim_isprintc(utf_ptr2char(rex.input));
         ADD_STATE_IF_MATCH(t->state);
         break;
 
       case NFA_SPRINT:          //  \P
-        result = !ascii_isdigit(curc) && vim_isprintc(PTR2CHAR(rex.input));
+        result = !ascii_isdigit(curc) && vim_isprintc(utf_ptr2char(rex.input));
         ADD_STATE_IF_MATCH(t->state);
         break;
 
@@ -6305,7 +6308,7 @@ static int nfa_regmatch(nfa_regprog_T *prog, nfa_state_T *start,
           } else {
             // Checking if the required start character matches is
             // cheaper than adding a state that won't match.
-            const int c = PTR2CHAR(rex.input + clen);
+            const int c = utf_ptr2char(rex.input + clen);
             if (c != prog->regstart
                 && (!rex.reg_ic
                     || utf_fold(c) != utf_fold(prog->regstart))) {
