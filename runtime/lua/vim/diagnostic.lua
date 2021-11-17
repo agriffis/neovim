@@ -245,6 +245,11 @@ local bufs_waiting_to_update = setmetatable({}, bufnr_and_namespace_cacher_mt)
 
 ---@private
 local function is_disabled(namespace, bufnr)
+  local ns = M.get_namespace(namespace)
+  if ns.disabled then
+    return true
+  end
+
   if type(diagnostic_disabled[bufnr]) == "table" then
     return diagnostic_disabled[bufnr][namespace]
   end
@@ -534,17 +539,24 @@ end
 ---                its severity. Otherwise, all signs use the same priority.
 ---       - float: Options for floating windows:
 ---                  * severity: See |diagnostic-severity|.
----                  * show_header: (boolean, default true) Show "Diagnostics:" header
+---                  * header: (string or table) String to use as the header for the floating
+---                            window. If a table, it is interpreted as a [text, hl_group] tuple.
+---                            Defaults to "Diagnostics:".
 ---                  * source: (string) Include the diagnostic source in
 ---                            the message. One of "always" or "if_many".
 ---                  * format: (function) A function that takes a diagnostic as input and returns a
 ---                            string. The return value is the text used to display the diagnostic.
----                  * prefix: (function or string) Prefix each diagnostic in the floating window. If
----                            a function, it must have the signature (diagnostic, i, total) -> string,
----                            where {i} is the index of the diagnostic being evaluated and {total} is
----                            the total number of diagnostics displayed in the window. The returned
----                            string is prepended to each diagnostic in the window. Otherwise,
----                            if {prefix} is a string, it is prepended to each diagnostic.
+---                  * prefix: (function, string, or table) Prefix each diagnostic in the floating
+---                            window. If a function, it must have the signature (diagnostic, i,
+---                            total) -> (string, string), where {i} is the index of the diagnostic
+---                            being evaluated and {total} is the total number of diagnostics
+---                            displayed in the window. The function should return a string which
+---                            is prepended to each diagnostic in the window as well as an
+---                            (optional) highlight group which will be used to highlight the
+---                            prefix. If {prefix} is a table, it is interpreted as a [text,
+---                            hl_group] tuple as in |nvim_echo()|; otherwise, if {prefix} is a
+---                            string, it is prepended to each diagnostic in the window with no
+---                            highlight.
 ---       - update_in_insert: (default false) Update diagnostics in Insert mode (if false,
 ---                           diagnostics are updated on InsertLeave)
 ---       - severity_sort: (default false) Sort diagnostics by severity. This affects the order in
@@ -1039,19 +1051,22 @@ end
 ---
 ---@param namespace number|nil Diagnostic namespace. When omitted, hide
 ---                            diagnostics from all namespaces.
----@param bufnr number|nil Buffer number. Defaults to the current buffer.
+---@param bufnr number|nil Buffer number, or 0 for current buffer. When
+---                        omitted, hide diagnostics in all buffers.
 function M.hide(namespace, bufnr)
   vim.validate {
     namespace = { namespace, 'n', true },
     bufnr = { bufnr, 'n', true },
   }
 
-  bufnr = get_bufnr(bufnr)
-  local namespaces = namespace and {namespace} or vim.tbl_keys(diagnostic_cache[bufnr])
-  for _, iter_namespace in ipairs(namespaces) do
-    for _, handler in pairs(M.handlers) do
-      if handler.hide then
-        handler.hide(iter_namespace, bufnr)
+  local buffers = bufnr and {get_bufnr(bufnr)} or vim.tbl_keys(diagnostic_cache)
+  for _, iter_bufnr in ipairs(buffers) do
+    local namespaces = namespace and {namespace} or vim.tbl_keys(diagnostic_cache[iter_bufnr])
+    for _, iter_namespace in ipairs(namespaces) do
+      for _, handler in pairs(M.handlers) do
+        if handler.hide then
+          handler.hide(iter_namespace, iter_bufnr)
+        end
       end
     end
   end
@@ -1061,12 +1076,14 @@ end
 ---
 ---@param namespace number|nil Diagnostic namespace. When omitted, show
 ---                            diagnostics from all namespaces.
----@param bufnr number|nil Buffer number. Defaults to the current buffer.
+---@param bufnr number|nil Buffer number, or 0 for current buffer. When omitted, show
+---                        diagnostics in all buffers.
 ---@param diagnostics table|nil The diagnostics to display. When omitted, use the
 ---                             saved diagnostics for the given namespace and
 ---                             buffer. This can be used to display a list of diagnostics
 ---                             without saving them or to display only a subset of
----                             diagnostics. May not be used when {namespace} is nil.
+---                             diagnostics. May not be used when {namespace}
+---                             or {bufnr} is nil.
 ---@param opts table|nil Display options. See |vim.diagnostic.config()|.
 function M.show(namespace, bufnr, diagnostics, opts)
   vim.validate {
@@ -1076,11 +1093,18 @@ function M.show(namespace, bufnr, diagnostics, opts)
     opts = { opts, 't', true },
   }
 
-  bufnr = get_bufnr(bufnr)
-  if not namespace then
-    assert(not diagnostics, "Cannot show diagnostics without a namespace")
-    for iter_namespace in pairs(diagnostic_cache[bufnr]) do
-      M.show(iter_namespace, bufnr, nil, opts)
+  if not bufnr or not namespace then
+    assert(not diagnostics, "Cannot show diagnostics without a buffer and namespace")
+    if not bufnr then
+      for iter_bufnr in pairs(diagnostic_cache) do
+        M.show(namespace, iter_bufnr, nil, opts)
+      end
+    else
+      -- namespace is nil
+      bufnr = get_bufnr(bufnr)
+      for iter_namespace in pairs(diagnostic_cache[bufnr]) do
+        M.show(iter_namespace, bufnr, nil, opts)
+      end
     end
     return
   end
@@ -1141,14 +1165,15 @@ end
 ---                             from |vim.diagnostic.config()|.
 ---            - severity: See |diagnostic-severity|. Overrides the setting from
 ---                        |vim.diagnostic.config()|.
----            - show_header: (boolean, default true) Show "Diagnostics:" header. Overrides the
----                           setting from |vim.diagnostic.config()|.
+---            - header: (string or table) String to use as the header for the floating window. If a
+---                      table, it is interpreted as a [text, hl_group] tuple. Overrides the setting
+---                      from |vim.diagnostic.config()|.
 ---            - source: (string) Include the diagnostic source in the message. One of "always" or
 ---                      "if_many". Overrides the setting from |vim.diagnostic.config()|.
 ---            - format: (function) A function that takes a diagnostic as input and returns a
 ---                      string. The return value is the text used to display the diagnostic.
 ---                      Overrides the setting from |vim.diagnostic.config()|.
----            - prefix: (function or string) Prefix each diagnostic in the floating window.
+---            - prefix: (function, string, or table) Prefix each diagnostic in the floating window.
 ---                      Overrides the setting from |vim.diagnostic.config()|.
 ---@return tuple ({float_bufnr}, {win_id})
 function M.open_float(bufnr, opts)
@@ -1220,10 +1245,21 @@ function M.open_float(bufnr, opts)
 
   local lines = {}
   local highlights = {}
-  local show_header = vim.F.if_nil(opts.show_header, true)
-  if show_header then
-    table.insert(lines, "Diagnostics:")
-    table.insert(highlights, {0, "Bold"})
+  local header = if_nil(opts.header, "Diagnostics:")
+  if header then
+    vim.validate { header = { header, function(v)
+      return type(v) == "string" or type(v) == "table"
+    end, "'string' or 'table'" } }
+    if type(header) == "table" then
+      -- Don't insert any lines for an empty string
+      if string.len(if_nil(header[1], "")) > 0 then
+        table.insert(lines, header[1])
+        table.insert(highlights, {0, header[2] or "Bold"})
+      end
+    elseif #header > 0 then
+      table.insert(lines, header)
+      table.insert(highlights, {0, "Bold"})
+    end
   end
 
   if opts.format then
@@ -1237,18 +1273,28 @@ function M.open_float(bufnr, opts)
   local prefix_opt = if_nil(opts.prefix, (scope == "cursor" and #diagnostics <= 1) and "" or function(_, i)
       return string.format("%d. ", i)
   end)
+
+  local prefix, prefix_hl_group
   if prefix_opt then
     vim.validate { prefix = { prefix_opt, function(v)
-      return type(v) == "string" or type(v) == "function"
-    end, "'string' or 'function'" } }
+      return type(v) == "string" or type(v) == "table" or type(v) == "function"
+    end, "'string' or 'table' or 'function'" } }
+    if type(prefix_opt) == "string" then
+      prefix, prefix_hl_group = prefix_opt, "NormalFloat"
+    elseif type(prefix_opt) == "table" then
+      prefix, prefix_hl_group = prefix_opt[1] or "", prefix_opt[2] or "NormalFloat"
+    end
   end
 
   for i, diagnostic in ipairs(diagnostics) do
-    local prefix = type(prefix_opt) == "string" and prefix_opt or prefix_opt(diagnostic, i, #diagnostics)
+    if prefix_opt and type(prefix_opt) == "function" then
+      prefix, prefix_hl_group = prefix_opt(diagnostic, i, #diagnostics)
+      prefix, prefix_hl_group = prefix or "", prefix_hl_group or "NormalFloat"
+    end
     local hiname = floating_highlight_map[diagnostic.severity]
     local message_lines = vim.split(diagnostic.message, '\n')
     table.insert(lines, prefix..message_lines[1])
-    table.insert(highlights, {#prefix, hiname})
+    table.insert(highlights, {#prefix, hiname, prefix_hl_group})
     for j = 2, #message_lines do
       table.insert(lines, string.rep(' ', #prefix) .. message_lines[j])
       table.insert(highlights, {0, hiname})
@@ -1261,8 +1307,10 @@ function M.open_float(bufnr, opts)
   end
   local float_bufnr, winnr = require('vim.lsp.util').open_floating_preview(lines, 'plaintext', opts)
   for i, hi in ipairs(highlights) do
-    local prefixlen, hiname = unpack(hi)
-    -- Start highlight after the prefix
+    local prefixlen, hiname, prefix_hiname = unpack(hi)
+    if prefix_hiname then
+      vim.api.nvim_buf_add_highlight(float_bufnr, -1, prefix_hiname, i-1, 0, prefixlen)
+    end
     vim.api.nvim_buf_add_highlight(float_bufnr, -1, hiname, i-1, prefixlen, -1)
   end
 
@@ -1323,44 +1371,67 @@ end
 
 --- Disable diagnostics in the given buffer.
 ---
----@param bufnr number|nil Buffer number. Defaults to the current buffer.
+---@param bufnr number|nil Buffer number, or 0 for current buffer. When
+---                        omitted, disable diagnostics in all buffers.
 ---@param namespace number|nil Only disable diagnostics for the given namespace.
 function M.disable(bufnr, namespace)
   vim.validate { bufnr = {bufnr, 'n', true}, namespace = {namespace, 'n', true} }
-  bufnr = get_bufnr(bufnr)
-  if namespace == nil then
-    diagnostic_disabled[bufnr] = true
-    for ns in pairs(diagnostic_cache[bufnr]) do
-      M.hide(ns, bufnr)
+  if bufnr == nil then
+    if namespace == nil then
+      -- Disable everything (including as yet non-existing buffers and
+      -- namespaces) by setting diagnostic_disabled to an empty table and set
+      -- its metatable to always return true. This metatable is removed
+      -- in enable()
+      diagnostic_disabled = setmetatable({}, {
+        __index = function() return true end,
+      })
+    else
+      local ns = M.get_namespace(namespace)
+      ns.disabled = true
     end
   else
-    if type(diagnostic_disabled[bufnr]) ~= "table" then
-      diagnostic_disabled[bufnr] = {}
+    bufnr = get_bufnr(bufnr)
+    if namespace == nil then
+      diagnostic_disabled[bufnr] = true
+    else
+      if type(diagnostic_disabled[bufnr]) ~= "table" then
+        diagnostic_disabled[bufnr] = {}
+      end
+      diagnostic_disabled[bufnr][namespace] = true
     end
-    diagnostic_disabled[bufnr][namespace] = true
-    M.hide(namespace, bufnr)
   end
+
+  M.hide(namespace, bufnr)
 end
 
 --- Enable diagnostics in the given buffer.
 ---
----@param bufnr number|nil Buffer number. Defaults to the current buffer.
+---@param bufnr number|nil Buffer number, or 0 for current buffer. When
+---                        omitted, enable diagnostics in all buffers.
 ---@param namespace number|nil Only enable diagnostics for the given namespace.
 function M.enable(bufnr, namespace)
   vim.validate { bufnr = {bufnr, 'n', true}, namespace = {namespace, 'n', true} }
-  bufnr = get_bufnr(bufnr)
-  if namespace == nil then
-    diagnostic_disabled[bufnr] = nil
-    for ns in pairs(diagnostic_cache[bufnr]) do
-      M.show(ns, bufnr)
+  if bufnr == nil then
+    if namespace == nil then
+      -- Enable everything by setting diagnostic_disabled to an empty table
+      diagnostic_disabled = {}
+    else
+      local ns = M.get_namespace(namespace)
+      ns.disabled = false
     end
   else
-    if type(diagnostic_disabled[bufnr]) ~= "table" then
-      return
+    bufnr = get_bufnr(bufnr)
+    if namespace == nil then
+      diagnostic_disabled[bufnr] = nil
+    else
+      if type(diagnostic_disabled[bufnr]) ~= "table" then
+        return
+      end
+      diagnostic_disabled[bufnr][namespace] = nil
     end
-    diagnostic_disabled[bufnr][namespace] = nil
-    M.show(namespace, bufnr)
   end
+
+  M.show(namespace, bufnr)
 end
 
 --- Parse a diagnostic from a string.

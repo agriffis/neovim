@@ -375,8 +375,11 @@ config({opts}, {namespace})                          *vim.diagnostic.config()*
 
                                  • float: Options for floating windows:
                                    • severity: See |diagnostic-severity|.
-                                   • show_header: (boolean, default true) Show
-                                     "Diagnostics:" header
+                                   • header: (string or table) String to use
+                                     as the header for the floating window. If
+                                     a table, it is interpreted as a [text,
+                                     hl_group] tuple. Defaults to
+                                     "Diagnostics:".
                                    • source: (string) Include the diagnostic
                                      source in the message. One of "always" or
                                      "if_many".
@@ -384,17 +387,24 @@ config({opts}, {namespace})                          *vim.diagnostic.config()*
                                      a diagnostic as input and returns a
                                      string. The return value is the text used
                                      to display the diagnostic.
-                                   • prefix: (function or string) Prefix each
-                                     diagnostic in the floating window. If a
-                                     function, it must have the signature
-                                     (diagnostic, i, total) -> string, where
-                                     {i} is the index of the diagnostic being
-                                     evaluated and {total} is the total number
-                                     of diagnostics displayed in the window.
-                                     The returned string is prepended to each
-                                     diagnostic in the window. Otherwise, if
+                                   • prefix: (function, string, or table)
+                                     Prefix each diagnostic in the floating
+                                     window. If a function, it must have the
+                                     signature (diagnostic, i, total) ->
+                                     (string, string), where {i} is the index
+                                     of the diagnostic being evaluated and
+                                     {total} is the total number of
+                                     diagnostics displayed in the window. The
+                                     function should return a string which is
+                                     prepended to each diagnostic in the
+                                     window as well as an (optional) highlight
+                                     group which will be used to highlight the
+                                     prefix. If {prefix} is a table, it is
+                                     interpreted as a [text, hl_group] tuple
+                                     as in |nvim_echo()|; otherwise, if
                                      {prefix} is a string, it is prepended to
-                                     each diagnostic.
+                                     each diagnostic in the window with no
+                                     highlight.
 
                                  • update_in_insert: (default false) Update
                                    diagnostics in Insert mode (if false,
@@ -414,8 +424,9 @@ disable({bufnr}, {namespace})                       *vim.diagnostic.disable()*
                 Disable diagnostics in the given buffer.
 
                 Parameters: ~
-                    {bufnr}      number|nil Buffer number. Defaults to the
-                                 current buffer.
+                    {bufnr}      number|nil Buffer number, or 0 for current
+                                 buffer. When omitted, disable diagnostics in
+                                 all buffers.
                     {namespace}  number|nil Only disable diagnostics for the
                                  given namespace.
 
@@ -423,8 +434,9 @@ enable({bufnr}, {namespace})                         *vim.diagnostic.enable()*
                 Enable diagnostics in the given buffer.
 
                 Parameters: ~
-                    {bufnr}      number|nil Buffer number. Defaults to the
-                                 current buffer.
+                    {bufnr}      number|nil Buffer number, or 0 for current
+                                 buffer. When omitted, enable diagnostics in
+                                 all buffers.
                     {namespace}  number|nil Only enable diagnostics for the
                                  given namespace.
 
@@ -550,8 +562,9 @@ hide({namespace}, {bufnr})                             *vim.diagnostic.hide()*
                     {namespace}  number|nil Diagnostic namespace. When
                                  omitted, hide diagnostics from all
                                  namespaces.
-                    {bufnr}      number|nil Buffer number. Defaults to the
-                                 current buffer.
+                    {bufnr}      number|nil Buffer number, or 0 for current
+                                 buffer. When omitted, hide diagnostics in all
+                                 buffers.
 
                                                       *vim.diagnostic.match()*
 match({str}, {pat}, {groups}, {severity_map}, {defaults})
@@ -613,9 +626,11 @@ open_float({bufnr}, {opts})                      *vim.diagnostic.open_float()*
                                |vim.diagnostic.config()|.
                              • severity: See |diagnostic-severity|. Overrides
                                the setting from |vim.diagnostic.config()|.
-                             • show_header: (boolean, default true) Show
-                               "Diagnostics:" header. Overrides the setting
-                               from |vim.diagnostic.config()|.
+                             • header: (string or table) String to use as the
+                               header for the floating window. If a table, it
+                               is interpreted as a [text, hl_group] tuple.
+                               Overrides the setting from
+                               |vim.diagnostic.config()|.
                              • source: (string) Include the diagnostic source
                                in the message. One of "always" or "if_many".
                                Overrides the setting from
@@ -625,9 +640,10 @@ open_float({bufnr}, {opts})                      *vim.diagnostic.open_float()*
                                return value is the text used to display the
                                diagnostic. Overrides the setting from
                                |vim.diagnostic.config()|.
-                             • prefix: (function or string) Prefix each
-                               diagnostic in the floating window. Overrides
-                               the setting from |vim.diagnostic.config()|.
+                             • prefix: (function, string, or table) Prefix
+                               each diagnostic in the floating window.
+                               Overrides the setting from
+                               |vim.diagnostic.config()|.
 
                 Return: ~
                     tuple ({float_bufnr}, {win_id})
@@ -698,15 +714,16 @@ show({namespace}, {bufnr}, {diagnostics}, {opts})
                     {namespace}    number|nil Diagnostic namespace. When
                                    omitted, show diagnostics from all
                                    namespaces.
-                    {bufnr}        number|nil Buffer number. Defaults to the
-                                   current buffer.
+                    {bufnr}        number|nil Buffer number, or 0 for current
+                                   buffer. When omitted, show diagnostics in
+                                   all buffers.
                     {diagnostics}  table|nil The diagnostics to display. When
                                    omitted, use the saved diagnostics for the
                                    given namespace and buffer. This can be
                                    used to display a list of diagnostics
                                    without saving them or to display only a
                                    subset of diagnostics. May not be used when
-                                   {namespace} is nil.
+                                   {namespace} or {bufnr} is nil.
                     {opts}         table|nil Display options. See
                                    |vim.diagnostic.config()|.
 
