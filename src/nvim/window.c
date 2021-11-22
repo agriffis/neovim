@@ -4592,6 +4592,7 @@ void fix_current_dir(void)
         do_autocmd_dirchanged(new_dir, curwin->w_localdir
                               ? kCdScopeWindow : kCdScopeTabpage, kCdCauseWindow);
       }
+      last_chdir_reason = NULL;
       shorten_fnames(true);
     }
   } else if (globaldir != NULL) {
@@ -4603,6 +4604,7 @@ void fix_current_dir(void)
       }
     }
     XFREE_CLEAR(globaldir);
+    last_chdir_reason = NULL;
     shorten_fnames(true);
   }
 }
@@ -4753,6 +4755,8 @@ static void win_free(win_T *wp, tabpage_T *tp)
 
   clear_winopt(&wp->w_onebuf_opt);
   clear_winopt(&wp->w_allbuf_opt);
+
+  xfree(wp->w_p_lcs_chars.multispace);
 
   vars_clear(&wp->w_vars->dv_hashtab);          // free all w: variables
   hash_init(&wp->w_vars->dv_hashtab);

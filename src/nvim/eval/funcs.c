@@ -3386,15 +3386,17 @@ static void f_getcompletion(typval_T *argvars, typval_T *rettv, FunPtr fptr)
     emsg(_(e_invarg));
     return;
   }
+  const char *pattern = tv_get_string(&argvars[0]);
 
   if (strcmp(type, "cmdline") == 0) {
-    set_one_cmd_context(&xpc, tv_get_string(&argvars[0]));
+    set_one_cmd_context(&xpc, pattern);
     xpc.xp_pattern_len = STRLEN(xpc.xp_pattern);
+    xpc.xp_col = STRLEN(pattern);
     goto theend;
   }
 
   ExpandInit(&xpc);
-  xpc.xp_pattern = (char_u *)tv_get_string(&argvars[0]);
+  xpc.xp_pattern = (char_u *)pattern;
   xpc.xp_pattern_len = STRLEN(xpc.xp_pattern);
   xpc.xp_context = cmdcomplete_str_to_type(type);
   if (xpc.xp_context == EXPAND_NOTHING) {
@@ -3485,11 +3487,6 @@ static void f_getcwd(typval_T *argvars, typval_T *rettv, FunPtr fptr)
     }
   }
 
-  // If the user didn't specify anything, default to window scope
-  if (scope == kCdScopeInvalid) {
-    scope = MIN_CD_SCOPE;
-  }
-
   // Find the tabpage by number
   if (scope_number[kCdScopeTabpage] > 0) {
     tp = find_tabpage(scope_number[kCdScopeTabpage]);
@@ -3535,12 +3532,13 @@ static void f_getcwd(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   case kCdScopeGlobal:
     if (globaldir) {        // `globaldir` is not always set.
       from = globaldir;
-    } else if (os_dirname(cwd, MAXPATHL) == FAIL) {  // Get the OS CWD.
+      break;
+    }
+    FALLTHROUGH;            // In global directory, just need to get OS CWD.
+  case kCdScopeInvalid:     // If called without any arguments, get OS CWD.
+    if (os_dirname(cwd, MAXPATHL) == FAIL) {
       from = (char_u *)"";  // Return empty string on failure.
     }
-    break;
-  case kCdScopeInvalid:     // We should never get here
-    abort();
   }
 
   if (from) {

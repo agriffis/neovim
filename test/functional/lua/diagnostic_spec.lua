@@ -110,17 +110,21 @@ describe('vim.diagnostic', function()
 
   it('retrieves diagnostics from all buffers and namespaces', function()
     local result = exec_lua [[
-      vim.diagnostic.set(diagnostic_ns, 1, {
+      local other_bufnr = vim.api.nvim_create_buf(true, false)
+      local lines = {"1st line of text", "2nd line of text", "wow", "cool", "more", "lines"}
+      vim.api.nvim_buf_set_lines(other_bufnr, 0, 1, false, lines)
+
+      vim.diagnostic.set(diagnostic_ns, diagnostic_bufnr, {
         make_error('Diagnostic #1', 1, 1, 1, 1),
         make_error('Diagnostic #2', 2, 1, 2, 1),
       })
-      vim.diagnostic.set(other_ns, 2, {
+      vim.diagnostic.set(other_ns, other_bufnr, {
         make_error('Diagnostic #3', 3, 1, 3, 1),
       })
       return vim.diagnostic.get()
     ]]
     eq(3, #result)
-    eq(2, exec_lua([[return #vim.tbl_filter(function(d) return d.bufnr == 1 end, ...)]], result))
+    eq(2, exec_lua([[return #vim.tbl_filter(function(d) return d.bufnr == diagnostic_bufnr end, ...)]], result))
     eq('Diagnostic #1', result[1].message)
   end)
 
@@ -338,6 +342,16 @@ describe('vim.diagnostic', function()
       eq(3, result[4])
       eq(0, result[5])
       eq(3, result[6])
+    end)
+
+    it("doesn't error after bwipeout on buffer", function()
+      exec_lua [[
+        vim.diagnostic.set(diagnostic_ns, diagnostic_bufnr, { lnum = 0, end_lnum = 0, col = 0, end_col = 0 })
+        vim.cmd("bwipeout! " .. diagnostic_bufnr)
+
+        vim.diagnostic.show(diagnostic_ns)
+        vim.diagnostic.hide(diagnostic_ns)
+      ]]
     end)
   end)
 
@@ -625,6 +639,15 @@ describe('vim.diagnostic', function()
       ]])
 
     end)
+
+    it("doesn't error after bwipeout called on buffer", function()
+      exec_lua [[
+        vim.diagnostic.set(diagnostic_ns, diagnostic_bufnr, { lnum = 0, end_lnum = 0, col = 0, end_col = 0 })
+        vim.cmd("bwipeout! " .. diagnostic_bufnr)
+
+        vim.diagnostic.reset(diagnostic_ns)
+      ]]
+    end)
   end)
 
   describe('get_next_pos()', function()
@@ -680,6 +703,19 @@ describe('vim.diagnostic', function()
         vim.api.nvim_win_set_buf(0, diagnostic_bufnr)
         vim.api.nvim_win_set_cursor(0, {vim.api.nvim_buf_line_count(0), 1})
         return vim.diagnostic.get_prev_pos { namespace = diagnostic_ns }
+      ]])
+    end)
+
+    it('works with diagnostics past the end of the line #16349', function()
+      eq({4, 0}, exec_lua [[
+        vim.diagnostic.set(diagnostic_ns, diagnostic_bufnr, {
+          make_error('Diagnostic #1', 3, 9001, 3, 9001),
+          make_error('Diagnostic #2', 4, 0, 4, 0),
+        })
+        vim.api.nvim_win_set_buf(0, diagnostic_bufnr)
+        vim.api.nvim_win_set_cursor(0, {1, 1})
+        vim.diagnostic.goto_next { float = false }
+        return vim.diagnostic.get_next_pos { namespace = diagnostic_ns }
       ]])
     end)
   end)

@@ -115,6 +115,13 @@ local format_line_ending = {
   ["mac"] = '\r',
 }
 
+---@private
+---@param bufnr (number)
+---@returns (string)
+local function buf_get_line_ending(bufnr)
+  return format_line_ending[nvim_buf_get_option(bufnr, 'fileformat')] or '\n'
+end
+
 local client_index = 0
 ---@private
 --- Returns a new, unused client id.
@@ -236,7 +243,6 @@ local function validate_client_config(config)
     config = { config, 't' };
   }
   validate {
-    root_dir        = { config.root_dir, optional_validator(is_dir), "directory" };
     handlers        = { config.handlers, "t", true };
     capabilities    = { config.capabilities, "t", true };
     cmd_cwd         = { config.cmd_cwd, optional_validator(is_dir), "directory" };
@@ -278,9 +284,10 @@ end
 ---@param bufnr (number) Buffer handle, or 0 for current.
 ---@returns Buffer text as string.
 local function buf_get_full_text(bufnr)
-  local text = table.concat(nvim_buf_get_lines(bufnr, 0, -1, true), '\n')
+  local line_ending = buf_get_line_ending(bufnr)
+  local text = table.concat(nvim_buf_get_lines(bufnr, 0, -1, true), line_ending)
   if nvim_buf_get_option(bufnr, 'eol') then
-    text = text .. '\n'
+    text = text .. line_ending
   end
   return text
 end
@@ -362,9 +369,9 @@ do
     local incremental_changes = function(client)
       local cached_buffers = state_by_client[client.id].buffers
       local curr_lines = nvim_buf_get_lines(bufnr, 0, -1, true)
-      local line_ending = format_line_ending[vim.api.nvim_buf_get_option(0, 'fileformat')]
+      local line_ending = buf_get_line_ending(bufnr)
       local incremental_change = sync.compute_diff(
-        cached_buffers[bufnr], curr_lines, firstline, lastline, new_lastline, client.offset_encoding or 'utf-16', line_ending or '\n')
+        cached_buffers[bufnr], curr_lines, firstline, lastline, new_lastline, client.offset_encoding or 'utf-16', line_ending)
       cached_buffers[bufnr] = curr_lines
       return incremental_change
     end
@@ -566,12 +573,10 @@ end
 --
 --- Starts and initializes a client with the given configuration.
 ---
---- Parameters `cmd` and `root_dir` are required.
+--- Parameter `cmd` is required.
 ---
 --- The following parameters describe fields in the {config} table.
 ---
----@param root_dir: (string) Directory where the LSP server will base
---- its rootUri on initialization.
 ---
 ---@param cmd: (required, string or list treated like |jobstart()|) Base command
 --- that initiates the LSP client.
@@ -586,6 +591,11 @@ end
 --- <pre>
 --- { "PRODUCTION=true"; "TEST=123"; PORT = 8080; HOST = "0.0.0.0"; }
 --- </pre>
+---
+---@param workspace_folders (table) List of workspace folders passed to the
+--- language server. For backwards compatibility rootUri and rootPath will be
+--- derived from the first workspace folder in this list. See `workspaceFolders` in
+--- the LSP spec.
 ---
 ---@param capabilities Map overriding the default capabilities defined by
 --- |vim.lsp.protocol.make_client_capabilities()|, passed to the language
@@ -610,10 +620,6 @@ end
 --- as `initializationOptions`. See `initialize` in the LSP spec.
 ---
 ---@param name (string, default=client-id) Name in log messages.
---
----@param workspace_folders (table) List of workspace folders passed to the
---- language server. Defaults to root_dir if not set. See `workspaceFolders` in
---- the LSP spec
 ---
 ---@param get_language_id function(bufnr, filetype) -> language ID as string.
 --- Defaults to the filetype.
@@ -663,6 +669,11 @@ end
 --- - exit_timeout (number, default 500): Milliseconds to wait for server to
 --        exit cleanly after sending the 'shutdown' request before sending kill -15.
 --        If set to false, nvim exits immediately after sending the 'shutdown' request to the server.
+---
+---@param root_dir string Directory where the LSP
+--- server will base its workspaceFolders, rootUri, and rootPath
+--- on initialization.
+---
 ---@returns Client id. |vim.lsp.get_client_by_id()| Note: client may not be
 --- fully initialized. Use `on_init` to do any actions once
 --- the client has been initialized.
@@ -805,11 +816,24 @@ function lsp.start_client(config)
     }
     local version = vim.version()
 
-    if config.root_dir and not config.workspace_folders then
-      config.workspace_folders = {{
-        uri = vim.uri_from_fname(config.root_dir);
-        name = string.format("%s", config.root_dir);
-      }};
+    local workspace_folders
+    local root_uri
+    local root_path
+    if config.workspace_folders or config.root_dir then
+      if config.root_dir and not config.workspace_folders then
+        workspace_folders = {{
+          uri = vim.uri_from_fname(config.root_dir);
+          name = string.format("%s", config.root_dir);
+        }};
+      else
+        workspace_folders = config.workspace_folders
+      end
+      root_uri = workspace_folders[1].uri
+      root_path = vim.uri_to_fname(root_uri)
+    else
+      workspace_folders = vim.NIL
+      root_uri = vim.NIL
+      root_path = vim.NIL
     end
 
     local initialize_params = {
@@ -827,10 +851,15 @@ function lsp.start_client(config)
       -- The rootPath of the workspace. Is null if no folder is open.
       --
       -- @deprecated in favour of rootUri.
-      rootPath = config.root_dir;
+      rootPath = root_path;
       -- The rootUri of the workspace. Is null if no folder is open. If both
       -- `rootPath` and `rootUri` are set `rootUri` wins.
-      rootUri = config.root_dir and vim.uri_from_fname(config.root_dir);
+      rootUri = root_uri;
+      -- The workspace folders configured in the client when the server starts.
+      -- This property is only available if the client supports workspace folders.
+      -- It can be `null` if the client supports workspace folders but none are
+      -- configured.
+      workspaceFolders = workspace_folders;
       -- User provided initialization options.
       initializationOptions = config.init_options;
       -- The capabilities provided by the client (editor or tool)
@@ -838,21 +867,6 @@ function lsp.start_client(config)
       -- The initial trace setting. If omitted trace is disabled ("off").
       -- trace = "off" | "messages" | "verbose";
       trace = valid_traces[config.trace] or 'off';
-      -- The workspace folders configured in the client when the server starts.
-      -- This property is only available if the client supports workspace folders.
-      -- It can be `null` if the client supports workspace folders but none are
-      -- configured.
-      --
-      -- Since 3.6.0
-      -- workspaceFolders?: WorkspaceFolder[] | null;
-      -- export interface WorkspaceFolder {
-      --  -- The associated URI for this workspace folder.
-      --  uri
-      --  -- The name of the workspace folder. Used to refer to this
-      --  -- workspace folder in the user interface.
-      --  name
-      -- }
-      workspaceFolders = config.workspace_folders,
     }
     if config.before_init then
       -- TODO(ashkan) handle errors here.
