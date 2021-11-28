@@ -521,7 +521,9 @@ buf_request({bufnr}, {method}, {params}, {handler})
                     {method}   (string) LSP method name
                     {params}   (optional, table) Parameters to send to the
                                server
-                    {handler}  (optional, function) See |lsp-handler|
+                    {handler}  (optional, function) See |lsp-handler| If nil,
+                               follows resolution strategy defined in
+                               |lsp-handler-configuration|
 
                 Return: ~
                     2-tuple:
@@ -676,6 +678,8 @@ get_active_clients()                            *vim.lsp.get_active_clients()*
 
                                           *vim.lsp.get_buffers_by_client_id()*
 get_buffers_by_client_id({client_id})
+                Returns list of buffers attached to client_id.
+
                 Parameters: ~
                     {client_id}  number client id
 
@@ -718,7 +722,7 @@ omnifunc({findstart}, {base})                             *vim.lsp.omnifunc()*
                     |CompleteDone|
 
                                                            *vim.lsp.prepare()*
-prepare({bufnr}, {firstline}, {lastline}, {new_lastline}, {changedtick})
+prepare({bufnr}, {firstline}, {lastline}, {new_lastline})
                 TODO: Documentation
 
 reset({client_id})                                           *vim.lsp.reset()*
@@ -796,10 +800,11 @@ start_client({config})                                *vim.lsp.start_client()*
                                          functions. Commands passed to
                                          start_client take precedence over the
                                          global command registry. Each key
-                                         must be a unique comand name, and the
-                                         value is a function which is called
-                                         if any LSP action (code action, code
-                                         lenses, ...) triggers the command.
+                                         must be a unique command name, and
+                                         the value is a function which is
+                                         called if any LSP action (code
+                                         action, code lenses, ...) triggers
+                                         the command.
                     {init_options}       Values to pass in the initialization
                                          request as `initializationOptions` .
                                          See `initialize` in the LSP spec.
@@ -873,6 +878,11 @@ start_client({config})                                *vim.lsp.start_client()*
                                            debounce occurs if nil
                                          • exit_timeout (number, default 500):
                                            Milliseconds to wait for server to
+                                           exit cleanly after sending the
+                                           'shutdown' request before sending
+                                           kill -15. If set to false, nvim
+                                           exits immediately after sending the
+                                           'shutdown' request to the server.
                     {root_dir}           string Directory where the LSP server
                                          will base its workspaceFolders,
                                          rootUri, and rootPath on
@@ -1360,7 +1370,7 @@ buf_highlight_references({bufnr}, {references}, {offset_encoding})
                 See also: ~
                     https://microsoft.github.io/language-server-protocol/specifications/specification-3-17/#documentHighlight
 
-buf_lines({bufnr})                                  *vim.lsp.util.buf_lines()*
+buf_lines()                                         *vim.lsp.util.buf_lines()*
                 TODO: Documentation
 
                                              *vim.lsp.util.character_offset()*
@@ -1599,24 +1609,27 @@ open_floating_preview({contents}, {syntax}, {opts})
                 Parameters: ~
                     {contents}  table of lines to show in window
                     {syntax}    string of syntax to set for opened buffer
-                    {opts}      dictionary with optional fields
-                                • height of floating window
-                                • width of floating window
-                                • wrap boolean enable wrapping of long lines
-                                  (defaults to true)
-                                • wrap_at character to wrap at for computing
-                                  height when wrap is enabled
-                                • max_width maximal width of floating window
-                                • max_height maximal height of floating window
-                                • pad_top number of lines to pad contents at
-                                  top
-                                • pad_bottom number of lines to pad contents
-                                  at bottom
-                                • focus_id if a popup with this id is opened,
-                                  then focus it
-                                • close_events list of events that closes the
+                    {opts}      table with optional fields (additional keys
+                                are passed on to |vim.api.nvim_open_win()|)
+                                • height: (number) height of floating window
+                                • width: (number) width of floating window
+                                • wrap: (boolean, default true) wrap long
+                                  lines
+                                • wrap_at: (string) character to wrap at for
+                                  computing height when wrap is enabled
+                                • max_width: (number) maximal width of
                                   floating window
-                                • focusable (boolean, default true): Make
+                                • max_height: (number) maximal height of
+                                  floating window
+                                • pad_top: (number) number of lines to pad
+                                  contents at top
+                                • pad_bottom: (number) number of lines to pad
+                                  contents at bottom
+                                • focus_id: (string) if a popup with this id
+                                  is opened, then focus it
+                                • close_events: (table) list of events that
+                                  closes the floating window
+                                • focusable: (boolean, default true) Make
                                   float focusable
 
                 Return: ~
@@ -1837,7 +1850,8 @@ rpc_response_error({code}, {message}, {data})
                                                          *vim.lsp.rpc.start()*
 start({cmd}, {cmd_args}, {dispatchers}, {extra_spawn_params})
                 Starts an LSP server process and create an LSP RPC client
-                object to interact with it.
+                object to interact with it. Communication with the server is
+                currently limited to stdio.
 
                 Parameters: ~
                     {cmd}                 (string) Command to start the LSP

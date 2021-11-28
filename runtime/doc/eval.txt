@@ -3081,7 +3081,7 @@ bufname([{buf}])						*bufname()*
 	bufname(3)		name of buffer 3
 	bufname("%")		name of current buffer
 	bufname("file2")	name of buffer where "file2" matches.
-
+<
 							*bufnr()*
 bufnr([{buf} [, {create}]])
 		The result is the number of a buffer, as it is displayed by
@@ -8552,6 +8552,7 @@ setbufline({buf}, {lnum}, {text})			*setbufline()*
 		For the use of {buf}, see |bufname()| above.
 
 		{lnum} is used like with |setline()|.
+		Use "$" to refer to the last line in buffer {buf}.
 		When {lnum} is just below the last line the {text} will be
 		added below the last line.
 		On success 0 is returned, on failure 1 is returned.
@@ -8976,7 +8977,7 @@ shellescape({string} [, {special}])			*shellescape()*
 		Otherwise encloses {string} in single-quotes and replaces all
 		"'" with "'\''".
 
-		If {special} is a ||non-zero-arg|:
+		If {special} is a |non-zero-arg|:
 		- Special items such as "!", "%", "#" and "<cword>" will be
 		  preceded by a backslash. The backslash will be removed again
 		  by the |:!| command.
@@ -8986,7 +8987,7 @@ shellescape({string} [, {special}])			*shellescape()*
 		- The "!" character will be escaped. This is because csh and
 		  tcsh use "!" for history replacement even in single-quotes.
 		- The <NL> character is escaped (twice if {special} is
-		  a ||non-zero-arg|).
+		  a |non-zero-arg|).
 
 		If 'shell' contains "fish" in the tail, the "\" character will
 		be escaped because in fish it is used as an escape character
