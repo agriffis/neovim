@@ -158,6 +158,7 @@ end
 local function get_lines(bufnr, rows)
   rows = type(rows) == "table" and rows or { rows }
 
+  ---@private
   local function buf_lines()
     local lines = {}
     for _, row in pairs(rows) do
@@ -262,6 +263,7 @@ local function get_line_byte_from_position(bufnr, position, offset_encoding)
 end
 
 --- Process and return progress reports from lsp server
+---@private
 function M.get_progress_messages()
 
   local new_messages = {}
@@ -657,7 +659,7 @@ function M.rename(old_fname, new_fname, opts)
   api.nvim_buf_delete(oldbuf, { force = true })
 end
 
-
+---@private
 local function create_file(change)
   local opts = change.options or {}
   -- from spec: Overwrite wins over `ignoreIfExists`
@@ -669,7 +671,7 @@ local function create_file(change)
   vim.fn.bufadd(fname)
 end
 
-
+---@private
 local function delete_file(change)
   local opts = change.options or {}
   local fname = vim.uri_to_fname(change.uri)
@@ -1318,6 +1320,9 @@ end
 ---             - focus_id: (string) if a popup with this id is opened, then focus it
 ---             - close_events: (table) list of events that closes the floating window
 ---             - focusable: (boolean, default true) Make float focusable
+---             - focus: (boolean, default true) If `true`, and if {focusable}
+---                      is also `true`, focus an existing floating window with the same
+---                      {focus_id}
 ---@returns bufnr,winnr buffer and window number of the newly created floating
 ---preview window
 function M.open_floating_preview(contents, syntax, opts)
@@ -1329,12 +1334,13 @@ function M.open_floating_preview(contents, syntax, opts)
   opts = opts or {}
   opts.wrap = opts.wrap ~= false -- wrapping by default
   opts.stylize_markdown = opts.stylize_markdown ~= false
+  opts.focus = opts.focus ~= false
   opts.close_events = opts.close_events or {"CursorMoved", "CursorMovedI", "BufHidden", "InsertCharPre"}
 
   local bufnr = api.nvim_get_current_buf()
 
   -- check if this popup is focusable and we need to focus
-  if opts.focus_id and opts.focusable ~= false then
+  if opts.focus_id and opts.focusable ~= false and opts.focus then
     -- Go back to previous window if we are in a focusable one
     local current_winnr = api.nvim_get_current_win()
     if npcall(api.nvim_win_get_var, current_winnr, opts.focus_id) then
@@ -1414,7 +1420,7 @@ do --[[ References ]]
 
   --- Removes document highlights from a buffer.
   ---
-  ---@param bufnr buffer id
+  ---@param bufnr number Buffer id
   function M.buf_clear_references(bufnr)
     validate { bufnr = {bufnr, 'n', true} }
     api.nvim_buf_clear_namespace(bufnr, reference_ns, 0, -1)
@@ -1422,9 +1428,9 @@ do --[[ References ]]
 
   --- Shows a list of document highlights for a certain buffer.
   ---
-  ---@param bufnr buffer id
-  ---@param references List of `DocumentHighlight` objects to highlight
-  ---@param offset_encoding string utf-8|utf-16|utf-32|nil defaults to utf-16
+  ---@param bufnr number Buffer id
+  ---@param references table List of `DocumentHighlight` objects to highlight
+  ---@param offset_encoding string One of "utf-8", "utf-16", "utf-32", or nil. Defaults to utf-16
   ---@see https://microsoft.github.io/language-server-protocol/specifications/specification-3-17/#documentHighlight
   function M.buf_highlight_references(bufnr, references, offset_encoding)
     validate { bufnr = {bufnr, 'n', true} }
