@@ -196,6 +196,7 @@ void do_exmode(void)
 
   exmode_active = true;
   State = NORMAL;
+  trigger_modechanged();
 
   // When using ":global /pat/ visual" and then "Q" we return to continue
   // the :global command.
@@ -818,7 +819,7 @@ int do_cmdline(char_u *cmdline, LineGetter fgetline, void *cookie, int flags)
     // of interrupts or errors to exceptions, and ensure that no more
     // commands are executed.
     if (current_exception) {
-      void *p = NULL;
+      char *p = NULL;
       char_u *saved_sourcing_name;
       int saved_sourcing_lnum;
       struct msglist *messages = NULL;
@@ -835,7 +836,7 @@ int do_cmdline(char_u *cmdline, LineGetter fgetline, void *cookie, int flags)
         vim_snprintf((char *)IObuff, IOSIZE,
                      _("E605: Exception not caught: %s"),
                      current_exception->value);
-        p = vim_strsave(IObuff);
+        p = (char *)vim_strsave(IObuff);
         break;
       case ET_ERROR:
         messages = current_exception->messages;
