@@ -4828,7 +4828,7 @@ int get_option_tv(const char **const arg, typval_T *const rettv, const bool eval
     } else if (opt_type == -1) {      // hidden number option
       rettv->v_type = VAR_NUMBER;
       rettv->vval.v_number = 0;
-    } else if (opt_type == 1) {       // number option
+    } else if (opt_type == 1 || opt_type == 2) {  // number or boolean option
       rettv->v_type = VAR_NUMBER;
       rettv->vval.v_number = numval;
     } else {                          // string option
@@ -7146,30 +7146,30 @@ void dict_list(typval_T *const tv, typval_T *const rettv, const DictListType wha
     typval_T tv_item = { .v_lock = VAR_UNLOCKED };
 
     switch (what) {
-    case kDictListKeys:
-      tv_item.v_type = VAR_STRING;
-      tv_item.vval.v_string = vim_strsave(di->di_key);
-      break;
-    case kDictListValues:
-      tv_copy(&di->di_tv, &tv_item);
-      break;
-    case kDictListItems: {
-      // items()
-      list_T *const sub_l = tv_list_alloc(2);
-      tv_item.v_type = VAR_LIST;
-      tv_item.vval.v_list = sub_l;
-      tv_list_ref(sub_l);
+      case kDictListKeys:
+        tv_item.v_type = VAR_STRING;
+        tv_item.vval.v_string = vim_strsave(di->di_key);
+        break;
+      case kDictListValues:
+        tv_copy(&di->di_tv, &tv_item);
+        break;
+      case kDictListItems: {
+        // items()
+        list_T *const sub_l = tv_list_alloc(2);
+        tv_item.v_type = VAR_LIST;
+        tv_item.vval.v_list = sub_l;
+        tv_list_ref(sub_l);
 
-      tv_list_append_owned_tv(sub_l, (typval_T) {
+        tv_list_append_owned_tv(sub_l, (typval_T) {
           .v_type = VAR_STRING,
           .v_lock = VAR_UNLOCKED,
           .vval.v_string = (char_u *)xstrdup((const char *)di->di_key),
         });
 
-      tv_list_append_tv(sub_l, &di->di_tv);
+        tv_list_append_tv(sub_l, &di->di_tv);
 
-      break;
-    }
+        break;
+      }
     }
 
     tv_list_append_owned_tv(rettv->vval.v_list, tv_item);
