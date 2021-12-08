@@ -451,9 +451,11 @@ int update_screen(int type)
   // reset cmdline_row now (may have been changed temporarily)
   compute_cmdrow();
 
+  bool hl_changed = false;
   // Check for changed highlighting
   if (need_highlight_changed) {
     highlight_changed();
+    hl_changed = true;
   }
 
   if (type == CLEAR) {          // first clear screen
@@ -554,7 +556,7 @@ int update_screen(int type)
    * buffer.  Each buffer must only be done once.
    */
   FOR_ALL_WINDOWS_IN_TAB(wp, curtab) {
-    update_window_hl(wp, type >= NOT_VALID);
+    update_window_hl(wp, type >= NOT_VALID || hl_changed);
 
     buf_T *buf = wp->w_buffer;
     if (buf->b_mod_set) {
@@ -1692,7 +1694,7 @@ static void win_update(win_T *wp, Providers *providers)
     if (eof) {  // we hit the end of the file
       wp->w_botline = buf->b_ml.ml_line_count + 1;
       j = win_get_fill(wp, wp->w_botline);
-      if (j > 0 && !wp->w_botfill) {
+      if (j > 0 && !wp->w_botfill && row < wp->w_grid.Rows) {
         // Display filler text below last line. win_line() will check
         // for ml_line_count+1 and only draw filler lines
         foldinfo_T info = FOLDINFO_INIT;
@@ -6930,7 +6932,7 @@ int showmode(void)
   do_mode = ((p_smd && msg_silent == 0)
              && ((State & TERM_FOCUS)
                  || (State & INSERT)
-                 || restart_edit
+                 || restart_edit != NUL
                  || VIsual_active));
   if (do_mode || reg_recording != 0) {
     // Don't show mode right now, when not redrawing or inside a mapping.
@@ -7010,7 +7012,7 @@ int showmode(void)
           }
           msg_puts_attr(_(" INSERT"), attr);
         } else if (restart_edit == 'I' || restart_edit == 'i'
-                   || restart_edit == 'a') {
+                   || restart_edit == 'a' || restart_edit == 'A') {
           msg_puts_attr(_(" (insert)"), attr);
         } else if (restart_edit == 'R') {
           msg_puts_attr(_(" (replace)"), attr);
