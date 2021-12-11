@@ -18,7 +18,6 @@
 #include "nvim/memline.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
-#include "nvim/misc1.h"
 #include "nvim/option.h"
 #include "nvim/os/input.h"
 #include "nvim/os/os.h"
@@ -1337,6 +1336,17 @@ int gen_expand_wildcards(int num_pat, char_u **pat, int *num_file, char_u ***fil
   return ((flags & EW_EMPTYOK) || ga.ga_data != NULL) ? OK : FAIL;
 }
 
+/// Free the list of files returned by expand_wildcards() or other expansion functions.
+void FreeWild(int count, char_u **files)
+{
+  if (count <= 0 || files == NULL) {
+    return;
+  }
+  while (count--) {
+    xfree(files[count]);
+  }
+  xfree(files);
+}
 
 /*
  * Return TRUE if we can expand this backtick thing here.

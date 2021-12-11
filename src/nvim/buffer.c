@@ -57,7 +57,6 @@
 #include "nvim/mbyte.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
-#include "nvim/misc1.h"
 #include "nvim/move.h"
 #include "nvim/option.h"
 #include "nvim/os/input.h"
@@ -2719,7 +2718,7 @@ void buflist_list(exarg_T *eap)
       IObuff[len++] = ' ';
     } while (--i > 0 && len < IOSIZE - 18);
     if (vim_strchr(eap->arg, 't') && buf->b_last_used) {
-      add_time(IObuff + len, (size_t)(IOSIZE - len), buf->b_last_used);
+      undo_fmt_time(IObuff + len, (size_t)(IOSIZE - len), buf->b_last_used);
     } else {
       vim_snprintf((char *)IObuff + len, (size_t)(IOSIZE - len),
                    _("line %" PRId64),

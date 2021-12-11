@@ -98,7 +98,6 @@
 #include "nvim/memory.h"
 #include "nvim/menu.h"
 #include "nvim/message.h"
-#include "nvim/misc1.h"
 #include "nvim/move.h"
 #include "nvim/normal.h"
 #include "nvim/option.h"
@@ -312,6 +311,19 @@ void update_curbuf(int type)
 {
   redraw_curbuf_later(type);
   update_screen(type);
+}
+
+/// called when the status bars for the buffer 'buf' need to be updated
+void redraw_buf_status_later(buf_T *buf)
+{
+  FOR_ALL_WINDOWS_IN_TAB(wp, curtab) {
+    if (wp->w_buffer == buf && wp->w_status_height) {
+      wp->w_redr_status = true;
+      if (must_redraw < VALID) {
+        must_redraw = VALID;
+      }
+    }
+  }
 }
 
 /// Redraw the parts of the screen that is marked for redraw.

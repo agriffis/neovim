@@ -14,6 +14,7 @@
 #include "nvim/ascii.h"
 #include "nvim/buffer.h"
 #include "nvim/charset.h"
+#include "nvim/change.h"
 #include "nvim/cursor.h"
 #include "nvim/edit.h"
 #include "nvim/eval.h"
@@ -31,11 +32,11 @@
 #include "nvim/memline.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
-#include "nvim/misc1.h"
 #include "nvim/mouse.h"
 #include "nvim/move.h"
 #include "nvim/normal.h"
 #include "nvim/option.h"
+#include "nvim/os/input.h"
 #include "nvim/os/time.h"
 #include "nvim/path.h"
 #include "nvim/regexp.h"
@@ -1352,6 +1353,10 @@ int do_search(oparg_T *oap, int dirc, int search_delim, char_u *pat, long count,
       oap->inclusive = true;        // 'e' includes last character
     }
     retval = 1;                     // pattern found
+
+    if (sia && sia->sa_wrapped) {
+      apply_autocmds(EVENT_SEARCHWRAPPED, NULL, NULL, false, NULL);
+    }
 
     /*
      * Add character and/or line offset

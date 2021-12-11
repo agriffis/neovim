@@ -28,11 +28,10 @@
 #include "nvim/mbyte.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
+#include "nvim/os/input.h"
 #include "nvim/pos.h"
 #include "nvim/types.h"
 #include "nvim/vim.h"
-// TODO(ZyX-I): Move line_breakcheck out of misc1
-#include "nvim/misc1.h"  // For line_breakcheck
 #include "nvim/os/fileio.h"
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS
