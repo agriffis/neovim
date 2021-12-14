@@ -164,22 +164,36 @@ function M.parse_query(lang, query)
   return self
 end
 
--- TODO(vigoux): support multiline nodes too
-
 --- Gets the text corresponding to a given node
 ---
 ---@param node the node
----@param bsource The buffer or string from which the node is extracted
+---@param source The buffer or string from which the node is extracted
 function M.get_node_text(node, source)
   local start_row, start_col, start_byte = node:start()
   local end_row, end_col, end_byte = node:end_()
 
   if type(source) == "number" then
-    if start_row ~= end_row then
+    local lines
+    local eof_row = a.nvim_buf_line_count(source)
+    if start_row >= eof_row then
       return nil
     end
-    local line = a.nvim_buf_get_lines(source, start_row, start_row+1, true)[1]
-    return string.sub(line, start_col+1, end_col)
+
+    if end_col == 0 then
+      lines = a.nvim_buf_get_lines(source, start_row, end_row, true)
+      end_col = -1
+    else
+      lines = a.nvim_buf_get_lines(source, start_row, end_row + 1, true)
+    end
+
+    if #lines == 1 then
+      lines[1]      = string.sub(lines[1], start_col+1, end_col)
+    else
+      lines[1]      = string.sub(lines[1], start_col+1)
+      lines[#lines] = string.sub(lines[#lines], 1, end_col)
+    end
+
+    return table.concat(lines, "\n")
   elseif type(source) == "string" then
     return source:sub(start_byte+1, end_byte)
   end
@@ -211,11 +225,6 @@ local predicate_handlers = {
   ["lua-match?"] = function(match, _, source, predicate)
       local node = match[predicate[2]]
       local regex = predicate[3]
-      local start_row, _, end_row, _ = node:range()
-      if start_row ~= end_row then
-        return false
-      end
-
       return string.find(M.get_node_text(node, source), regex)
   end,
 
@@ -239,13 +248,8 @@ local predicate_handlers = {
 
     return function(match, _, source, pred)
       local node = match[pred[2]]
-      local start_row, start_col, end_row, end_col = node:range()
-      if start_row ~= end_row then
-        return false
-      end
-
       local regex = compiled_vim_regexes[pred[3]]
-      return regex:match_line(source, start_row, start_col, end_col)
+      return regex:match_str(M.get_node_text(node, source))
     end
   end)(),
 
