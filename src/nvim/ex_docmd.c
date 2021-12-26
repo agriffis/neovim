@@ -2900,6 +2900,31 @@ int cmd_exists(const char *const name)
   return ea.cmdidx == CMD_SIZE ? 0 : (full ? 2 : 1);
 }
 
+// "fullcommand" function
+void f_fullcommand(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+{
+  exarg_T ea;
+  char_u *name = argvars[0].vval.v_string;
+
+  while (name[0] != NUL && name[0] == ':') {
+    name++;
+  }
+  name = skip_range(name, NULL);
+
+  rettv->v_type = VAR_STRING;
+
+  ea.cmd = (*name == '2' || *name == '3') ? name + 1 : name;
+  ea.cmdidx = (cmdidx_T)0;
+  char_u *p = find_command(&ea, NULL);
+  if (p == NULL || ea.cmdidx == CMD_SIZE) {
+    return;
+  }
+
+  rettv->vval.v_string = vim_strsave(IS_USER_CMDIDX(ea.cmdidx)
+                                     ? get_user_commands(NULL, ea.useridx)
+                                     : cmdnames[ea.cmdidx].cmd_name);
+}
+
 /// This is all pretty much copied from do_one_cmd(), with all the extra stuff
 /// we don't need/want deleted.  Maybe this could be done better if we didn't
 /// repeat all this stuff.  The only problem is that they may not stay
@@ -7807,14 +7832,17 @@ bool changedir_func(char_u *new_dir, CdScope scope)
     prev_dir = pdir;
   }
 
+  // For UNIX ":cd" means: go to home directory.
+  // On other systems too if 'cdhome' is set.
 #if defined(UNIX)
-  // On Unix ":cd" means: go to home directory.
   if (*new_dir == NUL) {
+#else
+  if (*new_dir == NUL && p_cdh) {
+#endif
     // Use NameBuff for home directory name.
     expand_env((char_u *)"$HOME", NameBuff, MAXPATHL);
     new_dir = NameBuff;
   }
-#endif
 
   bool dir_differs = new_dir == NULL || pdir == NULL
     || pathcmp((char *)pdir, (char *)new_dir, -1) != 0;
@@ -7834,9 +7862,9 @@ void ex_cd(exarg_T *eap)
 {
   char_u *new_dir;
   new_dir = eap->arg;
-#if !defined(UNIX) && !defined(VMS)
-  // for non-UNIX ":cd" means: print current directory
-  if (*new_dir == NUL) {
+#if !defined(UNIX)
+  // for non-UNIX ":cd" means: print current directory unless 'cdhome' is set
+  if (*new_dir == NUL && !p_cdh) {
     ex_pwd(NULL);
   } else
 #endif
