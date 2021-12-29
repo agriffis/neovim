@@ -361,7 +361,7 @@ UTF-32 and UTF-16 sizes of the deleted region is also passed as additional
 arguments {old_utf32_size} and {old_utf16_size}.
 
 "on_changedtick" is invoked when |b:changedtick| was incremented but no text
-was changed. The parameters recieved are ("changedtick", {buf}, {changedtick}).
+was changed. The parameters received are ("changedtick", {buf}, {changedtick}).
 
                                                         *api-lua-detach*
 In-process Lua callbacks can detach by returning `true`. This will detach all
@@ -626,6 +626,56 @@ nvim__stats()                                                  *nvim__stats()*
                 Return: ~
                     Map of various internal stats.
 
+                                                     *nvim_add_user_command()*
+nvim_add_user_command({name}, {command}, {*opts})
+                Create a new user command |user-commands|
+
+                {name} is the name of the new command. The name must begin
+                with an uppercase letter.
+
+                {command} is the replacement text or Lua function to execute.
+
+                Example: >
+                   :call nvim_add_user_command('SayHello', 'echo "Hello world!"', {})
+                   :SayHello
+                   Hello world!
+<
+
+                Parameters: ~
+                    {name}     Name of the new user command. Must begin with
+                               an uppercase letter.
+                    {command}  Replacement command to execute when this user
+                               command is executed. When called from Lua, the
+                               command can also be a Lua function. The
+                               function is called with a single table argument
+                               that contains the following keys:
+                               • args: (string) The args passed to the
+                                 command, if any |<args>|
+                               • bang: (boolean) "true" if the command was
+                                 executed with a ! modifier |<bang>|
+                               • line1: (number) The starting line of the
+                                 command range |<line1>|
+                               • line2: (number) The final line of the command
+                                 range |<line2>|
+                               • range: (number) The number of items in the
+                                 command range: 0, 1, or 2 |<range>|
+                               • count: (number) Any count supplied |<count>|
+                               • reg: (string) The optional register, if
+                                 specified |<reg>|
+                               • mods: (string) Command modifiers, if any
+                                 |<mods>|
+                    {opts}     Optional command attributes. See
+                               |command-attributes| for more details. To use
+                               boolean attributes (such as |:command-bang| or
+                               |:command-bar|) set the value to "true". When
+                               using a Lua function for {command} you can also
+                               provide a "desc" key that will be displayed
+                               when listing commands. In addition to the
+                               string options listed in |:command-complete|,
+                               the "complete" key also accepts a Lua function
+                               which works like the "customlist" completion
+                               mode |:command-complete-customlist|.
+
 nvim_call_atomic({calls})                                 *nvim_call_atomic()*
                 Calls many API methods atomically.
 
@@ -634,7 +684,7 @@ nvim_call_atomic({calls})                                 *nvim_call_atomic()*
                    atomically, i.e. without interleaving redraws, RPC requests
                    from other clients, or user interactions (however API
                    methods may trigger autocommands or event processing which
-                   have such side-effects, e.g. |:sleep| may wake timers).
+                   have such side effects, e.g. |:sleep| may wake timers).
                 2. To minimize RPC overhead (roundtrips) of a sequence of many
                    requests.
 
@@ -698,7 +748,7 @@ nvim_del_keymap({mode}, {lhs})                             *nvim_del_keymap()*
                     |nvim_set_keymap()|
 
 nvim_del_mark({name})                                        *nvim_del_mark()*
-                Deletes a uppercase/file named mark. See |mark-motions|.
+                Deletes an uppercase/file named mark. See |mark-motions|.
 
                 Note:
                     fails with error if a lowercase or buffer local named mark
@@ -713,6 +763,12 @@ nvim_del_mark({name})                                        *nvim_del_mark()*
                 See also: ~
                     |nvim_buf_del_mark()|
                     |nvim_get_mark()|
+
+nvim_del_user_command({name})                        *nvim_del_user_command()*
+                Delete a user-defined command.
+
+                Parameters: ~
+                    {name}  Name of the command to delete.
 
 nvim_del_var({name})                                          *nvim_del_var()*
                 Removes a global (g:) variable.
@@ -1061,7 +1117,7 @@ nvim_get_option_value({name}, {*opts})               *nvim_get_option_value()*
                 Parameters: ~
                     {name}  Option name
                     {opts}  Optional parameters
-                            • scope: One of 'global' or 'local'. Analagous to
+                            • scope: One of 'global' or 'local'. Analogous to
                               |:setglobal| and |:setlocal|, respectively.
 
                 Return: ~
@@ -1545,7 +1601,7 @@ nvim_set_option_value({name}, {value}, {*opts})
                     {name}   Option name
                     {value}  New option value
                     {opts}   Optional parameters
-                             • scope: One of 'global' or 'local'. Analagous to
+                             • scope: One of 'global' or 'local'. Analogous to
                                |:setglobal| and |:setlocal|, respectively.
 
 nvim_set_var({name}, {value})                                 *nvim_set_var()*
@@ -1790,6 +1846,16 @@ nvim__buf_redraw_range({buffer}, {first}, {last})
 nvim__buf_stats({buffer})                                  *nvim__buf_stats()*
                 TODO: Documentation
 
+                                                 *nvim_buf_add_user_command()*
+nvim_buf_add_user_command({buffer}, {name}, {command}, {*opts})
+                Create a new user command |user-commands| in the given buffer.
+
+                Parameters: ~
+                    {buffer}  Buffer handle, or 0 for current buffer.
+
+                See also: ~
+                    nvim_add_user_command
+
 nvim_buf_attach({buffer}, {send_buffer}, {opts})           *nvim_buf_attach()*
                 Activates buffer-update events on a channel, or as Lua
                 callbacks.
@@ -1924,6 +1990,18 @@ nvim_buf_del_mark({buffer}, {name})                      *nvim_buf_del_mark()*
                 See also: ~
                     |nvim_buf_set_mark()|
                     |nvim_del_mark()|
+
+                                                 *nvim_buf_del_user_command()*
+nvim_buf_del_user_command({buffer}, {name})
+                Delete a buffer-local user-defined command.
+
+                Only commands created with |:command-buffer| or
+                |nvim_buf_add_user_command()| can be deleted with this
+                function.
+
+                Parameters: ~
+                    {buffer}  Buffer handle, or 0 for current buffer.
+                    {name}    Name of the command to delete.
 
 nvim_buf_del_var({buffer}, {name})                        *nvim_buf_del_var()*
                 Removes a buffer-scoped (b:) variable
@@ -2687,7 +2765,7 @@ nvim_win_is_valid({window})                              *nvim_win_is_valid()*
                     true if the window is valid, false otherwise
 
 nvim_win_set_buf({window}, {buffer})                      *nvim_win_set_buf()*
-                Sets the current buffer in a window, without side-effects
+                Sets the current buffer in a window, without side effects
 
                 Attributes: ~
                     not allowed when |textlock| is active
