@@ -1505,7 +1505,7 @@ do --[[ References ]]
   ---@param bufnr number Buffer id
   function M.buf_clear_references(bufnr)
     validate { bufnr = {bufnr, 'n', true} }
-    api.nvim_buf_clear_namespace(bufnr, reference_ns, 0, -1)
+    api.nvim_buf_clear_namespace(bufnr or 0, reference_ns, 0, -1)
   end
 
   --- Shows a list of document highlights for a certain buffer.
@@ -1677,7 +1677,7 @@ function M.symbols_to_items(symbols, bufnr)
     end
     return _items
   end
-  return _symbols_to_items(symbols, {}, bufnr)
+  return _symbols_to_items(symbols, {}, bufnr or 0)
 end
 
 --- Removes empty lines from the beginning and end.
@@ -1796,7 +1796,7 @@ end
 ---@returns { textDocument = { uri = `current_file_uri` }, range = { start =
 ---`current_position`, end = `current_position` } }
 function M.make_range_params(window, offset_encoding)
-  local buf = vim.api.nvim_win_get_buf(window)
+  local buf = vim.api.nvim_win_get_buf(window or 0)
   offset_encoding = offset_encoding or M._get_offset_encoding(buf)
   local position = make_position_param(window, offset_encoding)
   return {
