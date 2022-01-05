@@ -434,6 +434,15 @@ static int nlua_state_init(lua_State *const lstate) FUNC_ATTR_NONNULL_ALL
     // [package, loaded, module]
     lua_setfield(lstate, -2, "vim.F");  // [package, loaded]
 
+    code = (char *)&lua_filetype_module[0];
+    if (luaL_loadbuffer(lstate, code, sizeof(lua_filetype_module) - 1, "@vim/filetype.lua")
+        || nlua_pcall(lstate, 0, 1)) {
+      nlua_error(lstate, _("E5106: Error while creating vim.filetype module: %.*s"));
+      return 1;
+    }
+    // [package, loaded, module]
+    lua_setfield(lstate, -2, "vim.filetype");  // [package, loaded]
+
     lua_pop(lstate, 2);  // []
   }
 
@@ -1115,11 +1124,23 @@ void ex_lua(exarg_T *const eap)
   FUNC_ATTR_NONNULL_ALL
 {
   size_t len;
-  char *const code = script_get(eap, &len);
+  char *code = script_get(eap, &len);
   if (eap->skip) {
     xfree(code);
     return;
   }
+  // When =expr is used transform it to print(vim.inspect(expr))
+  if (code[0] == '=') {
+    len += sizeof("print(vim.inspect())") - sizeof("=");
+    // code_buf needs to be 1 char larger then len for null byte in the end.
+    // lua nlua_typval_exec doesn't expect null terminated string so len
+    // needs to end before null byte.
+    char *code_buf = xmallocz(len);
+    vim_snprintf(code_buf, len+1, "print(vim.inspect(%s))", code+1);
+    xfree(code);
+    code = code_buf;
+  }
+
   nlua_typval_exec(code, len, ":lua", NULL, 0, false, NULL);
 
   xfree(code);
