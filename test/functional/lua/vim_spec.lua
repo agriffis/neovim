@@ -2203,6 +2203,40 @@ describe('lua stdlib', function()
     end)
   end)
 
+  it('vim.notify_once', function()
+    local screen = Screen.new(60,5)
+    screen:set_default_attr_ids({
+      [0] = {bold=true, foreground=Screen.colors.Blue},
+      [1] = {foreground=Screen.colors.Red},
+    })
+    screen:attach()
+    screen:expect{grid=[[
+      ^                                                            |
+      {0:~                                                           }|
+      {0:~                                                           }|
+      {0:~                                                           }|
+                                                                  |
+    ]]}
+    exec_lua [[vim.notify_once("I'll only tell you this once...", vim.log.levels.WARN)]]
+    screen:expect{grid=[[
+      ^                                                            |
+      {0:~                                                           }|
+      {0:~                                                           }|
+      {0:~                                                           }|
+      {1:I'll only tell you this once...}                             |
+    ]]}
+    feed('<C-l>')
+    screen:expect{grid=[[
+      ^                                                            |
+      {0:~                                                           }|
+      {0:~                                                           }|
+      {0:~                                                           }|
+                                                                  |
+    ]]}
+    exec_lua [[vim.notify_once("I'll only tell you this once...")]]
+    screen:expect_unchanged()
+  end)
+
   describe('vim.schedule_wrap', function()
     it('preserves argument lists', function()
       exec_lua [[
@@ -2297,4 +2331,83 @@ describe('lua: require("mod") from packages', function()
     -- safety check: after/lua/fancy_z.lua is still loaded
     eq('I am fancy_z.lua', exec_lua [[ return require'fancy_z' ]])
   end)
+end)
+
+describe('vim.keymap', function()
+  it('can make a mapping', function()
+    eq(0, exec_lua [[
+      GlobalCount = 0
+      vim.keymap.set('n', 'asdf', function() GlobalCount = GlobalCount + 1 end)
+      return GlobalCount
+    ]])
+
+    feed('asdf\n')
+
+    eq(1, exec_lua[[return GlobalCount]])
+  end)
+
+  it('can make an expr mapping', function()
+    exec_lua [[
+      vim.keymap.set('n', 'aa', function() return ':lua SomeValue = 99<cr>' end, {expr = true})
+    ]]
+
+    feed('aa')
+
+    eq(99, exec_lua[[return SomeValue]])
+  end)
+
+  it('can overwrite a mapping', function()
+    eq(0, exec_lua [[
+      GlobalCount = 0
+      vim.keymap.set('n', 'asdf', function() GlobalCount = GlobalCount + 1 end)
+      return GlobalCount
+    ]])
+
+    feed('asdf\n')
+
+    eq(1, exec_lua[[return GlobalCount]])
+
+    exec_lua [[
+      vim.keymap.set('n', 'asdf', function() GlobalCount = GlobalCount - 1 end)
+    ]]
+
+    feed('asdf\n')
+
+    eq(0, exec_lua[[return GlobalCount]])
+  end)
+
+  it('can unmap a mapping', function()
+    eq(0, exec_lua [[
+      GlobalCount = 0
+      vim.keymap.set('n', 'asdf', function() GlobalCount = GlobalCount + 1 end)
+      return GlobalCount
+    ]])
+
+    feed('asdf\n')
+
+    eq(1, exec_lua[[return GlobalCount]])
+
+    exec_lua [[
+      vim.keymap.del('n', 'asdf')
+    ]]
+
+    feed('asdf\n')
+
+    eq(1, exec_lua[[return GlobalCount]])
+    eq('\nNo mapping found', helpers.exec_capture('nmap asdf'))
+  end)
+
+  it('can do <Plug> mappings', function()
+    eq(0, exec_lua [[
+      GlobalCount = 0
+      vim.keymap.set('n', '<plug>(asdf)', function() GlobalCount = GlobalCount + 1 end)
+      vim.keymap.set('n', 'ww', '<plug>(asdf)')
+      return GlobalCount
+    ]])
+
+    feed('ww\n')
+
+    eq(1, exec_lua[[return GlobalCount]])
+  end)
+
 end)
