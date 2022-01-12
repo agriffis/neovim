@@ -1,7 +1,7 @@
 " Vim support file to detect file types
 "
 " Maintainer:	Bram Moolenaar <Bram@vim.org>
-" Last Change:	2021 Dec 27
+" Last Change:	2022 Jan 05
 
 " Listen very carefully, I will say this only once
 if exists("did_load_filetypes")
@@ -1209,6 +1209,9 @@ au BufNewFile,BufRead *.xom,*.xin		setf omnimark
 
 " OPAM
 au BufNewFile,BufRead opam,*.opam,*.opam.template setf opam
+
+" OpenFOAM
+au BufNewFile,BufRead [a-zA-Z0-9]*Dict\(.*\)\=,[a-zA-Z]*Properties\(.*\)\=,*Transport\(.*\),fvSchemes,fvSolution,fvConstrains,fvModels,*/constant/g,*/0\(\.orig\)\=/* call dist#ft#FTfoam()
 
 " OpenROAD
 au BufNewFile,BufRead *.or			setf openroad
