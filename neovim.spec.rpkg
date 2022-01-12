@@ -1,21 +1,25 @@
 %bcond_with jemalloc
-%ifarch %{arm32} %{arm64} %{ix86} x86_64 %{mips}
+%ifarch %{arm} %{ix86} x86_64 %{mips} aarch64
 %bcond_without luajit
 %else
 %bcond_with luajit
 %endif
 
+%global luv_min_ver 1.42.0
+
 %if %{with luajit}
-%global luaver 5.1
+%global luajit_version 2.1
+%global lua_prg %{_bindir}/luajit
+
+%global luv_include_dir %{_includedir}/luajit-%{luajit_version}
+%global luv_library %{_libdir}/luajit/%{luajit_version}/luv.so
 %else
-%global luaver %{lua_version}
+%global lua_version 5.1
+%global lua_prg %{_bindir}/lua-5.1
+
+%global luv_include_dir %{_includedir}/lua-%{lua_version}
+%global luv_library %{_libdir}/lua/%{lua_version}/luv.so
 %endif
-
-%global luv_min_ver 1.30.0
-
-# This enables cmake to work consistently between pre-f33 and after.
-# https://docs.fedoraproject.org/en-US/packaging-guidelines/CMake/#_notes
-%undefine __cmake_in_source_build
 
 Name:           {{{git_name name="neovim"}}}
 Version:        {{{git_version}}}
@@ -29,7 +33,10 @@ Source0:        {{{git_pack}}}
 Source1:        sysinit.vim
 Source2:        spec-template
 
-Patch1000:      neovim-0.5.0-bitop.patch
+Patch0:         neovim-libvterm-0-2-support.patch
+
+Patch1000:      neovim-lua-bit32.patch
+Patch1001:      neovim-cmake-lua-5.1.patch
 
 BuildRequires:  gcc-c++
 BuildRequires:  cmake
@@ -38,45 +45,36 @@ BuildRequires:  fdupes
 BuildRequires:  gettext
 BuildRequires:  gperf
 BuildRequires:  gcc
-BuildRequires:  tree-sitter-devel
-Requires:       tree-sitter
 %if %{with luajit}
 # luajit implements version 5.1 of the lua language spec, so it needs the
 # compat versions of libs.
 BuildRequires:  luajit-devel
-BuildRequires:  lua5.1-lpeg
-BuildRequires:  lua5.1-mpack
+BuildRequires:  luajit2.1-luv-devel >= %{luv_min_ver}
+Requires:       luajit2.1-luv >= %{luv_min_ver}
+%else
+# lua5.1
+BuildRequires:  compat-lua
+BuildRequires:  compat-lua-devel
+BuildRequires:  lua5.1-bit32
 BuildRequires:  lua5.1-luv-devel >= %{luv_min_ver}
 Requires:       lua5.1-luv >= %{luv_min_ver}
-%else
-BuildRequires:  lua-devel
-%if 0%{?fedora} >= 33
-# built-in bit32 removed in Lua 5.4
-BuildRequires:  lua-bit32
-Requires:       lua-bit32
+# /with luajit
 %endif
-BuildRequires:  lua-lpeg
-BuildRequires:  lua-mpack
-BuildRequires:  lua-luv-devel >= %{luv_min_ver}
-Requires:       lua-luv >= %{luv_min_ver}
-%endif
+BuildRequires:  lua5.1-lpeg
+BuildRequires:  lua5.1-mpack
 %if %{with jemalloc}
 BuildRequires:  jemalloc-devel
 %endif
 BuildRequires:  msgpack-devel >= 3.1.0
 BuildRequires:  libtermkey-devel
-BuildRequires:  libuv-devel >= 1.28.0
-BuildRequires:  libvterm-devel >= 0.1.1
+BuildRequires:  libuv-devel >= 1.42.0
+BuildRequires:  libvterm-devel >= 0.1.4
 BuildRequires:  unibilium-devel
-%if 0%{?el7}
-BuildRequires:  lua-bit32
-Requires:       lua-bit32
-%else
+BuildRequires:  libtree-sitter-devel >= 0.20.0
 Suggests:       (python2-neovim if python2)
 Suggests:       (python3-neovim if python3)
 # XSel provides access to the system clipboard
 Recommends:     xsel
-%endif
 
 %description
 Neovim is a refactor - and sometimes redactor - in the tradition of
@@ -91,17 +89,23 @@ parts of Vim, without compromise, and more.
 %prep
 {{{git_setup_macro}}}
 
+%patch0 -p1
+
 %if %{without luajit}
-%patch1000 -p1 -b .bitop
+%patch1000 -p1
+%patch1001 -p1
 %endif
 
 %build
+# set vars to make build reproducible; see config/CMakeLists.txt
+HOSTNAME=koji
+USERNAME=koji
 %cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
        -DPREFER_LUA=%{?with_luajit:OFF}%{!?with_luajit:ON} \
-       -DLUA_PRG=%{_bindir}/%{?with_luajit:luajit}%{!?with_luajit:lua} \
+       -DLUA_PRG=%{lua_prg} \
        -DENABLE_JEMALLOC=%{?with_jemalloc:ON}%{!?with_jemalloc:OFF} \
-       -DLIBLUV_INCLUDE_DIR=%{_includedir}/lua-%{luaver} \
-       -DLIBLUV_LIBRARY=%{_libdir}/lua/%{luaver}/luv.so \
+       -DLIBLUV_INCLUDE_DIR=%{luv_include_dir} \
+       -DLIBLUV_LIBRARY=%{luv_library} \
        -DNVIM_VERSION_MEDIUM="{{{neovim_dev_version}}}"
 
 %cmake_build
@@ -118,22 +122,66 @@ install -d -m0755 %{buildroot}%{_datadir}/pixmaps
 install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 
 %fdupes %{buildroot}%{_datadir}/
+# Fix exec bits
+find %{buildroot}%{_datadir} \( -name "*.bat" -o -name "*.awk" \) \
+    -print -exec chmod -x '{}' \;
 %find_lang nvim
 
 %files -f nvim.lang
 %license LICENSE
 %doc BACKERS.md CONTRIBUTING.md README.md
 %{_bindir}/nvim
-%{_datadir}/applications/nvim.desktop
-%{_datadir}/nvim
-%{_datadir}/pixmaps/nvim.png
+
 %{_mandir}/man1/nvim.1*
-%exclude %{_datadir}/icons
+%{_datadir}/applications/nvim.desktop
+%{_datadir}/pixmaps/nvim.png
+%{_datadir}/icons/hicolor/128x128/apps/nvim.png
+
+%{_datadir}/nvim
 
 
 %changelog
 * {{{git_changelog_date}}} Aron Griffis <aron@scampersand.com> - {{{git_changelog_version}}}
 - Nightly build from git master
+
+* Sat Jan 01 2022 Andreas Schneider <asn@redhat.com> - 0.6.1-1
+- Update to version 0.6.1
+
+* Wed Dec 01 2021 Andreas Schneider <asn@redhat.com> - 0.6.0-1
+- Update to version 0.6.0
+
+* Thu Oct 28 2021 Andreas Schneider <asn@redhat.com> - 0.5.1-2
+- Use luajit also on aarch64
+
+* Mon Sep 27 2021 Andreas Schneider <asn@redhat.com> - 0.5.1-1
+- Update to version 0.5.1
+
+* Fri Jul 30 2021 Andreas Schneider <asn@redhat.com> - 0.5.0-5
+- Build with luajit2.1-luv when we use luajit
+
+* Fri Jul 30 2021 Andreas Schneider <asn@redhat.com> - 0.5.0-4
+- resolves: rhbz#1983288 - Build with lua-5.1 on platforms where luajit is not
+  available
+
+* Thu Jul 22 2021 Fedora Release Engineering <releng@fedoraproject.org> - 0.5.0-3
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_35_Mass_Rebuild
+
+* Thu Jul 08 2021 Andreas Schneider <asn@redhat.com> - 0.5.0-2
+- Fixed execute bits of bat and awk files
+
+* Mon Jul 05 2021 Andreas Schneider <asn@redhat.com> - 0.5.0-1
+- Raise BuildRequires for some libraries
+
+* Sat Jul 03 2021 Andreas Schneider <asn@redhat.com> - 0.5.0-0
+- Update to version 0.5.0
+  * https://github.com/neovim/neovim/releases/tag/v0.5.0
+
+* Mon Apr 19 2021 Andreas Schneider <asn@redhat.com> - 0.4.4-5
+- resolves: #1909495 - Load installed vim plugins
+- Make build reproducible
+
+* Tue Jan 26 2021 Fedora Release Engineering <releng@fedoraproject.org> - 0.4.4-4
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_34_Mass_Rebuild
 
 * Tue Sep  1 2020 Michel Alexandre Salim <salimma@fedoraproject.org> - 0.4.4-3
 - When using Lua 5.4, also pull in lua-bit32 at installation

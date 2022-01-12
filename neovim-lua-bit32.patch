@@ -1,0 +1,36 @@
+Index: neovim-0.5.0/CMakeLists.txt
+===================================================================
+--- neovim-0.5.0.orig/CMakeLists.txt
++++ neovim-0.5.0/CMakeLists.txt
+@@ -517,7 +517,7 @@ endforeach()
+ 
+ # Find Lua interpreter
+ include(LuaHelpers)
+-set(LUA_DEPENDENCIES lpeg mpack bit)
++set(LUA_DEPENDENCIES lpeg mpack bit32)
+ if(NOT LUA_PRG)
+   foreach(CURRENT_LUA_PRG luajit lua5.1 lua5.2 lua)
+     unset(_CHECK_LUA_PRG CACHE)
+Index: neovim-0.5.0/src/nvim/ex_cmds.lua
+===================================================================
+--- neovim-0.5.0.orig/src/nvim/ex_cmds.lua
++++ neovim-0.5.0/src/nvim/ex_cmds.lua
+@@ -1,4 +1,4 @@
+-local bit = require 'bit'
++local bit = require 'bit32'
+ 
+ local module = {}
+ 
+Index: neovim-0.5.0/src/nvim/generators/gen_ex_cmds.lua
+===================================================================
+--- neovim-0.5.0.orig/src/nvim/generators/gen_ex_cmds.lua
++++ neovim-0.5.0/src/nvim/generators/gen_ex_cmds.lua
+@@ -22,7 +22,7 @@ local defsfname = autodir .. '/ex_cmds_d
+ local enumfile = io.open(enumfname, 'w')
+ local defsfile = io.open(defsfname, 'w')
+ 
+-local bit = require 'bit'
++local bit = require 'bit32'
+ local ex_cmds = require('ex_cmds')
+ local defs = ex_cmds.cmds
+ local flags = ex_cmds.flags
