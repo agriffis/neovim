@@ -184,7 +184,7 @@ function M.formatting_sync(options, timeout_ms)
 
     local result, err = client.request_sync('textDocument/formatting', params, timeout_ms, bufnr)
     if result and result.result then
-      util.apply_text_edits(result.result, bufnr)
+      util.apply_text_edits(result.result, bufnr, client.offset_encoding)
     elseif err then
       vim.notify('vim.lsp.buf.formatting_sync: ' .. err, vim.log.levels.WARN)
     end
@@ -228,7 +228,7 @@ function M.formatting_seq_sync(options, timeout_ms, order)
       local params = util.make_formatting_params(options)
       local result, err = client.request_sync("textDocument/formatting", params, timeout_ms, vim.api.nvim_get_current_buf())
       if result and result.result then
-        util.apply_text_edits(result.result, bufnr)
+        util.apply_text_edits(result.result, bufnr, client.offset_encoding)
       elseif err then
         vim.notify(string.format("vim.lsp.buf.formatting_seq_sync: (%s) %s", client.name, err), vim.log.levels.WARN)
       end
@@ -503,7 +503,7 @@ local function on_code_action_results(results, ctx)
   ---@private
   local function apply_action(action, client)
     if action.edit then
-      util.apply_workspace_edit(action.edit)
+      util.apply_workspace_edit(action.edit, client.offset_encoding)
     end
     if action.command then
       local command = type(action.command) == 'table' and action.command or action
