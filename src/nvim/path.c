@@ -1682,6 +1682,10 @@ char_u *find_file_name_in_path(char_u *ptr, size_t len, int options, long count,
   char_u *file_name;
   char_u *tofree = NULL;
 
+  if (len == 0) {
+    return NULL;
+  }
+
   if ((options & FNAME_INCL) && *curbuf->b_p_inex != NUL) {
     tofree = (char_u *)eval_includeexpr((char *)ptr, len);
     if (tofree != NULL) {
@@ -1743,14 +1747,32 @@ int path_is_url(const char *p)
   return 0;
 }
 
-/// Check if "fname" starts with "name://".  Return URL_SLASH if it does.
+/// Check if "fname" starts with "name://" or "name:\\".
 ///
 /// @param  fname         is the filename to test
-/// @return URL_BACKSLASH for "name:\\", zero otherwise.
+/// @return URL_SLASH for "name://", URL_BACKSLASH for "name:\\", zero otherwise.
 int path_with_url(const char *fname)
 {
   const char *p;
-  for (p = fname; isalpha(*p); p++) {}
+
+  // We accept alphabetic characters and a dash in scheme part.
+  // RFC 3986 allows for more, but it increases the risk of matching
+  // non-URL text.
+
+  // first character must be alpha
+  if (!isalpha(*fname)) {
+    return 0;
+  }
+
+  // check body: alpha or dash
+  for (p = fname; (isalpha(*p) || (*p == '-')); p++) {}
+
+  // check last char is not a dash
+  if (p[-1] == '-') {
+    return 0;
+  }
+
+  // "://" or ":\\" must follow
   return path_is_url(p);
 }
 

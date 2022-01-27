@@ -663,8 +663,12 @@ static int insert_execute(VimState *state, int key)
   InsertState *const s = (InsertState *)state;
   if (stop_insert_mode) {
     // Insert mode ended, possibly from a callback.
+    if (key != K_IGNORE && key != K_NOP) {
+      vungetc(key);
+    }
     s->count = 0;
     s->nomove = true;
+    ins_compl_prep(ESC);
     return 0;
   }
 
@@ -909,7 +913,7 @@ static int insert_handle_key(InsertState *s)
     ins_ctrl_o();
 
     // don't move the cursor left when 'virtualedit' has "onemore".
-    if (ve_flags & VE_ONEMORE) {
+    if (get_ve_flags() & VE_ONEMORE) {
       ins_at_eol = false;
       s->nomove = true;
     }
@@ -5631,8 +5635,12 @@ int get_literal(void)
   i = 0;
   for (;;) {
     nc = plain_vgetc();
-    if (!(State & CMDLINE)
-        && MB_BYTE2LEN_CHECK(nc) == 1) {
+    if ((mod_mask & ~MOD_MASK_SHIFT) != 0) {
+      // A character with non-Shift modifiers should not be a valid
+      // character for i_CTRL-V_digit.
+      break;
+    }
+    if (!(State & CMDLINE) && MB_BYTE2LEN_CHECK(nc) == 1) {
       add_to_showcmd(nc);
     }
     if (nc == 'x' || nc == 'X') {
@@ -5698,6 +5706,8 @@ int get_literal(void)
   --no_mapping;
   if (nc) {
     vungetc(nc);
+    // A character typed with i_CTRL-V_digit cannot have modifiers.
+    mod_mask = 0;
   }
   got_int = false;          // CTRL-C typed after CTRL-V is not an interrupt
   return cc;
@@ -6905,8 +6915,7 @@ int oneright(void)
 
   // move "l" bytes right, but don't end up on the NUL, unless 'virtualedit'
   // contains "onemore".
-  if (ptr[l] == NUL
-      && (ve_flags & VE_ONEMORE) == 0) {
+  if (ptr[l] == NUL && (get_ve_flags() & VE_ONEMORE) == 0) {
     return FAIL;
   }
   curwin->w_cursor.col += l;
@@ -8028,7 +8037,7 @@ static bool ins_esc(long *count, int cmdchar, bool nomove)
               && !VIsual_active
               ))
       && !revins_on) {
-    if (curwin->w_cursor.coladd > 0 || ve_flags == VE_ALL) {
+    if (curwin->w_cursor.coladd > 0 || get_ve_flags() == VE_ALL) {
       oneleft();
       if (restart_edit != NUL) {
         curwin->w_cursor.coladd++;

@@ -281,7 +281,7 @@ typedef struct vimoption {
 # include "options.generated.h"
 #endif
 
-#define PARAM_COUNT ARRAY_SIZE(options)
+#define OPTION_COUNT ARRAY_SIZE(options)
 
 static char *(p_ambw_values[]) =      { "single", "double", NULL };
 static char *(p_bg_values[]) =        { "light", "dark", NULL };
@@ -929,6 +929,21 @@ void set_title_defaults(void)
     options[idx1].def_val = (char_u *)(intptr_t)0;
     p_icon = 0;
   }
+}
+
+void ex_set(exarg_T *eap)
+{
+  int flags = 0;
+
+  if (eap->cmdidx == CMD_setlocal) {
+    flags = OPT_LOCAL;
+  } else if (eap->cmdidx == CMD_setglobal) {
+    flags = OPT_GLOBAL;
+  }
+  if (eap->forceit) {
+    flags |= OPT_ONECOLUMN;
+  }
+  (void)do_set(eap->arg, flags);
 }
 
 /// Parse 'arg' for option settings.
@@ -3084,14 +3099,27 @@ ambw_end:
     if (foldmethodIsIndent(curwin)) {
       foldUpdateAll(curwin);
     }
-  } else if (varp == &p_ve) {  // 'virtualedit'
-    if (opt_strings_flags(p_ve, p_ve_values, &ve_flags, true) != OK) {
-      errmsg = e_invarg;
-    } else if (STRCMP(p_ve, oldval) != 0) {
-      // Recompute cursor position in case the new 've' setting
-      // changes something.
-      validate_virtcol();
-      coladvance(curwin->w_virtcol);
+  } else if (gvarp == &p_ve) {  // 'virtualedit'
+    char_u *ve = p_ve;
+    unsigned int *flags = &ve_flags;
+
+    if (opt_flags & OPT_LOCAL) {
+      ve = curwin->w_p_ve;
+      flags = &curwin->w_ve_flags;
+    }
+
+    if ((opt_flags & OPT_LOCAL) && *ve == NUL) {
+      // make the local value empty: use the global value
+      *flags = 0;
+    } else {
+      if (opt_strings_flags(ve, p_ve_values, flags, true) != OK) {
+        errmsg = e_invarg;
+      } else if (STRCMP(p_ve, oldval) != 0) {
+        // Recompute cursor position in case the new 've' setting
+        // changes something.
+        validate_virtcol();
+        coladvance(curwin->w_virtcol);
+      }
     }
   } else if (varp == &p_csqf) {
     if (p_csqf != NULL) {
@@ -5184,7 +5212,7 @@ static void showoptions(int all, int opt_flags)
 #define INC 20
 #define GAP 3
 
-  vimoption_T **items = xmalloc(sizeof(vimoption_T *) * PARAM_COUNT);
+  vimoption_T **items = xmalloc(sizeof(vimoption_T *) * OPTION_COUNT);
 
   // Highlight title
   if (opt_flags & OPT_GLOBAL) {
@@ -5198,6 +5226,7 @@ static void showoptions(int all, int opt_flags)
   // Do the loop two times:
   // 1. display the short items
   // 2. display the long items (only strings and numbers)
+  // When "opt_flags" has OPT_ONECOLUMN do everything in run 2.
   for (run = 1; run <= 2 && !got_int; run++) {
     // collect the items in items[]
     item_count = 0;
@@ -5208,7 +5237,7 @@ static void showoptions(int all, int opt_flags)
       }
 
       varp = NULL;
-      if (opt_flags != 0) {
+      if ((opt_flags & (OPT_LOCAL | OPT_GLOBAL)) != 0) {
         if (p->indir != PV_NONE) {
           varp = get_varp_scope(p, opt_flags);
         }
@@ -5217,8 +5246,10 @@ static void showoptions(int all, int opt_flags)
       }
       if (varp != NULL
           && (all == 1 || (all == 0 && !optval_default(p, varp)))) {
-        if (p->flags & P_BOOL) {
-          len = 1;                      //  a toggle option fits always
+        if (opt_flags & OPT_ONECOLUMN) {
+          len = Columns;
+        } else if (p->flags & P_BOOL) {
+          len = 1;                      // a toggle option fits always
         } else {
           option_value2string(p, opt_flags);
           len = (int)STRLEN(p->fullname) + vim_strsize(NameBuff) + 1;
@@ -5748,6 +5779,10 @@ void unset_global_local_option(char *name, void *from)
     set_chars_option((win_T *)from, &((win_T *)from)->w_p_fcs, true);
     redraw_later((win_T *)from, NOT_VALID);
     break;
+  case PV_VE:
+    clear_string_option(&((win_T *)from)->w_p_ve);
+    ((win_T *)from)->w_ve_flags = 0;
+    break;
   }
 }
 
@@ -5814,6 +5849,8 @@ static char_u *get_varp_scope(vimoption_T *p, int opt_flags)
       return (char_u *)&(curwin->w_p_fcs);
     case PV_LCS:
       return (char_u *)&(curwin->w_p_lcs);
+    case PV_VE:
+      return (char_u *)&(curwin->w_p_ve);
     }
     return NULL;     // "cannot happen"
   }
@@ -5908,6 +5945,9 @@ static char_u *get_varp(vimoption_T *p)
   case PV_LCS:
     return *curwin->w_p_lcs != NUL
            ? (char_u *)&(curwin->w_p_lcs) : p->var;
+  case PV_VE:
+    return *curwin->w_p_ve != NUL
+           ? (char_u *)&curwin->w_p_ve : p->var;
 
   case PV_ARAB:
     return (char_u *)&(curwin->w_p_arab);
@@ -6148,6 +6188,8 @@ void copy_winopt(winopt_T *from, winopt_T *to)
   to->wo_list = from->wo_list;
   to->wo_nu = from->wo_nu;
   to->wo_rnu = from->wo_rnu;
+  to->wo_ve = vim_strsave(from->wo_ve);
+  to->wo_ve_flags = from->wo_ve_flags;
   to->wo_nuw = from->wo_nuw;
   to->wo_rl  = from->wo_rl;
   to->wo_rlc = vim_strsave(from->wo_rlc);
@@ -6224,6 +6266,7 @@ static void check_winopt(winopt_T *wop)
   check_string_option(&wop->wo_winhl);
   check_string_option(&wop->wo_fcs);
   check_string_option(&wop->wo_lcs);
+  check_string_option(&wop->wo_ve);
 }
 
 /// Free the allocated memory inside a winopt_T.
@@ -6248,6 +6291,7 @@ void clear_winopt(winopt_T *wop)
   clear_string_option(&wop->wo_winhl);
   clear_string_option(&wop->wo_fcs);
   clear_string_option(&wop->wo_lcs);
+  clear_string_option(&wop->wo_ve);
 }
 
 void didset_window_options(win_T *wp)
@@ -7813,6 +7857,12 @@ static bool briopt_check(win_T *wp)
 unsigned int get_bkc_value(buf_T *buf)
 {
   return buf->b_bkc_flags ? buf->b_bkc_flags : bkc_flags;
+}
+
+/// Get the local or global value of the 'virtualedit' flags.
+unsigned int get_ve_flags(void)
+{
+  return (curwin->w_ve_flags ? curwin->w_ve_flags : ve_flags) & ~(VE_NONE | VE_NONEU);
 }
 
 /// Get the local or global value of 'showbreak'.

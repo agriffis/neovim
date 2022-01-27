@@ -1435,6 +1435,11 @@ int op_delete(oparg_T *oap)
     return FAIL;
   }
 
+  if (VIsual_select && oap->is_VIsual) {
+    // Use the register given with CTRL_R, defaults to zero
+    oap->regname = VIsual_select_reg;
+  }
+
   mb_adjust_opend(oap);
 
   /*
@@ -2196,19 +2201,22 @@ void op_insert(oparg_T *oap, long count1)
     // doing block_prep().  When only "block" is used, virtual edit is
     // already disabled, but still need it when calling
     // coladvance_force().
+    // coladvance_force() uses get_ve_flags() to get the 'virtualedit'
+    // state for the current window.  To override that state, we need to
+    // set the window-local value of ve_flags rather than the global value.
     if (curwin->w_cursor.coladd > 0) {
-      unsigned old_ve_flags = ve_flags;
+      unsigned old_ve_flags = curwin->w_ve_flags;
 
-      ve_flags = VE_ALL;
       if (u_save_cursor() == FAIL) {
         return;
       }
+      curwin->w_ve_flags = VE_ALL;
       coladvance_force(oap->op_type == OP_APPEND
           ? oap->end_vcol + 1 : getviscol());
       if (oap->op_type == OP_APPEND) {
         --curwin->w_cursor.col;
       }
-      ve_flags = old_ve_flags;
+      curwin->w_ve_flags = old_ve_flags;
     }
     // Get the info about the block before entering the text
     block_prep(oap, &bd, oap->start.lnum, true);
@@ -2801,7 +2809,7 @@ static void yank_copy_line(yankreg_T *reg, struct block_def *bd, size_t y_idx,
   if (exclude_trailing_space) {
     int s = bd->textlen + bd->endspaces;
 
-    while (ascii_iswhite(*(bd->textstart + s - 1)) && s > 0) {
+    while (s > 0 && ascii_iswhite(*(bd->textstart + s - 1))) {
       s = s - utf_head_off(bd->textstart, bd->textstart + s - 1) - 1;
       pnew--;
     }
@@ -2906,6 +2914,7 @@ void do_put(int regname, yankreg_T *reg, int dir, long count, int flags)
   char_u *insert_string = NULL;
   bool allocated = false;
   long cnt;
+  unsigned int cur_ve_flags = get_ve_flags();
 
   if (flags & PUT_FIXINDENT) {
     orig_indent = get_indent();
@@ -2976,7 +2985,7 @@ void do_put(int regname, yankreg_T *reg, int dir, long count, int flags)
           eol = (*(cursor_pos + utfc_ptr2len(cursor_pos)) == NUL);
         }
 
-        bool ve_allows = (ve_flags == VE_ALL || ve_flags == VE_ONEMORE);
+        bool ve_allows = (cur_ve_flags == VE_ALL || cur_ve_flags == VE_ONEMORE);
         bool eof = curbuf->b_ml.ml_line_count == curwin->w_cursor.lnum
                    && one_past_line;
         if (ve_allows || !(eol || eof)) {
@@ -3152,7 +3161,7 @@ void do_put(int regname, yankreg_T *reg, int dir, long count, int flags)
 
   yanklen = (int)STRLEN(y_array[0]);
 
-  if (ve_flags == VE_ALL && y_type == kMTCharWise) {
+  if (cur_ve_flags == VE_ALL && y_type == kMTCharWise) {
     if (gchar_cursor() == TAB) {
       int viscol = getviscol();
       long ts = curbuf->b_p_ts;
@@ -3181,7 +3190,7 @@ void do_put(int regname, yankreg_T *reg, int dir, long count, int flags)
     colnr_T endcol2 = 0;
 
     if (dir == FORWARD && c != NUL) {
-      if (ve_flags == VE_ALL) {
+      if (cur_ve_flags == VE_ALL) {
         getvcol(curwin, &curwin->w_cursor, &col, NULL, &endcol2);
       } else {
         getvcol(curwin, &curwin->w_cursor, NULL, NULL, &col);
@@ -3195,9 +3204,8 @@ void do_put(int regname, yankreg_T *reg, int dir, long count, int flags)
     }
 
     col += curwin->w_cursor.coladd;
-    if (ve_flags == VE_ALL
-        && (curwin->w_cursor.coladd > 0
-            || endcol2 == curwin->w_cursor.col)) {
+    if (cur_ve_flags == VE_ALL
+        && (curwin->w_cursor.coladd > 0 || endcol2 == curwin->w_cursor.col)) {
       if (dir == FORWARD && c == NUL) {
         col++;
       }
@@ -3629,14 +3637,16 @@ end:
  */
 void adjust_cursor_eol(void)
 {
+  unsigned int cur_ve_flags = get_ve_flags();
+
   if (curwin->w_cursor.col > 0
       && gchar_cursor() == NUL
-      && (ve_flags & VE_ONEMORE) == 0
+      && (cur_ve_flags & VE_ONEMORE) == 0
       && !(restart_edit || (State & INSERT))) {
     // Put the cursor on the last character in the line.
     dec_cursor();
 
-    if (ve_flags == VE_ALL) {
+    if (cur_ve_flags == VE_ALL) {
       colnr_T scol, ecol;
 
       // Coladd is set to the width of the last character.
