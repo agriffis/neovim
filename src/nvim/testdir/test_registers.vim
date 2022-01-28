@@ -1,6 +1,4 @@
-"
 " Tests for register operations
-"
 
 source check.vim
 source view_util.vim
@@ -121,6 +119,17 @@ func Test_recording_esc_sequence()
   endif
 endfunc
 
+func Test_recording_with_select_mode()
+  new
+  call feedkeys("qacc12345\<Esc>gH98765\<Esc>q", "tx")
+  call assert_equal("98765", getline(1))
+  call assert_equal("cc12345\<Esc>gH98765\<Esc>", @a)
+  call setline(1, 'asdf')
+  normal! @a
+  call assert_equal("98765", getline(1))
+  bwipe!
+endfunc
+
 " Test for executing the last used register (@)
 func Test_last_used_exec_reg()
   " Test for the @: command
@@ -173,15 +182,6 @@ func Test_get_register()
   call assert_equal('', getreg("\<C-L>"))
 
   call assert_equal('', getregtype('!'))
-
-  " Test for clipboard registers (* and +)
-  if has("clipboard_working")
-    call append(0, "text for clipboard test")
-    normal gg"*yiw
-    call assert_equal('text', getreg('*'))
-    normal gg2w"+yiw
-    call assert_equal('clipboard', getreg('+'))
-  endif
 
   " Test for inserting an invalid register content
   call assert_beeps('exe "normal i\<C-R>!"')
@@ -238,7 +238,179 @@ func Test_set_register()
   call feedkeys('qRhhq', 'xt')
   call assert_equal('llhh', getreg('r'))
 
+  " Appending a list of characters to a register from different lines
+  let @r = ''
+  call append(0, ['abcdef', '123456'])
+  normal gg"ry3l
+  call cursor(2, 4)
+  normal "Ry3l
+  call assert_equal('abc456', @r)
+
+  " Test for gP with multiple lines selected using characterwise motion
+  %delete
+  call append(0, ['vim editor', 'vim editor'])
+  let @r = ''
+  exe "normal ggwy/vim /e\<CR>gP"
+  call assert_equal(['vim editor', 'vim editor', 'vim editor'], getline(1, 3))
+
+  " Test for gP with . register
+  %delete
+  normal iabc
+  normal ".gp
+  call assert_equal('abcabc', getline(1))
+  normal 0".gP
+  call assert_equal('abcabcabc', getline(1))
+
   enew!
+endfunc
+
+" Test for clipboard registers (* and +)
+func Test_clipboard_regs()
+  throw 'skipped: needs clipboard=autoselect,autoselectplus'
+
+  CheckNotGui
+  CheckFeature clipboard_working
+
+  new
+  call append(0, "text for clipboard test")
+  normal gg"*yiw
+  call assert_equal('text', getreg('*'))
+  normal gg2w"+yiw
+  call assert_equal('clipboard', getreg('+'))
+
+  " Test for replacing the clipboard register contents
+  set clipboard=unnamed
+  let @* = 'food'
+  normal ggviw"*p
+  call assert_equal('text', getreg('*'))
+  call assert_equal('food for clipboard test', getline(1))
+  normal ggviw"*p
+  call assert_equal('food', getreg('*'))
+  call assert_equal('text for clipboard test', getline(1))
+
+  " Test for replacing the selection register contents
+  set clipboard=unnamedplus
+  let @+ = 'food'
+  normal ggviw"+p
+  call assert_equal('text', getreg('+'))
+  call assert_equal('food for clipboard test', getline(1))
+  normal ggviw"+p
+  call assert_equal('food', getreg('+'))
+  call assert_equal('text for clipboard test', getline(1))
+
+  " Test for auto copying visually selected text to clipboard register
+  call setline(1, "text for clipboard test")
+  let @* = ''
+  set clipboard=autoselect
+  normal ggwwviwy
+  call assert_equal('clipboard', @*)
+
+  " Test for auto copying visually selected text to selection register
+  let @+ = ''
+  set clipboard=autoselectplus
+  normal ggwviwy
+  call assert_equal('for', @+)
+
+  set clipboard&vim
+  bwipe!
+endfunc
+
+" Test for restarting the current mode (insert or virtual replace) after
+" executing the contents of a register
+func Test_put_reg_restart_mode()
+  new
+  call append(0, 'editor')
+  normal gg
+  let @r = "ivim \<Esc>"
+  call feedkeys("i\<C-O>@r\<C-R>=mode()\<CR>", 'xt')
+  call assert_equal('vimi editor', getline(1))
+
+  call setline(1, 'editor')
+  normal gg
+  call feedkeys("gR\<C-O>@r\<C-R>=mode()\<CR>", 'xt')
+  call assert_equal('vimReditor', getline(1))
+
+  bwipe!
+endfunc
+
+" Test for getting register info
+func Test_get_reginfo()
+  enew
+  call setline(1, ['foo', 'bar'])
+
+  exe 'norm! "zyy'
+  let info = getreginfo('"')
+  call assert_equal('z', info.points_to)
+  call setreg('y', 'baz')
+  call assert_equal('z', getreginfo('').points_to)
+  call setreg('y', { 'isunnamed': v:true })
+  call assert_equal('y', getreginfo('"').points_to)
+
+  exe '$put'
+  call assert_equal(getreg('y'), getline(3))
+  call setreg('', 'qux')
+  call assert_equal('0', getreginfo('').points_to)
+  call setreg('x', 'quux')
+  call assert_equal('0', getreginfo('').points_to)
+
+  let info = getreginfo('')
+  call assert_equal(getreg('', 1, 1), info.regcontents)
+  call assert_equal(getregtype(''), info.regtype)
+
+  exe "norm! 0\<c-v>e" .. '"zy'
+  let info = getreginfo('z')
+  call assert_equal(getreg('z', 1, 1), info.regcontents)
+  call assert_equal(getregtype('z'), info.regtype)
+  call assert_equal(1, +info.isunnamed)
+
+  let info = getreginfo('"')
+  call assert_equal('z', info.points_to)
+
+  bwipe!
+endfunc
+
+" Test for restoring register with dict from getreginfo
+func Test_set_register_dict()
+  enew!
+
+  call setreg('"', #{ regcontents: ['one', 'two'],
+        \ regtype: 'V', points_to: 'z' })
+  call assert_equal(['one', 'two'], getreg('"', 1, 1))
+  let info = getreginfo('"')
+  call assert_equal('z', info.points_to)
+  call assert_equal('V', info.regtype)
+  call assert_equal(1, +getreginfo('z').isunnamed)
+
+  call setreg('x', #{ regcontents: ['three', 'four'],
+        \ regtype: 'v', isunnamed: v:true })
+  call assert_equal(['three', 'four'], getreg('"', 1, 1))
+  let info = getreginfo('"')
+  call assert_equal('x', info.points_to)
+  call assert_equal('v', info.regtype)
+  call assert_equal(1, +getreginfo('x').isunnamed)
+
+  call setreg('y', #{ regcontents: 'five',
+        \ regtype: "\<c-v>", isunnamed: v:false })
+  call assert_equal("\<c-v>4", getreginfo('y').regtype)
+  call assert_equal(0, +getreginfo('y').isunnamed)
+  call assert_equal(['three', 'four'], getreg('"', 1, 1))
+  call assert_equal('x', getreginfo('"').points_to)
+
+  call setreg('"', #{ regcontents: 'six' })
+  call assert_equal('0', getreginfo('"').points_to)
+  call assert_equal(1, +getreginfo('0').isunnamed)
+  call assert_equal(['six'], getreginfo('0').regcontents)
+  call assert_equal(['six'], getreginfo('"').regcontents)
+
+  let @x = 'one'
+  call setreg('x', {})
+  call assert_equal(1, len(split(execute('reg x'), '\n')))
+
+  call assert_fails("call setreg('0', #{regtype: 'V'}, 'v')", 'E118:')
+  call assert_fails("call setreg('0', #{regtype: 'X'})", 'E475:')
+  call assert_fails("call setreg('0', #{regtype: 'vy'})", 'E475:')
+
+  bwipe!
 endfunc
 
 func Test_v_register()
@@ -336,86 +508,6 @@ func Test_insert_small_delete()
   call assert_equal("'foo' foobar bar", getline(1))
   exe ":norm! w.w."
   call assert_equal("'foo' 'foobar' 'bar'", getline(1))
-  bwipe!
-endfunc
-
-" Test for getting register info
-func Test_get_reginfo()
-  enew
-  call setline(1, ['foo', 'bar'])
-
-  exe 'norm! "zyy'
-  let info = getreginfo('"')
-  call assert_equal('z', info.points_to)
-  call setreg('y', 'baz')
-  call assert_equal('z', getreginfo('').points_to)
-  call setreg('y', { 'isunnamed': v:true })
-  call assert_equal('y', getreginfo('"').points_to)
-
-  exe '$put'
-  call assert_equal(getreg('y'), getline(3))
-  call setreg('', 'qux')
-  call assert_equal('0', getreginfo('').points_to)
-  call setreg('x', 'quux')
-  call assert_equal('0', getreginfo('').points_to)
-
-  let info = getreginfo('')
-  call assert_equal(getreg('', 1, 1), info.regcontents)
-  call assert_equal(getregtype(''), info.regtype)
-
-  exe "norm! 0\<c-v>e" .. '"zy'
-  let info = getreginfo('z')
-  call assert_equal(getreg('z', 1, 1), info.regcontents)
-  call assert_equal(getregtype('z'), info.regtype)
-  call assert_equal(1, +info.isunnamed)
-
-  let info = getreginfo('"')
-  call assert_equal('z', info.points_to)
-
-  bwipe!
-endfunc
-
-" Test for restoring register with dict from getreginfo
-func Test_set_register_dict()
-  enew!
-
-  call setreg('"', #{ regcontents: ['one', 'two'],
-        \ regtype: 'V', points_to: 'z' })
-  call assert_equal(['one', 'two'], getreg('"', 1, 1))
-  let info = getreginfo('"')
-  call assert_equal('z', info.points_to)
-  call assert_equal('V', info.regtype)
-  call assert_equal(1, +getreginfo('z').isunnamed)
-
-  call setreg('x', #{ regcontents: ['three', 'four'],
-        \ regtype: 'v', isunnamed: v:true })
-  call assert_equal(['three', 'four'], getreg('"', 1, 1))
-  let info = getreginfo('"')
-  call assert_equal('x', info.points_to)
-  call assert_equal('v', info.regtype)
-  call assert_equal(1, +getreginfo('x').isunnamed)
-
-  call setreg('y', #{ regcontents: 'five',
-        \ regtype: "\<c-v>", isunnamed: v:false })
-  call assert_equal("\<c-v>4", getreginfo('y').regtype)
-  call assert_equal(0, +getreginfo('y').isunnamed)
-  call assert_equal(['three', 'four'], getreg('"', 1, 1))
-  call assert_equal('x', getreginfo('"').points_to)
-
-  call setreg('"', #{ regcontents: 'six' })
-  call assert_equal('0', getreginfo('"').points_to)
-  call assert_equal(1, +getreginfo('0').isunnamed)
-  call assert_equal(['six'], getreginfo('0').regcontents)
-  call assert_equal(['six'], getreginfo('"').regcontents)
-
-  let @x = 'one'
-  call setreg('x', {})
-  call assert_equal(1, len(split(execute('reg x'), '\n')))
-
-  call assert_fails("call setreg('0', #{regtype: 'V'}, 'v')", 'E118:')
-  call assert_fails("call setreg('0', #{regtype: 'X'})", 'E475:')
-  call assert_fails("call setreg('0', #{regtype: 'vy'})", 'E475:')
-
   bwipe!
 endfunc
 
