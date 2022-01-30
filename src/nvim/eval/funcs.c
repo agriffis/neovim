@@ -3795,7 +3795,7 @@ static void f_getmatches(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 }
 
 // "getmousepos()" function
-void f_getmousepos(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+static void f_getmousepos(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
   dict_T *d;
   win_T *wp;
@@ -6927,7 +6927,7 @@ static void f_prompt_setinterrupt(typval_T *argvars, typval_T *rettv, FunPtr fpt
 }
 
 /// "prompt_getprompt({buffer})" function
-void f_prompt_getprompt(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+static void f_prompt_getprompt(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   FUNC_ATTR_NONNULL_ALL
 {
   // return an empty string by default, e.g. it's not a prompt buffer
@@ -6982,36 +6982,13 @@ static void f_pumvisible(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   }
 }
 
-/*
- * "pyeval()" function
- */
-static void f_pyeval(typval_T *argvars, typval_T *rettv, FunPtr fptr)
-{
-  script_host_eval("python", argvars, rettv);
-}
-
-/*
- * "py3eval()" function
- */
+/// "py3eval()" and "pyxeval()" functions (always python3)
 static void f_py3eval(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
   script_host_eval("python3", argvars, rettv);
 }
 
-// "pyxeval()" function
-static void f_pyxeval(typval_T *argvars, typval_T *rettv, FunPtr fptr)
-{
-  init_pyxversion();
-  if (p_pyx == 2) {
-    f_pyeval(argvars, rettv, NULL);
-  } else {
-    f_py3eval(argvars, rettv, NULL);
-  }
-}
-
-///
 /// "perleval()" function
-///
 static void f_perleval(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
   script_host_eval("perl", argvars, rettv);
@@ -10673,7 +10650,7 @@ static void f_stridx(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 /*
  * "string()" function
  */
-void f_string(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+static void f_string(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
   rettv->v_type = VAR_STRING;
   rettv->vval.v_string = (char_u *)encode_tv2string(&argvars[0], NULL);
@@ -11987,6 +11964,42 @@ static void f_win_id2tabwin(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 static void f_win_id2win(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
   rettv->vval.v_number = win_id2win(argvars);
+}
+
+/// "win_move_separator()" function
+static void f_win_move_separator(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+{
+  win_T *wp;
+  int offset;
+
+  rettv->vval.v_number = false;
+
+  wp = find_win_by_nr_or_id(&argvars[0]);
+  if (wp == NULL || wp->w_floating) {
+    return;
+  }
+
+  offset = (int)tv_get_number(&argvars[1]);
+  win_drag_vsep_line(wp, offset);
+  rettv->vval.v_number = true;
+}
+
+/// "win_move_statusline()" function
+static void f_win_move_statusline(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+{
+  win_T *wp;
+  int offset;
+
+  rettv->vval.v_number = false;
+
+  wp = find_win_by_nr_or_id(&argvars[0]);
+  if (wp == NULL || wp->w_floating) {
+    return;
+  }
+
+  offset = (int)tv_get_number(&argvars[1]);
+  win_drag_status_line(wp, offset);
+  rettv->vval.v_number = true;
 }
 
 /// "winbufnr(nr)" function

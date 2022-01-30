@@ -556,6 +556,7 @@ let s:filename_checks = {
     \ 'usserverlog': ['usserver.log', 'USSERVER.LOG', 'usserver.file.log', 'USSERVER.FILE.LOG', 'file.usserver.log', 'FILE.USSERVER.LOG'],
     \ 'usw2kagtlog': ['usw2kagt.log', 'USW2KAGT.LOG', 'usw2kagt.file.log', 'USW2KAGT.FILE.LOG', 'file.usw2kagt.log', 'FILE.USW2KAGT.LOG'],
     \ 'vb': ['file.sba', 'file.vb', 'file.vbs', 'file.dsm', 'file.ctl'],
+    \ 'vala': ['file.vala'],
     \ 'vera': ['file.vr', 'file.vri', 'file.vrh'],
     \ 'verilog': ['file.v'],
     \ 'verilogams': ['file.va', 'file.vams'],
@@ -745,6 +746,24 @@ func Test_hook_file()
   call delete('Xfile.hook')
   filetype off
 endfunc
+
+func Test_tf_file()
+  filetype on
+
+  call writefile([';;; TF MUD client is super duper cool'], 'Xfile.tf')
+  split Xfile.tf
+  call assert_equal('tf', &filetype)
+  bwipe!
+
+  call writefile(['provider "azurerm" {'], 'Xfile.tf')
+  split Xfile.tf
+  call assert_equal('terraform', &filetype)
+  bwipe!
+
+  call delete('Xfile.tf')
+  filetype off
+endfunc
+
 
 func Test_ts_file()
   filetype on

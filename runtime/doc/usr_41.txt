@@ -549,7 +549,7 @@ A "&" character is prepended to "path", thus the argument to eval() is
 
 Vim defines many functions and provides a large amount of functionality that
 way.  A few examples will be given in this section.  You can find the whole
-list here: |functions|.
+list below: |function-list|.
 
 A function is called with the ":call" command.  The parameters are passed in
 between parentheses separated by commas.  Example: >
@@ -588,8 +588,8 @@ after the substitute() call.
 FUNCTIONS						*function-list*
 
 There are many functions.  We will mention them here, grouped by what they are
-used for.  You can find an alphabetical list here: |functions|.  Use CTRL-] on
-the function name to jump to detailed help on it.
+used for.  You can find an alphabetical list here: |builtin-function-list|.
+Use CTRL-] on the function name to jump to detailed help on it.
 
 String manipulation:					*string-functions*
 	nr2char()		get a character by its number value
@@ -837,6 +837,8 @@ Buffers, windows and the argument list:
 	win_gotoid()		go to window with ID
 	win_id2tabwin()		get tab and window nr from window ID
 	win_id2win()		get window nr from window ID
+	win_move_separator()	move window vertical separator
+	win_move_statusline()	move window status line
 	getbufinfo()		get a list with buffer information
 	gettabinfo()		get a list with tab page information
 	getwininfo()		get a list with window information
