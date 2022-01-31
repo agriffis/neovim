@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# backward compat since cached function went away
+# https://pagure.io/rpkg-util/c/bb62554c62fd52224709e861c2353a5c15b50220?branch=master
+function cached {
+    echo -n "${CACHE[$1]}"
+}
+
 function get_cmake_var {
     declare v
     v=$(grep -m1 "^set($1\\s" < CMakeLists.txt)

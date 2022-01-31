@@ -29,7 +29,7 @@ License:        ASL 2.0
 Summary:        Vim-fork focused on extensibility and agility
 Url:            https://neovim.io
 
-Source0:        {{{git_pack}}}
+Source0:        {{{git_repo_pack}}}
 Source1:        sysinit.vim
 Source2:        spec-template
 
@@ -87,7 +87,7 @@ excisions, Neovim is Vim. It is built for users who want the good
 parts of Vim, without compromise, and more.
 
 %prep
-{{{git_setup_macro}}}
+{{{git_setup_macro path="$GIT_ROOT"}}}
 
 %patch0 -p1
 
