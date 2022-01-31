@@ -78,6 +78,10 @@
 #include "nvim/vim.h"
 #include "nvim/window.h"
 
+static char *e_no_such_user_defined_command_str = N_("E184: No such user-defined command: %s");
+static char *e_no_such_user_defined_command_in_current_buffer_str
+    = N_("E1237: No such user-defined command in current buffer: %s");
+
 static int quitmore = 0;
 static bool ex_pressedreturn = false;
 
@@ -1758,7 +1762,9 @@ static char_u *do_one_cmd(char_u **cmdlinep, int flags, cstack_T *cstack, LineGe
       ea.regname = *ea.arg++;
       // for '=' register: accept the rest of the line as an expression
       if (ea.arg[-1] == '=' && ea.arg[0] != NUL) {
-        set_expr_line(vim_strsave(ea.arg));
+        if (!ea.skip) {
+          set_expr_line(vim_strsave(ea.arg));
+        }
         ea.arg += STRLEN(ea.arg);
       }
       ea.arg = skipwhite(ea.arg);
@@ -2697,10 +2703,8 @@ static char_u *find_ucmd(exarg_T *eap, char_u *p, int *full, expand_T *xp, int *
   bool amb_local = false;            // Found ambiguous buffer-local command,
                                      // only full match global is accepted.
 
-  /*
-   * Look for buffer-local user commands first, then global ones.
-   */
-  gap = &curbuf->b_ucmds;
+  // Look for buffer-local user commands first, then global ones.
+  gap = is_in_cmdwin() ? &prevwin->w_buffer->b_ucmds : &curbuf->b_ucmds;
   for (;;) {
     for (j = 0; j < gap->ga_len; j++) {
       uc = USER_CMD_GA(gap, j);
@@ -5347,9 +5351,7 @@ static void uc_list(char_u *name, size_t name_len)
   uint32_t a;
 
   // In cmdwin, the alternative buffer should be used.
-  garray_T *gap = (cmdwin_type != 0 && get_cmdline_type() == NUL)
-    ? &prevwin->w_buffer->b_ucmds
-    : &curbuf->b_ucmds;
+  garray_T *gap = is_in_cmdwin() ? &prevwin->w_buffer->b_ucmds : &curbuf->b_ucmds;
   for (;;) {
     for (i = 0; i < gap->ga_len; i++) {
       cmd = USER_CMD_GA(gap, i);
@@ -5737,26 +5739,36 @@ static void ex_delcommand(exarg_T *eap)
 {
   int i = 0;
   ucmd_T *cmd = NULL;
-  int cmp = -1;
+  int res = -1;
   garray_T *gap;
+  const char_u *arg = eap->arg;
+  bool buffer_only = false;
+
+  if (STRNCMP(arg, "-buffer", 7) == 0 && ascii_iswhite(arg[7])) {
+    buffer_only = true;
+    arg = skipwhite(arg + 7);
+  }
 
   gap = &curbuf->b_ucmds;
   for (;;) {
     for (i = 0; i < gap->ga_len; i++) {
       cmd = USER_CMD_GA(gap, i);
-      cmp = STRCMP(eap->arg, cmd->uc_name);
-      if (cmp <= 0) {
+      res = STRCMP(arg, cmd->uc_name);
+      if (res <= 0) {
         break;
       }
     }
-    if (gap == &ucmds || cmp == 0) {
+    if (gap == &ucmds || res == 0 || buffer_only) {
       break;
     }
     gap = &ucmds;
   }
 
-  if (cmp != 0) {
-    semsg(_("E184: No such user-defined command: %s"), eap->arg);
+  if (res != 0) {
+    semsg(_(buffer_only
+            ? e_no_such_user_defined_command_in_current_buffer_str
+            : e_no_such_user_defined_command_str),
+          arg);
     return;
   }
 
@@ -6293,9 +6305,7 @@ char_u *get_user_commands(expand_T *xp FUNC_ATTR_UNUSED, int idx)
   FUNC_ATTR_PURE FUNC_ATTR_WARN_UNUSED_RESULT
 {
   // In cmdwin, the alternative buffer should be used.
-  const buf_T *const buf = (cmdwin_type != 0 && get_cmdline_type() == NUL)
-    ? prevwin->w_buffer
-    : curbuf;
+  const buf_T *const buf = is_in_cmdwin() ? prevwin->w_buffer : curbuf;
 
   if (idx < buf->b_ucmds.ga_len) {
     return USER_CMD_GA(&buf->b_ucmds, idx)->uc_name;
@@ -6317,7 +6327,7 @@ static char_u *get_user_command_name(int idx, int cmdidx)
   }
   if (cmdidx == CMD_USER_BUF) {
     // In cmdwin, the alternative buffer should be used.
-    buf_T *buf = (cmdwin_type != 0 && get_cmdline_type() == NUL) ? prevwin->w_buffer : curbuf;
+    buf_T *buf = is_in_cmdwin() ? prevwin->w_buffer : curbuf;
     if (idx < buf->b_ucmds.ga_len) {
       return USER_CMD_GA(&buf->b_ucmds, idx)->uc_name;
     }
@@ -7825,7 +7835,6 @@ void post_chdir(CdScope scope, bool trigger_dirchanged)
 /// @return true if the directory is successfully changed.
 bool changedir_func(char_u *new_dir, CdScope scope)
 {
-  char_u *tofree;
   char_u *pdir = NULL;
   bool retval = false;
 
@@ -7843,24 +7852,10 @@ bool changedir_func(char_u *new_dir, CdScope scope)
     new_dir = pdir;
   }
 
-  // Free the previous directory
-  tofree = get_prevdir(scope);
-
   if (os_dirname(NameBuff, MAXPATHL) == OK) {
     pdir = vim_strsave(NameBuff);
   } else {
     pdir = NULL;
-  }
-
-  switch (scope) {
-  case kCdScopeTabpage:
-    curtab->tp_prevdir = pdir;
-    break;
-  case kCdScopeWindow:
-    curwin->w_prevdir = pdir;
-    break;
-  default:
-    prev_dir = pdir;
   }
 
   // For UNIX ":cd" means: go to home directory.
@@ -7878,12 +7873,27 @@ bool changedir_func(char_u *new_dir, CdScope scope)
   bool dir_differs = new_dir == NULL || pdir == NULL
                      || pathcmp((char *)pdir, (char *)new_dir, -1) != 0;
   if (new_dir != NULL && (!dir_differs || vim_chdir(new_dir) == 0)) {
+    char_u **pp;
+
+    switch (scope) {
+    case kCdScopeTabpage:
+      pp = &curtab->tp_prevdir;
+      break;
+    case kCdScopeWindow:
+      pp = &curwin->w_prevdir;
+      break;
+    default:
+      pp = &prev_dir;
+    }
+    xfree(*pp);
+    *pp = pdir;
+
     post_chdir(scope, dir_differs);
     retval = true;
   } else {
     emsg(_(e_failed));
+    xfree(pdir);
   }
-  xfree(tofree);
 
   return retval;
 }
