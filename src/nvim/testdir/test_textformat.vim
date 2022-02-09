@@ -238,7 +238,33 @@ func Test_format_c_comment()
   END
   call assert_equal(expected, getline(1, '$'))
 
-  " Using "o" repeats the line comment, "O" does not.
+  " Using either "o" or "O" repeats a line comment occupying a whole line.
+  %del
+  let text =<< trim END
+      nop;
+      // This is a comment
+      val = val;
+  END
+  call setline(1, text)
+  normal 2Go
+  let expected =<< trim END
+      nop;
+      // This is a comment
+      //
+      val = val;
+  END
+  call assert_equal(expected, getline(1, '$'))
+  normal 2GO
+  let expected =<< trim END
+      nop;
+      //
+      // This is a comment
+      //
+      val = val;
+  END
+  call assert_equal(expected, getline(1, '$'))
+
+  " Using "o" repeats a line comment after a statement, "O" does not.
   %del
   let text =<< trim END
       nop;
@@ -530,6 +556,21 @@ func Test_format_align()
   right
   call assert_equal("\t\t Vim", getline(1))
   q!
+
+  " align text with 'rightleft'
+  if has('rightleft')
+    new
+    call setline(1, 'Vim')
+    setlocal rightleft
+    left 20
+    setlocal norightleft
+    call assert_equal("\t\t Vim", getline(1))
+    setlocal rightleft
+    right
+    setlocal norightleft
+    call assert_equal("Vim", getline(1))
+    close!
+  endif
 
   set tw&
 endfunc
