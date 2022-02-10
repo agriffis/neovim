@@ -135,10 +135,18 @@ static char opchars[][3] =
   { Ctrl_X, NUL, OPF_CHANGE },           // OP_NR_SUB
 };
 
-/*
- * Translate a command name into an operator type.
- * Must only be called with a valid operator name!
- */
+yankreg_T *get_y_previous(void)
+{
+  return y_previous;
+}
+
+void set_y_previous(yankreg_T *yreg)
+{
+  y_previous = yreg;
+}
+
+/// Translate a command name into an operator type.
+/// Must only be called with a valid operator name!
 int get_op_type(int char1, int char2)
 {
   int i;
@@ -566,7 +574,7 @@ static void block_insert(oparg_T *oap, char_u *s, int b_insert, struct block_def
       if (b_insert) {
         off = utf_head_off(oldp, oldp + offset + spaces);
       } else {
-        off = (*mb_off_next)(oldp, oldp + offset);
+        off = mb_off_next(oldp, oldp + offset);
         offset += off;
       }
       spaces -= off;
