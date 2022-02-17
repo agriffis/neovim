@@ -497,8 +497,12 @@ ArrayOf(String) nvim_get_runtime_file(String name, Boolean all, Error *err)
 
   int flags = DIP_DIRFILE | (all ? DIP_ALL : 0);
 
-  do_in_runtimepath((char_u *)(name.size ? name.data : ""),
-                    flags, find_runtime_cb, &rv);
+  TRY_WRAP({
+    try_start();
+    do_in_runtimepath((char_u *)(name.size ? name.data : ""),
+                      flags, find_runtime_cb, &rv);
+    try_end(err);
+  });
   return rv;
 }
 
@@ -1584,7 +1588,7 @@ ArrayOf(Dictionary) nvim_get_keymap(uint64_t channel_id, String mode)
 /// @param  rhs   Right-hand-side |{rhs}| of the mapping.
 /// @param  opts  Optional parameters map. Accepts all |:map-arguments|
 ///               as keys excluding |<buffer>| but including |noremap| and "desc".
-///               |desc| can be used to give a description to keymap.
+///               "desc" can be used to give a description to keymap.
 ///               When called from Lua, also accepts a "callback" key that takes
 ///               a Lua function to call when the mapping is executed.
 ///               Values are Booleans. Unknown key is an error.
