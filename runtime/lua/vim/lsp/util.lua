@@ -1551,9 +1551,7 @@ do --[[ References ]]
                       document_highlight_kind[kind],
                       { start_line, start_idx },
                       { end_line, end_idx },
-                      nil,
-                      false,
-                      40)
+                      { priority = vim.highlight.priorities.user })
     end
   end
 end

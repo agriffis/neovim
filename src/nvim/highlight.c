@@ -800,6 +800,7 @@ HlAttrs dict2hlattrs(Dict(highlight) *dict, bool use_rgb, int *link_id, Error *e
 {
   HlAttrs hlattrs = HLATTRS_INIT;
   int32_t fg = -1, bg = -1, ctermfg = -1, ctermbg = -1, sp = -1;
+  int blend = -1;
   int16_t mask = 0;
   int16_t cterm_mask = 0;
   bool cterm_mask_provided = false;
@@ -842,6 +843,20 @@ HlAttrs dict2hlattrs(Dict(highlight) *dict, bool use_rgb, int *link_id, Error *e
     sp = object_to_color(dict->sp, "sp", true, err);
   } else if (HAS_KEY(dict->special)) {
     sp = object_to_color(dict->special, "special", true, err);
+  }
+  if (ERROR_SET(err)) {
+    return hlattrs;
+  }
+
+  if (dict->blend.type == kObjectTypeInteger) {
+    Integer blend0 = dict->blend.data.integer;
+    if (blend0 < 0 || blend0 > 100) {
+      api_set_error(err, kErrorTypeValidation, "'blend' is not between 0 to 100");
+    } else {
+      blend = (int)blend0;
+    }
+  } else if (HAS_KEY(dict->blend)) {
+    api_set_error(err, kErrorTypeValidation, "'blend' must be an integer");
   }
   if (ERROR_SET(err)) {
     return hlattrs;
@@ -908,6 +923,7 @@ HlAttrs dict2hlattrs(Dict(highlight) *dict, bool use_rgb, int *link_id, Error *e
     hlattrs.rgb_bg_color = bg;
     hlattrs.rgb_fg_color = fg;
     hlattrs.rgb_sp_color = sp;
+    hlattrs.hl_blend = blend;
     hlattrs.cterm_bg_color = ctermbg == -1 ? 0 : ctermbg + 1;
     hlattrs.cterm_fg_color = ctermfg == -1 ? 0 : ctermfg + 1;
     hlattrs.cterm_ae_attr = cterm_mask;
@@ -927,10 +943,11 @@ int object_to_color(Object val, char *key, bool rgb, Error *err)
   } else if (val.type == kObjectTypeString) {
     String str = val.data.string;
     // TODO(bfredl): be more fancy with "bg", "fg" etc
+    if (!str.size || STRICMP(str.data, "NONE") == 0) {
+      return -1;
+    }
     int color;
-    if (!str.size) {
-      color = 0;
-    } else if (rgb) {
+    if (rgb) {
       color = name_to_color(str.data);
     } else {
       color = name_to_ctermcolor(str.data);

@@ -9,6 +9,8 @@ on:
     branches:
       - 'master'
       - 'release-[0-9]+.[0-9]+'
+    paths-ignore:
+      - 'runtime/doc/*'
 
 # Cancel any in-progress CI runs for a PR if it is updated
 concurrency:
@@ -29,19 +31,46 @@ jobs:
 
       - name: Install apt packages
         run: |
+          sudo add-apt-repository ppa:neovim-ppa/stable
           sudo apt-get update
-          sudo apt-get install -y autoconf automake build-essential ccache cmake gettext gperf libtool-bin locales ninja-build pkg-config flake8
+          sudo apt-get install -y \
+            autoconf \
+            automake \
+            build-essential \
+            ccache \
+            cmake \
+            flake8 \
+            gettext \
+            gperf \
+            libluajit-5.1-dev \
+            libmsgpack-dev \
+            libtermkey-dev \
+            libtool-bin \
+            libtree-sitter-dev \
+            libunibilium-dev \
+            libuv1-dev \
+            libvterm-dev \
+            locales \
+            lua-busted \
+            lua-check \
+            lua-filesystem \
+            lua-inspect \
+            lua-lpeg \
+            lua-luv-dev \
+            lua-nvim \
+            luajit \
+            ninja-build \
+            pkg-config
 
-      - name: Cache dependencies
+      - name: Cache artifacts
         uses: actions/cache@v2
         with:
           path: |
-            ${{ env.CACHE_NVIM_DEPS_DIR }}
             ~/.ccache
-          key: lint-${{ hashFiles('cmake/*', 'third-party/**', '**/CMakeLists.txt') }}-${{ github.base_ref }}
+          key: lint-${{ hashFiles('cmake/*', '**/CMakeLists.txt', '!third-party/**CMakeLists.txt') }}-${{ github.base_ref }}
 
-      - name: Build third-party
-        run: ./ci/before_script.sh
+      - name: Build nvim
+        run: ./ci/run_tests.sh build
 
       - if: "!cancelled()"
         name: clint
@@ -64,7 +93,6 @@ jobs:
         run: ./ci/run_lint.sh single-includes
 
       - name: Cache dependencies
-        if: ${{ success() }}
         run: ./ci/before_cache.sh
 
   unixish:
@@ -176,11 +204,10 @@ jobs:
         run: ./ci/run_tests.sh install_nvim
 
       - name: Cache dependencies
-        if: ${{ success() }}
         run: ./ci/before_cache.sh
 
   windows:
-    runs-on: windows-2016
+    runs-on: windows-2019
     if: github.event.pull_request.draft == false
     env:
       DEPS_BUILD_DIR: ${{ format('{0}/nvim-deps', github.workspace) }}
