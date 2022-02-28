@@ -128,7 +128,7 @@ find %{buildroot}%{_datadir} \( -name "*.bat" -o -name "*.awk" \) \
 %find_lang nvim
 
 %files -f nvim.lang
-%license LICENSE
+%license LICENSE.txt
 %doc BACKERS.md CONTRIBUTING.md README.md
 %{_bindir}/nvim
 
