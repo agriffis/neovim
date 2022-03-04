@@ -239,7 +239,6 @@ void aupat_del_for_event_and_group(event_T event, int group)
     }
   }
 
-  au_need_clean = true;
   au_cleanup();  // may really delete removed patterns/commands now
 }
 
@@ -2473,7 +2472,7 @@ bool aucmd_exec_is_deleted(AucmdExecutable acc)
   case CALLABLE_EX:
     return acc.callable.cmd == NULL;
   case CALLABLE_CB:
-    return callback_is_freed(acc.callable.cb);
+    return acc.callable.cb.type == kCallbackNone;
   case CALLABLE_NONE:
     return true;
   }
