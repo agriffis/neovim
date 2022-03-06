@@ -121,11 +121,11 @@ static int include_link = 0;    // when 2 include "nvim/link" and "clear"
 /// The "term", "cterm" and "gui" arguments can be any combination of the
 /// following names, separated by commas (but no spaces!).
 static char *(hl_name_table[]) =
-{ "bold", "standout", "underline", "undercurl",
-  "italic", "reverse", "inverse", "strikethrough", "nocombine", "NONE" };
+{ "bold", "standout", "underline", "underlineline", "undercurl", "underdot",
+  "underdash", "italic", "reverse", "inverse", "strikethrough", "nocombine", "NONE" };
 static int hl_attr_table[] =
-{ HL_BOLD, HL_STANDOUT, HL_UNDERLINE, HL_UNDERCURL, HL_ITALIC, HL_INVERSE,
-  HL_INVERSE, HL_STRIKETHROUGH, HL_NOCOMBINE, 0 };
+{ HL_BOLD, HL_STANDOUT, HL_UNDERLINE, HL_UNDERLINELINE, HL_UNDERCURL, HL_UNDERDOT, HL_UNDERDASH,
+  HL_ITALIC, HL_INVERSE, HL_INVERSE, HL_STRIKETHROUGH, HL_NOCOMBINE, 0 };
 
 static char e_illegal_arg[] = N_("E390: Illegal argument: %s");
 
@@ -4208,7 +4208,7 @@ static char_u *get_syn_options(char_u *arg, syn_opt_arg_T *opt, int *conceal_cha
       p = flagtab[fidx].name;
       int i;
       for (i = 0, len = 0; p[i] != NUL; i += 2, ++len) {
-        if (arg[len] != p[i] && arg[len] != p[i + 1]) {
+        if (arg[len] != (char_u)p[i] && arg[len] != (char_u)p[i + 1]) {
           break;
         }
       }
