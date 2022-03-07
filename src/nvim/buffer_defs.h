@@ -862,9 +862,12 @@ struct file_buffer {
                                 // may use a different synblock_T.
 
   sign_entry_T *b_signlist;     // list of placed signs
-  int b_signcols;               // last calculated number of sign columns
-  bool b_signcols_valid;        // calculated sign columns is valid
-  int b_signcols_max;           // Maximum value b_signcols is valid for.
+  struct {
+    int size;                   // last calculated number of sign columns
+    bool valid;                 // calculated sign columns is valid
+    linenr_T sentinel;          // a line number which is holding up the signcolumn
+    int max;                    // Maximum value size is valid for.
+  } b_signcols;
 
   Terminal *terminal;           // Terminal instance associated with the buffer
 
@@ -875,6 +878,7 @@ struct file_buffer {
   MarkTree b_marktree[1];
   Map(uint32_t, uint32_t) b_extmark_ns[1];         // extmark namespaces
   size_t b_virt_line_blocks;    // number of virt_line blocks
+  size_t b_signs;               // number of sign extmarks
 
   // array of channel_id:s which have asked to receive updates for this
   // buffer.
