@@ -1023,6 +1023,60 @@ static int stuff_yank(int regname, char_u *p)
 
 static int execreg_lastc = NUL;
 
+/// When executing a register as a series of ex-commands, if the
+/// line-continuation character is used for a line, then join it with one or
+/// more previous lines. Note that lines are processed backwards starting from
+/// the last line in the register.
+///
+/// @param lines list of lines in the register
+/// @param idx   index of the line starting with \ or "\. Join this line with all the immediate
+///              predecessor lines that start with a \ and the first line that doesn't start
+///              with a \. Lines that start with a comment "\ character are ignored.
+/// @returns the concatenated line. The index of the line that should be
+///          processed next is returned in idx.
+static char_u *execreg_line_continuation(char_u **lines, size_t *idx)
+{
+  size_t i = *idx;
+  assert(i > 0);
+  const size_t cmd_end = i;
+
+  garray_T ga;
+  ga_init(&ga, (int)sizeof(char_u), 400);
+
+  char_u *p;
+
+  // search backwards to find the first line of this command.
+  // Any line not starting with \ or "\ is the start of the
+  // command.
+  while (--i > 0) {
+    p = skipwhite(lines[i]);
+    if (*p != '\\' && (p[0] != '"' || p[1] != '\\' || p[2] != ' ')) {
+      break;
+    }
+  }
+  const size_t cmd_start = i;
+
+  // join all the lines
+  ga_concat(&ga, (char *)lines[cmd_start]);
+  for (size_t j = cmd_start + 1; j <= cmd_end; j++) {
+    p = skipwhite(lines[j]);
+    if (*p == '\\') {
+      // Adjust the growsize to the current length to
+      // speed up concatenating many lines.
+      if (ga.ga_len > 400) {
+        ga_set_growsize(&ga, MIN(ga.ga_len, 8000));
+      }
+      ga_concat(&ga, (char *)(p + 1));
+    }
+  }
+  ga_append(&ga, NUL);
+  char_u *str = vim_strsave(ga.ga_data);
+  ga_clear(&ga);
+
+  *idx = i;
+  return str;
+}
+
 /// Execute a yank register: copy it into the stuff buffer
 ///
 /// @param colon   insert ':' before each line
@@ -1111,7 +1165,21 @@ int do_execreg(int regname, int colon, int addcr, int silent)
           return FAIL;
         }
       }
-      escaped = vim_strsave_escape_ks(reg->y_array[i]);
+
+      // Handle line-continuation for :@<register>
+      char_u *str = reg->y_array[i];
+      bool free_str = false;
+      if (colon && i > 0) {
+        p = skipwhite(str);
+        if (*p == '\\' || (p[0] == '"' && p[1] == '\\' && p[2] == ' ')) {
+          str = execreg_line_continuation(reg->y_array, &i);
+          free_str = true;
+        }
+      }
+      escaped = vim_strsave_escape_ks(str);
+      if (free_str) {
+        xfree(str);
+      }
       retval = ins_typebuf(escaped, remap, 0, true, silent);
       xfree(escaped);
       if (retval == FAIL) {
@@ -1504,20 +1572,20 @@ int op_delete(oparg_T *oap)
     yankreg_T *reg = NULL;
     int did_yank = false;
     if (oap->regname != 0) {
-      // yank without message
-      did_yank = op_yank(oap, false, true);
-      if (!did_yank) {
-        // op_yank failed, don't do anything
+      // check for read-only register
+      if (!valid_yank_reg(oap->regname, true)) {
+        beep_flush();
         return OK;
       }
+      reg = get_yank_register(oap->regname, YREG_YANK);  // yank into specif'd reg
+      op_yank_reg(oap, false, reg, is_append_register(oap->regname));  // yank without message
+      did_yank = true;
     }
 
-    /*
-     * Put deleted text into register 1 and shift number registers if the
-     * delete contains a line break, or when a regname has been specified.
-     */
-    if (oap->regname != 0 || oap->motion_type == kMTLineWise
-        || oap->line_count > 1 || oap->use_reg_one) {
+    // Put deleted text into register 1 and shift number registers if the
+    // delete contains a line break, or when using a specific operator (Vi
+    // compatible)
+    if (oap->motion_type == kMTLineWise || oap->line_count > 1 || oap->use_reg_one) {
       shift_delete_registers(is_append_register(oap->regname));
       reg = &y_regs[1];
       op_yank_reg(oap, false, reg, false);
@@ -2579,12 +2647,12 @@ void free_register(yankreg_T *reg)
 /// Yanks the text between "oap->start" and "oap->end" into a yank register.
 /// If we are to append (uppercase register), we first yank into a new yank
 /// register and then concatenate the old and the new one.
+/// Do not call this from a delete operation. Use op_yank_reg() instead.
 ///
 /// @param oap operator arguments
 /// @param message show message when more than `&report` lines are yanked.
-/// @param deleting whether the function was called from a delete operation.
 /// @returns whether the operation register was writable.
-bool op_yank(oparg_T *oap, bool message, int deleting)
+bool op_yank(oparg_T *oap, bool message)
   FUNC_ATTR_NONNULL_ALL
 {
   // check for read-only register
@@ -2598,11 +2666,8 @@ bool op_yank(oparg_T *oap, bool message, int deleting)
 
   yankreg_T *reg = get_yank_register(oap->regname, YREG_YANK);
   op_yank_reg(oap, message, reg, is_append_register(oap->regname));
-  // op_delete will set_clipboard and do_autocmd
-  if (!deleting) {
-    set_clipboard(oap->regname, reg);
-    do_autocmd_textyankpost(oap, reg);
-  }
+  set_clipboard(oap->regname, reg);
+  do_autocmd_textyankpost(oap, reg);
 
   return true;
 }
@@ -6630,7 +6695,7 @@ void do_pending_operator(cmdarg_T *cap, int old_col, bool gui_yank)
       } else {
         curwin->w_p_lbr = lbr_saved;
         oap->excl_tr_ws = cap->cmdchar == 'z';
-        (void)op_yank(oap, !gui_yank, false);
+        (void)op_yank(oap, !gui_yank);
       }
       check_cursor_col();
       break;

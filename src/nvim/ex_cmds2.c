@@ -1698,7 +1698,7 @@ static bool concat_continued_line(garray_T *const ga, const int init_growsize,
     return false;
   }
   if (ga->ga_len > init_growsize) {
-    ga_set_growsize(ga, MAX(ga->ga_len, 8000));
+    ga_set_growsize(ga, MIN(ga->ga_len, 8000));
   }
   ga_concat_len(ga, (const char *)line + 1, len - 1);
   return true;
@@ -1796,7 +1796,7 @@ scriptitem_T *new_script_item(char_u *const name, scid_T *const sid_out)
   if (sid_out != NULL) {
     *sid_out = sid;
   }
-  ga_grow(&script_items, (int)(sid - script_items.ga_len));
+  ga_grow(&script_items, sid - script_items.ga_len);
   while (script_items.ga_len < sid) {
     script_items.ga_len++;
     SCRIPT_ITEM(script_items.ga_len).sn_name = NULL;
@@ -1852,7 +1852,7 @@ static void cmd_source_buffer(const exarg_T *const eap)
   for (linenr_T curr_lnum = eap->line1; curr_lnum <= final_lnum; curr_lnum++) {
     // Adjust growsize to current length to speed up concatenating many lines.
     if (ga.ga_len > 400) {
-      ga_set_growsize(&ga, MAX(ga.ga_len, 8000));
+      ga_set_growsize(&ga, MIN(ga.ga_len, 8000));
     }
     ga_concat(&ga, (char *)ml_get(curr_lnum));
     ga_append(&ga, NL);
@@ -2186,7 +2186,6 @@ scriptitem_T *get_current_script_id(char_u *fname, sctx_T *ret_sctx)
 
   return si;
 }
-
 
 
 /// ":scriptnames"
