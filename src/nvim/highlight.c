@@ -5,6 +5,7 @@
 
 #include "nvim/api/private/defs.h"
 #include "nvim/api/private/helpers.h"
+#include "nvim/decoration_provider.h"
 #include "nvim/highlight.h"
 #include "nvim/highlight_defs.h"
 #include "nvim/lua/executor.h"
@@ -819,9 +820,9 @@ HlAttrs dict2hlattrs(Dict(highlight) *dict, bool use_rgb, int *link_id, Error *e
   bool cterm_mask_provided = false;
 
 #define CHECK_FLAG(d, m, name, extra, flag) \
-    if (api_object_to_bool(d->name ## extra, #name, false, err)) { \
-      m = m | flag; \
-    }
+  if (api_object_to_bool(d->name##extra, #name, false, err)) { \
+    m = m | flag; \
+  }
 
   CHECK_FLAG(dict, mask, bold, , HL_BOLD);
   CHECK_FLAG(dict, mask, standout, , HL_STANDOUT);
@@ -906,7 +907,6 @@ HlAttrs dict2hlattrs(Dict(highlight) *dict, bool use_rgb, int *link_id, Error *e
     CHECK_FLAG(cterm, cterm_mask, reverse, , HL_INVERSE);
     CHECK_FLAG(cterm, cterm_mask, strikethrough, , HL_STRIKETHROUGH);
     CHECK_FLAG(cterm, cterm_mask, nocombine, , HL_NOCOMBINE);
-
   } else if (dict->cterm.type == kObjectTypeArray && dict->cterm.data.array.size == 0) {
     // empty list from Lua API should clear all cterm attributes
     // TODO(clason): handle via gen_api_dispatch
