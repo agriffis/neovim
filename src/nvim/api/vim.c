@@ -1140,6 +1140,7 @@ Integer nvim_open_term(Buffer buffer, DictionaryOf(LuaRef) opts, Error *err)
   TerminalOptions topts;
   Channel *chan = channel_alloc(kChannelStreamInternal);
   chan->stream.internal.cb = cb;
+  chan->stream.internal.closed = false;
   topts.data = chan;
   // NB: overridden in terminal_check_size if a window is already
   // displaying the buffer
@@ -1997,9 +1998,8 @@ Array nvim_get_proc_children(Integer pid, Error *err)
     DLOG("fallback to vim._os_proc_children()");
     Array a = ARRAY_DICT_INIT;
     ADD(a, INTEGER_OBJ(pid));
-    String s = cstr_to_string("return vim._os_proc_children(...)");
+    String s = STATIC_CSTR_AS_STRING("return vim._os_proc_children(...)");
     Object o = nlua_exec(s, a, err);
-    api_free_string(s);
     api_free_array(a);
     if (o.type == kObjectTypeArray) {
       rvobj = o.data.array;
