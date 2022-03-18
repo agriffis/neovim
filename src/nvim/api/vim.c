@@ -35,6 +35,7 @@
 #include "nvim/globals.h"
 #include "nvim/highlight.h"
 #include "nvim/highlight_defs.h"
+#include "nvim/highlight_group.h"
 #include "nvim/lua/executor.h"
 #include "nvim/mark.h"
 #include "nvim/memline.h"
@@ -50,7 +51,6 @@
 #include "nvim/popupmnu.h"
 #include "nvim/screen.h"
 #include "nvim/state.h"
-#include "nvim/syntax.h"
 #include "nvim/types.h"
 #include "nvim/ui.h"
 #include "nvim/vim.h"
@@ -112,7 +112,7 @@ Dictionary nvim_get_hl_by_id(Integer hl_id, Boolean rgb, Error *err)
 Integer nvim_get_hl_id_by_name(String name)
   FUNC_API_SINCE(7)
 {
-  return syn_check_group(name.data, (int)name.size);
+  return syn_check_group(name.data, name.size);
 }
 
 Dictionary nvim__get_hl_defs(Integer ns_id, Error *err)
@@ -147,7 +147,7 @@ Dictionary nvim__get_hl_defs(Integer ns_id, Error *err)
 void nvim_set_hl(Integer ns_id, String name, Dict(highlight) *val, Error *err)
   FUNC_API_SINCE(7)
 {
-  int hl_id = syn_check_group(name.data, (int)name.size);
+  int hl_id = syn_check_group(name.data, name.size);
   int link_id = -1;
 
   HlAttrs attrs = dict2hlattrs(val, true, &link_id, err);
@@ -2329,7 +2329,7 @@ Dictionary nvim_eval_statusline(String str, Dict(eval_statusline) *opts, Error *
 
     maxwidth = (int)opts->maxwidth.data.integer;
   } else {
-    maxwidth = use_tabline ? Columns : wp->w_width;
+    maxwidth = (use_tabline || global_stl_height() > 0) ? Columns : wp->w_width;
   }
 
   char buf[MAXPATHL];

@@ -22,6 +22,7 @@
 #include "nvim/ex_getln.h"
 #include "nvim/fileio.h"
 #include "nvim/fold.h"
+#include "nvim/highlight_group.h"
 #include "nvim/mark.h"
 #include "nvim/mbyte.h"
 #include "nvim/memline.h"
@@ -39,7 +40,6 @@
 #include "nvim/screen.h"
 #include "nvim/search.h"
 #include "nvim/strings.h"
-#include "nvim/syntax.h"
 #include "nvim/ui.h"
 #include "nvim/vim.h"
 #include "nvim/window.h"
@@ -3635,7 +3635,7 @@ static int qf_goto_cwindow(const qf_info_T *qi, bool resize, int sz, bool vertsp
         win_setwidth(sz);
       }
     } else if (sz != win->w_height
-               && (win->w_height + win->w_status_height + tabline_height()
+               && (win->w_height + win->w_hsep_height + win->w_status_height + tabline_height()
                    < cmdline_row)) {
       win_setheight(sz);
     }

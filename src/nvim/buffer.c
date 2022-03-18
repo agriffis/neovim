@@ -51,6 +51,7 @@
 #include "nvim/getchar.h"
 #include "nvim/hashtab.h"
 #include "nvim/highlight.h"
+#include "nvim/highlight_group.h"
 #include "nvim/indent.h"
 #include "nvim/indent_c.h"
 #include "nvim/main.h"
@@ -4947,8 +4948,8 @@ void ex_buffer_all(exarg_T *eap)
       wpnext = wp->w_next;
       if ((wp->w_buffer->b_nwindows > 1
            || ((cmdmod.split & WSP_VERT)
-               ? wp->w_height + wp->w_status_height < Rows - p_ch
-               - tabline_height()
+               ? wp->w_height + wp->w_hsep_height + wp->w_status_height < Rows - p_ch
+               - tabline_height() - global_stl_height()
                : wp->w_width != Columns)
            || (had_tab > 0 && wp != firstwin))
           && !ONE_WINDOW
