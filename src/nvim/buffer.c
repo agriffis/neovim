@@ -1042,8 +1042,24 @@ static int empty_curbuf(int close_others, int forceit, int action)
   set_bufref(&bufref, buf);
 
   if (close_others) {
-    // Close any other windows on this buffer, then make it empty.
-    close_windows(buf, true);
+    bool can_close_all_others = true;
+    if (curwin->w_floating) {
+      // Closing all other windows with this buffer may leave only floating windows.
+      can_close_all_others = false;
+      for (win_T *wp = firstwin; !wp->w_floating; wp = wp->w_next) {
+        if (wp->w_buffer != curbuf) {
+          // Found another non-floating window with a different (probably unlisted) buffer.
+          // Closing all other windows with this buffer is fine in this case.
+          can_close_all_others = true;
+          break;
+        }
+      }
+    }
+    // If it is fine to close all other windows with this buffer, keep the current window and
+    // close any other windows with this buffer, then make it empty.
+    // Otherwise close_windows() will refuse to close the last non-floating window, so allow it
+    // to close the current window instead.
+    close_windows(buf, can_close_all_others);
   }
 
   setpcmark();
@@ -1224,11 +1240,12 @@ int do_buffer(int action, int start, int dir, int count, int forceit)
     }
 
     // If the deleted buffer is the current one, close the current window
-    // (unless it's the only window).  Repeat this so long as we end up in
-    // a window with this buffer.
+    // (unless it's the only non-floating window).
+    // When the autocommand window is involved win_close() may need to print an error message.
+    // Repeat this so long as we end up in a window with this buffer.
     while (buf == curbuf
            && !(curwin->w_closing || curwin->w_buffer->b_locked > 0)
-           && (!ONE_WINDOW || first_tabpage->tp_next != NULL)) {
+           && (lastwin == aucmd_win || !last_window(curwin))) {
       if (win_close(curwin, false, false) == FAIL) {
         break;
       }
