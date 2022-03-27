@@ -340,8 +340,7 @@ cleanup:
 ///     -- Vimscript function name (as a string)
 ///     local myvimfun = "g:MyVimFunction"
 ///
-///     vim.api.nvim_create_autocmd({
-///       event = {"BufEnter", "BufWinEnter"},
+///     vim.api.nvim_create_autocmd({"BufEnter", "BufWinEnter"}, {
 ///       pattern = {"*.c", "*.h"},
 ///       callback = myluafun,  -- Or myvimfun
 ///     })
@@ -349,8 +348,7 @@ cleanup:
 ///
 /// Example using command:
 /// <pre>
-///     vim.api.nvim_create_autocmd({
-///       event = {"BufEnter", "BufWinEnter"},
+///     vim.api.nvim_create_autocmd({"BufEnter", "BufWinEnter"}, {
 ///       pattern = {"*.c", "*.h"},
 ///       command = "echo 'Entering a C or C++ file'",
 ///     })
@@ -364,8 +362,8 @@ cleanup:
 ///
 /// Examples values for event:
 /// <pre>
-///   event = "BufPreWrite"
-///   event = {"CursorHold", "BufPreWrite", "BufPostWrite"}
+///   "BufPreWrite"
+///   {"CursorHold", "BufPreWrite", "BufPostWrite"}
 /// </pre>
 ///
 /// @param event (String|Array) The event or events to register this autocommand
@@ -697,7 +695,7 @@ void nvim_del_augroup_by_name(String name)
 ///             - modeline (bool) optional: defaults to true. Process the
 ///             modeline after the autocommands |<nomodeline>|.
 /// @see |:doautocmd|
-void nvim_do_autocmd(Object event, Dict(do_autocmd) *opts, Error *err)
+void nvim_exec_autocmd(Object event, Dict(exec_autocmd) *opts, Error *err)
   FUNC_API_SINCE(9)
 {
   int au_group = AUGROUP_ALL;
