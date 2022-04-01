@@ -1480,15 +1480,13 @@ bool edit(int cmdchar, bool startln, long count)
 /// @param ready  not busy with something
 static void ins_redraw(bool ready)
 {
-  bool conceal_cursor_moved = false;
-
   if (char_avail()) {
     return;
   }
 
   // Trigger CursorMoved if the cursor moved.  Not when the popup menu is
   // visible, the command might delete it.
-  if (ready && (has_event(EVENT_CURSORMOVEDI) || curwin->w_p_cole > 0)
+  if (ready && has_event(EVENT_CURSORMOVEDI)
       && !equalpos(curwin->w_last_cursormoved, curwin->w_cursor)
       && !pum_visible()) {
     // Need to update the screen first, to make sure syntax
@@ -1498,13 +1496,10 @@ static void ins_redraw(bool ready)
     if (syntax_present(curwin) && must_redraw) {
       update_screen(0);
     }
-    if (has_event(EVENT_CURSORMOVEDI)) {
-      // Make sure curswant is correct, an autocommand may call
-      // getcurpos()
-      update_curswant();
-      ins_apply_autocmds(EVENT_CURSORMOVEDI);
-    }
-    conceal_cursor_moved = true;
+    // Make sure curswant is correct, an autocommand may call
+    // getcurpos()
+    update_curswant();
+    ins_apply_autocmds(EVENT_CURSORMOVEDI);
     curwin->w_last_cursormoved = curwin->w_cursor;
   }
 
@@ -1558,11 +1553,6 @@ static void ins_redraw(bool ready)
       && !pum_visible()) {
     apply_autocmds(EVENT_BUFMODIFIEDSET, NULL, NULL, false, curbuf);
     curbuf->b_changed_invalid = false;
-  }
-
-  if (curwin->w_p_cole > 0 && conceal_cursor_line(curwin)
-      && conceal_cursor_moved) {
-    redrawWinline(curwin, curwin->w_cursor.lnum);
   }
 
   pum_check_clear();

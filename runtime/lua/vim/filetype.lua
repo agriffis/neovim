@@ -438,6 +438,8 @@ local extension = {
   opam = "opam",
   ["or"] = "openroad",
   ora = "ora",
+  org = "org",
+  org_archive = "org",
   pxsl = "papp",
   papp = "papp",
   pxml = "papp",
@@ -1424,6 +1426,8 @@ local pattern = {
       return "git"
     end
   end,
+  -- Neovim only
+  [".*/queries/.*%.scm"] = "query", -- tree-sitter queries
   -- END PATTERN
 }
 -- luacheck: pop
