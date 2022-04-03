@@ -1030,7 +1030,7 @@ A jump table for the options with a short description can be found at |Q_op|.
 	This option lets you choose which characters might cause a line
 	break if 'linebreak' is on.  Only works for ASCII characters.
 
-						*'breakindent'* *'bri'*
+			*'breakindent'* *'bri'* *'nobreakindent'* *'nobri'*
 'breakindent' 'bri'	boolean (default off)
 			local to window
 	Every wrapped line will continue visually indented (same amount of
@@ -2133,7 +2133,7 @@ A jump table for the options with a short description can be found at |Q_op|.
 		hor	horizontally, height of windows is not affected
 		both	width and height of windows is affected
 
-						*'emoji'* *'emo'*
+					*'emoji'* *'emo'* *'noemoji'* *'noemo'*
 'emoji' 'emo'	boolean (default: on)
 			global
 	When on all Unicode emoji characters are considered to be full width.
@@ -2733,7 +2733,7 @@ A jump table for the options with a short description can be found at |Q_op|.
 	This option cannot be set from a |modeline| or in the |sandbox|, for
 	security reasons.
 
-						*'fsync'* *'fs'*
+					*'fsync'* *'fs'* *'nofsync'* *'nofs'*
 'fsync' 'fs'		boolean	(default off)
 			global
 	When on, the OS function fsync() will be called after saving a file
@@ -6429,7 +6429,7 @@ A jump table for the options with a short description can be found at |Q_op|.
 	'arabicshape' is ignored, but 'rightleft' isn't changed automatically.
 	For further details see |arabic.txt|.
 
-						*'termguicolors'* *'tgc'*
+			*'termguicolors'* *'tgc'* *'notermguicolors'* *'notgc'*
 'termguicolors' 'tgc'	boolean (default off)
 			global
 	Enables 24-bit RGB color in the |TUI|.  Uses "gui" |:highlight|
