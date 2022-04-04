@@ -279,15 +279,15 @@ static void init_class_tab(void)
   done = true;
 }
 
-# define ri_digit(c)    (c < 0x100 && (class_tab[c] & RI_DIGIT))
-# define ri_hex(c)      (c < 0x100 && (class_tab[c] & RI_HEX))
-# define ri_octal(c)    (c < 0x100 && (class_tab[c] & RI_OCTAL))
-# define ri_word(c)     (c < 0x100 && (class_tab[c] & RI_WORD))
-# define ri_head(c)     (c < 0x100 && (class_tab[c] & RI_HEAD))
-# define ri_alpha(c)    (c < 0x100 && (class_tab[c] & RI_ALPHA))
-# define ri_lower(c)    (c < 0x100 && (class_tab[c] & RI_LOWER))
-# define ri_upper(c)    (c < 0x100 && (class_tab[c] & RI_UPPER))
-# define ri_white(c)    (c < 0x100 && (class_tab[c] & RI_WHITE))
+# define ri_digit(c)    ((c) < 0x100 && (class_tab[c] & RI_DIGIT))
+# define ri_hex(c)      ((c) < 0x100 && (class_tab[c] & RI_HEX))
+# define ri_octal(c)    ((c) < 0x100 && (class_tab[c] & RI_OCTAL))
+# define ri_word(c)     ((c) < 0x100 && (class_tab[c] & RI_WORD))
+# define ri_head(c)     ((c) < 0x100 && (class_tab[c] & RI_HEAD))
+# define ri_alpha(c)    ((c) < 0x100 && (class_tab[c] & RI_ALPHA))
+# define ri_lower(c)    ((c) < 0x100 && (class_tab[c] & RI_LOWER))
+# define ri_upper(c)    ((c) < 0x100 && (class_tab[c] & RI_UPPER))
+# define ri_white(c)    ((c) < 0x100 && (class_tab[c] & RI_WHITE))
 
 // flags for regflags
 #define RF_ICASE    1   // ignore case
@@ -1531,7 +1531,7 @@ static fptr_T do_Lower(int *d, int c)
  *
  * The tildes are parsed once before the first call to vim_regsub().
  */
-char_u *regtilde(char_u *source, int magic)
+char_u *regtilde(char_u *source, int magic, bool preview)
 {
   char_u      *newsub = source;
   char_u      *tmpsub;
@@ -1576,7 +1576,7 @@ char_u *regtilde(char_u *source, int magic)
   }
 
   // Only change reg_prev_sub when not previewing.
-  if (!(State & CMDPREVIEW)) {
+  if (!preview) {
     xfree(reg_prev_sub);
     if (newsub != source) {             // newsub was allocated, just keep it
       reg_prev_sub = newsub;

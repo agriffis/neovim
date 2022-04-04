@@ -2330,8 +2330,6 @@ static int vgetorpeek(bool advance)
           // cmdline window.
           if (p_im && (State & INSERT)) {
             c = Ctrl_L;
-          } else if ((State & CMDLINE) && exmode_active) {
-            c = '\n';
           } else if ((State & CMDLINE) || (cmdwin_type > 0 && tc == ESC)) {
             c = Ctrl_C;
           } else {
@@ -2573,7 +2571,7 @@ int inchar(char_u *buf, int maxlen, long wait_time)
     // Don't use buf[] here, closescript() may have freed typebuf.tb_buf[]
     // and buf may be pointing inside typebuf.tb_buf[].
     if (got_int) {
-#define DUM_LEN MAXMAPLEN * 3 + 3
+#define DUM_LEN (MAXMAPLEN * 3 + 3)
       char_u dum[DUM_LEN + 1];
 
       for (;;) {
