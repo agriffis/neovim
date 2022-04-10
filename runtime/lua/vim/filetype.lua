@@ -79,7 +79,6 @@ local extension = {
   cfc = "cf",
   cfm = "cf",
   cfi = "cf",
-  cfg = "cfg",
   hgrc = "cfg",
   chf = "ch",
   chai = "chaiscript",
@@ -96,6 +95,7 @@ local extension = {
   clj = "clojure",
   cljc = "clojure",
   cljs = "clojure",
+  cook = "cook",
   cmake = "cmake",
   cmod = "cmod",
   lib = "cobol",
@@ -158,7 +158,6 @@ local extension = {
   diff = "diff",
   rej = "diff",
   Dockerfile = "dockerfile",
-  sys = "dosbatch",
   bat = "dosbatch",
   wrap = "dosini",
   ini = "dosini",
@@ -395,7 +394,6 @@ local extension = {
   mmp = "mmp",
   DEF = "modula2",
   ["m2"] = "modula2",
-  MOD = "modula2",
   mi = "modula2",
   ssc = "monk",
   monk = "monk",
@@ -1061,6 +1059,7 @@ local filename = {
   Puppetfile = "ruby",
   [".irbrc"] = "ruby",
   irbrc = "ruby",
+  Vagrantfile = "ruby",
   ["smb.conf"] = "samba",
   screenrc = "screen",
   [".screenrc"] = "screen",
@@ -1428,9 +1427,13 @@ local pattern = {
       return "git"
     end
   end,
+  [".*%.[Cc][Ff][Gg]"] = function() vim.fn["dist#ft#FTcfg"]() end,
   [".*%.[Dd][Aa][Tt]"] = function() vim.fn["dist#ft#FTdat"]() end,
+  [".*%.[Mm][Oo][Dd]"] = function() vim.fn["dist#ft#FTmod"]() end,
   [".*%.[Ss][Rr][Cc]"] = function() vim.fn["dist#ft#FTsrc"]() end,
   [".*%.[Ss][Uu][Bb]"] = "krl",
+  [".*%.[Pp][Rr][Gg]"] = function() vim.fn["dist#ft#FTprg"]() end,
+  [".*%.[Ss][Yy][Ss]"] = function() vim.fn["dist#ft#FTsys"]() end,
   -- Neovim only
   [".*/queries/.*%.scm"] = "query", -- tree-sitter queries
   -- END PATTERN
