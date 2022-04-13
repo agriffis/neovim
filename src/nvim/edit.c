@@ -1545,7 +1545,7 @@ static void ins_redraw(bool ready)
 
   if (ready) {
     // Trigger Scroll if viewport changed.
-    may_trigger_winscrolled(curwin);
+    may_trigger_winscrolled();
   }
 
   // Trigger BufModified if b_changed_invalid is set.
@@ -9260,7 +9260,7 @@ static int ins_digraph(void)
     }
     if (cc != ESC) {
       AppendToRedobuff(CTRL_V_STR);
-      c = getdigraph(c, cc, true);
+      c = digraph_get(c, cc, true);
       clear_showcmd();
       return c;
     }
