@@ -1,7 +1,7 @@
 " Vim support file to detect file types
 "
 " Maintainer:	Bram Moolenaar <Bram@vim.org>
-" Last Change:	2022 Apr 07
+" Last Change:	2022 Apr 13
 
 " Listen very carefully, I will say this only once
 if exists("did_load_filetypes")
@@ -1008,6 +1008,9 @@ au BufNewFile,BufRead *.ll			setf lifelines
 
 " Lilo: Linux loader
 au BufNewFile,BufRead lilo.conf			setf lilo
+
+" Lilypond
+au BufNewFile,BufRead *.ly,*.ily		setf lilypond
 
 " Lisp (*.el = ELisp, *.cl = Common Lisp)
 " *.jl was removed, it's also used for Julia, better skip than guess wrong.
