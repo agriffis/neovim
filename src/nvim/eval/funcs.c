@@ -25,7 +25,6 @@
 #include "nvim/eval/funcs.h"
 #include "nvim/eval/typval.h"
 #include "nvim/eval/userfunc.h"
-#include "nvim/ex_cmds2.h"
 #include "nvim/ex_docmd.h"
 #include "nvim/ex_getln.h"
 #include "nvim/file_search.h"
@@ -70,7 +69,7 @@
 #include "nvim/undo.h"
 #include "nvim/version.h"
 #include "nvim/vim.h"
-
+#include "nvim/window.h"
 
 /// Describe data to return from find_some_match()
 typedef enum {
@@ -4278,6 +4277,8 @@ static void f_has(typval_T *argvars, typval_T *rettv, FunPtr fptr)
     "nvim",
   };
 
+  // XXX: eval_has_provider() may shell out :(
+  const int save_shell_error = get_vim_var_nr(VV_SHELL_ERROR);
   bool n = false;
   const char *const name = tv_get_string(&argvars[0]);
   for (size_t i = 0; i < ARRAY_SIZE(has_list); i++) {
@@ -4334,6 +4335,7 @@ static void f_has(typval_T *argvars, typval_T *rettv, FunPtr fptr)
     n = true;
   }
 
+  set_vim_var_nr(VV_SHELL_ERROR, save_shell_error);
   rettv->vval.v_number = n;
 }
 
