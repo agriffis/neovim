@@ -1335,8 +1335,10 @@ static int command_line_execute(VimState *state, int key)
   // mode when 'insertmode' is set, CTRL-\ e prompts for an expression.
   if (s->c == Ctrl_BSL) {
     no_mapping++;
+    allow_keys++;
     s->c = plain_vgetc();
     no_mapping--;
+    allow_keys--;
     // CTRL-\ e doesn't work when obtaining an expression, unless it
     // is in a mapping.
     if (s->c != Ctrl_N
@@ -1889,6 +1891,7 @@ static int command_line_handle_key(CommandLineState *s)
   case Ctrl_R: {                      // insert register
     putcmdline('"', true);
     no_mapping++;
+    allow_keys++;
     int i = s->c = plain_vgetc();      // CTRL-R <char>
     if (i == Ctrl_O) {
       i = Ctrl_R;                      // CTRL-R CTRL-O == CTRL-R CTRL-R
@@ -1897,7 +1900,8 @@ static int command_line_handle_key(CommandLineState *s)
     if (i == Ctrl_R) {
       s->c = plain_vgetc();              // CTRL-R CTRL-R <char>
     }
-    --no_mapping;
+    no_mapping--;
+    allow_keys--;
     // Insert the result of an expression.
     // Need to save the current command line, to be able to enter
     // a new one...
@@ -2208,7 +2212,11 @@ static int command_line_handle_key(CommandLineState *s)
   case Ctrl_Q:
     s->ignore_drag_release = true;
     putcmdline('^', true);
-    s->c = get_literal();                 // get next (two) character(s)
+
+    // Get next (two) characters.
+    // Do not include modifiers into the key for CTRL-SHIFT-V.
+    s->c = get_literal(mod_mask & MOD_MASK_SHIFT);
+
     s->do_abbr = false;                   // don't do abbreviation now
     ccline.special_char = NUL;
     // may need to remove ^ when composing char was typed
@@ -3121,7 +3129,7 @@ static void ui_ext_cmdline_show(CmdlineInfo *line)
 
       assert(chunk.end >= chunk.start);
       ADD(item, STRING_OBJ(cbuf_to_string((char *)line->cmdbuff + chunk.start,
-                                          (size_t)(chunk.end-chunk.start))));
+                                          (size_t)(chunk.end - chunk.start))));
       ADD(content, ARRAY_OBJ(item));
     }
   } else {
@@ -3180,7 +3188,7 @@ void cmdline_screen_cleared(void)
     ui_call_cmdline_block_show(copy_array(cmdline_block));
   }
 
-  int prev_level = ccline.level-1;
+  int prev_level = ccline.level - 1;
   CmdlineInfo *line = ccline.prev_ccline;
   while (prev_level > 0 && line) {
     if (line->level == prev_level) {
@@ -3637,7 +3645,7 @@ static void cursorcmd(void)
   }
 
   if (cmdmsg_rl) {
-    msg_row = cmdline_row  + (ccline.cmdspos / (Columns - 1));
+    msg_row = cmdline_row + (ccline.cmdspos / (Columns - 1));
     msg_col = Columns - (ccline.cmdspos % (Columns - 1)) - 1;
     if (msg_row <= 0) {
       msg_row = Rows - 1;
@@ -4452,7 +4460,7 @@ char_u *sm_gettail(char_u *s, bool eager)
 #endif
         ) {
       if (eager) {
-        t = p+1;
+        t = p + 1;
       } else {
         had_sep = true;
       }
@@ -5563,7 +5571,7 @@ static int ExpandPackAddDir(char_u *pat, int *num_file, char_u ***file)
   for (int i = 0; i < ga.ga_len; i++) {
     char_u *match = ((char_u **)ga.ga_data)[i];
     s = path_tail(match);
-    memmove(match, s, STRLEN(s)+1);
+    memmove(match, s, STRLEN(s) + 1);
   }
 
   if (GA_EMPTY(&ga)) {
@@ -6248,7 +6256,7 @@ void ex_history(exarg_T *eap)
     if (histype1 == HIST_INVALID) {
       if (STRNICMP(arg, "all", end - arg) == 0) {
         histype1 = 0;
-        histype2 = HIST_COUNT-1;
+        histype2 = HIST_COUNT - 1;
       } else {
         emsg(_(e_trailing));
         return;
@@ -6274,10 +6282,10 @@ void ex_history(exarg_T *eap)
     j = hisidx1;
     k = hisidx2;
     if (j < 0) {
-      j = (-j > hislen) ? 0 : hist[(hislen+j+idx+1) % hislen].hisnum;
+      j = (-j > hislen) ? 0 : hist[(hislen + j + idx + 1) % hislen].hisnum;
     }
     if (k < 0) {
-      k = (-k > hislen) ? 0 : hist[(hislen+k+idx+1) % hislen].hisnum;
+      k = (-k > hislen) ? 0 : hist[(hislen + k + idx + 1) % hislen].hisnum;
     }
     if (idx >= 0 && j <= k) {
       for (i = idx + 1; !got_int; ++i) {

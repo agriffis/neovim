@@ -356,6 +356,8 @@ struct mapblock {
   LuaRef m_luaref;         // lua function reference as rhs
   int m_keylen;                 // strlen(m_keys)
   int m_mode;                   // valid mode
+  int m_simplified;             // m_keys was simplified, do no use this map
+                                // if keys are typed
   int m_noremap;                // if non-zero no re-mapping for m_str
   char m_silent;                // <silent> used, don't echo commands
   char m_nowait;                // <nowait> used
@@ -1152,7 +1154,7 @@ struct VimMenu {
   char *name;                 ///< Name of menu, possibly translated
   char *dname;                ///< Displayed Name ("name" without '&')
   char *en_name;              ///< "name" untranslated, NULL when
-                                ///< was not translated
+                              ///< was not translated
   char *en_dname;             ///< NULL when "dname" untranslated
   int mnemonic;                      ///< mnemonic key (after '&')
   char *actext;               ///< accelerator text (after TAB)

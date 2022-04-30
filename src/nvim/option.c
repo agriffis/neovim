@@ -3015,7 +3015,7 @@ ambw_end:
   } else if (varp == &p_pt) {
     // 'pastetoggle': translate key codes like in a mapping
     if (*p_pt) {
-      (void)replace_termcodes(p_pt, STRLEN(p_pt), &p, true, true, true,
+      (void)replace_termcodes(p_pt, STRLEN(p_pt), &p, REPTERM_FROM_PART | REPTERM_DO_LT, NULL,
                               CPO_TO_CPO_FLAGS);
       if (p != NULL) {
         if (new_value_alloced) {
@@ -3858,10 +3858,10 @@ static bool parse_winhl_opt(win_T *wp)
     if (!colon) {
       return false;
     }
-    size_t nlen = (size_t)(colon-p);
-    char *hi = colon+1;
+    size_t nlen = (size_t)(colon - p);
+    char *hi = colon + 1;
     char *commap = xstrchrnul(hi, ',');
-    size_t len = (size_t)(commap-hi);
+    size_t len = (size_t)(commap - hi);
     int hl_id = len ? syn_check_group(hi, len) : -1;
 
     if (strncmp("Normal", p, nlen) == 0) {
@@ -3879,7 +3879,7 @@ static bool parse_winhl_opt(win_T *wp)
       }
     }
 
-    p = *commap ? commap+1 : "";
+    p = *commap ? commap + 1 : "";
   }
 
   wp->w_hl_id_normal = w_hl_id_normal;
@@ -5222,7 +5222,8 @@ int find_key_option_len(const char_u *arg_arg, size_t len, bool has_lt)
   } else if (has_lt) {
     arg--;  // put arg at the '<'
     modifiers = 0;
-    key = find_special_key(&arg, len + 1, &modifiers, true, true, false);
+    key = find_special_key(&arg, len + 1, &modifiers,
+                           FSK_KEYCODE | FSK_KEEP_X_KEY | FSK_SIMPLIFY, NULL);
     if (modifiers) {  // can't handle modifiers here
       key = 0;
     }

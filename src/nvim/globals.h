@@ -15,7 +15,7 @@
 #include "nvim/syntax_defs.h"
 #include "nvim/types.h"
 
-#define IOSIZE         (1024+1)          // file I/O and sprintf buffer size
+#define IOSIZE         (1024 + 1)          // file I/O and sprintf buffer size
 
 #define MSG_BUF_LEN 480                 // length of buffer for small messages
 #define MSG_BUF_CLEN  (MSG_BUF_LEN / 6)  // cell length (worst case: utf-8
@@ -129,6 +129,9 @@ typedef off_t off_T;
 // held down based on the MOD_MASK_* symbols that are read first.
 EXTERN int mod_mask INIT(= 0);  // current key modifiers
 
+// The value of "mod_mask" and the unmodified character before calling merge_modifiers().
+EXTERN int vgetc_mod_mask INIT(= 0);
+EXTERN int vgetc_char INIT(= 0);
 
 // Cmdline_row is the row where the command line starts, just below the
 // last window.
@@ -649,6 +652,7 @@ EXTERN int reg_recorded INIT(= 0);      // last recorded register or zero
 
 EXTERN int no_mapping INIT(= false);    // currently no mapping allowed
 EXTERN int no_zero_mapping INIT(= 0);   // mapping zero not allowed
+EXTERN int allow_keys INIT(= false);    // allow key codes when no_mapping is set
 EXTERN int no_u_sync INIT(= 0);         // Don't call u_sync()
 EXTERN int u_sync_once INIT(= 0);       // Call u_sync() once when evaluating
                                         // an expression.
@@ -666,6 +670,7 @@ EXTERN bool ins_at_eol INIT(= false);   // put cursor after eol when
 EXTERN bool no_abbr INIT(= true);       // true when no abbreviations loaded
 
 EXTERN int mapped_ctrl_c INIT(= 0);  // Modes where CTRL-C is mapped.
+EXTERN bool ctrl_c_interrupts INIT(= true);  // CTRL-C sets got_int
 
 EXTERN cmdmod_T cmdmod;                 // Ex command modifiers
 
@@ -993,8 +998,8 @@ EXTERN char e_float_as_string[] INIT(= N_("E806: using Float as a String"));
 
 EXTERN char e_autocmd_err[] INIT(= N_("E5500: autocmd has thrown an exception: %s"));
 EXTERN char e_cmdmap_err[] INIT(= N_("E5520: <Cmd> mapping must end with <CR>"));
-EXTERN char e_cmdmap_repeated[] INIT(= N_("E5521: <Cmd> mapping must end with <CR> before second <Cmd>"));
-EXTERN char e_cmdmap_key[] INIT(= N_("E5522: <Cmd> mapping must not include %s key"));
+EXTERN char e_cmdmap_repeated[]
+INIT(= N_("E5521: <Cmd> mapping must end with <CR> before second <Cmd>"));
 
 EXTERN char e_api_error[] INIT(= N_("E5555: API call: %s"));
 

@@ -236,8 +236,8 @@ void ex_menu(exarg_T *eap)
     } else if (modes & MENU_TIP_MODE) {
       map_buf = NULL;  // Menu tips are plain text.
     } else {
-      map_to = (char *)replace_termcodes((char_u *)map_to, STRLEN(map_to),
-                                         (char_u **)&map_buf, false, true, true, CPO_TO_CPO_FLAGS);
+      map_to = (char *)replace_termcodes((char_u *)map_to, STRLEN(map_to), (char_u **)&map_buf,
+                                         REPTERM_DO_LT, NULL, CPO_TO_CPO_FLAGS);
     }
     menuarg.modes = modes;
     menuarg.noremap[0] = noremap;
@@ -486,8 +486,7 @@ erret:
     } else {
       menup = &parent->parent->children;
     }
-    for (; *menup != NULL && *menup != parent; menup = &((*menup)->next)) {
-    }
+    for (; *menup != NULL && *menup != parent; menup = &((*menup)->next)) {}
     if (*menup == NULL) {   // safety check
       break;
     }
@@ -1656,4 +1655,3 @@ static char *menu_translate_tab_and_shift(char *arg_start)
 
   return arg;
 }
-

@@ -762,8 +762,10 @@ static int insert_execute(VimState *state, int key)
     // may need to redraw when no more chars available now
     ins_redraw(false);
     no_mapping++;
+    allow_keys++;
     s->c = plain_vgetc();
     no_mapping--;
+    allow_keys--;
     if (s->c != Ctrl_N && s->c != Ctrl_G && s->c != Ctrl_O) {
       // it's something else
       vungetc(s->c);
@@ -1587,7 +1589,8 @@ static void ins_ctrl_v(void)
 
   add_to_showcmd_c(Ctrl_V);
 
-  c = get_literal();
+  // Do not include modifiers into the key for CTRL-SHIFT-V.
+  c = get_literal(mod_mask & MOD_MASK_SHIFT);
   if (did_putchar) {
     // when the line fits in 'columns' the '^' is at the start of the next
     // line and will not removed by the redraw
@@ -2000,7 +2003,7 @@ void change_indent(int type, int amount, int round, int replaced, int call_chang
     // TODO(bfredl): test for crazy edge cases, like we stand on a TAB or
     // something? does this even do the right text change then?
     int delta = orig_col - new_col;
-    extmark_splice_cols(curbuf, curwin->w_cursor.lnum-1, new_col,
+    extmark_splice_cols(curbuf, curwin->w_cursor.lnum - 1, new_col,
                         delta < 0 ? -delta : 0,
                         delta > 0 ? delta : 0,
                         kExtmarkUndo);
@@ -3959,8 +3962,7 @@ static buf_T *ins_compl_next_buf(buf_T *buf, int flag)
     }
     assert(wp);
     while ((wp = (wp->w_next != NULL ? wp->w_next : firstwin)) != curwin
-           && wp->w_buffer->b_scanned) {
-    }
+           && wp->w_buffer->b_scanned) {}
     buf = wp->w_buffer;
   } else {
     /* 'b' (just loaded buffers), 'u' (just non-loaded buffers) or 'U'
@@ -3971,8 +3973,7 @@ static buf_T *ins_compl_next_buf(buf_T *buf, int flag)
                 ? buf->b_p_bl
                 : (!buf->b_p_bl
                    || (buf->b_ml.ml_mfp == NULL) != (flag == 'u')))
-               || buf->b_scanned)) {
-    }
+               || buf->b_scanned)) {}
   }
   return buf;
 }
@@ -5175,8 +5176,7 @@ static int ins_complete(int c, bool enable_pum)
       if ((compl_cont_status & CONT_SOL)
           || ctrl_x_mode == CTRL_X_PATH_DEFINES) {
         if (!(compl_cont_status & CONT_ADDING)) {
-          while (--startcol >= 0 && vim_isIDc(line[startcol])) {
-          }
+          while (--startcol >= 0 && vim_isIDc(line[startcol])) {}
           compl_col += ++startcol;
           compl_length = curs_col - startcol;
         }
@@ -5612,13 +5612,13 @@ static unsigned quote_meta(char_u *dest, char_u *src, int len)
   return m;
 }
 
-/*
- * Next character is interpreted literally.
- * A one, two or three digit decimal number is interpreted as its byte value.
- * If one or two digits are entered, the next character is given to vungetc().
- * For Unicode a character > 255 may be returned.
- */
-int get_literal(void)
+/// Next character is interpreted literally.
+/// A one, two or three digit decimal number is interpreted as its byte value.
+/// If one or two digits are entered, the next character is given to vungetc().
+/// For Unicode a character > 255 may be returned.
+///
+/// @param  no_simplify  do not include modifiers into the key
+int get_literal(bool no_simplify)
 {
   int cc;
   int nc;
@@ -5636,6 +5636,9 @@ int get_literal(void)
   i = 0;
   for (;;) {
     nc = plain_vgetc();
+    if (!no_simplify) {
+      nc = merge_modifiers(nc, &mod_mask);
+    }
     if ((mod_mask & ~MOD_MASK_SHIFT) != 0) {
       // A character with non-Shift modifiers should not be a valid
       // character for i_CTRL-V_digit.
@@ -5864,8 +5867,7 @@ void insertchar(int c, int flags, int second_indent)
 
       // Skip white space before the cursor
       i = curwin->w_cursor.col;
-      while (--i >= 0 && ascii_iswhite(line[i])) {
-      }
+      while (--i >= 0 && ascii_iswhite(line[i])) {}
       i++;
 
       // Skip to before the middle leader
@@ -5936,7 +5938,7 @@ void insertchar(int c, int flags, int second_indent)
     }
 
     do_digraph(-1);                     // clear digraphs
-    do_digraph(buf[i-1]);               // may be the start of a digraph
+    do_digraph(buf[i - 1]);               // may be the start of a digraph
     buf[i] = NUL;
     ins_str(buf);
     if (flags & INSCHAR_CTRLV) {
@@ -6453,7 +6455,7 @@ void auto_format(bool trailblank, bool prev_line)
    * be adjusted for the text formatting.
    */
   saved_cursor = pos;
-  format_lines((linenr_T)-1, FALSE);
+  format_lines((linenr_T) - 1, false);
   curwin->w_cursor = saved_cursor;
   saved_cursor.lnum = 0;
 
@@ -7711,7 +7713,7 @@ int hkmap(int c)
       (char_u)BET,  // b
       (char_u)hKAF,  // c
       (char_u)DALET,  // d
-      (char_u)-1,  // e
+      (char_u) - 1,  // e
       (char_u)PEIsofit,  // f
       (char_u)GIMEL,  // g
       (char_u)HEI,  // h
@@ -7723,14 +7725,14 @@ int hkmap(int c)
       (char_u)NUN,  // n
       (char_u)SAMEH,  // o
       (char_u)PEI,  // p
-      (char_u)-1,  // q
+      (char_u) - 1,  // q
       (char_u)RESH,  // r
       (char_u)ZAIN,  // s
       (char_u)TAV,  // t
       (char_u)TET,  // u
       (char_u)VAV,  // v
       (char_u)hSHIN,  // w
-      (char_u)-1,  // x
+      (char_u) - 1,  // x
       (char_u)AIN,  // y
       (char_u)ZADI,  // z
     };
@@ -7811,11 +7813,10 @@ static void ins_reg(void)
   }
 
 
-  /*
-   * Don't map the register name. This also prevents the mode message to be
-   * deleted when ESC is hit.
-   */
-  ++no_mapping;
+  // Don't map the register name. This also prevents the mode message to be
+  // deleted when ESC is hit.
+  no_mapping++;
+  allow_keys++;
   regname = plain_vgetc();
   LANGMAP_ADJUST(regname, TRUE);
   if (regname == Ctrl_R || regname == Ctrl_O || regname == Ctrl_P) {
@@ -7825,7 +7826,8 @@ static void ins_reg(void)
     regname = plain_vgetc();
     LANGMAP_ADJUST(regname, TRUE);
   }
-  --no_mapping;
+  no_mapping--;
+  allow_keys--;
 
   // Don't call u_sync() while typing the expression or giving an error
   // message for it. Only call it explicitly.
@@ -7893,13 +7895,13 @@ static void ins_ctrl_g(void)
   // Right after CTRL-X the cursor will be after the ruler.
   setcursor();
 
-  /*
-   * Don't map the second key. This also prevents the mode message to be
-   * deleted when ESC is hit.
-   */
-  ++no_mapping;
+  // Don't map the second key. This also prevents the mode message to be
+  // deleted when ESC is hit.
+  no_mapping++;
+  allow_keys++;
   c = plain_vgetc();
-  --no_mapping;
+  no_mapping--;
+  allow_keys--;
   switch (c) {
   // CTRL-G k and CTRL-G <Up>: cursor up to Insstart.col
   case K_UP:
@@ -9233,8 +9235,10 @@ static int ins_digraph(void)
   // don't map the digraph chars. This also prevents the
   // mode message to be deleted when ESC is hit
   no_mapping++;
+  allow_keys++;
   c = plain_vgetc();
   no_mapping--;
+  allow_keys--;
   if (did_putchar) {
     // when the line fits in 'columns' the '?' is at the start of the next
     // line and will not be removed by the redraw
@@ -9260,8 +9264,10 @@ static int ins_digraph(void)
       add_to_showcmd_c(c);
     }
     no_mapping++;
+    allow_keys++;
     cc = plain_vgetc();
     no_mapping--;
+    allow_keys--;
     if (did_putchar) {
       // when the line fits in 'columns' the '?' is at the start of the
       // next line and will not be removed by a redraw
@@ -9383,8 +9389,7 @@ static void ins_try_si(int c)
       ptr = ml_get(pos->lnum);
       i = pos->col;
       if (i > 0) {              // skip blanks before '{'
-        while (--i > 0 && ascii_iswhite(ptr[i])) {
-        }
+        while (--i > 0 && ascii_iswhite(ptr[i])) {}
       }
       curwin->w_cursor.lnum = pos->lnum;
       curwin->w_cursor.col = i;

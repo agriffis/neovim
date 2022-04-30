@@ -541,8 +541,7 @@ LexExprToken viml_pexpr_next_token(ParserState *const pstate, const int flags)
       ret.data.opt.len = 4;
       ret.len += 4;
     } else {
-      for (; p < e && ASCII_ISALPHA(*p); p++) {
-      }
+      for (; p < e && ASCII_ISALPHA(*p); p++) {}
       ret.data.opt.len = (size_t)(p - ret.data.opt.name);
       if (ret.data.opt.len == 0) {
         OPTNAMEMISS(ret);
@@ -1817,9 +1816,13 @@ static void parse_quoted_string(ParserState *const pstate, ExprASTNode *const no
         }
         // Special key, e.g.: "\<C-W>"
         case '<': {
-          const size_t special_len = (
-                                      trans_special((const char_u **)&p, (size_t)(e - p),
-                                                    (char_u *)v_p, true, true));
+          int flags = FSK_KEYCODE | FSK_IN_STRING;
+
+          if (p[1] != '*') {
+            flags |= FSK_SIMPLIFY;
+          }
+          const size_t special_len = trans_special((const char_u **)&p, (size_t)(e - p),
+                                                   (char_u *)v_p, flags, NULL);
           if (special_len != 0) {
             v_p += special_len;
           } else {

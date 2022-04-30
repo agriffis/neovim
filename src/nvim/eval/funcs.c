@@ -15,8 +15,8 @@
 #include "nvim/charset.h"
 #include "nvim/context.h"
 #include "nvim/cursor.h"
-#include "nvim/digraph.h"
 #include "nvim/diff.h"
+#include "nvim/digraph.h"
 #include "nvim/edit.h"
 #include "nvim/eval.h"
 #include "nvim/eval/decode.h"
@@ -135,8 +135,7 @@ char_u *get_function_name(expand_T *xp, int idx)
     }
   }
   while ((size_t)++intidx < ARRAY_SIZE(functions)
-         && functions[intidx].name[0] == '\0') {
-  }
+         && functions[intidx].name[0] == '\0') {}
 
   if ((size_t)intidx >= ARRAY_SIZE(functions)) {
     return NULL;
@@ -2445,7 +2444,7 @@ static void f_float2nr(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   float_T f;
 
   if (tv_get_float_chk(argvars, &f)) {
-    if (f <= (float_T)-VARNUMBER_MAX + DBL_EPSILON) {
+    if (f <= (float_T) - VARNUMBER_MAX + DBL_EPSILON) {
       rettv->vval.v_number = -VARNUMBER_MAX;
     } else if (f >= (float_T)VARNUMBER_MAX - DBL_EPSILON) {
       rettv->vval.v_number = VARNUMBER_MAX;
@@ -2631,8 +2630,7 @@ static void f_foldtextresult(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 
 /// "foreground()" function
 static void f_foreground(typval_T *argvars, typval_T *rettv, FunPtr fptr)
-{
-}
+{}
 
 static void f_funcref(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
@@ -2975,6 +2973,7 @@ static void getchar_common(typval_T *argvars, typval_T *rettv)
   bool error = false;
 
   no_mapping++;
+  allow_keys++;
   for (;;) {
     // Position the cursor.  Needed after a message that ends in a space,
     // or if event processing caused a redraw.
@@ -3012,6 +3011,7 @@ static void getchar_common(typval_T *argvars, typval_T *rettv)
     break;
   }
   no_mapping--;
+  allow_keys--;
 
   set_vim_var_nr(VV_MOUSE_WIN, 0);
   set_vim_var_nr(VV_MOUSE_WINID, 0);
@@ -3855,8 +3855,7 @@ static void f_getwininfo(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 
 /// Dummy timer callback. Used by f_wait().
 static void dummy_timer_due_cb(TimeWatcher *tw, void *data)
-{
-}
+{}
 
 /// Dummy timer close callback. Used by f_wait().
 static void dummy_timer_close_cb(TimeWatcher *tw, void *data)
@@ -5648,6 +5647,8 @@ static void f_localtime(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 static void get_maparg(typval_T *argvars, typval_T *rettv, int exact)
 {
   char_u *keys_buf = NULL;
+  char_u *alt_keys_buf = NULL;
+  bool did_simplify = false;
   char_u *rhs;
   LuaRef rhs_lua;
   int mode;
@@ -5655,6 +5656,7 @@ static void get_maparg(typval_T *argvars, typval_T *rettv, int exact)
   int get_dict = FALSE;
   mapblock_T *mp;
   int buffer_local;
+  int flags = REPTERM_FROM_PART | REPTERM_DO_LT;
 
   // Return empty string for failure.
   rettv->v_type = VAR_STRING;
@@ -5684,10 +5686,16 @@ static void get_maparg(typval_T *argvars, typval_T *rettv, int exact)
 
   mode = get_map_mode((char_u **)&which, 0);
 
-  keys = replace_termcodes(keys, STRLEN(keys), &keys_buf, true, true, true,
-                           CPO_TO_CPO_FLAGS);
-  rhs = check_map(keys, mode, exact, false, abbr, &mp, &buffer_local, &rhs_lua);
-  xfree(keys_buf);
+  char_u *keys_simplified
+    = replace_termcodes(keys, STRLEN(keys), &keys_buf, flags, &did_simplify, CPO_TO_CPO_FLAGS);
+  rhs = check_map(keys_simplified, mode, exact, false, abbr, &mp, &buffer_local, &rhs_lua);
+  if (did_simplify) {
+    // When the lhs is being simplified the not-simplified keys are
+    // preferred for printing, like in do_map().
+    (void)replace_termcodes(keys, STRLEN(keys), &alt_keys_buf, flags | REPTERM_NO_SIMPLIFY, NULL,
+                            CPO_TO_CPO_FLAGS);
+    rhs = check_map(alt_keys_buf, mode, exact, false, abbr, &mp, &buffer_local, &rhs_lua);
+  }
 
   if (!get_dict) {
     // Return a string.
@@ -5710,6 +5718,9 @@ static void get_maparg(typval_T *argvars, typval_T *rettv, int exact)
       mapblock_fill_dict(rettv->vval.v_dict, mp, buffer_local, true);
     }
   }
+
+  xfree(keys_buf);
+  xfree(alt_keys_buf);
 }
 
 /// luaeval() function implementation
