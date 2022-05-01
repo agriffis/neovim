@@ -176,7 +176,7 @@ enum {
 struct exarg {
   char_u *arg;             ///< argument of the command
   char_u *nextcmd;         ///< next command (NULL if none)
-  char_u *cmd;             ///< the name of the command (except for :make)
+  char *cmd;               ///< the name of the command (except for :make)
   char_u **cmdlinep;       ///< pointer to pointer of allocated cmdline
   cmdidx_T cmdidx;              ///< the index for the command
   uint32_t argt;                ///< flags for the command
@@ -260,5 +260,19 @@ typedef struct {
   regmatch_T filter_regmatch;  ///< set by :filter /pat/
   bool filter_force;           ///< set for :filter!
 } cmdmod_T;
+
+/// Stores command modifier info used by `nvim_parse_cmd`
+typedef struct {
+  bool silent;
+  bool emsg_silent;
+  bool sandbox;
+  bool noautocmd;
+  long verbose;
+  cmdmod_T cmdmod;
+  struct {
+    bool file;
+    bool bar;
+  } magic;
+} CmdParseInfo;
 
 #endif  // NVIM_EX_CMDS_DEFS_H

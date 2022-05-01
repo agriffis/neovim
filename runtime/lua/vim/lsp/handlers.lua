@@ -27,7 +27,7 @@ local function progress_handler(_, result, ctx, _)
   local client = vim.lsp.get_client_by_id(client_id)
   local client_name = client and client.name or string.format("id=%d", client_id)
   if not client then
-    err_message("LSP[", client_name, "] client has shut down after sending the message")
+    err_message("LSP[", client_name, "] client has shut down during progress update")
     return vim.NIL
   end
   local val = result.value    -- unspecified yet
@@ -70,7 +70,7 @@ M['window/workDoneProgress/create'] =  function(_, result, ctx)
   local token = result.token  -- string or number
   local client_name = client and client.name or string.format("id=%d", client_id)
   if not client then
-    err_message("LSP[", client_name, "] client has shut down after sending the message")
+    err_message("LSP[", client_name, "] client has shut down while creating progress report")
     return vim.NIL
   end
   client.messages.progress[token] = {}
@@ -132,7 +132,7 @@ M['workspace/configuration'] = function(_, result, ctx)
   local client_id = ctx.client_id
   local client = vim.lsp.get_client_by_id(client_id)
   if not client then
-    err_message("LSP[id=", client_id, "] client has shut down after sending the message")
+    err_message("LSP[", client_id, "] client has shut down after sending a workspace/configuration request")
     return
   end
   if not result.items then
@@ -379,7 +379,7 @@ function M.signature_help(_, result, ctx, config)
     return
   end
   local client = vim.lsp.get_client_by_id(ctx.client_id)
-  local triggers = client.resolved_capabilities.signature_help_trigger_characters
+  local triggers = vim.tbl_get(client.server_capabilities, "signatureHelpProvider", "triggerCharacters")
   local ft = api.nvim_buf_get_option(ctx.bufnr, 'filetype')
   local lines, hl = util.convert_signature_help_to_markdown_lines(result, ft, triggers)
   lines = util.trim_empty_lines(lines)
@@ -449,7 +449,7 @@ M['window/logMessage'] = function(_, result, ctx, _)
   local client = vim.lsp.get_client_by_id(client_id)
   local client_name = client and client.name or string.format("id=%d", client_id)
   if not client then
-    err_message("LSP[", client_name, "] client has shut down after sending the message")
+    err_message("LSP[", client_name, "] client has shut down after sending ", message)
   end
   if message_type == protocol.MessageType.Error then
     log.error(message)
@@ -471,7 +471,7 @@ M['window/showMessage'] = function(_, result, ctx, _)
   local client = vim.lsp.get_client_by_id(client_id)
   local client_name = client and client.name or string.format("id=%d", client_id)
   if not client then
-    err_message("LSP[", client_name, "] client has shut down after sending the message")
+    err_message("LSP[", client_name, "] client has shut down after sending ", message)
   end
   if message_type == protocol.MessageType.Error then
     err_message("LSP[", client_name, "] ", message)
