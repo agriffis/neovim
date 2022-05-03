@@ -261,7 +261,7 @@ static void ui_set_option(UI *ui, bool init, String name, Object value, Error *e
       api_set_error(error, kErrorTypeValidation, "term_name must be a String");
       return;
     }
-    set_tty_option("term", xstrdup(value.data.string.data));
+    set_tty_option("term", string_to_cstr(value.data.string));
     return;
   }
 
@@ -280,6 +280,22 @@ static void ui_set_option(UI *ui, bool init, String name, Object value, Error *e
       return;
     }
     set_tty_background(value.data.string.data);
+    return;
+  }
+
+  if (strequal(name.data, "stdin_fd")) {
+    if (value.type != kObjectTypeInteger || value.data.integer < 0) {
+      api_set_error(error, kErrorTypeValidation, "stdin_fd must be a non-negative Integer");
+      return;
+    }
+
+    if (starting != NO_SCREEN) {
+      api_set_error(error, kErrorTypeValidation,
+                    "stdin_fd can only be used with first attached ui");
+      return;
+    }
+
+    stdin_fd = (int)value.data.integer;
     return;
   }
 
