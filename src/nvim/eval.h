@@ -62,7 +62,7 @@ typedef struct lval_S {
   long ll_n2;         ///< Second index for list range.
   dict_T *ll_dict;    ///< The Dictionary or NULL.
   dictitem_T *ll_di;  ///< The dictitem or NULL.
-  char_u *ll_newkey;  ///< New key for Dict in allocated memory or NULL.
+  char *ll_newkey;  ///< New key for Dict in allocated memory or NULL.
   blob_T *ll_blob;    ///< The Blob or NULL.
 } lval_T;
 
@@ -164,7 +164,7 @@ typedef enum {
   VV_ARGV,
   VV_COLLATE,
   VV_EXITING,
-  // Neovim
+  // Nvim
   VV_STDERR,
   VV_MSGPACK_TYPES,
   VV__NULL_STRING,  // String with NULL value. For test purposes only.
@@ -266,7 +266,7 @@ typedef enum {
   kDictListItems,  ///< List dictionary contents: [keys, values].
 } DictListType;
 
-typedef int (*ex_unletlock_callback)(lval_T *, char_u *, exarg_T *, int);
+typedef int (*ex_unletlock_callback)(lval_T *, char *, exarg_T *, int);
 
 // Used for checking if local variables or arguments used in a lambda.
 extern bool *eval_lavars_used;

@@ -75,7 +75,7 @@ local busted = require('busted')
 local deepcopy = helpers.deepcopy
 local shallowcopy = helpers.shallowcopy
 local concat_tables = helpers.concat_tables
-local request, run_session = helpers.request, helpers.run_session
+local run_session = helpers.run_session
 local eq = helpers.eq
 local dedent = helpers.dedent
 local get_session = helpers.get_session
@@ -89,8 +89,6 @@ end
 
 local Screen = {}
 Screen.__index = Screen
-
-local debug_screen
 
 local default_timeout_factor = 1
 if os.getenv('VALGRIND') then
@@ -121,18 +119,6 @@ do
   session:close()
   Screen.colors = colors
   Screen.colornames = colornames
-end
-
-function Screen.debug(command)
-  if not command then
-    command = 'pynvim -n -c '
-  end
-  command = command .. request('vim_eval', '$NVIM_LISTEN_ADDRESS')
-  if debug_screen then
-    debug_screen:close()
-  end
-  debug_screen = io.popen(command, 'r')
-  debug_screen:read()
 end
 
 function Screen.new(width, height)
@@ -179,6 +165,7 @@ function Screen.new(width, height)
     _width = width,
     _height = height,
     _grids = {},
+    _grid_win_extmarks = {},
     _cursor = {
       grid = 1, row = 1, col = 1
     },
@@ -278,6 +265,8 @@ local ext_keys = {
 --              attributes in the final state are an error.
 --              Use screen:set_default_attr_ids() to define attributes for many
 --              expect() calls.
+-- extmarks:    Expected win_extmarks accumulated for the grids. For each grid,
+--              the win_extmark messages are accumulated into an array.
 -- condition:   Function asserting some arbitrary condition. Return value is
 --              ignored, throw an error (use eq() or similar) to signal failure.
 -- any:         Lua pattern string expected to match a screen line. NB: the
@@ -320,7 +309,7 @@ function Screen:expect(expected, attr_ids, ...)
     assert(not (attr_ids ~= nil))
     local is_key = {grid=true, attr_ids=true, condition=true, mouse_enabled=true,
                     any=true, mode=true, unchanged=true, intermediate=true,
-                    reset=true, timeout=true, request_cb=true, hl_groups=true}
+                    reset=true, timeout=true, request_cb=true, hl_groups=true, extmarks=true}
     for _, v in ipairs(ext_keys) do
       is_key[v] = true
     end
@@ -456,6 +445,25 @@ screen:redraw_debug() to show all intermediate screen states.  ]])
         local status, res = pcall(eq, expected_hl, actual_hl, "highlight "..name)
         if not status then
           return tostring(res)
+        end
+      end
+    end
+
+    if expected.extmarks ~= nil then
+      for gridid, expected_marks in pairs(expected.extmarks) do
+        local stored_marks = self._grid_win_extmarks[gridid]
+        if stored_marks == nil then
+          return 'no win_extmark for grid '..tostring(gridid)
+        end
+        local status, res = pcall(eq, expected_marks, stored_marks, "extmarks for grid "..tostring(gridid))
+        if not status then
+          return tostring(res)
+        end
+      end
+      for gridid, _ in pairs(self._grid_win_extmarks) do
+        local expected_marks = expected.extmarks[gridid]
+        if expected_marks == nil then
+          return 'unexpected win_extmark for grid '..tostring(gridid)
         end
       end
     end
@@ -703,6 +711,7 @@ function Screen:_reset()
   self.cmdline_block = {}
   self.wildmenu_items = nil
   self.wildmenu_pos = nil
+  self._grid_win_extmarks = {}
 end
 
 function Screen:_handle_mode_info_set(cursor_style_enabled, mode_info)
@@ -801,6 +810,13 @@ end
 
 function Screen:_handle_win_close(grid)
   self.float_pos[grid] = nil
+end
+
+function Screen:_handle_win_extmark(grid, ...)
+  if self._grid_win_extmarks[grid] == nil then
+    self._grid_win_extmarks[grid] = {}
+  end
+  table.insert(self._grid_win_extmarks[grid], {...})
 end
 
 function Screen:_handle_busy_start()
