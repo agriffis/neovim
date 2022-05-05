@@ -553,7 +553,7 @@ static int insert_check(VimState *state)
     Insstart_orig = Insstart;
   }
 
-  if (stop_insert_mode && !pum_visible()) {
+  if (stop_insert_mode && !compl_started) {
     // ":stopinsert" used or 'insertmode' reset
     s->count = 0;
     return 0;  // exit insert mode
@@ -5278,7 +5278,7 @@ static int ins_complete(int c, bool enable_pum)
         // "pattern not found" message.
         compl_col = curs_col;
       } else {
-        compl_col = (int)(compl_xp.xp_pattern - compl_pattern);
+        compl_col = (int)((char_u *)compl_xp.xp_pattern - compl_pattern);
       }
       compl_length = curs_col - compl_col;
     } else if (ctrl_x_mode == CTRL_X_FUNCTION || ctrl_x_mode == CTRL_X_OMNI

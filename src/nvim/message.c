@@ -631,7 +631,7 @@ static bool emsg_multiline(const char *s, bool multiline)
      * when the message should be ignored completely (used for the
      * interrupt message).
      */
-    if (cause_errthrow((char_u *)s, severe, &ignore)) {
+    if (cause_errthrow(s, severe, &ignore)) {
       if (!ignore) {
         did_emsg++;
       }
@@ -1671,11 +1671,13 @@ const char *str2special(const char **const sp, const bool replace_spaces, const 
 {
   static char buf[7];
 
-  // Try to un-escape a multi-byte character.  Return the un-escaped
-  // string if it is a multi-byte character.
-  const char *const p = mb_unescape(sp);
-  if (p != NULL) {
-    return p;
+  {
+    // Try to un-escape a multi-byte character.  Return the un-escaped
+    // string if it is a multi-byte character.
+    const char *const p = mb_unescape(sp);
+    if (p != NULL) {
+      return p;
+    }
   }
 
   const char *str = *sp;
@@ -1698,18 +1700,24 @@ const char *str2special(const char **const sp, const bool replace_spaces, const 
   }
 
   if (!IS_SPECIAL(c)) {
-    const int len = utf_ptr2len((const char_u *)str);
+    *sp = str;
+    // Try to un-escape a multi-byte character after modifiers.
+    const char *p = mb_unescape(sp);
 
-    // Check for an illegal byte.
-    if (MB_BYTE2LEN((uint8_t)(*str)) > len) {
-      transchar_nonprint(curbuf, (char_u *)buf, c);
-      *sp = str + 1;
-      return buf;
+    if (p == NULL) {
+      const int len = utf_ptr2len((const char_u *)str);
+      // Check for an illegal byte.
+      if (MB_BYTE2LEN((uint8_t)(*str)) > len) {
+        transchar_nonprint(curbuf, (char_u *)buf, c);
+        *sp = str + 1;
+        return buf;
+      }
+      *sp = str + len;
+      p = str;
     }
-    // Since 'special' is TRUE the multi-byte character 'c' will be
+    // Since 'special' is true the multi-byte character 'c' will be
     // processed by get_special_key_name().
-    c = utf_ptr2char((const char_u *)str);
-    *sp = str + len;
+    c = utf_ptr2char((const char_u *)p);
   } else {
     *sp = str + 1;
   }
