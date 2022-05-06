@@ -64,6 +64,7 @@ static int64_t next_autocmd_id = 1;
 ///         containing the following fields:
 ///             - id (number): the autocommand id (only when defined with the API).
 ///             - group (integer): the autocommand group id.
+///             - group_name (string): the autocommand group name.
 ///             - desc (string): the autocommand description.
 ///             - event (string): the autocommand event.
 ///             - command (string): the autocommand command.
@@ -269,6 +270,7 @@ Array nvim_get_autocmds(Dict(get_autocmds) *opts, Error *err)
 
         if (ap->group != AUGROUP_DEFAULT) {
           PUT(autocmd_info, "group", INTEGER_OBJ(ap->group));
+          PUT(autocmd_info, "group_name", CSTR_TO_OBJ(augroup_name(ap->group)));
         }
 
         if (ac->id > 0) {
@@ -460,7 +462,7 @@ Integer nvim_create_autocmd(uint64_t channel_id, Object event, Dict(create_autoc
       cb.data.luaref = api_new_luaref(callback->data.luaref);
     } else if (callback->type == kObjectTypeString) {
       cb.type = kCallbackFuncref;
-      cb.data.funcref = (char_u *)string_to_cstr(callback->data.string);
+      cb.data.funcref = string_to_cstr(callback->data.string);
     } else {
       api_set_error(err,
                     kErrorTypeException,
