@@ -290,7 +290,7 @@ static void insert_enter(InsertState *s)
 {
   s->did_backspace = true;
   s->old_topfill = -1;
-  s->replaceState = REPLACE;
+  s->replaceState = MODE_REPLACE;
   s->cmdchar_todo = s->cmdchar;
   // Remember whether editing was restarted after CTRL-O
   did_restart_edit = restart_edit;
@@ -335,7 +335,7 @@ static void insert_enter(InsertState *s)
       int save_state = State;
 
       curwin->w_cursor = save_cursor;
-      State = INSERT;
+      State = MODE_INSERT;
       check_cursor_col();
       State = save_state;
     }
@@ -377,14 +377,14 @@ static void insert_enter(InsertState *s)
   }
 
   if (s->cmdchar == 'R') {
-    State = REPLACE;
+    State = MODE_REPLACE;
   } else if (s->cmdchar == 'V' || s->cmdchar == 'v') {
-    State = VREPLACE;
-    s->replaceState = VREPLACE;
+    State = MODE_VREPLACE;
+    s->replaceState = MODE_VREPLACE;
     orig_line_count = curbuf->b_ml.ml_line_count;
     vr_lines_changed = 1;
   } else {
-    State = INSERT;
+    State = MODE_INSERT;
   }
 
   may_trigger_modechanged();
@@ -400,13 +400,13 @@ static void insert_enter(InsertState *s)
   // 'iminsert' value may not reflect what is actually used.  It is updated
   // when hitting <Esc>.
   if (curbuf->b_p_iminsert == B_IMODE_LMAP) {
-    State |= LANGMAP;
+    State |= MODE_LANGMAP;
   }
 
   setmouse();
   clear_showcmd();
   // there is no reverse replace mode
-  revins_on = (State == INSERT && p_ri);
+  revins_on = (State == MODE_INSERT && p_ri);
   if (revins_on) {
     undisplay_dollar();
   }
@@ -1339,7 +1339,7 @@ normalchar:
               ins_char(s->c);
             }
           }
-          AppendToRedobuffLit(str, -1);
+          AppendToRedobuffLit((char *)str, -1);
         }
         xfree(str);
         s->c = NUL;
@@ -1800,7 +1800,7 @@ void change_indent(int type, int amount, int round, int replaced, int call_chang
   colnr_T orig_col = 0;                 // init for GCC
   char_u *new_line, *orig_line = NULL;     // init for GCC
 
-  // VREPLACE mode needs to know what the line was like before changing
+  // MODE_VREPLACE state needs to know what the line was like before changing
   if (State & VREPLACE_FLAG) {
     orig_line = vim_strsave(get_cursor_line_ptr());   // Deal with NULL below
     orig_col = curwin->w_cursor.col;
@@ -1848,7 +1848,7 @@ void change_indent(int type, int amount, int round, int replaced, int call_chang
 
     // Avoid being called recursively.
     if (State & VREPLACE_FLAG) {
-      State = INSERT;
+      State = MODE_INSERT;
     }
     shift_line(type == INDENT_DEC, round, 1, call_changed_bytes);
     State = save_State;
@@ -1873,7 +1873,7 @@ void change_indent(int type, int amount, int round, int replaced, int call_chang
       insstart_less = MAXCOL;
     }
     new_cursor_col += curwin->w_cursor.col;
-  } else if (!(State & INSERT)) {
+  } else if (!(State & MODE_INSERT)) {
     new_cursor_col = curwin->w_cursor.col;
   } else {
     /*
@@ -1933,7 +1933,7 @@ void change_indent(int type, int amount, int round, int replaced, int call_chang
   /*
    * May have to adjust the start of the insert.
    */
-  if (State & INSERT) {
+  if (State & MODE_INSERT) {
     if (curwin->w_cursor.lnum == Insstart.lnum && Insstart.col != 0) {
       if ((int)Insstart.col <= insstart_less) {
         Insstart.col = 0;
@@ -1948,13 +1948,11 @@ void change_indent(int type, int amount, int round, int replaced, int call_chang
     }
   }
 
-  /*
-   * For REPLACE mode, may have to fix the replace stack, if it's possible.
-   * If the number of characters before the cursor decreased, need to pop a
-   * few characters from the replace stack.
-   * If the number of characters before the cursor increased, need to push a
-   * few NULs onto the replace stack.
-   */
+  // For MODE_REPLACE state, may have to fix the replace stack, if it's
+  // possible.  If the number of characters before the cursor decreased, need
+  // to pop a few characters from the replace stack.
+  // If the number of characters before the cursor increased, need to push a
+  // few NULs onto the replace stack.
   if (REPLACE_NORMAL(State) && start_col >= 0) {
     while (start_col > (int)curwin->w_cursor.col) {
       replace_join(0);              // remove a NUL from the replace stack
@@ -1970,11 +1968,9 @@ void change_indent(int type, int amount, int round, int replaced, int call_chang
     }
   }
 
-  /*
-   * For VREPLACE mode, we also have to fix the replace stack.  In this case
-   * it is always possible because we backspace over the whole line and then
-   * put it back again the way we wanted it.
-   */
+  // For MODE_VREPLACE state, we also have to fix the replace stack.  In this
+  // case it is always possible because we backspace over the whole line and
+  // then put it back again the way we wanted it.
   if (State & VREPLACE_FLAG) {
     // Save new line
     new_line = vim_strsave(get_cursor_line_ptr());
@@ -2009,11 +2005,9 @@ void change_indent(int type, int amount, int round, int replaced, int call_chang
   }
 }
 
-/*
- * Truncate the space at the end of a line.  This is to be used only in an
- * insert mode.  It handles fixing the replace stack for REPLACE and VREPLACE
- * modes.
- */
+/// Truncate the space at the end of a line.  This is to be used only in an
+/// insert mode.  It handles fixing the replace stack for MODE_REPLACE and
+/// MODE_VREPLACE modes.
 void truncate_spaces(char_u *line)
 {
   int i;
@@ -2027,12 +2021,10 @@ void truncate_spaces(char_u *line)
   line[i + 1] = NUL;
 }
 
-/*
- * Backspace the cursor until the given column.  Handles REPLACE and VREPLACE
- * modes correctly.  May also be used when not in insert mode at all.
- * Will attempt not to go before "col" even when there is a composing
- * character.
- */
+/// Backspace the cursor until the given column.  Handles MODE_REPLACE and
+/// MODE_VREPLACE modes correctly.  May also be used when not in insert mode at
+/// all.  Will attempt not to go before "col" even when there is a composing
+/// character.
 void backspace_until_column(int col)
 {
   while ((int)curwin->w_cursor.col > col) {
@@ -2354,7 +2346,7 @@ int ins_compl_add_infercase(char_u *str_arg, int len, bool icase, char_u *fname,
       char_u *p = IObuff;
       i = 0;
       while (i < actual_len && (p - IObuff + 6) < IOSIZE) {
-        p += utf_char2bytes(wca[i++], p);
+        p += utf_char2bytes(wca[i++], (char *)p);
       }
       *p = NUL;
     }
@@ -3515,7 +3507,7 @@ static void ins_compl_addleader(int c)
   if ((cc = utf_char2len(c)) > 1) {
     char_u buf[MB_MAXBYTES + 1];
 
-    utf_char2bytes(c, buf);
+    utf_char2bytes(c, (char *)buf);
     buf[cc] = NUL;
     ins_char_bytes(buf, (size_t)cc);
   } else {
@@ -3939,7 +3931,7 @@ static void ins_compl_fixRedoBufForLeader(char_u *ptr_arg)
   } else {
     len = 0;
   }
-  AppendToRedobuffLit(ptr + len, -1);
+  AppendToRedobuffLit((char *)ptr + len, -1);
 }
 
 /*
@@ -4513,7 +4505,7 @@ static int ins_compl_get_exp(pos_T *ini)
             }
             ptr = ml_get_buf(ins_buf, pos->lnum + 1, false);
             if (!p_paste) {
-              ptr = skipwhite(ptr);
+              ptr = (char_u *)skipwhite((char *)ptr);
             }
           }
           len = (int)STRLEN(ptr);
@@ -4541,7 +4533,7 @@ static int ins_compl_get_exp(pos_T *ini)
               // compl_length, so the next STRNCPY always works -- Acevedo
               STRNCPY(IObuff, ptr, len);
               ptr = ml_get_buf(ins_buf, pos->lnum + 1, false);
-              tmp_ptr = ptr = skipwhite(ptr);
+              tmp_ptr = ptr = (char_u *)skipwhite((char *)ptr);
               // Find start of next word.
               tmp_ptr = find_word_start(tmp_ptr);
               // Find end of next word.
@@ -5126,8 +5118,9 @@ static int ins_complete(int c, bool enable_pum)
            * mode but first we need to redefine compl_startpos */
           if (compl_cont_status & CONT_S_IPOS) {
             compl_cont_status |= CONT_SOL;
-            compl_startpos.col = (colnr_T)(skipwhite(line + compl_length
-                                                     + compl_startpos.col) - line);
+            compl_startpos.col = (colnr_T)((char_u *)skipwhite((char *)line
+                                                               + compl_length
+                                                               + compl_startpos.col) - line);
           }
           compl_col = compl_startpos.col;
         }
@@ -5640,7 +5633,7 @@ int get_literal(bool no_simplify)
       // character for i_CTRL-V_digit.
       break;
     }
-    if (!(State & CMDLINE) && MB_BYTE2LEN_CHECK(nc) == 1) {
+    if ((State & MODE_CMDLINE) == 0 && MB_BYTE2LEN_CHECK(nc) == 1) {
       add_to_showcmd(nc);
     }
     if (nc == 'x' || nc == 'X') {
@@ -5739,8 +5732,8 @@ static void insert_special(int c, int allow_modmask, int ctrlv)
       }
       p[len - 1] = NUL;
       ins_str(p);
-      AppendToRedobuffLit(p, -1);
-      ctrlv = FALSE;
+      AppendToRedobuffLit((char *)p, -1);
+      ctrlv = false;
     }
   }
   if (stop_arrow() == OK) {
@@ -5783,21 +5776,19 @@ void insertchar(int c, int flags, int second_indent)
   const int textwidth = comp_textwidth(force_format);
   const bool fo_ins_blank = has_format_option(FO_INS_BLANK);
 
-  /*
-   * Try to break the line in two or more pieces when:
-   * - Always do this if we have been called to do formatting only.
-   * - Always do this when 'formatoptions' has the 'a' flag and the line
-   *   ends in white space.
-   * - Otherwise:
-   *     - Don't do this if inserting a blank
-   *     - Don't do this if an existing character is being replaced, unless
-   *       we're in VREPLACE mode.
-   *     - Do this if the cursor is not on the line where insert started
-   *     or - 'formatoptions' doesn't have 'l' or the line was not too long
-   *           before the insert.
-   *        - 'formatoptions' doesn't have 'b' or a blank was inserted at or
-   *          before 'textwidth'
-   */
+  // Try to break the line in two or more pieces when:
+  // - Always do this if we have been called to do formatting only.
+  // - Always do this when 'formatoptions' has the 'a' flag and the line
+  //   ends in white space.
+  // - Otherwise:
+  //     - Don't do this if inserting a blank
+  //     - Don't do this if an existing character is being replaced, unless
+  //       we're in MODE_VREPLACE state.
+  //     - Do this if the cursor is not on the line where insert started
+  //     or - 'formatoptions' doesn't have 'l' or the line was not too long
+  //           before the insert.
+  //        - 'formatoptions' doesn't have 'b' or a blank was inserted at or
+  //          before 'textwidth'
   if (textwidth > 0
       && (force_format
           || (!ascii_iswhite(c)
@@ -5942,7 +5933,7 @@ void insertchar(int c, int flags, int second_indent)
       i = 0;
     }
     if (buf[i] != NUL) {
-      AppendToRedobuffLit(buf + i, -1);
+      AppendToRedobuffLit((char *)buf + i, -1);
     }
   } else {
     int cc;
@@ -5950,7 +5941,7 @@ void insertchar(int c, int flags, int second_indent)
     if ((cc = utf_char2len(c)) > 1) {
       char_u buf[MB_MAXBYTES + 1];
 
-      utf_char2bytes(c, buf);
+      utf_char2bytes(c, (char *)buf);
       buf[cc] = NUL;
       ins_char_bytes(buf, (size_t)cc);
       AppendCharToRedobuff(c);
@@ -6247,11 +6238,9 @@ static void internal_format(int textwidth, int second_indent, int flags, int for
     // Going to break the line, remove any "$" now.
     undisplay_dollar();
 
-    /*
-     * Offset between cursor position and line break is used by replace
-     * stack functions.  VREPLACE does not use this, and backspaces
-     * over the text instead.
-     */
+    // Offset between cursor position and line break is used by replace
+    // stack functions.  MODE_VREPLACE does not use this, and backspaces
+    // over the text instead.
     if (State & VREPLACE_FLAG) {
       orig_col = startcol;              // Will start backspacing from here
     } else {
@@ -6273,10 +6262,8 @@ static void internal_format(int textwidth, int second_indent, int flags, int for
     }
 
     if (State & VREPLACE_FLAG) {
-      /*
-       * In VREPLACE mode, we will backspace over the text to be
-       * wrapped, so save a copy now to put on the next line.
-       */
+      // In MODE_VREPLACE state, we will backspace over the text to be
+      // wrapped, so save a copy now to put on the next line.
       saved_text = vim_strsave(get_cursor_pos_ptr());
       curwin->w_cursor.col = orig_col;
       saved_text[startcol] = NUL;
@@ -6348,10 +6335,8 @@ static void internal_format(int textwidth, int second_indent, int flags, int for
     }
 
     if (State & VREPLACE_FLAG) {
-      /*
-       * In VREPLACE mode we have backspaced over the text to be
-       * moved, now we re-insert it into the new line.
-       */
+      // In MODE_VREPLACE state we have backspaced over the text to be
+      // moved, now we re-insert it into the new line.
       ins_bytes(saved_text);
       xfree(saved_text);
     } else {
@@ -6853,7 +6838,7 @@ char_u *add_char2buf(int c, char_u *s)
   FUNC_ATTR_NONNULL_ALL FUNC_ATTR_WARN_UNUSED_RESULT
 {
   char_u temp[MB_MAXBYTES + 1];
-  const int len = utf_char2bytes(c, temp);
+  const int len = utf_char2bytes(c, (char *)temp);
   for (int i = 0; i < len; i++) {
     c = temp[i];
     // Need to escape K_SPECIAL like in the typeahead buffer.
@@ -7020,7 +7005,7 @@ int cursor_up(long n, int upd_topline)
         // If we entered a fold, move to the beginning, unless in
         // Insert mode or when 'foldopen' contains "all": it will open
         // in a moment.
-        if (n > 0 || !((State & INSERT) || (fdo_flags & FDO_ALL))) {
+        if (n > 0 || !((State & MODE_INSERT) || (fdo_flags & FDO_ALL))) {
           (void)hasFolding(lnum, &lnum, NULL);
         }
       }
@@ -7292,16 +7277,14 @@ static void replace_join(int off)
   }
 }
 
-/*
- * Pop bytes from the replace stack until a NUL is found, and insert them
- * before the cursor.  Can only be used in REPLACE or VREPLACE mode.
- */
+/// Pop bytes from the replace stack until a NUL is found, and insert them
+/// before the cursor.  Can only be used in MODE_REPLACE or MODE_VREPLACE state.
 static void replace_pop_ins(void)
 {
   int cc;
   int oldState = State;
 
-  State = NORMAL;                       // don't want REPLACE here
+  State = MODE_NORMAL;                       // don't want MODE_REPLACE here
   while ((cc = replace_pop()) > 0) {
     mb_replace_pop_ins(cc);
     dec_cursor();
@@ -7557,7 +7540,7 @@ bool in_cinkeys(int keytyped, int when, bool line_is_empty)
     } else if (*look == 'e') {
       if (try_match && keytyped == 'e' && curwin->w_cursor.col >= 4) {
         p = get_cursor_line_ptr();
-        if (skipwhite(p) == p + curwin->w_cursor.col - 4
+        if ((char_u *)skipwhite((char *)p) == p + curwin->w_cursor.col - 4
             && STRNCMP(p + curwin->w_cursor.col - 4, "else", 4) == 0) {
           return true;
         }
@@ -7949,14 +7932,14 @@ static void ins_ctrl_g(void)
  */
 static void ins_ctrl_hat(void)
 {
-  if (map_to_exists_mode("", LANGMAP, false)) {
+  if (map_to_exists_mode("", MODE_LANGMAP, false)) {
     // ":lmap" mappings exists, Toggle use of ":lmap" mappings.
-    if (State & LANGMAP) {
+    if (State & MODE_LANGMAP) {
       curbuf->b_p_iminsert = B_IMODE_NONE;
-      State &= ~LANGMAP;
+      State &= ~MODE_LANGMAP;
     } else {
       curbuf->b_p_iminsert = B_IMODE_LMAP;
-      State |= LANGMAP;
+      State |= MODE_LANGMAP;
     }
   }
   set_iminsert_global();
@@ -8063,7 +8046,7 @@ static bool ins_esc(long *count, int cmdchar, bool nomove)
   }
 
 
-  State = NORMAL;
+  State = MODE_NORMAL;
   may_trigger_modechanged();
   // need to position cursor again when on a TAB
   if (gchar_cursor() == TAB) {
@@ -8096,7 +8079,7 @@ static void ins_ctrl_(void)
     }
   }
   p_ri = !p_ri;
-  revins_on = (State == INSERT && p_ri);
+  revins_on = (State == MODE_INSERT && p_ri);
   if (revins_on) {
     revins_scol = curwin->w_cursor.col;
     revins_legal++;
@@ -8160,13 +8143,13 @@ static bool ins_start_select(int c)
 static void ins_insert(int replaceState)
 {
   set_vim_var_string(VV_INSERTMODE, ((State & REPLACE_FLAG) ? "i" :
-                                     replaceState == VREPLACE ? "v" :
+                                     replaceState == MODE_VREPLACE ? "v" :
                                      "r"), 1);
   ins_apply_autocmds(EVENT_INSERTCHANGE);
   if (State & REPLACE_FLAG) {
-    State = INSERT | (State & LANGMAP);
+    State = MODE_INSERT | (State & MODE_LANGMAP);
   } else {
-    State = replaceState | (State & LANGMAP);
+    State = replaceState | (State & MODE_LANGMAP);
   }
   may_trigger_modechanged();
   AppendCharToRedobuff(K_INS);
@@ -8226,7 +8209,7 @@ static void ins_shift(int c, int lastc)
     change_indent(c == Ctrl_D ? INDENT_DEC : INDENT_INC, 0, TRUE, 0, TRUE);
   }
 
-  if (did_ai && *skipwhite(get_cursor_line_ptr()) != NUL) {
+  if (did_ai && *skipwhite((char *)get_cursor_line_ptr()) != NUL) {
     did_ai = false;
   }
   did_si = false;
@@ -8404,23 +8387,17 @@ static bool ins_bs(int c, int mode, int *inserted_space_p)
         dec_cursor();
       }
 
-      /*
-       * In REPLACE mode we have to put back the text that was replaced
-       * by the NL. On the replace stack is first a NUL-terminated
-       * sequence of characters that were deleted and then the
-       * characters that NL replaced.
-       */
+      // In MODE_REPLACE mode we have to put back the text that was
+      // replaced by the NL. On the replace stack is first a
+      // NUL-terminated sequence of characters that were deleted and then
+      // the characters that NL replaced.
       if (State & REPLACE_FLAG) {
-        /*
-         * Do the next ins_char() in NORMAL state, to
-         * prevent ins_char() from replacing characters and
-         * avoiding showmatch().
-         */
+        // Do the next ins_char() in MODE_NORMAL state, to
+        // prevent ins_char() from replacing characters and
+        // avoiding showmatch().
         oldState = State;
-        State = NORMAL;
-        /*
-         * restore characters (blanks) deleted after cursor
-         */
+        State = MODE_NORMAL;
+        // restore characters (blanks) deleted after cursor
         while (cc > 0) {
           save_col = curwin->w_cursor.col;
           mb_replace_pop_ins(cc);
@@ -9007,11 +8984,9 @@ static bool ins_tab(void)
                            curbuf->b_p_vts_array);
   }
 
-  /*
-   * Insert the first space with ins_char().    It will delete one char in
-   * replace mode.  Insert the rest with ins_str(); it will not delete any
-   * chars.  For VREPLACE mode, we use ins_char() for all characters.
-   */
+  // Insert the first space with ins_char().    It will delete one char in
+  // replace mode.  Insert the rest with ins_str(); it will not delete any
+  // chars.  For MODE_VREPLACE state, we use ins_char() for all characters.
   ins_char(' ');
   while (--temp > 0) {
     if (State & VREPLACE_FLAG) {
@@ -9039,10 +9014,8 @@ static bool ins_tab(void)
     int change_col = -1;
     int save_list = curwin->w_p_list;
 
-    /*
-     * Get the current line.  For VREPLACE mode, don't make real changes
-     * yet, just work on a copy of the line.
-     */
+    // Get the current line.  For MODE_VREPLACE state, don't make real
+    // changes yet, just work on a copy of the line.
     if (State & VREPLACE_FLAG) {
       pos = curwin->w_cursor;
       cursor = &pos;
@@ -9135,11 +9108,9 @@ static bool ins_tab(void)
       }
       cursor->col -= i;
 
-      /*
-       * In VREPLACE mode, we haven't changed anything yet.  Do it now by
-       * backspacing over the changed spacing and then inserting the new
-       * spacing.
-       */
+      // In MODE_VREPLACE state, we haven't changed anything yet.  Do it
+      // now by backspacing over the changed spacing and then inserting
+      // the new spacing.
       if (State & VREPLACE_FLAG) {
         // Backspace from real cursor to change_col
         backspace_until_column(change_col);
@@ -9182,12 +9153,10 @@ static bool ins_eol(int c)
     replace_push(NUL);
   }
 
-  /*
-   * In VREPLACE mode, a NL replaces the rest of the line, and starts
-   * replacing the next line, so we push all of the characters left on the
-   * line onto the replace stack.  This is not done here though, it is done
-   * in open_line().
-   */
+  // In MODE_VREPLACE state, a NL replaces the rest of the line, and starts
+  // replacing the next line, so we push all of the characters left on the
+  // line onto the replace stack.  This is not done here though, it is done
+  // in open_line().
 
   // Put cursor on NUL if on the last char and coladd is 1 (happens after
   // CTRL-O).
@@ -9413,7 +9382,7 @@ static void ins_try_si(int c)
         old_pos = curwin->w_cursor;
         i = get_indent();
         while (curwin->w_cursor.lnum > 1) {
-          ptr = skipwhite(ml_get(--(curwin->w_cursor.lnum)));
+          ptr = (char_u *)skipwhite((char *)ml_get(--(curwin->w_cursor.lnum)));
 
           // ignore empty lines and lines starting with '#'.
           if (*ptr != '#' && *ptr != NUL) {
@@ -9479,7 +9448,7 @@ static char_u *do_insert_char_pre(int c)
   if (!has_event(EVENT_INSERTCHARPRE)) {
     return NULL;
   }
-  buf[utf_char2bytes(c, (char_u *)buf)] = NUL;
+  buf[utf_char2bytes(c, buf)] = NUL;
 
   // Lock the text to avoid weird things from happening.
   textlock++;

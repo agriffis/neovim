@@ -194,7 +194,7 @@ void do_ascii(const exarg_T *const eap)
     if (utf_iscomposing(c)) {
       IObuff[iobuff_len++] = ' ';  // Draw composing char on top of a space.
     }
-    iobuff_len += utf_char2bytes(c, IObuff + iobuff_len);
+    iobuff_len += utf_char2bytes(c, (char *)IObuff + iobuff_len);
 
     dig = (char *)get_digraph_for_char(c);
     if (dig != NULL) {
@@ -339,7 +339,7 @@ static int linelen(int *has_tab)
     return 0;
   }
   // find the first non-blank character
-  first = (char *)skipwhite((char_u *)line);
+  first = skipwhite(line);
 
   // find the character after the last non-blank character
   for (last = first + STRLEN(first);
@@ -609,9 +609,9 @@ void ex_sort(exarg_T *eap)
                      &nrs[lnum - eap->line1].st_u.num.value, NULL, 0, false);
         }
       } else {
-        s = (char *)skipwhite((char_u *)p);
+        s = skipwhite(p);
         if (*s == '+') {
-          s = (char *)skipwhite((char_u *)s + 1);
+          s = skipwhite(s + 1);
         }
 
         if (*s == NUL) {
@@ -1215,7 +1215,7 @@ void do_bang(int addr_count, exarg_T *eap, bool forceit, bool do_in, bool do_out
     // buffername.
     char *cmd = (char *)vim_strsave_escaped((char_u *)prevcmd, (char_u *)"%#");
 
-    AppendToRedobuffLit((char_u *)cmd, -1);
+    AppendToRedobuffLit(cmd, -1);
     xfree(cmd);
     AppendToRedobuff("\n");
     bangredo = false;
@@ -2768,7 +2768,7 @@ int do_ecmd(int fnum, char *ffname, char *sfname, exarg_T *eap, linenr_T newlnum
       const char *text = (char *)get_cursor_line_ptr();
 
       if (curwin->w_cursor.lnum != orig_pos.lnum
-          || curwin->w_cursor.col != (int)(skipwhite((char_u *)text) - (char_u *)text)) {
+          || curwin->w_cursor.col != (int)(skipwhite(text) - text)) {
         newlnum = curwin->w_cursor.lnum;
         newcol = curwin->w_cursor.col;
       }
@@ -2875,7 +2875,7 @@ int do_ecmd(int fnum, char *ffname, char *sfname, exarg_T *eap, linenr_T newlnum
     redraw_curbuf_later(NOT_VALID);     // redraw this buffer later
   }
 
-  if (p_im && (State & INSERT) == 0) {
+  if (p_im && (State & MODE_INSERT) == 0) {
     need_start_insertmode = true;
   }
 
@@ -2939,9 +2939,9 @@ void ex_append(exarg_T *eap)
     lnum = 0;
   }
 
-  State = INSERT;                   // behave like in Insert mode
+  State = MODE_INSERT;                   // behave like in Insert mode
   if (curbuf->b_p_iminsert == B_IMODE_LMAP) {
-    State |= LANGMAP;
+    State |= MODE_LANGMAP;
   }
 
   for (;;) {
@@ -2971,10 +2971,10 @@ void ex_append(exarg_T *eap)
       }
       eap->nextcmd = p;
     } else {
-      // Set State to avoid the cursor shape to be set to INSERT mode
-      // when getline() returns.
       int save_State = State;
-      State = CMDLINE;
+      // Set State to avoid the cursor shape to be set to MODE_INSERT
+      // state when getline() returns.
+      State = MODE_CMDLINE;
       theline = (char *)eap->getline(eap->cstack->cs_looplevel > 0 ? -1 :
                                      NUL, eap->cookie, indent, true);
       State = save_State;
@@ -3024,7 +3024,7 @@ void ex_append(exarg_T *eap)
       empty = 0;
     }
   }
-  State = NORMAL;
+  State = MODE_NORMAL;
 
   if (eap->forceit) {
     curbuf->b_p_ai = !curbuf->b_p_ai;
@@ -3477,7 +3477,7 @@ static buf_T *do_sub(exarg_T *eap, proftime_T timeout, bool do_buf_event, handle
   int start_nsubs;
   int save_ma = 0;
   int save_b_changed = curbuf->b_changed;
-  bool preview = (State & CMDPREVIEW);
+  bool preview = (State & MODE_CMDPREVIEW);
 
   bool did_save = false;
 
@@ -3573,7 +3573,7 @@ static buf_T *do_sub(exarg_T *eap, proftime_T timeout, bool do_buf_event, handle
   bool save_do_ask = subflags.do_ask;  // remember user specified 'c' flag
 
   // check for a trailing count
-  cmd = (char *)skipwhite((char_u *)cmd);
+  cmd = skipwhite(cmd);
   if (ascii_isdigit(*cmd)) {
     i = getdigits_long((char_u **)&cmd, true, 0);
     if (i <= 0 && !eap->skip && subflags.do_error) {
@@ -3590,7 +3590,7 @@ static buf_T *do_sub(exarg_T *eap, proftime_T timeout, bool do_buf_event, handle
   /*
    * check for trailing command or garbage
    */
-  cmd = (char *)skipwhite((char_u *)cmd);
+  cmd = skipwhite(cmd);
   if (*cmd && *cmd != '"') {        // if not end-of-line or comment
     eap->nextcmd = (char *)check_nextcmd((char_u *)cmd);
     if (eap->nextcmd == NULL) {
@@ -3823,10 +3823,10 @@ static buf_T *do_sub(exarg_T *eap, proftime_T timeout, bool do_buf_event, handle
         if (subflags.do_ask && !preview) {
           int typed = 0;
 
-          // change State to CONFIRM, so that the mouse works
+          // change State to MODE_CONFIRM, so that the mouse works
           // properly
           int save_State = State;
-          State = CONFIRM;
+          State = MODE_CONFIRM;
           setmouse();                   // disable mouse in xterm
           curwin->w_cursor.col = regmatch.startpos[0].col;
 
@@ -5819,10 +5819,10 @@ static void do_helptags(char *dirname, bool add_help_tags, bool ignore_writeerr)
   FreeWild(filecount, (char_u **)files);
 }
 
-static void helptags_cb(char_u *fname, void *cookie)
+static void helptags_cb(char *fname, void *cookie)
   FUNC_ATTR_NONNULL_ALL
 {
-  do_helptags((char *)fname, *(bool *)cookie, true);
+  do_helptags(fname, *(bool *)cookie, true);
 }
 
 /// ":helptags"
@@ -5835,7 +5835,7 @@ void ex_helptags(exarg_T *eap)
   // Check for ":helptags ++t {dir}".
   if (STRNCMP(eap->arg, "++t", 3) == 0 && ascii_iswhite(eap->arg[3])) {
     add_help_tags = true;
-    eap->arg = (char *)skipwhite((char_u *)eap->arg + 3);
+    eap->arg = skipwhite(eap->arg + 3);
   }
 
   if (STRCMP(eap->arg, "ALL") == 0) {
@@ -6050,7 +6050,7 @@ void close_preview_windows(void)
 /// from undo history.
 void ex_substitute(exarg_T *eap)
 {
-  bool preview = (State & CMDPREVIEW);
+  bool preview = (State & MODE_CMDPREVIEW);
   if (*p_icm == NUL || !preview) {  // 'inccommand' is disabled
     close_preview_windows();
     (void)do_sub(eap, profile_zero(), true, preview_bufnr);

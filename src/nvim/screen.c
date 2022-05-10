@@ -639,13 +639,13 @@ bool conceal_cursor_line(const win_T *wp)
   if (*wp->w_p_cocu == NUL) {
     return false;
   }
-  if (get_real_state() & VISUAL) {
+  if (get_real_state() & MODE_VISUAL) {
     c = 'v';
-  } else if (State & INSERT) {
+  } else if (State & MODE_INSERT) {
     c = 'i';
-  } else if (State & NORMAL) {
+  } else if (State & MODE_NORMAL) {
     c = 'n';
-  } else if (State & CMDLINE) {
+  } else if (State & MODE_CMDLINE) {
     c = 'c';
   } else {
     return false;
@@ -1946,7 +1946,7 @@ static size_t fill_foldcolumn(char_u *p, win_T *wp, foldinfo_T foldinfo, linenr_
       symbol = '>';
     }
 
-    len = utf_char2bytes(symbol, &p[char_counter]);
+    len = utf_char2bytes(symbol, (char *)&p[char_counter]);
     char_counter += len;
     if (first_level + i >= level) {
       i++;
@@ -1960,7 +1960,7 @@ static size_t fill_foldcolumn(char_u *p, win_T *wp, foldinfo_T foldinfo, linenr_
       char_counter -= len;
       memset(&p[char_counter], ' ', len);
     }
-    len = utf_char2bytes(wp->w_p_fcs_chars.foldclosed, &p[char_counter]);
+    len = utf_char2bytes(wp->w_p_fcs_chars.foldclosed, (char *)&p[char_counter]);
     char_counter += len;
   }
 
@@ -2384,7 +2384,7 @@ static int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool noc
         if (ae.rgb_fg_color == -1 && ae.cterm_fg_color == 0) {
           line_attr_lowprio = cul_attr;
         } else {
-          if (!(State & INSERT) && bt_quickfix(wp->w_buffer)
+          if (!(State & MODE_INSERT) && bt_quickfix(wp->w_buffer)
               && qf_current_entry(wp) == lnum) {
             line_attr = hl_combine_attr(cul_attr, line_attr);
           } else {
@@ -2727,9 +2727,9 @@ static int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool noc
               }
               if (wp->w_p_rl) {                       // reverse line numbers
                 // like rl_mirror(), but keep the space at the end
-                char_u *p2 = skipwhite(extra);
+                char_u *p2 = (char_u *)skipwhite((char *)extra);
                 p2 = skiptowhite(p2) - 1;
-                for (char_u *p1 = skipwhite(extra); p1 < p2; p1++, p2--) {
+                for (char_u *p1 = (char_u *)skipwhite((char *)extra); p1 < p2; p1++, p2--) {
                   const int t = *p1;
                   *p1 = *p2;
                   *p2 = t;
@@ -2876,7 +2876,7 @@ static int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool noc
       if (ae.rgb_fg_color == -1 && ae.cterm_fg_color == 0) {
         line_attr_lowprio = cul_attr;
       } else {
-        if (!(State & INSERT) && bt_quickfix(wp->w_buffer)
+        if (!(State & MODE_INSERT) && bt_quickfix(wp->w_buffer)
             && qf_current_entry(wp) == lnum) {
           line_attr = hl_combine_attr(cul_attr, line_attr);
         } else {
@@ -3299,7 +3299,7 @@ static int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool noc
             /* In Insert mode only highlight a word that
              * doesn't touch the cursor. */
             if (spell_hlf != HLF_COUNT
-                && (State & INSERT) != 0
+                && (State & MODE_INSERT)
                 && wp->w_cursor.lnum == lnum
                 && wp->w_cursor.col >=
                 (colnr_T)(prev_ptr - line)
@@ -3525,7 +3525,7 @@ static int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool noc
               if (wp->w_p_lcs_chars.tab3 && i == tab_len - 1) {
                 lcs = wp->w_p_lcs_chars.tab3;
               }
-              p += utf_char2bytes(lcs, p);
+              p += utf_char2bytes(lcs, (char *)p);
               n_extra += utf_char2len(lcs) - (saved_nextra > 0 ? 1 : 0);
             }
             p_extra = p_extra_free;
@@ -3666,13 +3666,12 @@ static int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool noc
       }
 
       if (wp->w_p_cole > 0
-          && (wp != curwin || lnum != wp->w_cursor.lnum
-              || conceal_cursor_line(wp))
+          && (wp != curwin || lnum != wp->w_cursor.lnum || conceal_cursor_line(wp))
           && ((syntax_flags & HL_CONCEAL) != 0 || has_match_conc > 0 || decor_conceal > 0)
-          && !(lnum_in_visual_area
-               && vim_strchr(wp->w_p_cocu, 'v') == NULL)) {
+          && !(lnum_in_visual_area && vim_strchr(wp->w_p_cocu, 'v') == NULL)) {
         char_attr = conceal_attr;
-        if ((prev_syntax_id != syntax_seqnr || has_match_conc > 1 || decor_conceal > 1)
+        if (((prev_syntax_id != syntax_seqnr && (syntax_flags & HL_CONCEAL) != 0)
+             || has_match_conc > 1 || decor_conceal > 1)
             && (syn_get_sub_char() != NUL
                 || (has_match_conc && match_conc)
                 || (decor_conceal && decor_state.conceal_char)
@@ -4275,7 +4274,7 @@ static int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool noc
   }     // for every character in the line
 
   // After an empty line check first word for capital.
-  if (*skipwhite(line) == NUL) {
+  if (*skipwhite((char *)line) == NUL) {
     capcol_lnum = lnum + 1;
     cap_col = 0;
   }
@@ -4507,7 +4506,6 @@ static void get_sign_display_info(bool nrcol, win_T *wp, linenr_T lnum, sign_att
     }
   }
 }
-
 
 
 /*
@@ -5328,7 +5326,7 @@ static void win_redr_custom(win_T *wp, bool draw_ruler)
    * might change the option value and free the memory. */
   stl = vim_strsave(stl);
   width =
-    build_stl_str_hl(ewp, buf, sizeof(buf), stl, use_sandbox,
+    build_stl_str_hl(ewp, (char *)buf, sizeof(buf), (char *)stl, use_sandbox,
                      fillchar, maxwidth, &hltab, &tabtab);
   xfree(stl);
   ewp->w_p_crb = p_crb_save;
@@ -5341,7 +5339,7 @@ static void win_redr_custom(win_T *wp, bool draw_ruler)
 
   // fill up with "fillchar"
   while (width < maxwidth && len < (int)sizeof(buf) - 1) {
-    len += utf_char2bytes(fillchar, buf + len);
+    len += utf_char2bytes(fillchar, (char *)buf + len);
     width++;
   }
   buf[len] = NUL;
@@ -5484,7 +5482,6 @@ static void end_search_hl(void)
     search_hl.rm.regprog = NULL;
   }
 }
-
 
 
 /// Check if there should be a delay.  Used before clearing or redrawing the
@@ -5946,8 +5943,8 @@ int showmode(void)
   msg_grid_validate();
 
   do_mode = ((p_smd && msg_silent == 0)
-             && ((State & TERM_FOCUS)
-                 || (State & INSERT)
+             && ((State & MODE_TERMINAL)
+                 || (State & MODE_INSERT)
                  || restart_edit != NUL
                  || VIsual_active));
   if (do_mode || reg_recording != 0) {
@@ -6016,13 +6013,13 @@ int showmode(void)
           }
         }
       } else {
-        if (State & TERM_FOCUS) {
+        if (State & MODE_TERMINAL) {
           msg_puts_attr(_(" TERMINAL"), attr);
         } else if (State & VREPLACE_FLAG) {
           msg_puts_attr(_(" VREPLACE"), attr);
         } else if (State & REPLACE_FLAG) {
           msg_puts_attr(_(" REPLACE"), attr);
-        } else if (State & INSERT) {
+        } else if (State & MODE_INSERT) {
           if (p_ri) {
             msg_puts_attr(_(" REVERSE"), attr);
           }
@@ -6038,7 +6035,7 @@ int showmode(void)
         if (p_hkmap) {
           msg_puts_attr(_(" Hebrew"), attr);
         }
-        if (State & LANGMAP) {
+        if (State & MODE_LANGMAP) {
           if (curwin->w_p_arab) {
             msg_puts_attr(_(" Arabic"), attr);
           } else if (get_keymap_str(curwin, (char_u *)" (%s)",
@@ -6046,7 +6043,7 @@ int showmode(void)
             msg_puts_attr((char *)NameBuff, attr);
           }
         }
-        if ((State & INSERT) && p_paste) {
+        if ((State & MODE_INSERT) && p_paste) {
           msg_puts_attr(_(" (paste)"), attr);
         }
 
@@ -6524,13 +6521,10 @@ static void win_redr_ruler(win_T *wp, bool always)
     return;
   }
 
-  /*
-   * Check if not in Insert mode and the line is empty (will show "0-1").
-   */
-  int empty_line = FALSE;
-  if (!(State & INSERT)
-      && *ml_get_buf(wp->w_buffer, wp->w_cursor.lnum, FALSE) == NUL) {
-    empty_line = TRUE;
+  // Check if not in Insert mode and the line is empty (will show "0-1").
+  int empty_line = false;
+  if ((State & MODE_INSERT) == 0 && *ml_get_buf(wp->w_buffer, wp->w_cursor.lnum, false) == NUL) {
+    empty_line = true;
   }
 
   /*
@@ -6620,7 +6614,7 @@ static void win_redr_ruler(win_T *wp, bool always)
     if (this_ru_col + o < width) {
       // Need at least 3 chars left for get_rel_pos() + NUL.
       while (this_ru_col + o < width && RULER_BUF_LEN > i + 4) {
-        i += utf_char2bytes(fillchar, buffer + i);
+        i += utf_char2bytes(fillchar, (char *)buffer + i);
         o++;
       }
       get_rel_pos(wp, buffer + i, RULER_BUF_LEN - i);
@@ -6768,9 +6762,9 @@ void screen_resize(int width, int height)
     return;
   }
 
-  if (State == HITRETURN || State == SETWSIZE) {
+  if (State == MODE_HITRETURN || State == MODE_SETWSIZE) {
     // postpone the resizing
-    State = SETWSIZE;
+    State = MODE_SETWSIZE;
     return;
   }
 
@@ -6803,7 +6797,7 @@ void screen_resize(int width, int height)
    * screenalloc() (also invoked from screenclear()).  That is because the
    * "recursive" check above may skip this, but not screenalloc(). */
 
-  if (State != ASKMORE && State != EXTERNCMD && State != CONFIRM) {
+  if (State != MODE_ASKMORE && State != MODE_EXTERNCMD && State != MODE_CONFIRM) {
     screenclear();
   }
 
@@ -6822,7 +6816,7 @@ void screen_resize(int width, int height)
      * Always need to call update_screen() or screenalloc(), to make
      * sure Rows/Columns and the size of the screen is correct!
      */
-    if (State == ASKMORE || State == EXTERNCMD || State == CONFIRM
+    if (State == MODE_ASKMORE || State == MODE_EXTERNCMD || State == MODE_CONFIRM
         || exmode_active) {
       screenalloc();
       if (msg_grid.chars) {
@@ -6836,7 +6830,7 @@ void screen_resize(int width, int height)
       if (curwin->w_p_scb) {
         do_check_scrollbind(true);
       }
-      if (State & CMDLINE) {
+      if (State & MODE_CMDLINE) {
         redraw_popupmenu = false;
         update_screen(NOT_VALID);
         redrawcmdline();

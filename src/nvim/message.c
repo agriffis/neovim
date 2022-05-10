@@ -134,7 +134,7 @@ static int msg_grid_scroll_discount = 0;
 static void ui_ext_msg_set_pos(int row, bool scrolled)
 {
   char buf[MAX_MCO + 1];
-  size_t size = utf_char2bytes(curwin->w_p_fcs_chars.msgsep, (char_u *)buf);
+  size_t size = utf_char2bytes(curwin->w_p_fcs_chars.msgsep, buf);
   buf[size] = '\0';
   ui_call_msg_set_pos(msg_grid.handle, row, scrolled,
                       (String){ .data = buf, .size = size });
@@ -1125,7 +1125,7 @@ void wait_return(int redraw)
     // just changed.
     screenalloc();
 
-    State = HITRETURN;
+    State = MODE_HITRETURN;
     setmouse();
     cmdline_row = msg_row;
     // Avoid the sequence that the user types ":" at the hit-return prompt
@@ -1250,7 +1250,7 @@ void wait_return(int redraw)
     XFREE_CLEAR(keep_msg);          // don't redisplay message, it's too long
   }
 
-  if (tmpState == SETWSIZE) {       // got resize event while in vgetc()
+  if (tmpState == MODE_SETWSIZE) {       // got resize event while in vgetc()
     ui_refresh();
   } else if (!skip_redraw) {
     if (redraw == true || (msg_scrolled != 0 && redraw != -1)) {
@@ -1420,7 +1420,7 @@ void msg_putchar_attr(int c, int attr)
     buf[2] = (char)K_THIRD(c);
     buf[3] = NUL;
   } else {
-    buf[utf_char2bytes(c, buf)] = NUL;
+    buf[utf_char2bytes(c, (char *)buf)] = NUL;
   }
   msg_puts_attr((const char *)buf, attr);
 }
@@ -1571,8 +1571,8 @@ void msg_make(char_u *arg)
   int i;
   static char_u *str = (char_u *)"eeffoc", *rs = (char_u *)"Plon#dqg#vxjduB";
 
-  arg = skipwhite(arg);
-  for (i = 5; *arg && i >= 0; --i) {
+  arg = (char_u *)skipwhite((char *)arg);
+  for (i = 5; *arg && i >= 0; i--) {
     if (*arg++ != str[i]) {
       break;
     }
@@ -1617,6 +1617,10 @@ int msg_outtrans_special(const char_u *strstart, bool from, int maxlen)
       str++;
     } else {
       text = str2special((const char **)&str, from, false);
+    }
+    if (text[0] != NUL && text[1] == NUL) {
+      // single-byte character or illegal byte
+      text = (char *)transchar_byte((uint8_t)text[0]);
     }
     const int len = vim_strsize((char_u *)text);
     if (maxlen > 0 && retval + len >= maxlen) {
@@ -1666,6 +1670,7 @@ char *str2special_save(const char *const str, const bool replace_spaces, const b
 /// @return Converted key code, in a static buffer. Buffer is always one and the
 ///         same, so save converted string somewhere before running str2special
 ///         for the second time.
+///         On illegal byte return a string with only that byte.
 const char *str2special(const char **const sp, const bool replace_spaces, const bool replace_lt)
   FUNC_ATTR_NONNULL_ALL FUNC_ATTR_WARN_UNUSED_RESULT FUNC_ATTR_NONNULL_RET
 {
@@ -1699,32 +1704,26 @@ const char *str2special(const char **const sp, const bool replace_spaces, const 
     }
   }
 
-  if (!IS_SPECIAL(c)) {
+  if (!IS_SPECIAL(c) && MB_BYTE2LEN(c) > 1) {
     *sp = str;
     // Try to un-escape a multi-byte character after modifiers.
     const char *p = mb_unescape(sp);
-
-    if (p == NULL) {
-      const int len = utf_ptr2len(str);
-      // Check for an illegal byte.
-      if (MB_BYTE2LEN((uint8_t)(*str)) > len) {
-        transchar_nonprint(curbuf, (char_u *)buf, c);
-        *sp = str + 1;
-        return buf;
-      }
-      *sp = str + len;
-      p = str;
+    if (p != NULL) {
+      // Since 'special' is true the multi-byte character 'c' will be
+      // processed by get_special_key_name().
+      c = utf_ptr2char(p);
+    } else {
+      // illegal byte
+      *sp = str + 1;
     }
-    // Since 'special' is true the multi-byte character 'c' will be
-    // processed by get_special_key_name().
-    c = utf_ptr2char(p);
   } else {
+    // single-byte character or illegal byte
     *sp = str + 1;
   }
 
-  // Make unprintable characters in <> form, also <M-Space> and <Tab>.
+  // Make special keys and C0 control characters in <> form, also <M-Space>.
   if (special
-      || char2cells(c) > 1
+      || c < ' '
       || (replace_spaces && c == ' ')
       || (replace_lt && c == '<')) {
     return (const char *)get_special_key_name(c, modifiers);
@@ -1821,7 +1820,7 @@ void msg_prt_line(char_u *s, int list)
       } else if (curwin->w_p_lcs_chars.nbsp != NUL && list
                  && (utf_ptr2char((char *)s) == 160
                      || utf_ptr2char((char *)s) == 0x202f)) {
-        utf_char2bytes(curwin->w_p_lcs_chars.nbsp, (char_u *)buf);
+        utf_char2bytes(curwin->w_p_lcs_chars.nbsp, buf);
         buf[utfc_ptr2len(buf)] = NUL;
       } else {
         memmove(buf, s, (size_t)l);
@@ -2187,7 +2186,7 @@ static void msg_puts_display(const char_u *str, int maxlen, int attr, int recurs
       if (lines_left > 0) {
         --lines_left;
       }
-      if (p_more && lines_left == 0 && State != HITRETURN
+      if (p_more && lines_left == 0 && State != MODE_HITRETURN
           && !msg_no_more && !exmode_active) {
         if (do_more_prompt(NUL)) {
           s = confirm_msg_tail;
@@ -2708,7 +2707,7 @@ static int do_more_prompt(int typed_char)
   // We get called recursively when a timer callback outputs a message. In
   // that case don't show another prompt. Also when at the hit-Enter prompt
   // and nothing was typed.
-  if (no_need_more || entered || (State == HITRETURN && typed_char == 0)) {
+  if (no_need_more || entered || (State == MODE_HITRETURN && typed_char == 0)) {
     return false;
   }
   entered = true;
@@ -2722,7 +2721,7 @@ static int do_more_prompt(int typed_char)
     }
   }
 
-  State = ASKMORE;
+  State = MODE_ASKMORE;
   setmouse();
   if (typed_char == NUL) {
     msg_moremsg(FALSE);
@@ -2993,19 +2992,19 @@ void msg_moremsg(int full)
   }
 }
 
-/// Repeat the message for the current mode: ASKMORE, EXTERNCMD, CONFIRM or
-/// exmode_active.
+/// Repeat the message for the current mode: MODE_ASKMORE, MODE_EXTERNCMD,
+/// MODE_CONFIRM or exmode_active.
 void repeat_message(void)
 {
-  if (State == ASKMORE) {
-    msg_moremsg(TRUE);          // display --more-- message again
+  if (State == MODE_ASKMORE) {
+    msg_moremsg(true);          // display --more-- message again
     msg_row = Rows - 1;
-  } else if (State == CONFIRM) {
+  } else if (State == MODE_CONFIRM) {
     display_confirm_msg();      // display ":confirm" message again
     msg_row = Rows - 1;
-  } else if (State == EXTERNCMD) {
+  } else if (State == MODE_EXTERNCMD) {
     ui_cursor_goto(msg_row, msg_col);     // put cursor back
-  } else if (State == HITRETURN || State == SETWSIZE) {
+  } else if (State == MODE_HITRETURN || State == MODE_SETWSIZE) {
     if (msg_row == Rows - 1) {
       // Avoid drawing the "hit-enter" prompt below the previous one,
       // overwrite it.  Esp. useful when regaining focus and a
@@ -3077,9 +3076,9 @@ int msg_end(void)
    * we have to redraw the window.
    * Do not do this if we are abandoning the file or editing the command line.
    */
-  if (!exiting && need_wait_return && !(State & CMDLINE)) {
-    wait_return(FALSE);
-    return FALSE;
+  if (!exiting && need_wait_return && !(State & MODE_CMDLINE)) {
+    wait_return(false);
+    return false;
   }
 
   // NOTE: ui_flush() used to be called here. This had to be removed, as it
@@ -3437,7 +3436,7 @@ int do_dialog(int type, char_u *title, char_u *message, char_u *buttons, int dfl
   int oldState = State;
 
   msg_silent = 0;  // If dialog prompts for input, user needs to see it! #8788
-  State = CONFIRM;
+  State = MODE_CONFIRM;
   setmouse();
 
   /*
@@ -3509,7 +3508,7 @@ static int copy_char(const char_u *from, char_u *to, bool lowercase)
 {
   if (lowercase) {
     int c = mb_tolower(utf_ptr2char((char *)from));
-    return utf_char2bytes(c, to);
+    return utf_char2bytes(c, (char *)to);
   }
   int len = utfc_ptr2len((char *)from);
   memmove(to, from, (size_t)len);

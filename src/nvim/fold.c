@@ -775,7 +775,7 @@ void clearFolding(win_T *win)
 /// The changes in lines from top to bot (inclusive).
 void foldUpdate(win_T *wp, linenr_T top, linenr_T bot)
 {
-  if (compl_busy || State & INSERT) {
+  if (compl_busy || State & MODE_INSERT) {
     return;
   }
 
@@ -1374,7 +1374,7 @@ void foldMarkAdjust(win_T *wp, linenr_T line1, linenr_T line2, long amount, long
   }
   // If appending a line in Insert mode, it should be included in the fold
   // just above the line.
-  if ((State & INSERT) && amount == (linenr_T)1 && line2 == MAXLNUM) {
+  if ((State & MODE_INSERT) && amount == (linenr_T)1 && line2 == MAXLNUM) {
     line1--;
   }
   foldMarkAdjustRecurse(wp, &wp->w_folds, line1, line2, amount, amount_after);
@@ -1394,7 +1394,7 @@ static void foldMarkAdjustRecurse(win_T *wp, garray_T *gap, linenr_T line1, line
 
   // In Insert mode an inserted line at the top of a fold is considered part
   // of the fold, otherwise it isn't.
-  if ((State & INSERT) && amount == (linenr_T)1 && line2 == MAXLNUM) {
+  if ((State & MODE_INSERT) && amount == (linenr_T)1 && line2 == MAXLNUM) {
     top = line1 + 1;
   } else {
     top = line1;
@@ -1840,7 +1840,7 @@ void foldtext_cleanup(char_u *str)
   bool did2 = false;
 
   // Ignore leading and trailing white space in 'commentstring'.
-  char_u *cms_start = skipwhite(curbuf->b_p_cms);
+  char_u *cms_start = (char_u *)skipwhite((char *)curbuf->b_p_cms);
   size_t cms_slen = STRLEN(cms_start);
   while (cms_slen > 0 && ascii_iswhite(cms_start[cms_slen - 1])) {
     --cms_slen;
@@ -1859,7 +1859,7 @@ void foldtext_cleanup(char_u *str)
     }
 
     // skip "%s" and white space after it
-    s = skipwhite(cms_end + 2);
+    s = (char_u *)skipwhite((char *)cms_end + 2);
     cms_elen -= (size_t)(s - cms_end);
     cms_end = s;
   }
@@ -2907,7 +2907,7 @@ static void foldlevelIndent(fline_T *flp)
   linenr_T lnum = flp->lnum + flp->off;
 
   buf = flp->wp->w_buffer;
-  s = skipwhite(ml_get_buf(buf, lnum, false));
+  s = (char_u *)skipwhite((char *)ml_get_buf(buf, lnum, false));
 
   // empty line or lines starting with a character in 'foldignore': level
   // depends on surrounding lines

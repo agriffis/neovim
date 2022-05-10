@@ -381,7 +381,7 @@ void terminal_check_size(Terminal *term)
   invalidate_terminal(term, -1, -1);
 }
 
-/// Implements TERM_FOCUS mode. :help Terminal-mode
+/// Implements MODE_TERMINAL state. :help Terminal-mode
 void terminal_enter(void)
 {
   buf_T *buf = curbuf;
@@ -398,8 +398,8 @@ void terminal_enter(void)
 
   int save_state = State;
   s->save_rd = RedrawingDisabled;
-  State = TERM_FOCUS;
-  mapped_ctrl_c |= TERM_FOCUS;  // Always map CTRL-C to avoid interrupt.
+  State = MODE_TERMINAL;
+  mapped_ctrl_c |= MODE_TERMINAL;  // Always map CTRL-C to avoid interrupt.
   RedrawingDisabled = false;
 
   // Disable these options in terminal-mode. They are nonsense because cursor is
@@ -1377,8 +1377,7 @@ static void fetch_row(Terminal *term, int row, int end_col)
     int cell_len = 0;
     if (cell.chars[0]) {
       for (int i = 0; cell.chars[i]; i++) {
-        cell_len += utf_char2bytes((int)cell.chars[i],
-                                   (uint8_t *)ptr + cell_len);
+        cell_len += utf_char2bytes((int)cell.chars[i], ptr + cell_len);
       }
     } else {
       *ptr = ' ';
@@ -1638,7 +1637,7 @@ static int linenr_to_row(Terminal *term, int linenr)
 
 static bool is_focused(Terminal *term)
 {
-  return State & TERM_FOCUS && curbuf->terminal == term;
+  return State & MODE_TERMINAL && curbuf->terminal == term;
 }
 
 static char *get_config_string(char *key)
