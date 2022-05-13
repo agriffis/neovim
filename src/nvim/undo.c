@@ -702,7 +702,7 @@ char *u_get_undo_file_name(const char *const buf_ffname, const bool reading)
       const size_t ffname_len = strlen(ffname);
       undo_file_name = xmalloc(ffname_len + 6);
       memmove(undo_file_name, ffname, ffname_len + 1);
-      char *const tail = (char *)path_tail((char_u *)undo_file_name);
+      char *const tail = path_tail(undo_file_name);
       const size_t tail_len = strlen(tail);
       memmove(tail + 1, tail, tail_len + 1);
       *tail = '.';
@@ -2418,10 +2418,11 @@ static void u_undoredo(int undo, bool do_buf_event)
 
     changed_lines(top + 1, 0, bot, newsize - oldsize, do_buf_event);
 
-    // set '[ and '] mark
+    // Set the '[ mark.
     if (top + 1 < curbuf->b_op_start.lnum) {
       curbuf->b_op_start.lnum = top + 1;
     }
+    // Set the '] mark.
     if (newsize == 0 && top + 1 > curbuf->b_op_end.lnum) {
       curbuf->b_op_end.lnum = top + 1;
     } else if (top + newsize > curbuf->b_op_end.lnum) {
@@ -2440,6 +2441,14 @@ static void u_undoredo(int undo, bool do_buf_event)
     nuep = uep->ue_next;
     uep->ue_next = newlist;
     newlist = uep;
+  }
+
+  // Ensure the '[ and '] marks are within bounds.
+  if (curbuf->b_op_start.lnum > curbuf->b_ml.ml_line_count) {
+    curbuf->b_op_start.lnum = curbuf->b_ml.ml_line_count;
+  }
+  if (curbuf->b_op_end.lnum > curbuf->b_ml.ml_line_count) {
+    curbuf->b_op_end.lnum = curbuf->b_ml.ml_line_count;
   }
 
   // Adjust Extmarks

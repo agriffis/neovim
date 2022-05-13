@@ -56,7 +56,7 @@
 #include "nvim/getchar.h"
 #include "nvim/highlight.h"
 #include "nvim/highlight_group.h"
-#include "nvim/keymap.h"
+#include "nvim/keycodes.h"
 #include "nvim/log.h"
 #include "nvim/macros.h"
 #include "nvim/main.h"
@@ -404,7 +404,7 @@ void terminal_enter(void)
 
   // Disable these options in terminal-mode. They are nonsense because cursor is
   // placed at end of buffer to "follow" output. #11072
-  win_T *save_curwin = curwin;
+  handle_T save_curwin = curwin->handle;
   bool save_w_p_cul = curwin->w_p_cul;
   char_u *save_w_p_culopt = NULL;
   char_u save_w_p_culopt_flags = curwin->w_p_culopt_flags;
@@ -442,7 +442,7 @@ void terminal_enter(void)
   RedrawingDisabled = s->save_rd;
   apply_autocmds(EVENT_TERMLEAVE, NULL, NULL, false, curbuf);
 
-  if (save_curwin == curwin) {  // save_curwin may be invalid (window closed)!
+  if (save_curwin == curwin->handle) {  // Else: window was closed.
     curwin->w_p_cul = save_w_p_cul;
     if (save_w_p_culopt) {
       xfree(curwin->w_p_culopt);

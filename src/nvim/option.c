@@ -49,7 +49,7 @@
 #include "nvim/highlight.h"
 #include "nvim/highlight_group.h"
 #include "nvim/indent_c.h"
-#include "nvim/keymap.h"
+#include "nvim/keycodes.h"
 #include "nvim/macros.h"
 #include "nvim/mbyte.h"
 #include "nvim/memfile.h"
@@ -491,17 +491,17 @@ void set_init_1(bool clean_arg)
 #endif
                      false);
 
-  char *backupdir = stdpaths_user_data_subpath("backup", 2, true);
+  char *backupdir = stdpaths_user_state_subpath("backup", 2, true);
   const size_t backupdir_len = strlen(backupdir);
   backupdir = xrealloc(backupdir, backupdir_len + 3);
   memmove(backupdir + 2, backupdir, backupdir_len + 1);
   memmove(backupdir, ".,", 2);
   set_string_default("backupdir", backupdir, true);
-  set_string_default("viewdir", stdpaths_user_data_subpath("view", 2, true),
+  set_string_default("viewdir", stdpaths_user_state_subpath("view", 2, true),
                      true);
-  set_string_default("directory", stdpaths_user_data_subpath("swap", 2, true),
+  set_string_default("directory", stdpaths_user_state_subpath("swap", 2, true),
                      true);
-  set_string_default("undodir", stdpaths_user_data_subpath("undo", 2, true),
+  set_string_default("undodir", stdpaths_user_state_subpath("undo", 2, true),
                      true);
   // Set default for &runtimepath. All necessary expansions are performed in
   // this function.
@@ -1963,13 +1963,10 @@ static char_u *option_expand(int opt_idx, char_u *val)
   return NameBuff;
 }
 
-// After setting various option values: recompute variables that depend on
-// option values.
-static void didset_options(void)
+/// After setting various option values: recompute variables that depend on
+/// option values.
+static void didset_string_options(void)
 {
-  // initialize the table for 'iskeyword' et.al.
-  (void)init_chartab();
-
   (void)opt_strings_flags(p_cmp, p_cmp_values, &cmp_flags, true);
   (void)opt_strings_flags(p_bkc, p_bkc_values, &bkc_flags, true);
   (void)opt_strings_flags(p_bo, p_bo_values, &bo_flags, true);
@@ -1981,8 +1978,20 @@ static void didset_options(void)
   (void)opt_strings_flags(p_tc, p_tc_values, &tc_flags, false);
   (void)opt_strings_flags(p_tpf, p_tpf_values, &tpf_flags, true);
   (void)opt_strings_flags(p_ve, p_ve_values, &ve_flags, true);
+  (void)opt_strings_flags(p_swb, p_swb_values, &swb_flags, true);
   (void)opt_strings_flags(p_wop, p_wop_values, &wop_flags, true);
   (void)opt_strings_flags(p_jop, p_jop_values, &jop_flags, true);
+}
+
+/// After setting various option values: recompute variables that depend on
+/// option values.
+static void didset_options(void)
+{
+  // initialize the table for 'iskeyword' et.al.
+  (void)init_chartab();
+
+  didset_string_options();
+
   (void)spell_check_msm();
   (void)spell_check_sps();
   (void)compile_cap_prog(curwin->w_s);
@@ -8161,13 +8170,13 @@ size_t copy_option_part(char_u **option, char_u *buf, size_t maxlen, char *sep_c
 /// Return true when 'shell' has "csh" in the tail.
 int csh_like_shell(void)
 {
-  return strstr((char *)path_tail(p_sh), "csh") != NULL;
+  return strstr(path_tail((char *)p_sh), "csh") != NULL;
 }
 
 /// Return true when 'shell' has "fish" in the tail.
 bool fish_like_shell(void)
 {
-  return strstr((char *)path_tail(p_sh), "fish") != NULL;
+  return strstr(path_tail((char *)p_sh), "fish") != NULL;
 }
 
 /// Return the number of requested sign columns, based on current
