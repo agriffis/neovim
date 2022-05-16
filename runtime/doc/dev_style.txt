@@ -48,22 +48,6 @@ The format of the symbol name should be `NVIM_<DIRECTORY>_<FILE>_H`.
 <
 
 
-Names and Order of Includes ~
-
-Use standard order for readability and to avoid hidden dependencies: C
-library, other libraries' `.h`, your project's `.h`.
-
-    In foo.c order your includes as follows:
-
-        1. C system files.
-        2. Other libraries' `.h` files.
-        3. Your project's `.h` files.
-
-    Exception: sometimes, system-specific code needs conditional includes.
-    Such code can put conditional includes after other includes. Of course,
-    keep your system-specific code small and localized.
-
-
 Constants ~
 
 Do not use macros to define constants in headers.
@@ -785,15 +769,6 @@ to follow if everyone uses the same style. Individuals may not agree with
 every aspect of the formatting rules, and some of the rules may take some
 getting used to, but it is important that all project contributors follow the
 style rules so that they can all read and understand everyone's code easily.
-
-
-Line Length ~
-
-Each line of text in your code should be at most 100 characters long.
-
-Exception: if a comment line contains an example command or a literal URL
-longer than 100 characters, that line may be longer than 100 characters for ease
-of cut and paste.
 
 
 Non-ASCII Characters ~

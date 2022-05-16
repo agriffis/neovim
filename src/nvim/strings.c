@@ -637,9 +637,9 @@ static const void *tv_ptr(const typval_T *const tvs, int *const idxp)
   STATIC_ASSERT(OFF(v_string) == OFF(v_list)
                 && OFF(v_string) == OFF(v_dict)
                 && OFF(v_string) == OFF(v_partial)
-                && sizeof(tvs[0].vval.v_string) == sizeof(tvs[0].vval.v_list)
-                && sizeof(tvs[0].vval.v_string) == sizeof(tvs[0].vval.v_dict)
-                && sizeof(tvs[0].vval.v_string) == sizeof(tvs[0].vval.v_partial),
+                && sizeof(tvs[0].vval.v_string) == sizeof(tvs[0].vval.v_list)      // -V568
+                && sizeof(tvs[0].vval.v_string) == sizeof(tvs[0].vval.v_dict)      // -V568
+                && sizeof(tvs[0].vval.v_string) == sizeof(tvs[0].vval.v_partial),  // -V568
                 "Strings, dictionaries, lists and partials are expected to be pointers, "
                 "so that all three of them can be accessed via v_string");
 #undef OFF
@@ -1479,4 +1479,33 @@ int vim_vsnprintf_typval(char *str, size_t str_m, const char *fmt, va_list ap, t
   // character); that is, the number of characters that would have been
   // written to the buffer if it were large enough.
   return (int)str_l;
+}
+
+int kv_do_printf(StringBuilder *str, const char *fmt, ...)
+  FUNC_ATTR_PRINTF(2, 3)
+{
+  size_t remaining = str->capacity - str->size;
+
+  va_list ap;
+  va_start(ap, fmt);
+  int printed = vsnprintf(str->items ? str->items + str->size : NULL, remaining, fmt, ap);
+  va_end(ap);
+
+  if (printed < 0) {
+    return -1;
+  }
+
+  // printed string didn't fit, resize and try again
+  if ((size_t)printed >= remaining) {
+    kv_ensure_space(*str, (size_t)printed + 1);  // include space for NUL terminator at the end
+    va_start(ap, fmt);
+    printed = vsnprintf(str->items + str->size, str->capacity - str->size, fmt, ap);
+    va_end(ap);
+    if (printed < 0) {
+      return -1;
+    }
+  }
+
+  str->size += (size_t)printed;
+  return printed;
 }
