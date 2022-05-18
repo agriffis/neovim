@@ -345,7 +345,7 @@ int do_cmdline(char *cmdline, LineGetter fgetline, void *cookie, int flags)
   // here.  The value of 200 allows nested function calls, ":source", etc.
   // Allow 200 or 'maxfuncdepth', whatever is larger.
   if (call_depth >= 200 && call_depth >= p_mfd) {
-    emsg(_("E169: Command too recursive"));
+    emsg(_(e_command_too_recursive));
     // When converting to an exception, we do not include the command name
     // since this is not an error of the specific command.
     do_errthrow((cstack_T *)NULL, NULL);
@@ -1683,14 +1683,13 @@ void execute_cmd(exarg_T *eap, CmdParseInfo *cmdinfo)
                                    (eap->argt & EX_BUFUNL) != 0, false, false);
       eap->addr_count = 1;
       // Shift each argument by 1
-      if (eap->args != NULL) {
-        for (size_t i = 0; i < eap->argc - 1; i++) {
-          eap->args[i] = eap->args[i + 1];
-        }
-        // Make the last argument point to the NUL terminator at the end of string
-        eap->args[eap->argc - 1] = eap->args[eap->argc - 1] + eap->arglens[eap->argc - 1];
-        eap->argc -= 1;
+      for (size_t i = 0; i < eap->argc - 1; i++) {
+        eap->args[i] = eap->args[i + 1];
       }
+      // Make the last argument point to the NUL terminator at the end of string
+      eap->args[eap->argc - 1] = eap->args[eap->argc - 1] + eap->arglens[eap->argc - 1];
+      eap->argc -= 1;
+
       eap->arg = eap->args[0];
     }
     if (eap->line2 < 0) {  // failed

@@ -785,7 +785,8 @@ describe('API: buffer events:', function()
 
   local function lines_subset(first, second)
     for i = 1,#first do
-      if first[i] ~= second[i] then
+      -- need to ignore trailing spaces
+      if first[i]:gsub(' +$', '') ~= second[i]:gsub(' +$', '') then
         return false
       end
     end
@@ -827,7 +828,6 @@ describe('API: buffer events:', function()
   end
 
   it('when :terminal lines change', function()
-    if helpers.pending_win32(pending) then return end
     local buffer_lines = {}
     local expected_lines = {}
     command('terminal "'..nvim_prog..'" -u NONE -i NONE -n -c "set shortmess+=A"')
