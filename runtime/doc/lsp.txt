@@ -461,6 +461,39 @@ LspSignatureActiveParameter
 ==============================================================================
 EVENTS                                                            *lsp-events*
 
+                                                                   *LspAttach*
+After an LSP client attaches to a buffer. The |autocmd-pattern| is the
+name of the buffer. When used from Lua, the client ID is passed to the
+callback in the "data" table. Example: >
+
+    vim.api.nvim_create_autocmd("LspAttach", {
+      callback = function(args)
+        local bufnr = args.buf
+        local client = vim.lsp.get_client_by_id(args.data.client_id)
+        if client.server_capabilities.completionProvider then
+          vim.bo[bufnr].omnifunc = "v:lua.vim.lsp.omnifunc"
+        end
+        if client.server_capabilities.definitionProvider then
+          vim.bo[bufnr].tagfunc = "v:lua.vim.lsp.tagfunc"
+        end
+      end,
+    })
+<
+                                                                   *LspDetach*
+Just before an LSP client detaches from a buffer. The |autocmd-pattern| is the
+name of the buffer. When used from Lua, the client ID is passed to the
+callback in the "data" table. Example: >
+
+    vim.api.nvim_create_autocmd("LspDetach", {
+      callback = function(args)
+        local client = vim.lsp.get_client_by_id(args.data.client_id)
+        -- Do something with the client
+        vim.cmd("setlocal tagfunc< omnifunc<")
+      end,
+    })
+<
+In addition, the following |User| |autocommands| are provided:
+
 LspProgressUpdate                                          *LspProgressUpdate*
    Upon receipt of a progress notification from the server. See
    |vim.lsp.util.get_progress_messages()|.
@@ -497,14 +530,6 @@ buf_detach_client({bufnr}, {client_id})          *vim.lsp.buf_detach_client()*
                 Parameters: ~
                     {bufnr}      (number) Buffer handle, or 0 for current
                     {client_id}  (number) Client id
-
-buf_get_clients({bufnr})                           *vim.lsp.buf_get_clients()*
-                Gets a map of client_id:client pairs for the given buffer,
-                where each value is a |vim.lsp.client| object.
-
-                Parameters: ~
-                    {bufnr}  (optional, number): Buffer handle, or 0 for
-                             current
 
 buf_is_attached({bufnr}, {client_id})              *vim.lsp.buf_is_attached()*
                 Checks if a buffer is attached for a particular client.
@@ -696,11 +721,22 @@ formatexpr({opts})                                      *vim.lsp.formatexpr()*
                             • timeout_ms (default 500ms). The timeout period
                               for the formatting request.
 
-get_active_clients()                            *vim.lsp.get_active_clients()*
-                Gets all active clients.
+get_active_clients({filter})                    *vim.lsp.get_active_clients()*
+                Get active clients.
+
+                Parameters: ~
+                    {filter}  (table|nil) A table with key-value pairs used to
+                              filter the returned clients. The available keys
+                              are:
+                              • id (number): Only return clients with the
+                                given id
+                              • bufnr (number): Only return clients attached
+                                to this buffer
+                              • name (string): Only return clients with the
+                                given name
 
                 Return: ~
-                    Table of |vim.lsp.client| objects
+                    (table) List of |vim.lsp.client| objects
 
                                           *vim.lsp.get_buffers_by_client_id()*
 get_buffers_by_client_id({client_id})
@@ -1015,14 +1051,24 @@ completion({context})                               *vim.lsp.buf.completion()*
                 See also: ~
                     |vim.lsp.protocol.constants.CompletionTriggerKind|
 
-declaration()                                      *vim.lsp.buf.declaration()*
+declaration({options})                             *vim.lsp.buf.declaration()*
                 Jumps to the declaration of the symbol under the cursor.
                 Note:
                     Many servers do not implement this method. Generally, see
                     |vim.lsp.buf.definition()| instead.
 
-definition()                                        *vim.lsp.buf.definition()*
+                Parameters: ~
+                    {options}  (table|nil) additional options
+                               • reuse_win: (boolean) Jump to existing window
+                                 if buffer is already open.
+
+definition({options})                               *vim.lsp.buf.definition()*
                 Jumps to the definition of the symbol under the cursor.
+
+                Parameters: ~
+                    {options}  (table|nil) additional options
+                               • reuse_win: (boolean) Jump to existing window
+                                 if buffer is already open.
 
 document_highlight()                        *vim.lsp.buf.document_highlight()*
                 Send request to the server to resolve document highlights for
@@ -1250,9 +1296,14 @@ signature_help()                                *vim.lsp.buf.signature_help()*
                 Displays signature information about the symbol under the
                 cursor in a floating window.
 
-type_definition()                              *vim.lsp.buf.type_definition()*
+type_definition({options})                     *vim.lsp.buf.type_definition()*
                 Jumps to the definition of the type of the symbol under the
                 cursor.
+
+                Parameters: ~
+                    {options}  (table|nil) additional options
+                               • reuse_win: (boolean) Jump to existing window
+                                 if buffer is already open.
 
 workspace_symbol({query})                     *vim.lsp.buf.workspace_symbol()*
                 Lists all symbols in the current workspace in the quickfix
@@ -1539,12 +1590,14 @@ get_effective_tabstop({bufnr})          *vim.lsp.util.get_effective_tabstop()*
                     |shiftwidth|
 
                                              *vim.lsp.util.jump_to_location()*
-jump_to_location({location}, {offset_encoding})
+jump_to_location({location}, {offset_encoding}, {reuse_win})
                 Jumps to a location.
 
                 Parameters: ~
                     {location}         (table) (`Location`|`LocationLink`)
                     {offset_encoding}  (string) utf-8|utf-16|utf-32 (required)
+                    {reuse_win}        (boolean) Jump to existing window if
+                                       buffer is already opened.
 
                 Return: ~
                     `true` if the jump succeeded

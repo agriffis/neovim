@@ -557,7 +557,6 @@ static char *(p_rdb_values[]) = {
 #define RDB_NODELTA            0x008
 
 EXTERN long p_rdt;              // 'redrawtime'
-EXTERN int p_remap;             // 'remap'
 EXTERN long p_re;               // 'regexpengine'
 EXTERN long p_report;           // 'report'
 EXTERN long p_pvh;              // 'previewheight'
@@ -618,6 +617,7 @@ EXTERN int p_stmp;              // 'shelltemp'
 EXTERN int p_ssl;               // 'shellslash'
 #endif
 EXTERN char_u *p_stl;         // 'statusline'
+EXTERN char *p_wbr;         // 'winbar'
 EXTERN int p_sr;                // 'shiftround'
 EXTERN char_u *p_shm;         // 'shortmess'
 EXTERN char_u *p_sbr;         // 'showbreak'
@@ -678,7 +678,6 @@ EXTERN int p_tr;                ///< 'tagrelative'
 EXTERN char_u *p_tags;          ///< 'tags'
 EXTERN int p_tgst;              ///< 'tagstack'
 EXTERN int p_tbidi;             ///< 'termbidi'
-EXTERN int p_terse;             ///< 'terse'
 EXTERN int p_to;                ///< 'tildeop'
 EXTERN int p_timeout;           ///< 'timeout'
 EXTERN long p_tm;               ///< 'timeoutlen'
@@ -897,6 +896,7 @@ enum {
   WV_FCS,
   WV_LCS,
   WV_WINBL,
+  WV_WBR,
   WV_COUNT,  // must be the last one
 };
 

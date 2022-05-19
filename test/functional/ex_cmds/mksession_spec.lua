@@ -1,15 +1,18 @@
 local lfs = require('lfs')
 local helpers = require('test.functional.helpers')(after_each)
+local Screen = require('test.functional.ui.screen')
 
 local clear = helpers.clear
 local command = helpers.command
 local get_pathsep = helpers.get_pathsep
+local iswin = helpers.iswin
 local eq = helpers.eq
 local neq = helpers.neq
 local funcs = helpers.funcs
 local matches = helpers.matches
 local pesc = helpers.pesc
 local rmdir = helpers.rmdir
+local sleep = helpers.sleep
 
 local file_prefix = 'Xtest-functional-ex_cmds-mksession_spec'
 
@@ -102,9 +105,13 @@ describe(':mksession', function()
     local session_path = cwd_dir..'/'..session_file
 
     command('cd '..tab_dir)
-    command('terminal echo $PWD')
+    command('terminal')
     command('cd '..cwd_dir)
     command('mksession '..session_path)
+    command('bdelete!')
+    if iswin() then
+      sleep(100)  -- Make sure all child processes have exited.
+    end
     command('qall!')
 
     -- Create a new test instance of Nvim.
@@ -113,5 +120,50 @@ describe(':mksession', function()
 
     local expected_cwd = cwd_dir..'/'..tab_dir
     matches('^term://'..pesc(expected_cwd)..'//%d+:', funcs.expand('%'))
+    command('bdelete!')
+    if iswin() then
+      sleep(100)  -- Make sure all child processes have exited.
+    end
+  end)
+
+  it('restores CWD for :terminal buffer at root directory #16988', function()
+    if iswin() then
+      pending('N/A for Windows')
+      return
+    end
+
+    local screen
+    local cwd_dir = funcs.fnamemodify('.', ':p:~'):gsub([[[\/]*$]], '')
+    local session_path = cwd_dir..'/'..session_file
+
+    screen = Screen.new(50, 6)
+    screen:attach({rgb=false})
+    local expected_screen = [[
+      ^/                                                 |
+                                                        |
+      [Process exited 0]                                |
+                                                        |
+                                                        |
+                                                        |
+    ]]
+
+    command('cd /')
+    command('terminal echo $PWD')
+
+    -- Verify that the terminal's working directory is "/".
+    screen:expect(expected_screen)
+
+    command('cd '..cwd_dir)
+    command('mksession '..session_path)
+    command('qall!')
+
+    -- Create a new test instance of Nvim.
+    clear()
+    screen = Screen.new(50, 6)
+    screen:attach({rgb=false})
+    command('silent source '..session_path)
+
+    -- Verify that the terminal's working directory is "/".
+    screen:expect(expected_screen)
   end)
 end)

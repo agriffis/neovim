@@ -6405,7 +6405,7 @@ dict_T *get_win_info(win_T *wp, int16_t tpnr, int16_t winnr)
   tv_dict_add_nr(dict, S_LEN("winrow"), wp->w_winrow + 1);
   tv_dict_add_nr(dict, S_LEN("topline"), wp->w_topline);
   tv_dict_add_nr(dict, S_LEN("botline"), wp->w_botline - 1);
-  tv_dict_add_nr(dict, S_LEN("winbar"), 0);
+  tv_dict_add_nr(dict, S_LEN("winbar"), wp->w_winbar_height);
   tv_dict_add_nr(dict, S_LEN("width"), wp->w_width);
   tv_dict_add_nr(dict, S_LEN("bufnr"), wp->w_buffer->b_fnum);
   tv_dict_add_nr(dict, S_LEN("wincol"), wp->w_wincol + 1);
@@ -6865,8 +6865,8 @@ void screenchar_adjust_grid(ScreenGrid **grid, int *row, int *col)
   // have its own buffer, this should just read from it instead.
   msg_scroll_flush();
   if (msg_grid.chars && msg_grid.comp_index > 0 && *row >= msg_grid.comp_row
-      && *row < (msg_grid.Rows + msg_grid.comp_row)
-      && *col < msg_grid.Columns) {
+      && *row < (msg_grid.rows + msg_grid.comp_row)
+      && *col < msg_grid.cols) {
     *grid = &msg_grid;
     *row -= msg_grid.comp_row;
   }

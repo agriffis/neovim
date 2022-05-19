@@ -1911,9 +1911,9 @@ return {
     },
     {
       full_name='remap',
-      short_desc=N_("mappings to work recursively"),
+      short_desc=N_("No description"),
       type='bool', scope={'global'},
-      varname='p_remap',
+      varname='p_force_on',
       defaults={if_true=true}
     },
     {
@@ -2529,9 +2529,9 @@ return {
     },
     {
       full_name='terse',
-      short_desc=N_("hides notification of search wrap"),
+      short_desc=N_("No description"),
       type='bool', scope={'global'},
-      varname='p_terse',
+      varname='p_force_off',
       defaults={if_true=false}
     },
     {
@@ -2830,6 +2830,16 @@ return {
       type='string', scope={'global'},
       varname='p_wak',
       defaults={if_true="menu"}
+    },
+    {
+      full_name='winbar', abbreviation='wbr',
+      short_desc=N_("custom format for the window bar"),
+      type='string', scope={'global', 'window'},
+      alloced=true,
+      modelineexpr=true,
+      redraw={'statuslines'},
+      varname='p_wbr',
+      defaults={if_true=""}
     },
     {
       full_name='winblend', abbreviation='winbl',

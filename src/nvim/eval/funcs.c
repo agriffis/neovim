@@ -3611,8 +3611,8 @@ static void f_getmousepos(typval_T *argvars, typval_T *rettv, FunPtr fptr)
     // necessary for a top border since `row` starts at -1 in that case.
     if (row < height + wp->w_border_adj[2]) {
       winid = wp->handle;
-      winrow = row + 1 + wp->w_border_adj[0];  // Adjust by 1 for top border
-      wincol = col + 1 + wp->w_border_adj[3];  // Adjust by 1 for left border
+      winrow = row + 1 + wp->w_winrow_off;  // Adjust by 1 for top border
+      wincol = col + 1 + wp->w_wincol_off;  // Adjust by 1 for left border
       if (row >= 0 && row < wp->w_height && col >= 0 && col < wp->w_width) {
         (void)mouse_comp_pos(wp, &row, &col, &lnum);
         col = vcol2col(wp, lnum, col);
@@ -8047,8 +8047,8 @@ static void f_screenattr(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 
   int row = (int)tv_get_number_chk(&argvars[0], NULL) - 1;
   int col = (int)tv_get_number_chk(&argvars[1], NULL) - 1;
-  if (row < 0 || row >= default_grid.Rows
-      || col < 0 || col >= default_grid.Columns) {
+  if (row < 0 || row >= default_grid.rows
+      || col < 0 || col >= default_grid.cols) {
     c = -1;
   } else {
     ScreenGrid *grid = &default_grid;
@@ -8065,8 +8065,8 @@ static void f_screenchar(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 
   int row = tv_get_number_chk(&argvars[0], NULL) - 1;
   int col = tv_get_number_chk(&argvars[1], NULL) - 1;
-  if (row < 0 || row >= default_grid.Rows
-      || col < 0 || col >= default_grid.Columns) {
+  if (row < 0 || row >= default_grid.rows
+      || col < 0 || col >= default_grid.cols) {
     c = -1;
   } else {
     ScreenGrid *grid = &default_grid;
@@ -8081,8 +8081,8 @@ static void f_screenchars(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
   int row = tv_get_number_chk(&argvars[0], NULL) - 1;
   int col = tv_get_number_chk(&argvars[1], NULL) - 1;
-  if (row < 0 || row >= default_grid.Rows
-      || col < 0 || col >= default_grid.Columns) {
+  if (row < 0 || row >= default_grid.rows
+      || col < 0 || col >= default_grid.cols) {
     tv_list_alloc_ret(rettv, 0);
     return;
   }
@@ -8148,8 +8148,8 @@ static void f_screenstring(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   rettv->v_type = VAR_STRING;
   int row = tv_get_number_chk(&argvars[0], NULL) - 1;
   int col = tv_get_number_chk(&argvars[1], NULL) - 1;
-  if (row < 0 || row >= default_grid.Rows
-      || col < 0 || col >= default_grid.Columns) {
+  if (row < 0 || row >= default_grid.rows
+      || col < 0 || col >= default_grid.cols) {
     return;
   }
   ScreenGrid *grid = &default_grid;
@@ -10790,8 +10790,14 @@ static void f_termopen(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   // "/home/foo/…" => "~/…"
   size_t len = home_replace(NULL, NameBuff, IObuff, sizeof(IObuff), true);
   // Trim slash.
-  if (IObuff[len - 1] == '\\' || IObuff[len - 1] == '/') {
+  if (len != 1 && (IObuff[len - 1] == '\\' || IObuff[len - 1] == '/')) {
     IObuff[len - 1] = '\0';
+  }
+
+  if (len == 1 && IObuff[0] == '/') {
+    // Avoid ambiguity in the URI when CWD is root directory.
+    IObuff[1] = '.';
+    IObuff[2] = '\0';
   }
 
   // Terminal URI: "term://$CWD//$PID:$CMD"

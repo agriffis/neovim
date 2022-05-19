@@ -80,6 +80,7 @@ return {
     "maxwidth";
     "fillchar";
     "highlights";
+    "use_winbar";
     "use_tabline";
   };
   option = {
@@ -145,6 +146,7 @@ return {
     "group";
     "modeline";
     "pattern";
+    "data";
   };
   get_autocmds = {
     "event";
