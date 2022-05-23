@@ -971,7 +971,11 @@ int do_move(linenr_T line1, linenr_T line2, linenr_T dest)
    */
   last_line = curbuf->b_ml.ml_line_count;
   mark_adjust_nofold(line1, line2, last_line - line2, 0L, kExtmarkNOOP);
+
+  disable_fold_update++;
   changed_lines(last_line - num_lines + 1, 0, last_line + 1, num_lines, false);
+  disable_fold_update--;
+
   int line_off = 0;
   bcount_t byte_off = 0;
   if (dest >= line2) {
@@ -1005,7 +1009,9 @@ int do_move(linenr_T line1, linenr_T line2, linenr_T dest)
   mark_adjust_nofold(last_line - num_lines + 1, last_line,
                      -(last_line - dest - extra), 0L, kExtmarkNOOP);
 
+  disable_fold_update++;
   changed_lines(last_line - num_lines + 1, 0, last_line + 1, -extra, false);
+  disable_fold_update--;
 
   // send update regarding the new lines that were added
   buf_updates_send_changes(curbuf, dest + 1, num_lines, 0, true);
@@ -2872,10 +2878,6 @@ int do_ecmd(int fnum, char *ffname, char *sfname, exarg_T *eap, linenr_T newlnum
     curwin->w_scbind_pos = curwin->w_topline;
     *so_ptr = n;
     redraw_curbuf_later(NOT_VALID);     // redraw this buffer later
-  }
-
-  if (p_im && (State & MODE_INSERT) == 0) {
-    need_start_insertmode = true;
   }
 
   // Change directories when the 'acd' option is set.
@@ -4903,9 +4905,8 @@ void ex_help(exarg_T *eap)
     }
   }
 
-  if (!p_im) {
-    restart_edit = 0;               // don't want insert mode in help file
-  }
+  restart_edit = 0;               // don't want insert mode in help file
+
   // Restore KeyTyped, setting 'filetype=help' may reset it.
   // It is needed for do_tag top open folds under the cursor.
   KeyTyped = old_KeyTyped;
