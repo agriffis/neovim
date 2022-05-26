@@ -146,7 +146,7 @@ char *vim_strnsave_unquoted(const char *const string, const size_t length)
   FUNC_ATTR_NONNULL_RET
 {
 #define ESCAPE_COND(p, inquote, string_end) \
-  (*p == '\\' && inquote && p + 1 < string_end && (p[1] == '\\' || p[1] == '"'))
+  (*(p) == '\\' && (inquote) && (p) + 1 < (string_end) && ((p)[1] == '\\' || (p)[1] == '"'))
   size_t ret_length = 0;
   bool inquote = false;
   const char *const string_end = string + length;
@@ -552,7 +552,6 @@ char_u *concat_str(const char_u *restrict str1, const char_u *restrict str2)
   STRCPY(dest + l, str2);
   return dest;
 }
-
 
 static const char *const e_printf =
   N_("E766: Insufficient arguments for printf()");

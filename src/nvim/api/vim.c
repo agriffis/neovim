@@ -209,7 +209,6 @@ static void on_redraw_event(void **argv)
   redraw_all_later(NOT_VALID);
 }
 
-
 /// Sends input-keys to Nvim, subject to various quirks controlled by `mode`
 /// flags. This is a blocking call, unlike |nvim_input()|.
 ///
@@ -441,7 +440,6 @@ String nvim_replace_termcodes(String str, Boolean from_part, Boolean do_lt, Bool
   return cstr_as_string(ptr);
 }
 
-
 /// Execute Lua code. Parameters (if any) are available as `...` inside the
 /// chunk. The chunk can return a value.
 ///
@@ -569,7 +567,6 @@ ArrayOf(String) nvim__get_runtime(Array pat, Boolean all, Dict(runtime) *opts, E
   }
   return runtime_get_named(is_lua, pat, all);
 }
-
 
 /// Changes the global working directory.
 ///
@@ -775,11 +772,15 @@ end:
 /// |:set|: for global-local options, both the global and local value are set
 /// unless otherwise specified with {scope}.
 ///
+/// Note the options {win} and {buf} cannot be used together.
+///
 /// @param name      Option name
 /// @param value     New option value
 /// @param opts      Optional parameters
 ///                  - scope: One of 'global' or 'local'. Analogous to
 ///                  |:setglobal| and |:setlocal|, respectively.
+///                  - win: |window-ID|. Used for setting window local option.
+///                  - buf: Buffer number. Used for setting buffer local option.
 /// @param[out] err  Error details, if any
 void nvim_set_option_value(String name, Object value, Dict(option) *opts, Error *err)
   FUNC_API_SINCE(9)
@@ -796,6 +797,36 @@ void nvim_set_option_value(String name, Object value, Dict(option) *opts, Error 
     }
   } else if (HAS_KEY(opts->scope)) {
     api_set_error(err, kErrorTypeValidation, "invalid value for key: scope");
+    return;
+  }
+
+  int opt_type = SREQ_GLOBAL;
+  void *to = NULL;
+
+  if (opts->win.type == kObjectTypeInteger) {
+    opt_type = SREQ_WIN;
+    to = find_window_by_handle((int)opts->win.data.integer, err);
+  } else if (HAS_KEY(opts->win)) {
+    api_set_error(err, kErrorTypeValidation, "invalid value for key: win");
+    return;
+  }
+
+  if (opts->buf.type == kObjectTypeInteger) {
+    scope = OPT_LOCAL;
+    opt_type = SREQ_BUF;
+    to = find_buffer_by_handle((int)opts->buf.data.integer, err);
+  } else if (HAS_KEY(opts->buf)) {
+    api_set_error(err, kErrorTypeValidation, "invalid value for key: buf");
+    return;
+  }
+
+  if (HAS_KEY(opts->scope) && HAS_KEY(opts->buf)) {
+    api_set_error(err, kErrorTypeValidation, "scope and buf cannot be used together");
+    return;
+  }
+
+  if (HAS_KEY(opts->win) && HAS_KEY(opts->buf)) {
+    api_set_error(err, kErrorTypeValidation, "buf and win cannot be used together");
     return;
   }
 
@@ -820,10 +851,7 @@ void nvim_set_option_value(String name, Object value, Dict(option) *opts, Error 
     return;
   }
 
-  char *e = set_option_value(name.data, numval, stringval, scope);
-  if (e) {
-    api_set_error(err, kErrorTypeException, "%s", e);
-  }
+  set_option_value_for(name.data, numval, stringval, scope, opt_type, to, err);
 }
 
 /// Gets the option information for all options.
@@ -1213,7 +1241,6 @@ static void term_close(void *data)
   chan->stream.internal.cb = LUA_NOREF;
   channel_decref(chan);
 }
-
 
 /// Send data to channel `id`. For a job, it writes it to the
 /// stdin of the process. For the stdio channel |channel-stdio|,
@@ -1904,13 +1931,13 @@ static void write_msg(String message, bool to_err)
   static char out_line_buf[LINE_BUFFER_SIZE], err_line_buf[LINE_BUFFER_SIZE];
 
 #define PUSH_CHAR(i, pos, line_buf, msg) \
-  if (message.data[i] == NL || pos == LINE_BUFFER_SIZE - 1) { \
-    line_buf[pos] = NUL; \
+  if (message.data[i] == NL || (pos) == LINE_BUFFER_SIZE - 1) { \
+    (line_buf)[pos] = NUL; \
     msg(line_buf); \
-    pos = 0; \
+    (pos) = 0; \
     continue; \
   } \
-  line_buf[pos++] = message.data[i];
+  (line_buf)[(pos)++] = message.data[i];
 
   no_wait_return++;
   for (uint32_t i = 0; i < message.size; i++) {
@@ -2160,7 +2187,6 @@ void nvim__screenshot(String path)
 {
   ui_call_screenshot(path);
 }
-
 
 /// Deletes an uppercase/file named mark. See |mark-motions|.
 ///
