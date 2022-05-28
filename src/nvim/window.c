@@ -1334,7 +1334,6 @@ int win_split_ins(int size, int flags, win_T *new_wp, int dir)
     set_fraction(oldwin);
   }
   wp->w_fraction = oldwin->w_fraction;
-  wp->w_winbar_height = oldwin->w_winbar_height;
 
   if (flags & WSP_VERT) {
     wp->w_p_scr = curwin->w_p_scr;
@@ -1571,6 +1570,8 @@ static void win_init(win_T *newp, win_T *oldp, int flags)
   copyFoldingState(oldp, newp);
 
   win_init_some(newp, oldp);
+
+  newp->w_winbar_height = oldp->w_winbar_height;
 }
 
 /*
@@ -6689,7 +6690,10 @@ static void last_status_rec(frame_T *fr, bool statusline, bool is_stl_global)
 void set_winbar(void)
 {
   FOR_ALL_WINDOWS_IN_TAB(wp, curtab) {
-    int winbar_height = (*p_wbr != NUL || *wp->w_p_wbr != NUL) ? 1 : 0;
+    // Require the local value to be set in order to show winbar on a floating window.
+    int winbar_height = wp->w_floating ? ((*wp->w_p_wbr != NUL) ? 1 : 0)
+                                       : ((*p_wbr != NUL || *wp->w_p_wbr != NUL) ? 1 : 0);
+
     if (wp->w_winbar_height != winbar_height) {
       wp->w_winbar_height = winbar_height;
       win_set_inner_size(wp);
