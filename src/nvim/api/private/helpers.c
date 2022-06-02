@@ -678,11 +678,7 @@ void modify_keymap(uint64_t channel_id, Buffer buffer, bool is_unmap, String mod
     if (rhs.size == 0) {  // assume that the user wants RHS to be a <Nop>
       parsed_args.rhs_is_noop = true;
     } else {
-      // the given RHS was nonempty and not a <Nop>, but was parsed as if it
-      // were empty?
-      assert(false && "Failed to parse nonempty RHS!");
-      api_set_error(err, kErrorTypeValidation, "Parsing of nonempty RHS failed: %s", rhs.data);
-      goto fail_and_free;
+      abort();  // should never happen
     }
   } else if (is_unmap && (parsed_args.rhs_len || parsed_args.rhs_lua != LUA_NOREF)) {
     if (parsed_args.rhs_len) {
@@ -1438,6 +1434,7 @@ void create_user_command(String name, Object command, Dict(user_command) *opts, 
   char *rep = NULL;
   LuaRef luaref = LUA_NOREF;
   LuaRef compl_luaref = LUA_NOREF;
+  LuaRef preview_luaref = LUA_NOREF;
 
   if (!uc_validate_name(name.data)) {
     api_set_error(err, kErrorTypeValidation, "Invalid command name");
@@ -1592,6 +1589,14 @@ void create_user_command(String name, Object command, Dict(user_command) *opts, 
     goto err;
   }
 
+  if (opts->preview.type == kObjectTypeLuaRef) {
+    argt |= EX_PREVIEW;
+    preview_luaref = api_new_luaref(opts->preview.data.luaref);
+  } else if (HAS_KEY(opts->preview)) {
+    api_set_error(err, kErrorTypeValidation, "Invalid value for 'preview'");
+    goto err;
+  }
+
   switch (command.type) {
   case kObjectTypeLuaRef:
     luaref = api_new_luaref(command.data.luaref);
@@ -1611,7 +1616,7 @@ void create_user_command(String name, Object command, Dict(user_command) *opts, 
   }
 
   if (uc_add_command(name.data, name.size, rep, argt, def, flags, compl, compl_arg, compl_luaref,
-                     addr_type_arg, luaref, force) != OK) {
+                     preview_luaref, addr_type_arg, luaref, force) != OK) {
     api_set_error(err, kErrorTypeException, "Failed to create user command");
     // Do not goto err, since uc_add_command now owns luaref, compl_luaref, and compl_arg
   }
