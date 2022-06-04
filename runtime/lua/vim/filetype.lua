@@ -6,11 +6,11 @@ local M = {}
 local function starsetf(ft)
   return {
     function(path)
-      if not vim.g.fg_ignore_pat then
+      if not vim.g.ft_ignore_pat then
         return ft
       end
 
-      local re = vim.regex(vim.g.fg_ignore_pat)
+      local re = vim.regex(vim.g.ft_ignore_pat)
       if re:match_str(path) then
         return ft
       end
@@ -1230,9 +1230,10 @@ local filename = {
   Dockerfile = 'dockerfile',
   npmrc = 'dosini',
   ['/etc/yum.conf'] = 'dosini',
-  ['/etc/pacman.conf'] = 'conf',
   ['.npmrc'] = 'dosini',
   ['.editorconfig'] = 'dosini',
+  ['/etc/pacman.conf'] = 'confini',
+  ['mpv.conf'] = 'confini',
   dune = 'dune',
   jbuild = 'dune',
   ['dune-workspace'] = 'dune',
@@ -1558,7 +1559,7 @@ local pattern = {
   ['.*/etc/DIR_COLORS'] = 'dircolors',
   ['.*/etc/dnsmasq%.conf'] = 'dnsmasq',
   ['php%.ini%-.*'] = 'dosini',
-  ['.*/etc/pacman%.conf'] = 'conf',
+  ['.*/etc/pacman%.conf'] = 'confini',
   ['.*/etc/yum%.conf'] = 'dosini',
   ['.*lvs'] = 'dracula',
   ['.*lpe'] = 'dracula',
