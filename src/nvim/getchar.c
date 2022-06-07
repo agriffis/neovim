@@ -2328,19 +2328,19 @@ static int vgetorpeek(bool advance)
       // try re-mapping.
       for (;;) {
         check_end_reg_executing(advance);
-        // os_breakcheck() can call input_enqueue()
-        if ((mapped_ctrl_c | curbuf->b_mapped_ctrl_c) & get_real_state()) {
-          ctrl_c_interrupts = false;
-        }
         // os_breakcheck() is slow, don't use it too often when
         // inside a mapping.  But call it each time for typed
         // characters.
         if (typebuf.tb_maplen) {
           line_breakcheck();
         } else {
+          // os_breakcheck() can call input_enqueue()
+          if ((mapped_ctrl_c | curbuf->b_mapped_ctrl_c) & get_real_state()) {
+            ctrl_c_interrupts = false;
+          }
           os_breakcheck();  // check for CTRL-C
+          ctrl_c_interrupts = true;
         }
-        ctrl_c_interrupts = true;
         int keylen = 0;
         if (got_int) {
           // flush all input
@@ -2585,8 +2585,8 @@ static int vgetorpeek(bool advance)
 
         // get a character: 3. from the user - get it
         if (typebuf.tb_len == 0) {
-          // timedout may have been set while waiting for a mapping
-          // that has a <Nop> RHS.
+          // timedout may have been set if a mapping with empty RHS
+          // fully matched while longer mappings timed out.
           timedout = false;
         }
 
