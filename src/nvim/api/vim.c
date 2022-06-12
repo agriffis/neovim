@@ -562,10 +562,25 @@ ArrayOf(String) nvim__get_runtime(Array pat, Boolean all, Dict(runtime) *opts, E
   FUNC_API_FAST
 {
   bool is_lua = api_object_to_bool(opts->is_lua, "is_lua", false, err);
+  bool source = api_object_to_bool(opts->do_source, "do_source", false, err);
+  if (source && !nlua_is_deferred_safe()) {
+    api_set_error(err, kErrorTypeValidation, "'do_source' cannot be used in fast callback");
+  }
+
   if (ERROR_SET(err)) {
     return (Array)ARRAY_DICT_INIT;
   }
-  return runtime_get_named(is_lua, pat, all);
+
+  ArrayOf(String) res = runtime_get_named(is_lua, pat, all);
+
+  if (source) {
+    for (size_t i = 0; i < res.size; i++) {
+      String name = res.items[i].data.string;
+      (void)do_source(name.data, false, DOSO_NONE);
+    }
+  }
+
+  return res;
 }
 
 /// Changes the global working directory.
@@ -927,26 +942,15 @@ void nvim_echo(Array chunks, Boolean history, Dictionary opts, Error *err)
     goto error;
   }
 
-  no_wait_return++;
-  msg_start();
-  msg_clr_eos();
-  bool need_clear = false;
-  for (uint32_t i = 0; i < kv_size(hl_msg); i++) {
-    HlMessageChunk chunk = kv_A(hl_msg, i);
-    msg_multiline_attr((const char *)chunk.text.data, chunk.attr,
-                       true, &need_clear);
-  }
+  msg_multiattr(hl_msg, history ? "echomsg" : "echo", history);
+
   if (history) {
-    msg_ext_set_kind("echomsg");
-    add_hl_msg_hist(hl_msg);
-  } else {
-    msg_ext_set_kind("echo");
+    // history takes ownership
+    return;
   }
-  no_wait_return--;
-  msg_end();
 
 error:
-  clear_hl_msg(&hl_msg);
+  hl_msg_free(hl_msg);
 }
 
 /// Writes a message to the Vim output buffer. Does not append "\n", the
