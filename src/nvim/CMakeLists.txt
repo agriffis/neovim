@@ -1,5 +1,7 @@
 option(USE_GCOV "Enable gcov support" OFF)
 
+include(DefCmdTarget)
+
 if(USE_GCOV)
   if(CLANG_TSAN)
     # GCOV and TSAN results in false data race reports
@@ -802,12 +804,23 @@ foreach(sfile ${LINT_NVIM_SOURCES})
 endforeach()
 add_custom_target(lintc DEPENDS ${LINT_TARGETS})
 
+def_cmd_target(lintuncrustify ${UNCRUSTIFY_PRG} UNCRUSTIFY_PRG false)  # Non-fatal so that "lintc" target can depend on it.
+if(UNCRUSTIFY_PRG)
+  add_custom_command(OUTPUT lintuncrustify-cmd APPEND
+    COMMAND ${CMAKE_COMMAND}
+      -D UNCRUSTIFY_PRG=${UNCRUSTIFY_PRG}
+      -D PROJECT_SOURCE_DIR=${PROJECT_SOURCE_DIR}
+      -D NVIM_SOURCES="${NVIM_SOURCES}"
+      -D NVIM_HEADERS="${NVIM_HEADERS}"
+      -P ${PROJECT_SOURCE_DIR}/cmake/RunUncrustify.cmake)
+endif()
+
 add_custom_target(
   lintcfull
   COMMAND
     ${LINT_PRG} --suppress-errors=${LINT_SUPPRESS_FILE} ${LINT_NVIM_REL_SOURCES}
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-  DEPENDS ${LINT_PRG} ${LINT_NVIM_SOURCES} ${LINT_SUPPRESS_FILE}
+  DEPENDS ${LINT_PRG} ${LINT_NVIM_SOURCES} ${LINT_SUPPRESS_FILE} lintuncrustify
 )
 
 add_custom_target(generated-sources DEPENDS
