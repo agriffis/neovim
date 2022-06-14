@@ -108,11 +108,9 @@ typedef enum {
   kCmdRedrawAll,
 } CmdRedraw;
 
-/*
- * Variables shared between getcmdline(), redrawcmdline() and others.
- * These need to be saved when using CTRL-R |, that's why they are in a
- * structure.
- */
+// Variables shared between getcmdline(), redrawcmdline() and others.
+// These need to be saved when using CTRL-R |, that's why they are in a
+// structure.
 struct cmdline_info {
   char_u *cmdbuff;         // pointer to command line buffer
   int cmdbufflen;               // length of cmdbuff
@@ -139,6 +137,7 @@ struct cmdline_info {
   bool special_shift;           ///< shift of last putcmdline char
   CmdRedraw redraw_state;       ///< needed redraw for external cmdline
 };
+
 /// Last value of prompt_id, incremented when doing new prompt
 static unsigned last_prompt_id = 0;
 
@@ -689,6 +688,14 @@ static void finish_incsearch_highlighting(int gotesc, incsearch_state_T *s, bool
 /// @param init_ccline  clear ccline first
 static uint8_t *command_line_enter(int firstc, long count, int indent, bool init_ccline)
 {
+  bool cmdheight0 = p_ch < 1 && !ui_has(kUIMessages) && vpeekc() == NUL;
+
+  if (cmdheight0) {
+    // If cmdheight is 0, cmdheight must be set to 1 when we enter command line.
+    set_option_value("ch", 1L, NULL, 0);
+    redraw_statuslines();
+  }
+
   // can be invoked recursively, identify each level
   static int cmdline_level = 0;
   cmdline_level++;
@@ -974,6 +981,11 @@ theend:
     restore_cmdline(&save_ccline);
   } else {
     ccline.cmdbuff = NULL;
+  }
+
+  if (cmdheight0) {
+    // Restore cmdheight
+    set_option_value("ch", 0L, NULL, 0);
   }
 
   return p;
@@ -2381,11 +2393,12 @@ static void cmdpreview_show(CommandLineState *s)
   // Copy the command line so we can modify it.
   char *cmdline = xstrdup((char *)ccline.cmdbuff);
   char *errormsg = NULL;
-
-  parse_cmdline(cmdline, &ea, &cmdinfo, &errormsg);
-  if (errormsg != NULL) {
+  emsg_off++;  // Block errors when parsing the command line, and don't update v:errmsg
+  if (!parse_cmdline(cmdline, &ea, &cmdinfo, &errormsg)) {
+    emsg_off--;
     goto end;
   }
+  emsg_off--;
 
   // Swap invalid command range if needed
   if ((ea.argt & EX_RANGE) && ea.line1 > ea.line2) {
@@ -2409,7 +2422,8 @@ static void cmdpreview_show(CommandLineState *s)
   cmdmod_T save_cmdmod = cmdmod;
 
   cmdpreview = true;
-  emsg_silent++;                 // Block error reporting as the command may be incomplete
+  emsg_silent++;                 // Block error reporting as the command may be incomplete,
+                                 // but still update v:errmsg
   msg_silent++;                  // Block messages, namely ones that prompt
   block_autocmds();              // Block events
   garray_T save_view;
@@ -2668,6 +2682,12 @@ char *getcmdline_prompt(const char firstc, const char *const prompt, const int a
   }
 
   return ret;
+}
+
+// Return current cmdline prompt
+char_u *get_cmdprompt(void)
+{
+  return ccline.cmdprompt;
 }
 
 /*
@@ -3777,7 +3797,7 @@ void redrawcmd(void)
   msg_no_more = TRUE;
   draw_cmdline(0, ccline.cmdlen);
   msg_clr_eos();
-  msg_no_more = FALSE;
+  msg_no_more = false;
 
   ccline.cmdspos = cmd_screencol(ccline.cmdpos);
 
