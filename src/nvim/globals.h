@@ -709,7 +709,7 @@ EXTERN typebuf_T typebuf INIT(= { NULL, NULL, 0, 0, 0, 0, 0, 0, 0 });
 EXTERN int ex_normal_busy INIT(= 0);     // recursiveness of ex_normal()
 EXTERN int ex_normal_lock INIT(= 0);     // forbid use of ex_normal()
 EXTERN int ignore_script INIT(= false);  // ignore script input
-EXTERN int stop_insert_mode;             // for ":stopinsert" and 'insertmode'
+EXTERN int stop_insert_mode;             // for ":stopinsert"
 EXTERN bool KeyTyped;                    // true if user typed current char
 EXTERN int KeyStuffed;                   // true if current char from stuffbuf
 EXTERN int maptick INIT(= 0);            // tick for each non-mapped char
@@ -757,7 +757,7 @@ EXTERN bool did_cursorhold INIT(= false);      // set when CursorHold t'gerd
 
 EXTERN int postponed_split INIT(= 0);        // for CTRL-W CTRL-] command
 EXTERN int postponed_split_flags INIT(= 0);  // args for win_split()
-EXTERN int postponed_split_tab INIT(= 0);    // cmdmod.tab
+EXTERN int postponed_split_tab INIT(= 0);    // cmdmod.cmod_tab
 EXTERN int g_do_tagpreview INIT(= 0);  // for tag preview commands:
                                        // height of preview window
 EXTERN bool g_tag_at_cursor INIT(= false);  // whether the tag command comes

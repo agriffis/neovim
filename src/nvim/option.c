@@ -4593,7 +4593,7 @@ static char *set_num_option(int opt_idx, char_u *varp, long value, char *errbuf,
   } else if (pp == &curwin->w_p_nuw) {
     curwin->w_nrwidth_line_count = 0;
   } else if (pp == &curwin->w_p_winbl && value != old_value) {
-    // 'floatblend'
+    // 'winblend'
     curwin->w_p_winbl = MAX(MIN(curwin->w_p_winbl, 100), 0);
     curwin->w_hl_needs_update = true;
     check_blending(curwin);
@@ -6515,7 +6515,7 @@ void buf_copy_options(buf_T *buf, int flags)
       buf->b_p_ml_nobin = p_ml_nobin;
       buf->b_p_inf = p_inf;
       COPY_OPT_SCTX(buf, BV_INF);
-      if (cmdmod.noswapfile) {
+      if (cmdmod.cmod_flags & CMOD_NOSWAPFILE) {
         buf->b_p_swf = false;
       } else {
         buf->b_p_swf = p_swf;
