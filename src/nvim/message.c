@@ -853,7 +853,7 @@ void msg_schedule_semsg(const char *const fmt, ...)
   va_end(ap);
 
   char *s = xstrdup((char *)IObuff);
-  multiqueue_put(main_loop.events, msg_semsg_event, 1, s);
+  loop_schedule_deferred(&main_loop, event_create(msg_semsg_event, 1, s));
 }
 
 /// Like msg(), but truncate to a single line if p_shm contains 't', or when
@@ -1851,8 +1851,8 @@ void msg_prt_line(char_u *s, int list)
       } else if (curwin->w_p_lcs_chars.nbsp != NUL && list
                  && (utf_ptr2char((char *)s) == 160
                      || utf_ptr2char((char *)s) == 0x202f)) {
-        utf_char2bytes(curwin->w_p_lcs_chars.nbsp, buf);
-        buf[utfc_ptr2len(buf)] = NUL;
+        int len = utf_char2bytes(curwin->w_p_lcs_chars.nbsp, buf);
+        buf[len] = NUL;
       } else {
         memmove(buf, s, (size_t)l);
         buf[l] = NUL;
