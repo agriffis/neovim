@@ -49,6 +49,7 @@
 #include "nvim/sign.h"
 #include "nvim/syntax.h"
 #include "nvim/ui.h"
+#include "nvim/ui_compositor.h"
 #include "nvim/undo.h"
 #include "nvim/version.h"
 #include "nvim/window.h"
@@ -6790,57 +6791,6 @@ char **tv_to_argv(typval_T *cmd_tv, const char **cmd, bool *executable)
   return argv;
 }
 
-/// Fill a dictionary with all applicable maparg() like dictionaries
-///
-/// @param dict          The dictionary to be filled
-/// @param mp            The maphash that contains the mapping information
-/// @param buffer_value  The "buffer" value
-/// @param compatible    True for compatible with old maparg() dict
-void mapblock_fill_dict(dict_T *const dict, const mapblock_T *const mp, long buffer_value,
-                        bool compatible)
-  FUNC_ATTR_NONNULL_ALL
-{
-  char *const lhs = str2special_save((const char *)mp->m_keys,
-                                     compatible, !compatible);
-  char *const mapmode = map_mode_to_chars(mp->m_mode);
-  varnumber_T noremap_value;
-
-  if (compatible) {
-    // Keep old compatible behavior
-    // This is unable to determine whether a mapping is a <script> mapping
-    noremap_value = !!mp->m_noremap;
-  } else {
-    // Distinguish between <script> mapping
-    // If it's not a <script> mapping, check if it's a noremap
-    noremap_value = mp->m_noremap == REMAP_SCRIPT ? 2 : !!mp->m_noremap;
-  }
-
-  if (mp->m_luaref != LUA_NOREF) {
-    tv_dict_add_nr(dict, S_LEN("callback"), mp->m_luaref);
-  } else {
-    if (compatible) {
-      tv_dict_add_str(dict, S_LEN("rhs"), (const char *)mp->m_orig_str);
-    } else {
-      tv_dict_add_allocated_str(dict, S_LEN("rhs"),
-                                str2special_save((const char *)mp->m_str, false,
-                                                 true));
-    }
-  }
-  if (mp->m_desc != NULL) {
-    tv_dict_add_allocated_str(dict, S_LEN("desc"), xstrdup(mp->m_desc));
-  }
-  tv_dict_add_allocated_str(dict, S_LEN("lhs"), lhs);
-  tv_dict_add_nr(dict, S_LEN("noremap"), noremap_value);
-  tv_dict_add_nr(dict, S_LEN("script"), mp->m_noremap == REMAP_SCRIPT ? 1 : 0);
-  tv_dict_add_nr(dict, S_LEN("expr"),  mp->m_expr ? 1 : 0);
-  tv_dict_add_nr(dict, S_LEN("silent"), mp->m_silent ? 1 : 0);
-  tv_dict_add_nr(dict, S_LEN("sid"), (varnumber_T)mp->m_script_ctx.sc_sid);
-  tv_dict_add_nr(dict, S_LEN("lnum"), (varnumber_T)mp->m_script_ctx.sc_lnum);
-  tv_dict_add_nr(dict, S_LEN("buffer"), (varnumber_T)buffer_value);
-  tv_dict_add_nr(dict, S_LEN("nowait"), mp->m_nowait ? 1 : 0);
-  tv_dict_add_allocated_str(dict, S_LEN("mode"), mapmode);
-}
-
 void return_register(int regname, typval_T *rettv)
 {
   char buf[2] = { (char)regname, 0 };
@@ -6849,19 +6799,19 @@ void return_register(int regname, typval_T *rettv)
   rettv->vval.v_string = xstrdup(buf);
 }
 
-void screenchar_adjust_grid(ScreenGrid **grid, int *row, int *col)
+void screenchar_adjust(ScreenGrid **grid, int *row, int *col)
 {
   // TODO(bfredl): this is a hack for legacy tests which use screenchar()
   // to check printed messages on the screen (but not floats etc
   // as these are not legacy features). If the compositor is refactored to
   // have its own buffer, this should just read from it instead.
   msg_scroll_flush();
-  if (msg_grid.chars && msg_grid.comp_index > 0 && *row >= msg_grid.comp_row
-      && *row < (msg_grid.rows + msg_grid.comp_row)
-      && *col < msg_grid.cols) {
-    *grid = &msg_grid;
-    *row -= msg_grid.comp_row;
-  }
+
+  *grid = ui_comp_get_grid_at_coord(*row, *col);
+
+  // Make `row` and `col` relative to the grid
+  *row -= (*grid)->comp_row;
+  *col -= (*grid)->comp_col;
 }
 
 /// Set line or list of lines in buffer "buf".
