@@ -573,11 +573,7 @@ endif()
 
 message(STATUS "Using Lua interpreter: ${LUA_PRG}")
 
-if(DEBUG)
-  option(COMPILE_LUA "Pre-compile Lua sources into bytecode (for sources that are included in the binary)" OFF)
-else()
-  option(COMPILE_LUA "Pre-compile Lua sources into bytecode (for sources that are included in the binary)" ON)
-endif()
+option(COMPILE_LUA "Pre-compile Lua sources into bytecode (for sources that are included in the binary)" ON)
 
 if(COMPILE_LUA AND NOT WIN32)
   if(PREFER_LUA)
@@ -678,7 +674,7 @@ if(BUSTED_PRG)
   list(APPEND TEST_TARGET_ARGS "USES_TERMINAL")
 
   set(UNITTEST_PREREQS nvim-test unittest-headers)
-  set(FUNCTIONALTEST_PREREQS nvim printenv-test printargs-test shell-test streams-test tty-test ${GENERATED_HELP_TAGS})
+  set(FUNCTIONALTEST_PREREQS nvim printenv-test printargs-test shell-test pwsh-test streams-test tty-test ${GENERATED_HELP_TAGS})
   set(BENCHMARK_PREREQS nvim tty-test)
 
   check_lua_module(${LUA_PRG} "ffi" LUA_HAS_FFI)
