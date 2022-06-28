@@ -161,12 +161,10 @@ list(REMOVE_ITEM NVIM_SOURCES ${to_remove})
 
 # Legacy files that do not yet pass -Wconversion.
 set(CONV_SOURCES
-  ex_cmds.c
   fileio.c
   lua/treesitter.c
   mbyte.c
   memline.c
-  message.c
   regexp.c
   screen.c
   search.c
