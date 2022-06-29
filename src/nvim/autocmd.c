@@ -174,7 +174,7 @@ static void aupat_show(AutoPat *ap, event_T event, int previous_group)
   }
 
   msg_col = 4;
-  msg_outtrans((char_u *)ap->pat);
+  msg_outtrans(ap->pat);
 
   for (AutoCmd *ac = ap->cmds; ac != NULL; ac = ac->next) {
     // skip removed commands
@@ -195,10 +195,10 @@ static void aupat_show(AutoPat *ap, event_T event, int previous_group)
       size_t msglen = 100;
       char *msg = (char *)xmallocz(msglen);
       snprintf(msg, msglen, "%s [%s]", exec_to_string, ac->desc);
-      msg_outtrans((char_u *)msg);
+      msg_outtrans(msg);
       XFREE_CLEAR(msg);
     } else {
-      msg_outtrans((char_u *)exec_to_string);
+      msg_outtrans(exec_to_string);
     }
     XFREE_CLEAR(exec_to_string);
     if (p_verbose > 0) {
@@ -471,7 +471,7 @@ void augroup_del(char *name, bool stupid_legacy_mode)
       FOR_ALL_AUEVENTS(event) {
         FOR_ALL_AUPATS_IN_EVENT(event, ap) {
           if (ap->group == i && ap->pat != NULL) {
-            give_warning((char_u *)_("W19: Deleting augroup that is still in use"), true);
+            give_warning(_("W19: Deleting augroup that is still in use"), true);
             map_put(String, int)(&map_augroup_name_to_id, cstr_as_string(name), AUGROUP_DELETED);
             augroup_map_del(ap->group, NULL);
             return;
@@ -717,7 +717,7 @@ char *au_event_disable(char *what)
   } else {
     STRCAT(new_ei, what);
   }
-  set_string_option_direct("ei", -1, (char_u *)new_ei, OPT_FREE, SID_NONE);
+  set_string_option_direct("ei", -1, new_ei, OPT_FREE, SID_NONE);
   xfree(new_ei);
 
   return save_ei;
@@ -726,7 +726,7 @@ char *au_event_disable(char *what)
 void au_event_restore(char *old_ei)
 {
   if (old_ei != NULL) {
-    set_string_option_direct("ei", -1, (char_u *)old_ei, OPT_FREE, SID_NONE);
+    set_string_option_direct("ei", -1, old_ei, OPT_FREE, SID_NONE);
     xfree(old_ei);
   }
 }
@@ -2707,14 +2707,21 @@ static void do_autocmd_focusgained(bool gained)
   recursive = false;
 }
 
-// initialization
+static void define_autocmd(event_T event, char *pat, char *group, bool once, bool nested, char *cmd)
+{
+  AucmdExecutable exec = AUCMD_EXECUTABLE_INIT;
+  exec.type = CALLABLE_EX;
+  exec.callable.cmd = cmd;  // autocmd_register() makes a copy
+  int group_id = augroup_add(group);
+  autocmd_register(0, event, pat, (int)strlen(pat), group_id, once, nested, NULL, exec);
+}
 
+/// initialization of default autocmds
 void init_default_autocmds(void)
 {
   // open terminals when opening files that start with term://
 #define PROTO "term://"
-  do_cmdline_cmd("augroup nvim_terminal");
-  do_cmdline_cmd("autocmd BufReadCmd " PROTO "* ++nested "
+  define_autocmd(EVENT_BUFREADCMD, PROTO "*", "nvim_terminal", false, true,
                  "if !exists('b:term_title')|call termopen("
                  // Capture the command string
                  "matchstr(expand(\"<amatch>\"), "
@@ -2723,11 +2730,8 @@ void init_default_autocmds(void)
                  "{'cwd': expand(get(matchlist(expand(\"<amatch>\"), "
                  "'\\c\\m" PROTO "\\(.\\{-}\\)//'), 1, ''))})"
                  "|endif");
-  do_cmdline_cmd("augroup END");
 #undef PROTO
-
   // limit syntax synchronization in the command window
-  do_cmdline_cmd("augroup nvim_cmdwin");
-  do_cmdline_cmd("autocmd! CmdwinEnter [:>] syntax sync minlines=1 maxlines=1");
-  do_cmdline_cmd("augroup END");
+  define_autocmd(EVENT_CMDWINENTER, "[:>]", "nvim_cmdwin", false, false,
+                 "syntax sync minlines=1 maxlines=1");
 }
