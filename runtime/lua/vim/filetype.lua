@@ -586,7 +586,6 @@ local extension = {
   c = function(path, bufnr)
     return require('vim.filetype.detect').lpc(bufnr)
   end,
-  sig = 'lprolog',
   lsl = 'lsl',
   lss = 'lss',
   nse = 'lua',
@@ -867,6 +866,9 @@ local extension = {
   end,
   sieve = 'sieve',
   siv = 'sieve',
+  sig = function(path, bufnr)
+    return require('vim.filetype.detect').sig(bufnr)
+  end,
   sil = 'sil',
   sim = 'simula',
   ['s85'] = 'sinda',
@@ -1171,57 +1173,57 @@ local extension = {
   -- Ignored extensions
   bak = function(path, bufnr)
     local root = vim.fn.fnamemodify(path, ':r')
-    return M.match(root, bufnr)
+    return M.match({ buf = bufnr, filename = root })
   end,
   ['dpkg-bak'] = function(path, bufnr)
     local root = vim.fn.fnamemodify(path, ':r')
-    return M.match(root, bufnr)
+    return M.match({ buf = bufnr, filename = root })
   end,
   ['dpkg-dist'] = function(path, bufnr)
     local root = vim.fn.fnamemodify(path, ':r')
-    return M.match(root, bufnr)
+    return M.match({ buf = bufnr, filename = root })
   end,
   ['dpkg-old'] = function(path, bufnr)
     local root = vim.fn.fnamemodify(path, ':r')
-    return M.match(root, bufnr)
+    return M.match({ buf = bufnr, filename = root })
   end,
   ['dpkg-new'] = function(path, bufnr)
     local root = vim.fn.fnamemodify(path, ':r')
-    return M.match(root, bufnr)
+    return M.match({ buf = bufnr, filename = root })
   end,
   ['in'] = function(path, bufnr)
     if vim.fs.basename(path) ~= 'configure.in' then
       local root = vim.fn.fnamemodify(path, ':r')
-      return M.match(root, bufnr)
+      return M.match({ buf = bufnr, filename = root })
     end
   end,
   new = function(path, bufnr)
     local root = vim.fn.fnamemodify(path, ':r')
-    return M.match(root, bufnr)
+    return M.match({ buf = bufnr, filename = root })
   end,
   old = function(path, bufnr)
     local root = vim.fn.fnamemodify(path, ':r')
-    return M.match(root, bufnr)
+    return M.match({ buf = bufnr, filename = root })
   end,
   orig = function(path, bufnr)
     local root = vim.fn.fnamemodify(path, ':r')
-    return M.match(root, bufnr)
+    return M.match({ buf = bufnr, filename = root })
   end,
   pacsave = function(path, bufnr)
     local root = vim.fn.fnamemodify(path, ':r')
-    return M.match(root, bufnr)
+    return M.match({ buf = bufnr, filename = root })
   end,
   pacnew = function(path, bufnr)
     local root = vim.fn.fnamemodify(path, ':r')
-    return M.match(root, bufnr)
+    return M.match({ buf = bufnr, filename = root })
   end,
   rpmsave = function(path, bufnr)
     local root = vim.fn.fnamemodify(path, ':r')
-    return M.match(root, bufnr)
+    return M.match({ buf = bufnr, filename = root })
   end,
   rmpnew = function(path, bufnr)
     local root = vim.fn.fnamemodify(path, ':r')
-    return M.match(root, bufnr)
+    return M.match({ buf = bufnr, filename = root })
   end,
   -- END EXTENSION
 }
@@ -2059,7 +2061,7 @@ local pattern = {
   ['.*~'] = function(path, bufnr)
     local short = path:gsub('~$', '', 1)
     if path ~= short and short ~= '' then
-      return M.match(vim.fn.fnameescape(short), bufnr)
+      return M.match({ buf = bufnr, filename = vim.fn.fnameescape(short) })
     end
   end,
   -- END PATTERN

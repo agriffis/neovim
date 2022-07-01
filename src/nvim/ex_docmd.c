@@ -62,6 +62,7 @@
 #include "nvim/os/time.h"
 #include "nvim/os_unix.h"
 #include "nvim/path.h"
+#include "nvim/popupmnu.h"
 #include "nvim/quickfix.h"
 #include "nvim/regexp.h"
 #include "nvim/screen.h"
@@ -2820,16 +2821,16 @@ int parse_cmd_address(exarg_T *eap, char **errormsg, bool silent)
 
         eap->cmd++;
         if (!eap->skip) {
-          pos_T *fp = getmark('<', false);
-          if (check_mark(fp) == FAIL) {
+          fmark_T *fm = mark_get_visual(curbuf, '<');
+          if (!mark_check(fm)) {
             goto theend;
           }
-          eap->line1 = fp->lnum;
-          fp = getmark('>', false);
-          if (check_mark(fp) == FAIL) {
+          eap->line1 = fm->mark.lnum;
+          fm = mark_get_visual(curbuf, '>');
+          if (!mark_check(fm)) {
             goto theend;
           }
-          eap->line2 = fp->lnum;
+          eap->line2 = fm->mark.lnum;
           eap->addr_count++;
         }
       }
@@ -4059,6 +4060,9 @@ const char *set_one_cmd_context(expand_T *xp, const char *buff)
   case CMD_cmenu:
   case CMD_cnoremenu:
   case CMD_cunmenu:
+  case CMD_tlmenu:
+  case CMD_tlnoremenu:
+  case CMD_tlunmenu:
   case CMD_tmenu:
   case CMD_tunmenu:
   case CMD_popup:
@@ -4230,7 +4234,6 @@ static linenr_T get_address(exarg_T *eap, char **ptr, cmd_addr_T addr_type, int 
   linenr_T n;
   char *cmd;
   pos_T pos;
-  pos_T *fp;
   linenr_T lnum;
   buf_T *buf;
 
@@ -4340,17 +4343,19 @@ static linenr_T get_address(exarg_T *eap, char **ptr, cmd_addr_T addr_type, int 
       } else {
         // Only accept a mark in another file when it is
         // used by itself: ":'M".
-        fp = getmark(*cmd, to_other_file && cmd[1] == NUL);
-        ++cmd;
-        if (fp == (pos_T *)-1) {
-          // Jumped to another file.
+        MarkGet flag = to_other_file && cmd[1] == NUL ? kMarkAll : kMarkBufLocal;
+        fmark_T *fm = mark_get(curbuf, curwin, NULL, flag, *cmd);
+        MarkMoveRes move_res = mark_move_to(fm, kMarkBeginLine);
+        cmd++;
+        // Switched buffer
+        if (move_res & kMarkSwitchedBuf) {
           lnum = curwin->w_cursor.lnum;
         } else {
-          if (check_mark(fp) == FAIL) {
+          if (fm == NULL) {
             cmd = NULL;
             goto error;
           }
-          lnum = fp->lnum;
+          lnum = fm->mark.lnum;
         }
       }
       break;
@@ -7982,6 +7987,11 @@ void do_exedit(exarg_T *eap, win_T *old_curwin)
 static void ex_nogui(exarg_T *eap)
 {
   eap->errmsg = N_("E25: Nvim does not have a built-in GUI");
+}
+
+static void ex_popup(exarg_T *eap)
+{
+  pum_make_popup(eap->arg, eap->forceit);
 }
 
 static void ex_swapname(exarg_T *eap)

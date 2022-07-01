@@ -186,7 +186,7 @@ int readfile(char *fname, char *sfname, linenr_T from, linenr_T lines_to_skip,
                     || (eap != NULL && eap->read_edit);
   linenr_T read_buf_lnum = 1;           // next line to read from curbuf
   colnr_T read_buf_col = 0;             // next char to read from this line
-  char_u c;
+  char c;
   linenr_T lnum = from;
   char *ptr = NULL;              // pointer into read buffer
   char *buffer = NULL;           // read buffer
@@ -422,7 +422,7 @@ int readfile(char *fname, char *sfname, linenr_T from, linenr_T lines_to_skip,
        * not be able to write to the file ourselves.
        * Setting the bits is done below, after creating the swap file.
        */
-      swap_mode = (file_info.stat.st_mode & 0644) | 0600;
+      swap_mode = ((int)file_info.stat.st_mode & 0644) | 0600;
 #endif
     } else {
       curbuf->b_mtime = 0;
@@ -562,7 +562,8 @@ int readfile(char *fname, char *sfname, linenr_T from, linenr_T lines_to_skip,
 
         if (os_fileinfo(swap_fname, &swap_info)
             && file_info.stat.st_gid != swap_info.stat.st_gid
-            && os_fchown(curbuf->b_ml.ml_mfp->mf_fd, -1, file_info.stat.st_gid)
+            && os_fchown(curbuf->b_ml.ml_mfp->mf_fd, (uv_uid_t)(-1),
+                         (uv_gid_t)file_info.stat.st_gid)
             == -1) {
           swap_mode &= 0600;
         }
@@ -984,7 +985,7 @@ retry:
 #endif
         if (conv_restlen > 0) {
           // Insert unconverted bytes from previous line.
-          memmove(ptr, conv_rest, conv_restlen);  // -V614
+          memmove(ptr, conv_rest, (size_t)conv_restlen);  // -V614
           ptr += conv_restlen;
           size -= conv_restlen;
         }
@@ -1013,7 +1014,7 @@ retry:
                   if (p[ni] == NL) {
                     ptr[tlen++] = NUL;
                   } else {
-                    ptr[tlen++] = p[ni];
+                    ptr[tlen++] = (char)p[ni];
                   }
                 }
                 read_buf_col += n;
@@ -1026,7 +1027,7 @@ retry:
                 if (p[ni] == NL) {
                   ptr[tlen++] = NUL;
                 } else {
-                  ptr[tlen++] = p[ni];
+                  ptr[tlen++] = (char)p[ni];
                 }
               }
               ptr[tlen++] = NL;
@@ -1046,7 +1047,7 @@ retry:
           /*
            * Read bytes from the file.
            */
-          size = read_eintr(fd, ptr, size);
+          size = read_eintr(fd, ptr, (size_t)size);
         }
 
         if (size <= 0) {
@@ -1091,8 +1092,8 @@ retry:
 #endif
                                                     )) {
                 while (conv_restlen > 0) {
-                  *(--ptr) = bad_char_behavior;
-                  --conv_restlen;
+                  *(--ptr) = (char)bad_char_behavior;
+                  conv_restlen--;
                 }
               }
               fio_flags = 0;  // don't convert this
@@ -1172,20 +1173,12 @@ retry:
 
 #ifdef HAVE_ICONV
       if (iconv_fd != (iconv_t)-1) {
-        /*
-         * Attempt conversion of the read bytes to 'encoding' using
-         * iconv().
-         */
-        const char *fromp;
-        char *top;
-        size_t from_size;
-        size_t to_size;
-
-        fromp = ptr;
-        from_size = size;
+        // Attempt conversion of the read bytes to 'encoding' using iconv().
+        const char *fromp = ptr;
+        size_t from_size = (size_t)size;
         ptr += size;
-        top = ptr;
-        to_size = real_size - size;
+        char *top = ptr;
+        size_t to_size = (size_t)(real_size - size);
 
         /*
          * If there is conversion error or not enough room try using
@@ -1210,8 +1203,8 @@ retry:
             *top++ = *(fromp - 1);
             --to_size;
           } else if (bad_char_behavior != BAD_DROP) {
-            *top++ = bad_char_behavior;
-            --to_size;
+            *top++ = (char)bad_char_behavior;
+            to_size--;
           }
         }
 
@@ -1263,11 +1256,11 @@ retry:
           if ((fio_flags & FIO_UTF16) && p > (uint8_t *)ptr) {
             // Check for a trailing leading word
             if (fio_flags & FIO_ENDIAN_L) {
-              u8c = (*--p << 8);
+              u8c = (unsigned)(*--p) << 8;
               u8c += *--p;
             } else {
               u8c = *--p;
-              u8c += (*--p << 8);
+              u8c += (unsigned)(*--p) << 8;
             }
             if (u8c >= 0xd800 && u8c <= 0xdbff) {
               tail = (char *)p;
@@ -1287,7 +1280,7 @@ retry:
         // conv_rest[].
         if (tail != NULL) {
           conv_restlen = (int)((ptr + size) - tail);
-          memmove(conv_rest, tail, conv_restlen);
+          memmove(conv_rest, tail, (size_t)conv_restlen);
           size -= conv_restlen;
         }
 
@@ -1296,11 +1289,11 @@ retry:
             u8c = *--p;
           } else if (fio_flags & (FIO_UCS2 | FIO_UTF16)) {
             if (fio_flags & FIO_ENDIAN_L) {
-              u8c = (*--p << 8);
+              u8c = (unsigned)(*--p) << 8;
               u8c += *--p;
             } else {
               u8c = *--p;
-              u8c += (*--p << 8);
+              u8c += (unsigned)(*--p) << 8;
             }
             if ((fio_flags & FIO_UTF16)
                 && u8c >= 0xdc00 && u8c <= 0xdfff) {
@@ -1318,7 +1311,7 @@ retry:
                   continue;
                 }
                 if (bad_char_behavior != BAD_KEEP) {
-                  u8c = bad_char_behavior;
+                  u8c = (unsigned)bad_char_behavior;
                 }
               }
 
@@ -1331,7 +1324,7 @@ retry:
                 u16c = *--p;
                 u16c += (*--p << 8);
               }
-              u8c = 0x10000 + ((u16c & 0x3ff) << 10)
+              u8c = 0x10000 + (((unsigned)u16c & 0x3ff) << 10)
                     + (u8c & 0x3ff);
 
               // Check if the word is indeed a leading word.
@@ -1346,7 +1339,7 @@ retry:
                   continue;
                 }
                 if (bad_char_behavior != BAD_KEEP) {
-                  u8c = bad_char_behavior;
+                  u8c = (unsigned)bad_char_behavior;
                 }
               }
             }
@@ -1372,7 +1365,7 @@ retry:
             } else {
               len = utf_head_off((char_u *)ptr, p);
               p -= len;
-              u8c = utf_ptr2char((char *)p);
+              u8c = (unsigned)utf_ptr2char((char *)p);
               if (len == 0) {
                 // Not a valid UTF-8 character, retry with
                 // another fenc when possible, otherwise just
@@ -1387,7 +1380,7 @@ retry:
                   continue;
                 }
                 if (bad_char_behavior != BAD_KEEP) {
-                  u8c = bad_char_behavior;
+                  u8c = (unsigned)bad_char_behavior;
                 }
               }
             }
@@ -1433,7 +1426,7 @@ retry:
               // already done so.
               if (p > (uint8_t *)ptr) {
                 conv_restlen = todo;
-                memmove(conv_rest, p, conv_restlen);
+                memmove(conv_rest, p, (size_t)conv_restlen);
                 size -= conv_restlen;
                 break;
               }
@@ -1458,11 +1451,11 @@ retry:
 
               // Drop, keep or replace the bad byte.
               if (bad_char_behavior == BAD_DROP) {
-                memmove(p, p + 1, todo - 1);
-                --p;
-                --size;
+                memmove(p, p + 1, (size_t)(todo - 1));
+                p--;
+                size--;
               } else if (bad_char_behavior != BAD_KEEP) {
-                *p = bad_char_behavior;
+                *p = (uint8_t)bad_char_behavior;
               }
             } else {
               p += l - 1;
@@ -1583,7 +1576,7 @@ rewind_retry:
               break;
             }
             if (read_undo_file) {
-              sha256_update(&sha_ctx, (char_u *)line_start, len);
+              sha256_update(&sha_ctx, (char_u *)line_start, (size_t)len);
             }
             ++lnum;
             if (--read_count == 0) {
@@ -1639,7 +1632,7 @@ rewind_retry:
               break;
             }
             if (read_undo_file) {
-              sha256_update(&sha_ctx, (char_u *)line_start, len);
+              sha256_update(&sha_ctx, (char_u *)line_start, (size_t)len);
             }
             ++lnum;
             if (--read_count == 0) {
@@ -1686,7 +1679,7 @@ failed:
       error = true;
     } else {
       if (read_undo_file) {
-        sha256_update(&sha_ctx, (char_u *)line_start, len);
+        sha256_update(&sha_ctx, (char_u *)line_start, (size_t)len);
       }
       read_no_eol_lnum = ++lnum;
     }
@@ -2084,7 +2077,7 @@ static char_u *next_fenc(char_u **pp, bool *alloced)
     r = enc_canonize(*pp);
     *pp += STRLEN(*pp);
   } else {
-    r = vim_strnsave(*pp, p - *pp);
+    r = vim_strnsave(*pp, (size_t)(p - *pp));
     *pp = p + 1;
     p = enc_canonize(r);
     xfree(r);
@@ -2552,7 +2545,7 @@ int buf_write(buf_T *buf, char *fname, char *sfname, linenr_T start, linenr_T en
   if (!os_fileinfo(fname, &file_info_old)) {
     newfile = true;
   } else {
-    perm = file_info_old.stat.st_mode;
+    perm = (long)file_info_old.stat.st_mode;
     if (!S_ISREG(file_info_old.stat.st_mode)) {             // not a file
       if (S_ISDIR(file_info_old.stat.st_mode)) {
         SET_ERRMSG_NUM("E502", _("is a directory"));
@@ -2686,19 +2679,19 @@ int buf_write(buf_T *buf, char *fname, char *sfname, linenr_T start, linenr_T en
         STRCPY(IObuff, fname);
         for (i = 4913;; i += 123) {
           char *tail = path_tail((char *)IObuff);
-          size_t size = (char_u *)tail - IObuff;
+          size_t size = (size_t)((char_u *)tail - IObuff);
           snprintf(tail, IOSIZE - size, "%d", i);
           if (!os_fileinfo_link((char *)IObuff, &file_info)) {
             break;
           }
         }
         fd = os_open((char *)IObuff,
-                     O_CREAT|O_WRONLY|O_EXCL|O_NOFOLLOW, perm);
+                     O_CREAT|O_WRONLY|O_EXCL|O_NOFOLLOW, (int)perm);
         if (fd < 0) {           // can't write in directory
           backup_copy = TRUE;
         } else {
 #ifdef UNIX
-          os_fchown(fd, file_info_old.stat.st_uid, file_info_old.stat.st_gid);
+          os_fchown(fd, (uv_uid_t)file_info_old.stat.st_uid, (uv_gid_t)file_info_old.stat.st_gid);
           if (!os_fileinfo((char *)IObuff, &file_info)
               || file_info.stat.st_uid != file_info_old.stat.st_uid
               || file_info.stat.st_gid != file_info_old.stat.st_gid
@@ -2866,9 +2859,9 @@ int buf_write(buf_T *buf, char *fname, char *sfname, linenr_T start, linenr_T en
           // protection bits for others.
           //
           if (file_info_new.stat.st_gid != file_info_old.stat.st_gid
-              && os_chown(backup, -1, file_info_old.stat.st_gid) != 0) {
+              && os_chown(backup, (uv_uid_t)-1, (uv_gid_t)file_info_old.stat.st_gid) != 0) {
             os_setperm((const char *)backup,
-                       (perm & 0707) | ((perm & 07) << 3));
+                       ((int)perm & 0707) | (((int)perm & 07) << 3));
           }
 #endif
 
@@ -2881,8 +2874,8 @@ int buf_write(buf_T *buf, char *fname, char *sfname, linenr_T start, linenr_T en
 
 #ifdef UNIX
           os_file_settime(backup,
-                          file_info_old.stat.st_atim.tv_sec,
-                          file_info_old.stat.st_mtim.tv_sec);
+                          (double)file_info_old.stat.st_atim.tv_sec,
+                          (double)file_info_old.stat.st_mtim.tv_sec);
 #endif
 #ifdef HAVE_ACL
           mch_set_acl((char_u *)backup, acl);
@@ -3014,7 +3007,7 @@ nobackup:
       && file_info_old.stat.st_uid == getuid()
       && vim_strchr(p_cpo, CPO_FWRITE) == NULL) {
     perm |= 0200;
-    (void)os_setperm((const char *)fname, perm);
+    (void)os_setperm((const char *)fname, (int)perm);
     made_writable = true;
   }
 #endif
@@ -3072,9 +3065,9 @@ nobackup:
     if (wb_flags & (FIO_UCS2 | FIO_UCS4 | FIO_UTF16 | FIO_UTF8)) {
       // Need to allocate a buffer to translate into.
       if (wb_flags & (FIO_UCS2 | FIO_UTF16 | FIO_UTF8)) {
-        write_info.bw_conv_buflen = bufsize * 2;
+        write_info.bw_conv_buflen = (size_t)bufsize * 2;
       } else {       // FIO_UCS4
-        write_info.bw_conv_buflen = bufsize * 4;
+        write_info.bw_conv_buflen = (size_t)bufsize * 4;
       }
       write_info.bw_conv_buf = verbose_try_malloc(write_info.bw_conv_buflen);
       if (!write_info.bw_conv_buf) {
@@ -3090,7 +3083,7 @@ nobackup:
     write_info.bw_iconv_fd = (iconv_t)my_iconv_open((char_u *)fenc, (char_u *)"utf-8");
     if (write_info.bw_iconv_fd != (iconv_t)-1) {
       // We're going to use iconv(), allocate a buffer to convert in.
-      write_info.bw_conv_buflen = bufsize * ICONV_MULT;
+      write_info.bw_conv_buflen = (size_t)bufsize * ICONV_MULT;
       write_info.bw_conv_buf = verbose_try_malloc(write_info.bw_conv_buflen);
       if (!write_info.bw_conv_buf) {
         end = 0;
@@ -3391,9 +3384,9 @@ restore_backup:
       if (!os_fileinfo(wfname, &file_info)
           || file_info.stat.st_uid != file_info_old.stat.st_uid
           || file_info.stat.st_gid != file_info_old.stat.st_gid) {
-        os_fchown(fd, file_info_old.stat.st_uid, file_info_old.stat.st_gid);
+        os_fchown(fd, (uv_uid_t)file_info_old.stat.st_uid, (uv_gid_t)file_info_old.stat.st_gid);
         if (perm >= 0) {  // Set permission again, may have changed.
-          (void)os_setperm((const char *)wfname, perm);
+          (void)os_setperm(wfname, (int)perm);
         }
       }
       buf_set_file_id(buf);
@@ -3414,7 +3407,7 @@ restore_backup:
     }
 #endif
     if (perm >= 0) {  // Set perm. of new file same as old file.
-      (void)os_setperm((const char *)wfname, perm);
+      (void)os_setperm((const char *)wfname, (int)perm);
     }
 #ifdef HAVE_ACL
     // Probably need to set the ACL before changing the user (can't set the
@@ -3588,8 +3581,8 @@ restore_backup:
         XFREE_CLEAR(backup);                   // don't delete the file
 #ifdef UNIX
         os_file_settime(org,
-                        file_info_old.stat.st_atim.tv_sec,
-                        file_info_old.stat.st_mtim.tv_sec);
+                        (double)file_info_old.stat.st_atim.tv_sec,
+                        (double)file_info_old.stat.st_mtim.tv_sec);
 #endif
       }
     }
@@ -3805,7 +3798,7 @@ static void add_quoted_fname(char *const ret_buf, const size_t buf_len, const bu
     fname = "-stdin-";
   }
   ret_buf[0] = '"';
-  home_replace(buf, fname, ret_buf + 1, (int)buf_len - 4, true);
+  home_replace(buf, fname, ret_buf + 1, buf_len - 4, true);
   xstrlcat(ret_buf, "\" ", buf_len);
 }
 
@@ -3846,14 +3839,14 @@ void msg_add_lines(int insert_space, long lnum, off_T nchars)
     *p++ = ' ';
   }
   if (shortmess(SHM_LINES)) {
-    vim_snprintf((char *)p, IOSIZE - (p - IObuff), "%" PRId64 "L, %" PRId64 "B",
+    vim_snprintf((char *)p, (size_t)(IOSIZE - (p - IObuff)), "%" PRId64 "L, %" PRId64 "B",
                  (int64_t)lnum, (int64_t)nchars);
   } else {
-    vim_snprintf((char *)p, IOSIZE - (p - IObuff),
+    vim_snprintf((char *)p, (size_t)(IOSIZE - (p - IObuff)),
                  NGETTEXT("%" PRId64 " line, ", "%" PRId64 " lines, ", lnum),
                  (int64_t)lnum);
     p += STRLEN(p);
-    vim_snprintf((char *)p, IOSIZE - (p - IObuff),
+    vim_snprintf((char *)p, (size_t)(IOSIZE - (p - IObuff)),
                  NGETTEXT("%" PRId64 " byte", "%" PRId64 " bytes", nchars),
                  (int64_t)nchars);
   }
@@ -3965,7 +3958,7 @@ static int buf_write_bytes(struct bw_info *ip)
             break;
           }
           if (n > 1) {
-            c = utf_ptr2char((char *)ip->bw_rest);
+            c = (unsigned)utf_ptr2char((char *)ip->bw_rest);
           } else {
             c = ip->bw_rest[0];
           }
@@ -3993,7 +3986,7 @@ static int buf_write_bytes(struct bw_info *ip)
             break;
           }
           if (n > 1) {
-            c = utf_ptr2char((char *)buf + wlen);
+            c = (unsigned)utf_ptr2char((char *)buf + wlen);
           } else {
             c = buf[wlen];
           }
@@ -4029,7 +4022,7 @@ static int buf_write_bytes(struct bw_info *ip)
         /* Need to concatenate the remainder of the previous call and
          * the bytes of the current call.  Use the end of the
          * conversion buffer for this. */
-        fromlen = len + ip->bw_restlen;
+        fromlen = (size_t)len + (size_t)ip->bw_restlen;
         fp = (char *)ip->bw_conv_buf + ip->bw_conv_buflen - fromlen;
         memmove(fp, ip->bw_rest, (size_t)ip->bw_restlen);
         memmove(fp + ip->bw_restlen, buf, (size_t)len);
@@ -4037,7 +4030,7 @@ static int buf_write_bytes(struct bw_info *ip)
         tolen = ip->bw_conv_buflen - fromlen;
       } else {
         from = (const char *)buf;
-        fromlen = len;
+        fromlen = (size_t)len;
         tolen = ip->bw_conv_buflen;
       }
       to = (char *)ip->bw_conv_buf;
@@ -4084,7 +4077,7 @@ static int buf_write_bytes(struct bw_info *ip)
     // Only checking conversion, which is OK if we get here.
     return OK;
   }
-  wlen = write_eintr(ip->bw_fd, buf, len);
+  wlen = (int)write_eintr(ip->bw_fd, buf, (size_t)len);
   return (wlen < len) ? FAIL : OK;
 }
 
@@ -4103,15 +4096,15 @@ static bool ucs2bytes(unsigned c, char_u **pp, int flags) FUNC_ATTR_NONNULL_ALL
 
   if (flags & FIO_UCS4) {
     if (flags & FIO_ENDIAN_L) {
-      *p++ = c;
-      *p++ = (c >> 8);
-      *p++ = (c >> 16);
-      *p++ = (c >> 24);
+      *p++ = (uint8_t)c;
+      *p++ = (uint8_t)(c >> 8);
+      *p++ = (uint8_t)(c >> 16);
+      *p++ = (uint8_t)(c >> 24);
     } else {
-      *p++ = (c >> 24);
-      *p++ = (c >> 16);
-      *p++ = (c >> 8);
-      *p++ = c;
+      *p++ = (uint8_t)(c >> 24);
+      *p++ = (uint8_t)(c >> 16);
+      *p++ = (uint8_t)(c >> 8);
+      *p++ = (uint8_t)c;
     }
   } else if (flags & (FIO_UCS2 | FIO_UTF16)) {
     if (c >= 0x10000) {
@@ -4122,13 +4115,13 @@ static bool ucs2bytes(unsigned c, char_u **pp, int flags) FUNC_ATTR_NONNULL_ALL
         if (c >= 0x100000) {
           error = true;
         }
-        cc = ((c >> 10) & 0x3ff) + 0xd800;
+        cc = (int)(((c >> 10) & 0x3ff) + 0xd800);
         if (flags & FIO_ENDIAN_L) {
-          *p++ = cc;
-          *p++ = ((unsigned)cc >> 8);
+          *p++ = (uint8_t)cc;
+          *p++ = (uint8_t)(cc >> 8);
         } else {
-          *p++ = ((unsigned)cc >> 8);
-          *p++ = cc;
+          *p++ = (uint8_t)(cc >> 8);
+          *p++ = (uint8_t)cc;
         }
         c = (c & 0x3ff) + 0xdc00;
       } else {
@@ -4136,18 +4129,18 @@ static bool ucs2bytes(unsigned c, char_u **pp, int flags) FUNC_ATTR_NONNULL_ALL
       }
     }
     if (flags & FIO_ENDIAN_L) {
-      *p++ = c;
-      *p++ = (c >> 8);
+      *p++ = (uint8_t)c;
+      *p++ = (uint8_t)(c >> 8);
     } else {
-      *p++ = (c >> 8);
-      *p++ = c;
+      *p++ = (uint8_t)(c >> 8);
+      *p++ = (uint8_t)c;
     }
   } else {  // Latin1
     if (c >= 0x100) {
       error = true;
       *p++ = 0xBF;
     } else {
-      *p++ = c;
+      *p++ = (uint8_t)c;
     }
   }
 
@@ -4670,7 +4663,7 @@ int vim_rename(const char_u *from, const char_u *to)
     STRCPY(tempname, from);
     for (n = 123; n < 99999; n++) {
       char *tail = path_tail((char *)tempname);
-      snprintf(tail, (MAXPATHL + 1) - (tail - (char *)tempname - 1), "%d", n);
+      snprintf(tail, (size_t)((MAXPATHL + 1) - (tail - (char *)tempname - 1)), "%d", n);
 
       if (!os_path_exists(tempname)) {
         if (os_rename(from, tempname) == OK) {
@@ -4744,8 +4737,8 @@ int vim_rename(const char_u *from, const char_u *to)
     return -1;
   }
 
-  while ((n = read_eintr(fd_in, buffer, BUFSIZE)) > 0) {
-    if (write_eintr(fd_out, buffer, n) != n) {
+  while ((n = (int)read_eintr(fd_in, buffer, BUFSIZE)) > 0) {
+    if (write_eintr(fd_out, buffer, (size_t)n) != n) {
       errmsg = _("E208: Error writing to \"%s\"");
       break;
     }
@@ -4893,13 +4886,11 @@ int buf_check_timestamp(buf_T *buf)
   char *mesg2 = "";
   bool helpmesg = false;
 
-  // uncrustify:off
   enum {
     RELOAD_NONE,
     RELOAD_NORMAL,
-    RELOAD_DETECT
+    RELOAD_DETECT,
   } reload = RELOAD_NONE;
-  // uncrustify:on
 
   bool can_reload = false;
   uint64_t orig_size = buf->b_orig_size;
@@ -5288,45 +5279,80 @@ void forward_slash(char_u *fname)
 }
 #endif
 
-/// Name of Vim's own temp dir. Ends in a slash.
-static char_u *vim_tempdir = NULL;
+/// Path to Nvim's own temp dir. Ends in a slash.
+static char *vim_tempdir = NULL;
 
-/// Create a directory for private use by this instance of Neovim.
-/// This is done once, and the same directory is used for all temp files.
+/// Creates a directory for private use by this instance of Nvim, trying each of
+/// `TEMP_DIR_NAMES` until one succeeds.
+///
+/// Only done once, the same directory is used for all temp files.
 /// This method avoids security problems because of symlink attacks et al.
 /// It's also a bit faster, because we only need to check for an existing
 /// file when creating the directory and not for each temp file.
-static void vim_maketempdir(void)
+static void vim_mktempdir(void)
 {
-  static const char *temp_dirs[] = TEMP_DIR_NAMES;
-  // Try the entries in `TEMP_DIR_NAMES` to create the temp directory.
-  char_u template[TEMP_FILE_PATH_MAXLEN];
-  char_u path[TEMP_FILE_PATH_MAXLEN];
+  static const char *temp_dirs[] = TEMP_DIR_NAMES;  // Try each of these until one succeeds.
+  char tmp[TEMP_FILE_PATH_MAXLEN];
+  char path[TEMP_FILE_PATH_MAXLEN];
+  char user[40] = { 0 };
+
+  (void)os_get_username(user, sizeof(user));
 
   // Make sure the umask doesn't remove the executable bit.
   // "repl" has been reported to use "0177".
   mode_t umask_save = umask(0077);
   for (size_t i = 0; i < ARRAY_SIZE(temp_dirs); i++) {
-    // Expand environment variables, leave room for "/nvimXXXXXX/999999999"
-    expand_env((char_u *)temp_dirs[i], template, TEMP_FILE_PATH_MAXLEN - 22);
-    if (!os_isdir(template)) {  // directory doesn't exist
+    // Expand environment variables, leave room for "/tmp/nvim.<user>/XXXXXX/999999999".
+    expand_env((char_u *)temp_dirs[i], (char_u *)tmp, TEMP_FILE_PATH_MAXLEN - 64);
+    if (!os_isdir((char_u *)tmp)) {
       continue;
     }
 
-    add_pathsep((char *)template);
-    // Concatenate with temporary directory name pattern
-    STRCAT(template, "nvimXXXXXX");
+    // "/tmp/" exists, now try to create "/tmp/nvim.<user>/".
+    add_pathsep(tmp);
+    xstrlcat(tmp, "nvim.", sizeof(tmp));
+    xstrlcat(tmp, user, sizeof(tmp));
+    (void)os_mkdir(tmp, 0700);  // Always create, to avoid a race.
+    bool owned = os_file_owned(tmp);
+    bool isdir = os_isdir((char_u *)tmp);
+#ifdef UNIX
+    int perm = os_getperm(tmp);  // XDG_RUNTIME_DIR must be owned by the user, mode 0700.
+    bool valid = isdir && owned && 0700 == (perm & 0777);
+#else
+    bool valid = isdir && owned;  // TODO(justinmk): Windows ACL?
+#endif
+    if (valid) {
+      add_pathsep(tmp);
+    } else {
+      if (!owned) {
+        ELOG("tempdir root not owned by current user (%s): %s", user, tmp);
+      } else if (!isdir) {
+        ELOG("tempdir root not a directory: %s", tmp);
+      }
+#ifdef UNIX
+      if (0700 != (perm & 0777)) {
+        ELOG("tempdir root has invalid permissions (%o): %s", perm, tmp);
+      }
+#endif
+      // If our "root" tempdir is invalid or fails, proceed without "<user>/".
+      // Else user1 could break user2 by creating "/tmp/nvim.user2/".
+      tmp[strlen(tmp) - strlen(user)] = '\0';
+    }
 
-    if (os_mkdtemp((const char *)template, (char *)path) != 0) {
+    // Now try to create "/tmp/nvim.<user>/XXXXXX".
+    xstrlcat(tmp, "XXXXXX", sizeof(tmp));  // mkdtemp "template", will be replaced with random alphanumeric chars.
+    int r = os_mkdtemp(tmp, path);
+    if (r != 0) {
+      WLOG("tempdir create failed: %s: %s", os_strerror(r), tmp);
       continue;
     }
 
-    if (vim_settempdir((char *)path)) {
+    if (vim_settempdir(path)) {
       // Successfully created and set temporary directory so stop trying.
       break;
     } else {
       // Couldn't set `vim_tempdir` to `path` so remove created directory.
-      os_rmdir((char *)path);
+      os_rmdir(path);
     }
   }
   (void)umask(umask_save);
@@ -5422,26 +5448,27 @@ void vim_deltempdir(void)
 {
   if (vim_tempdir != NULL) {
     // remove the trailing path separator
-    path_tail((char *)vim_tempdir)[-1] = NUL;
-    delete_recursive((const char *)vim_tempdir);
+    path_tail(vim_tempdir)[-1] = NUL;
+    delete_recursive(vim_tempdir);
     XFREE_CLEAR(vim_tempdir);
   }
 }
 
-/// @return  the name of temp directory. This directory would be created on the first
-///          call to this function.
-char_u *vim_gettempdir(void)
+/// Gets path to Nvim's own temp dir (ending with slash).
+///
+/// Creates the directory on the first call.
+char *vim_gettempdir(void)
 {
   if (vim_tempdir == NULL) {
-    vim_maketempdir();
+    vim_mktempdir();
   }
 
   return vim_tempdir;
 }
 
-/// Set Neovim own temporary directory name to `tempdir`. This directory should
-/// be already created. Expand this name to a full path and put it in
-/// `vim_tempdir`. This avoids that using `:cd` would confuse us.
+/// Sets Nvim's own temporary directory name to `tempdir`. This directory must
+/// already exist. Expands the name to a full path and put it in `vim_tempdir`.
+/// This avoids that using `:cd` would confuse us.
 ///
 /// @param tempdir must be no longer than MAXPATHL.
 ///
@@ -5454,7 +5481,7 @@ static bool vim_settempdir(char *tempdir)
   }
   vim_FullName(tempdir, buf, MAXPATHL, false);
   add_pathsep(buf);
-  vim_tempdir = (char_u *)xstrdup(buf);
+  vim_tempdir = xstrdup(buf);
   xfree(buf);
   return true;
 }
@@ -5463,14 +5490,14 @@ static bool vim_settempdir(char *tempdir)
 ///
 /// @note The temp file is NOT created.
 ///
-/// @return  pointer to the temp file name or NULL if Neovim can't create
+/// @return  pointer to the temp file name or NULL if Nvim can't create
 ///          temporary directory for its own temporary files.
 char_u *vim_tempname(void)
 {
   // Temp filename counter.
   static uint64_t temp_count;
 
-  char_u *tempdir = vim_gettempdir();
+  char *tempdir = vim_gettempdir();
   if (!tempdir) {
     return NULL;
   }
@@ -5795,12 +5822,11 @@ long read_eintr(int fd, void *buf, size_t bufsize)
 long write_eintr(int fd, void *buf, size_t bufsize)
 {
   long ret = 0;
-  long wlen;
 
   // Repeat the write() so long it didn't fail, other than being interrupted
   // by a signal.
   while (ret < (long)bufsize) {
-    wlen = write(fd, (char *)buf + ret, bufsize - ret);
+    long wlen = write(fd, (char *)buf + ret, bufsize - (size_t)ret);
     if (wlen < 0) {
       if (errno != EINTR) {
         break;

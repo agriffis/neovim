@@ -91,13 +91,11 @@ typedef enum {
 #  pragma function(floor)
 # endif
 
-// uncrustify:off
 PRAGMA_DIAG_PUSH_IGNORE_MISSING_PROTOTYPES
 PRAGMA_DIAG_PUSH_IGNORE_IMPLICIT_FALLTHROUGH
 # include "funcs.generated.h"
 PRAGMA_DIAG_POP
 PRAGMA_DIAG_POP
-// uncrustify:on
 #endif
 
 static char *e_listblobarg = N_("E899: Argument of %s must be a List or Blob");
@@ -8523,7 +8521,7 @@ static void set_position(typval_T *argvars, typval_T *rettv, bool charpos)
         rettv->vval.v_number = 0;
       } else if (name[0] == '\'' && name[1] != NUL && name[2] == NUL) {
         // set mark
-        if (setmark_pos((uint8_t)name[1], &pos, fnum) == OK) {
+        if (setmark_pos((uint8_t)name[1], &pos, fnum, NULL) == OK) {
           rettv->vval.v_number = 0;
         }
       } else {
@@ -9719,6 +9717,8 @@ static void f_stdpath(typval_T *argvars, typval_T *rettv, FunPtr fptr)
     rettv->vval.v_string = get_xdg_home(kXDGStateHome);
   } else if (strequal(p, "log")) {
     rettv->vval.v_string = get_xdg_home(kXDGStateHome);
+  } else if (strequal(p, "run")) {
+    rettv->vval.v_string = stdpaths_get_xdg_var(kXDGRuntimeDir);
   } else if (strequal(p, "config_dirs")) {
     get_xdg_var_list(kXDGConfigDirs, rettv);
   } else if (strequal(p, "data_dirs")) {
@@ -10303,21 +10303,29 @@ static void f_synIDattr(typval_T *argvars, typval_T *rettv, FunPtr fptr)
       p = highlight_has_attr(id, HL_STANDOUT, modec);
     }
     break;
-  case 'u': {
-    const size_t len = STRLEN(what);
-    if (len <= 5 || (TOLOWER_ASC(what[5]) == 'l' && len <= 9)) {  // underline
-      p = highlight_has_attr(id, HL_UNDERLINE, modec);
-    } else if (TOLOWER_ASC(what[5]) == 'c') {  // undercurl
-      p = highlight_has_attr(id, HL_UNDERCURL, modec);
-    } else if (len > 9 && TOLOWER_ASC(what[9]) == 'l') {  // underlineline
-      p = highlight_has_attr(id, HL_UNDERLINELINE, modec);
-    } else if (len > 6 && TOLOWER_ASC(what[6]) == 'o') {  // underdot
-      p = highlight_has_attr(id, HL_UNDERDOT, modec);
-    } else {  // underdash
-      p = highlight_has_attr(id, HL_UNDERDASH, modec);
+  case 'u':
+    if (STRLEN(what) >= 9) {
+      if (TOLOWER_ASC(what[5]) == 'l') {
+        // underline
+        p = highlight_has_attr(id, HL_UNDERLINE, modec);
+      } else if (TOLOWER_ASC(what[5]) != 'd') {
+        // undercurl
+        p = highlight_has_attr(id, HL_UNDERCURL, modec);
+      } else if (TOLOWER_ASC(what[6]) != 'o') {
+        // underdashed
+        p = highlight_has_attr(id, HL_UNDERDASHED, modec);
+      } else if (TOLOWER_ASC(what[7]) == 'u') {
+        // underdouble
+        p = highlight_has_attr(id, HL_UNDERDOUBLE, modec);
+      } else {
+        // underdotted
+        p = highlight_has_attr(id, HL_UNDERDOTTED, modec);
+      }
+    } else {
+      // ul
+      p = highlight_color(id, what, modec);
     }
     break;
-  }
   }
 
   rettv->v_type = VAR_STRING;

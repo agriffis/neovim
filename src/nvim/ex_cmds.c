@@ -2480,7 +2480,7 @@ int do_ecmd(int fnum, char *ffname, char *sfname, exarg_T *eap, linenr_T newlnum
     // May jump to last used line number for a loaded buffer or when asked
     // for explicitly
     if ((oldbuf && newlnum == ECMD_LASTL) || newlnum == ECMD_LAST) {
-      pos = buflist_findfpos(buf);
+      pos = &buflist_findfmark(buf)->mark;
       newlnum = pos->lnum;
       solcol = pos->col;
     }
@@ -3651,6 +3651,13 @@ static int do_sub(exarg_T *eap, proftime_T timeout, long cmdpreview_ns, handle_T
     sub_needs_free = cmdpreview && sub != source;
   }
 
+  bool cmdheight0 = p_ch < 1 && !ui_has(kUIMessages);
+  if (cmdheight0) {
+    // If cmdheight is 0, cmdheight must be set to 1 when we enter command line.
+    set_option_value("ch", 1L, NULL, 0);
+    redraw_statuslines();
+  }
+
   // Check for a match on each line.
   // If preview: limit to max('cmdwinheight', viewport).
   linenr_T line2 = eap->line2;
@@ -4461,6 +4468,11 @@ skip:
     }
   }
 
+  if (cmdheight0) {
+    // Restore cmdheight
+    set_option_value("ch", 0L, NULL, 0);
+  }
+
   kv_destroy(preview_lines.subresults);
   return retv;
 #undef ADJUST_SUB_FIRSTLNUM
@@ -5007,7 +5019,15 @@ static int help_compare(const void *s1, const void *s2)
 
   p1 = *(char **)s1 + strlen(*(char **)s1) + 1;
   p2 = *(char **)s2 + strlen(*(char **)s2) + 1;
-  return strcmp(p1, p2);
+
+  // Compare by help heuristic number first.
+  int cmp = strcmp(p1, p2);
+  if (cmp != 0) {
+    return cmp;
+  }
+
+  // Compare by strings as tie-breaker when same heuristic number.
+  return strcmp(*(char **)s1, *(char **)s2);
 }
 
 /// Find all help tags matching "arg", sort them and return in matches[], with

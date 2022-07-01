@@ -419,10 +419,10 @@ static void prt_get_attr(int hl_id, prt_text_attr_T *pattr, int modec)
   pattr->bold = (highlight_has_attr(hl_id, HL_BOLD, modec) != NULL);
   pattr->italic = (highlight_has_attr(hl_id, HL_ITALIC, modec) != NULL);
   pattr->underline = (highlight_has_attr(hl_id, HL_UNDERLINE, modec) != NULL);
-  pattr->underlineline = (highlight_has_attr(hl_id, HL_UNDERLINELINE, modec) != NULL);
   pattr->undercurl = (highlight_has_attr(hl_id, HL_UNDERCURL, modec) != NULL);
-  pattr->underdot = (highlight_has_attr(hl_id, HL_UNDERDOT, modec) != NULL);
-  pattr->underdash = (highlight_has_attr(hl_id, HL_UNDERDASH, modec) != NULL);
+  pattr->underdouble = (highlight_has_attr(hl_id, HL_UNDERDOUBLE, modec) != NULL);
+  pattr->underdotted = (highlight_has_attr(hl_id, HL_UNDERDOTTED, modec) != NULL);
+  pattr->underdashed = (highlight_has_attr(hl_id, HL_UNDERDASHED, modec) != NULL);
 
   uint32_t fg_color = prt_get_color(hl_id, modec);
 
@@ -2508,7 +2508,7 @@ bool mch_print_begin(prt_settings_T *psettings)
    */
   prt_dsc_start();
   prt_dsc_textline("Title", (char *)psettings->jobname);
-  if (os_get_user_name(buffer, 256) == FAIL) {
+  if (os_get_username(buffer, 256) == FAIL) {
     STRCPY(buffer, "Unknown");
   }
   prt_dsc_textline("For", buffer);
