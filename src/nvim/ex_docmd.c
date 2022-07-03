@@ -1621,21 +1621,21 @@ int execute_cmd(exarg_T *eap, CmdParseInfo *cmdinfo, bool preview)
 
       if (eap->cmdidx == CMD_bdelete || eap->cmdidx == CMD_bwipeout
           || eap->cmdidx == CMD_bunload) {
-        p = (char *)skiptowhite_esc((char_u *)eap->arg);
+        p = skiptowhite_esc(eap->arg);
       } else {
         p = eap->arg + STRLEN(eap->arg);
         while (p > eap->arg && ascii_iswhite(p[-1])) {
           p--;
         }
       }
-      eap->line2 = buflist_findpat((char_u *)eap->arg, (char_u *)p, (eap->argt & EX_BUFUNL) != 0,
+      eap->line2 = buflist_findpat(eap->arg, p, (eap->argt & EX_BUFUNL) != 0,
                                    false, false);
       eap->addr_count = 1;
       eap->arg = skipwhite(p);
     } else {
       // If argument positions are specified, just use the first argument
-      eap->line2 = buflist_findpat((char_u *)eap->args[0],
-                                   (char_u *)(eap->args[0] + eap->arglens[0]),
+      eap->line2 = buflist_findpat(eap->args[0],
+                                   eap->args[0] + eap->arglens[0],
                                    (eap->argt & EX_BUFUNL) != 0, false, false);
       eap->addr_count = 1;
       // Shift each argument by 1
@@ -2281,14 +2281,14 @@ static char *do_one_cmd(char **cmdlinep, int flags, cstack_T *cstack, LineGetter
      */
     if (ea.cmdidx == CMD_bdelete || ea.cmdidx == CMD_bwipeout
         || ea.cmdidx == CMD_bunload) {
-      p = (char *)skiptowhite_esc((char_u *)ea.arg);
+      p = skiptowhite_esc(ea.arg);
     } else {
       p = ea.arg + STRLEN(ea.arg);
       while (p > ea.arg && ascii_iswhite(p[-1])) {
         p--;
       }
     }
-    ea.line2 = buflist_findpat((char_u *)ea.arg, (char_u *)p, (ea.argt & EX_BUFUNL) != 0,
+    ea.line2 = buflist_findpat(ea.arg, p, (ea.argt & EX_BUFUNL) != 0,
                                false, false);
     if (ea.line2 < 0) {  // failed
       goto doend;
@@ -2341,7 +2341,7 @@ static char *do_one_cmd(char **cmdlinep, int flags, cstack_T *cstack, LineGetter
       do_return(&ea, TRUE, FALSE, NULL);
     }
   }
-  need_rethrow = check_cstack = FALSE;
+  need_rethrow = check_cstack = false;
 
 doend:
   // can happen with zero line number
@@ -2623,7 +2623,7 @@ int parse_command_modifiers(exarg_T *eap, char **errormsg, cmdmod_T *cmod, bool 
       }
       if (ascii_isdigit(*eap->cmd)) {
         // zero means not set, one is verbose == 0, etc.
-        cmod->cmod_verbose = atoi((char *)eap->cmd) + 1;
+        cmod->cmod_verbose = atoi(eap->cmd) + 1;
       } else {
         cmod->cmod_verbose = 2;  // default: verbose == 1
       }
@@ -5318,7 +5318,7 @@ static void ex_bunload(exarg_T *eap)
                           : eap->cmdidx == CMD_bwipeout
                           ? DOBUF_WIPE
                           : DOBUF_UNLOAD,
-                          (char_u *)eap->arg, eap->addr_count, (int)eap->line1, (int)eap->line2,
+                          eap->arg, eap->addr_count, (int)eap->line1, (int)eap->line2,
                           eap->forceit);
 }
 
@@ -6455,20 +6455,7 @@ static size_t uc_check_code(char *code, size_t len, char *buf, ucmd_T *cmd, exar
   }
 
   case ct_MODS:
-    result = quote ? 2 : 0;
-    if (buf != NULL) {
-      if (quote) {
-        *buf++ = '"';
-      }
-      *buf = '\0';
-    }
-
-    result += uc_mods(buf);
-
-    if (quote && buf != NULL) {
-      buf += result - 2;
-      *buf = '"';
-    }
+    result = uc_mods(buf, &cmdmod, quote);
     break;
 
   case ct_REGISTER:
@@ -6508,43 +6495,45 @@ static size_t uc_check_code(char *code, size_t len, char *buf, ucmd_T *cmd, exar
   return result;
 }
 
-/// Add modifiers from "cmdmod.cmod_split" to "buf".  Set "multi_mods" when one
+/// Add modifiers from "cmod->cmod_split" to "buf".  Set "multi_mods" when one
 /// was added.
 ///
 /// @return the number of bytes added
-size_t add_win_cmd_modifers(char *buf, bool *multi_mods)
+size_t add_win_cmd_modifers(char *buf, const cmdmod_T *cmod, bool *multi_mods)
 {
   size_t result = 0;
 
   // :aboveleft and :leftabove
-  if (cmdmod.cmod_split & WSP_ABOVE) {
+  if (cmod->cmod_split & WSP_ABOVE) {
     result += add_cmd_modifier(buf, "aboveleft", multi_mods);
   }
   // :belowright and :rightbelow
-  if (cmdmod.cmod_split & WSP_BELOW) {
+  if (cmod->cmod_split & WSP_BELOW) {
     result += add_cmd_modifier(buf, "belowright", multi_mods);
   }
   // :botright
-  if (cmdmod.cmod_split & WSP_BOT) {
+  if (cmod->cmod_split & WSP_BOT) {
     result += add_cmd_modifier(buf, "botright", multi_mods);
   }
 
   // :tab
-  if (cmdmod.cmod_tab > 0) {
+  if (cmod->cmod_tab > 0) {
     result += add_cmd_modifier(buf, "tab", multi_mods);
   }
   // :topleft
-  if (cmdmod.cmod_split & WSP_TOP) {
+  if (cmod->cmod_split & WSP_TOP) {
     result += add_cmd_modifier(buf, "topleft", multi_mods);
   }
   // :vertical
-  if (cmdmod.cmod_split & WSP_VERT) {
+  if (cmod->cmod_split & WSP_VERT) {
     result += add_cmd_modifier(buf, "vertical", multi_mods);
   }
   return result;
 }
 
-size_t uc_mods(char *buf)
+/// Generate text for the "cmod" command modifiers.
+/// If "buf" is NULL just return the length.
+size_t uc_mods(char *buf, const cmdmod_T *cmod, bool quote)
 {
   size_t result = 0;
   bool multi_mods = false;
@@ -6562,8 +6551,20 @@ size_t uc_mods(char *buf)
     { CMOD_KEEPMARKS, "keepmarks" },
     { CMOD_KEEPPATTERNS, "keeppatterns" },
     { CMOD_LOCKMARKS, "lockmarks" },
-    { CMOD_NOSWAPFILE, "noswapfile" }
+    { CMOD_NOSWAPFILE, "noswapfile" },
+    { CMOD_UNSILENT, "unsilent" },
+    { CMOD_NOAUTOCMD, "noautocmd" },
+    { CMOD_SANDBOX, "sandbox" },
   };
+
+  result = quote ? 2 : 0;
+  if (buf != NULL) {
+    if (quote) {
+      *buf++ = '"';
+    }
+    *buf = '\0';
+  }
+
   // the modifiers that are simple flags
   for (size_t i = 0; i < ARRAY_SIZE(mod_entries); i++) {
     if (cmdmod.cmod_flags & mod_entries[i].flag) {
@@ -6571,23 +6572,23 @@ size_t uc_mods(char *buf)
     }
   }
 
-  // TODO(vim): How to support :noautocmd?
-  // TODO(vim): How to support :sandbox?
-
   // :silent
   if (msg_silent > 0) {
-    result += add_cmd_modifier(buf, emsg_silent > 0 ? "silent!" : "silent", &multi_mods);
+    result += add_cmd_modifier(buf,
+                               (cmod->cmod_flags & CMOD_ERRSILENT) ? "silent!" : "silent",
+                               &multi_mods);
   }
-
-  // TODO(vim): How to support :unsilent?
-
   // :verbose
   if (p_verbose > 0) {
     result += add_cmd_modifier(buf, "verbose", &multi_mods);
   }
-  // flags from cmdmod.cmod_split
-  result += add_win_cmd_modifers(buf, &multi_mods);
+  // flags from cmod->cmod_split
+  result += add_win_cmd_modifers(buf, cmod, &multi_mods);
 
+  if (quote && buf != NULL) {
+    buf += result - 2;
+    *buf = '"';
+  }
   return result;
 }
 
@@ -7507,7 +7508,7 @@ void alist_set(alist_T *al, int count, char **files, int use_curbuf, int *fnum_l
       /* May set buffer name of a buffer previously used for the
        * argument list, so that it's re-used by alist_add. */
       if (fnum_list != NULL && i < fnum_len) {
-        buf_set_name(fnum_list[i], (char_u *)files[i]);
+        buf_set_name(fnum_list[i], files[i]);
       }
 
       alist_add(al, files[i], use_curbuf ? 2 : 1);
@@ -7537,7 +7538,7 @@ void alist_add(alist_T *al, char *fname, int set_fnum)
   AARGLIST(al)[al->al_ga.ga_len].ae_fname = (char_u *)fname;
   if (set_fnum > 0) {
     AARGLIST(al)[al->al_ga.ga_len].ae_fnum =
-      buflist_add((char_u *)fname, BLN_LISTED | (set_fnum == 2 ? BLN_CURBUF : 0));
+      buflist_add(fname, BLN_LISTED | (set_fnum == 2 ? BLN_CURBUF : 0));
   }
   ++al->al_ga.ga_len;
 }
@@ -7627,7 +7628,7 @@ void ex_splitview(exarg_T *eap)
 
   if (eap->cmdidx == CMD_sfind || eap->cmdidx == CMD_tabfind) {
     fname = (char *)find_file_in_path((char_u *)eap->arg, STRLEN(eap->arg),
-                                      FNAME_MESS, true, curbuf->b_ffname);
+                                      FNAME_MESS, true, (char_u *)curbuf->b_ffname);
     if (fname == NULL) {
       goto theend;
     }
@@ -7829,14 +7830,14 @@ static void ex_find(exarg_T *eap)
   linenr_T count;
 
   fname = (char *)find_file_in_path((char_u *)eap->arg, STRLEN(eap->arg),
-                                    FNAME_MESS, true, curbuf->b_ffname);
+                                    FNAME_MESS, true, (char_u *)curbuf->b_ffname);
   if (eap->addr_count > 0) {
     // Repeat finding the file "count" times.  This matters when it
     // appears several times in the path.
     count = eap->line2;
     while (fname != NULL && --count > 0) {
       xfree(fname);
-      fname = (char *)find_file_in_path(NULL, 0, FNAME_MESS, false, curbuf->b_ffname);
+      fname = (char *)find_file_in_path(NULL, 0, FNAME_MESS, false, (char_u *)curbuf->b_ffname);
     }
   }
 
@@ -8087,11 +8088,11 @@ static void ex_read(exarg_T *eap)
       if (check_fname() == FAIL) {       // check for no file name
         return;
       }
-      i = readfile((char *)curbuf->b_ffname, curbuf->b_fname,
+      i = readfile(curbuf->b_ffname, curbuf->b_fname,
                    eap->line2, (linenr_T)0, (linenr_T)MAXLNUM, eap, 0, false);
     } else {
       if (vim_strchr(p_cpo, CPO_ALTREAD) != NULL) {
-        (void)setaltfname((char_u *)eap->arg, (char_u *)eap->arg, (linenr_T)1);
+        (void)setaltfname(eap->arg, eap->arg, (linenr_T)1);
       }
       i = readfile(eap->arg, NULL,
                    eap->line2, (linenr_T)0, (linenr_T)MAXLNUM, eap, 0, false);
@@ -8139,10 +8140,10 @@ static char *get_prevdir(CdScope scope)
 {
   switch (scope) {
   case kCdScopeTabpage:
-    return (char *)curtab->tp_prevdir;
+    return curtab->tp_prevdir;
     break;
   case kCdScopeWindow:
-    return (char *)curwin->w_prevdir;
+    return curwin->w_prevdir;
     break;
   default:
     return prev_dir;
@@ -8180,10 +8181,10 @@ static void post_chdir(CdScope scope, bool trigger_dirchanged)
     XFREE_CLEAR(globaldir);
     break;
   case kCdScopeTabpage:
-    curtab->tp_localdir = (char_u *)xstrdup(cwd);
+    curtab->tp_localdir = xstrdup(cwd);
     break;
   case kCdScopeWindow:
-    curwin->w_localdir = (char_u *)xstrdup(cwd);
+    curwin->w_localdir = xstrdup(cwd);
     break;
   case kCdScopeInvalid:
     abort();
@@ -8249,10 +8250,10 @@ bool changedir_func(char *new_dir, CdScope scope)
   char **pp;
   switch (scope) {
   case kCdScopeTabpage:
-    pp = (char **)&curtab->tp_prevdir;
+    pp = &curtab->tp_prevdir;
     break;
   case kCdScopeWindow:
-    pp = (char **)&curwin->w_prevdir;
+    pp = &curwin->w_prevdir;
     break;
   default:
     pp = &prev_dir;
@@ -8380,10 +8381,10 @@ static void ex_winsize(exarg_T *eap)
     semsg(_(e_invarg2), arg);
     return;
   }
-  int w = getdigits_int((char_u **)&arg, false, 10);
+  int w = getdigits_int(&arg, false, 10);
   arg = skipwhite(arg);
   char *p = arg;
-  int h = getdigits_int((char_u **)&arg, false, 10);
+  int h = getdigits_int(&arg, false, 10);
   if (*p != NUL && *arg == NUL) {
     screen_resize(w, h);
   } else {
@@ -8559,7 +8560,7 @@ static void ex_join(exarg_T *eap)
     }
     ++eap->line2;
   }
-  do_join((size_t)(eap->line2 - eap->line1 + 1), !eap->forceit, true, true, true);
+  do_join((size_t)((ssize_t)eap->line2 - eap->line1 + 1), !eap->forceit, true, true, true);
   beginline(BL_WHITE | BL_FIX);
   ex_may_print(eap);
 }
@@ -9478,7 +9479,7 @@ char_u *eval_vars(char_u *src, char_u *srcstart, size_t *usedlen, linenr_T *lnum
       if (*s == '<') {                  // "#<99" uses v:oldfiles.
         s++;
       }
-      i = getdigits_int((char_u **)&s, false, 0);
+      i = getdigits_int(&s, false, 0);
       if ((char_u *)s == src + 2 && src[1] == '-') {
         // just a minus sign, don't skip over it
         s--;

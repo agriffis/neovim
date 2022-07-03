@@ -55,7 +55,7 @@ static int regex_match(lua_State *lstate, regprog_T **prog, char_u *str)
   regmatch_T rm;
   rm.regprog = *prog;
   rm.rm_ic = false;
-  bool match = vim_regexec(&rm, str, 0);
+  bool match = vim_regexec(&rm, (char *)str, 0);
   *prog = rm.regprog;
 
   if (match) {
@@ -252,7 +252,7 @@ static int nlua_str_utf_end(lua_State *const lstate) FUNC_ATTR_NONNULL_ALL
   if (offset < 0 || offset > (intptr_t)s1_len) {
     return luaL_error(lstate, "index out of range");
   }
-  int tail_offset = mb_tail_off((char_u *)s1, (char_u *)s1 + offset - 1);
+  int tail_offset = mb_tail_off(s1, s1 + offset - 1);
   lua_pushinteger(lstate, tail_offset);
   return 1;
 }
@@ -300,7 +300,9 @@ int nlua_regex(lua_State *lstate)
   });
 
   if (ERROR_SET(&err)) {
-    return luaL_error(lstate, "couldn't parse regex: %s", err.msg);
+    nlua_push_errstr(lstate, "couldn't parse regex: %s", err.msg);
+    api_clear_error(&err);
+    return lua_error(lstate);
   }
   assert(prog);
 
@@ -338,12 +340,14 @@ static dict_T *nlua_get_var_scope(lua_State *lstate)
       dict = tabpage->tp_vars;
     }
   } else {
-    luaL_error(lstate, "invalid scope", err.msg);
+    luaL_error(lstate, "invalid scope");
     return NULL;
   }
 
   if (ERROR_SET(&err)) {
-    luaL_error(lstate, "FAIL: %s", err.msg);
+    nlua_push_errstr(lstate, "scoped variable: %s", err.msg);
+    api_clear_error(&err);
+    lua_error(lstate);
     return NULL;
   }
   return dict;
@@ -536,4 +540,15 @@ void nlua_state_add_stdlib(lua_State *const lstate, bool is_thread)
   // vim.json
   lua_cjson_new(lstate);
   lua_setfield(lstate, -2, "json");
+}
+
+/// like luaL_error, but allow cleanup
+void nlua_push_errstr(lua_State *L, const char *fmt, ...)
+{
+  va_list argp;
+  va_start(argp, fmt);
+  luaL_where(L, 1);
+  lua_pushvfstring(L, fmt, argp);
+  va_end(argp);
+  lua_concat(L, 2);
 }
