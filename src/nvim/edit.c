@@ -1409,14 +1409,9 @@ bool edit(int cmdchar, bool startln, long count)
 
   // Don't allow changes in the buffer while editing the cmdline.  The
   // caller of getcmdline() may get confused.
-  if (textlock != 0) {
-    emsg(_(e_secure));
-    return false;
-  }
-
   // Don't allow recursive insert mode when busy with completion.
-  if (compl_started || compl_busy || pum_visible()) {
-    emsg(_(e_secure));
+  if (textlock != 0 || compl_started || compl_busy || pum_visible()) {
+    emsg(_(e_textlock));
     return false;
   }
 
@@ -3966,6 +3961,8 @@ static void expand_by_function(int type, char_u *base)
   pos = curwin->w_cursor;
   curwin_save = curwin;
   curbuf_save = curbuf;
+  // Lock the text to avoid weird things from happening.
+  textlock++;
 
   // Call a function, which returns a list or dict.
   if (call_vim_function((char *)funcname, 2, args, &rettv) == OK) {
@@ -3984,6 +3981,7 @@ static void expand_by_function(int type, char_u *base)
       break;
     }
   }
+  textlock--;
 
   if (curwin_save != curwin || curbuf_save != curbuf) {
     emsg(_(e_complwin));
@@ -7935,13 +7933,8 @@ static bool ins_esc(long *count, int cmdchar, bool nomove)
    * Don't do it for CTRL-O, unless past the end of the line.
    */
   if (!nomove
-      && (curwin->w_cursor.col != 0
-          || curwin->w_cursor.coladd > 0
-          )
-      && (restart_edit == NUL
-          || (gchar_cursor() == NUL
-              && !VIsual_active
-              ))
+      && (curwin->w_cursor.col != 0 || curwin->w_cursor.coladd > 0)
+      && (restart_edit == NUL || (gchar_cursor() == NUL && !VIsual_active))
       && !revins_on) {
     if (curwin->w_cursor.coladd > 0 || get_ve_flags() == VE_ALL) {
       oneleft();
@@ -8557,14 +8550,12 @@ static void ins_mousescroll(int dir)
   }
 
   // Don't scroll the window in which completion is being done.
-  if (!pum_visible()
-      || curwin != old_curwin) {
+  if (!pum_visible() || curwin != old_curwin) {
     if (dir == MSCR_DOWN || dir == MSCR_UP) {
       if (mod_mask & (MOD_MASK_SHIFT | MOD_MASK_CTRL)) {
-        scroll_redraw(dir,
-                      (curwin->w_botline - curwin->w_topline));
+        scroll_redraw(dir, (long)(curwin->w_botline - curwin->w_topline));
       } else {
-        scroll_redraw(dir, 3L);
+        scroll_redraw(dir, p_mousescroll_vert);
       }
     } else {
       mouse_scroll_horiz(dir);

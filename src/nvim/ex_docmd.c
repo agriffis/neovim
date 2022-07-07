@@ -2904,9 +2904,16 @@ int checkforcmd(char **pp, char *cmd, int len)
 /// invisible otherwise.
 static void append_command(char *cmd)
 {
+  size_t len = STRLEN(IObuff);
   char *s = cmd;
   char *d;
 
+  if (len > IOSIZE - 100) {
+    // Not enough space, truncate and put in "...".
+    d = (char *)IObuff + IOSIZE - 100;
+    d -= utf_head_off(IObuff, (const char_u *)d);
+    STRCPY(d, "...");
+  }
   STRCAT(IObuff, ": ");
   d = (char *)IObuff + STRLEN(IObuff);
   while (*s != NUL && (char_u *)d - IObuff + 5 < IOSIZE) {
@@ -4345,13 +4352,12 @@ static linenr_T get_address(exarg_T *eap, char **ptr, cmd_addr_T addr_type, int 
         // used by itself: ":'M".
         MarkGet flag = to_other_file && cmd[1] == NUL ? kMarkAll : kMarkBufLocal;
         fmark_T *fm = mark_get(curbuf, curwin, NULL, flag, *cmd);
-        MarkMoveRes move_res = mark_move_to(fm, kMarkBeginLine);
         cmd++;
-        // Switched buffer
-        if (move_res & kMarkSwitchedBuf) {
+        if (fm != NULL && fm->fnum != curbuf->handle) {
+          // Jumped to another file.
           lnum = curwin->w_cursor.lnum;
         } else {
-          if (fm == NULL) {
+          if (!mark_check(fm)) {
             cmd = NULL;
             goto error;
           }
