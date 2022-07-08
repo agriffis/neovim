@@ -176,7 +176,8 @@ local extension = {
   bsdl = 'bsdl',
   bst = 'bst',
   btm = function(path, bufnr)
-    return (vim.g.dosbatch_syntax_for_btm and vim.g.dosbatch_syntax_for_btm ~= 0) and 'dosbatch' or 'btm'
+    return (vim.g.dosbatch_syntax_for_btm and vim.g.dosbatch_syntax_for_btm ~= 0) and 'dosbatch'
+      or 'btm'
   end,
   bzl = 'bzl',
   bazel = 'bzl',
@@ -2169,7 +2170,10 @@ local function sort_by_priority(t)
   local sorted = {}
   for k, v in pairs(t) do
     local ft = type(v) == 'table' and v[1] or v
-    assert(type(ft) == 'string' or type(ft) == 'function', 'Expected string or function for filetype')
+    assert(
+      type(ft) == 'string' or type(ft) == 'function',
+      'Expected string or function for filetype'
+    )
 
     local opts = (type(v) == 'table' and type(v[2]) == 'table') and v[2] or {}
     if not opts.priority then
@@ -2223,8 +2227,7 @@ end
 ---
 --- See $VIMRUNTIME/lua/vim/filetype.lua for more examples.
 ---
---- Note that Lua filetype detection is only enabled when |g:do_filetype_lua| is
---- set to 1.
+--- Note that Lua filetype detection is disabled when |g:do_legacy_filetype| is set.
 ---
 --- Example:
 --- <pre>
