@@ -1355,49 +1355,11 @@ function M.stylize_markdown(bufnr, contents, opts)
 end
 
 ---@private
---- Creates autocommands to close a preview window when events happen.
----
----@param events table list of events
----@param winnr number window id of preview window
----@param bufnrs table list of buffers where the preview window will remain visible
----@see |autocmd-events|
-local function close_preview_autocmd(events, winnr, bufnrs)
-  local augroup = 'preview_window_' .. winnr
-
-  -- close the preview window when entered a buffer that is not
-  -- the floating window buffer or the buffer that spawned it
-  vim.cmd(string.format(
-    [[
-    augroup %s
-      autocmd!
-      autocmd BufEnter * lua vim.lsp.util._close_preview_window(%d, {%s})
-    augroup end
-  ]],
-    augroup,
-    winnr,
-    table.concat(bufnrs, ',')
-  ))
-
-  if #events > 0 then
-    vim.cmd(string.format(
-      [[
-      augroup %s
-        autocmd %s <buffer> lua vim.lsp.util._close_preview_window(%d)
-      augroup end
-    ]],
-      augroup,
-      table.concat(events, ','),
-      winnr
-    ))
-  end
-end
-
----@private
 --- Closes the preview window
 ---
 ---@param winnr number window id of preview window
 ---@param bufnrs table|nil optional list of ignored buffers
-function M._close_preview_window(winnr, bufnrs)
+local function close_preview_window(winnr, bufnrs)
   vim.schedule(function()
     -- exit if we are in one of ignored buffers
     if bufnrs and vim.tbl_contains(bufnrs, api.nvim_get_current_buf()) then
@@ -1405,18 +1367,40 @@ function M._close_preview_window(winnr, bufnrs)
     end
 
     local augroup = 'preview_window_' .. winnr
-    vim.cmd(string.format(
-      [[
-      augroup %s
-        autocmd!
-      augroup end
-      augroup! %s
-    ]],
-      augroup,
-      augroup
-    ))
+    api.nvim_del_augroup_by_name(augroup)
     pcall(vim.api.nvim_win_close, winnr, true)
   end)
+end
+
+---@private
+--- Creates autocommands to close a preview window when events happen.
+---
+---@param events table list of events
+---@param winnr number window id of preview window
+---@param bufnrs table list of buffers where the preview window will remain visible
+---@see |autocmd-events|
+local function close_preview_autocmd(events, winnr, bufnrs)
+  local augroup = api.nvim_create_augroup('preview_window_' .. winnr, {
+    clear = true,
+  })
+
+  -- close the preview window when entered a buffer that is not
+  -- the floating window buffer or the buffer that spawned it
+  api.nvim_create_autocmd('BufEnter', {
+    group = augroup,
+    callback = function()
+      close_preview_window(winnr, bufnrs)
+    end,
+  })
+
+  if #events > 0 then
+    api.nvim_create_autocmd(events, {
+      buffer = bufnrs[2],
+      callback = function()
+        close_preview_window(winnr)
+      end,
+    })
+  end
 end
 
 ---@internal
@@ -1736,35 +1720,6 @@ function M.locations_to_items(locations, offset_encoding)
     end
   end
   return items
-end
-
---- Fills target window's location list with given list of items.
---- Can be obtained with e.g. |vim.lsp.util.locations_to_items()|.
---- Defaults to current window.
----
----@deprecated Use |setloclist()|
----
----@param items (table) list of items
-function M.set_loclist(items, win_id)
-  vim.deprecate('vim.lsp.util.set_loclist', 'setloclist', '0.8')
-  vim.fn.setloclist(win_id or 0, {}, ' ', {
-    title = 'Language Server',
-    items = items,
-  })
-end
-
---- Fills quickfix list with given list of items.
---- Can be obtained with e.g. |vim.lsp.util.locations_to_items()|.
----
----@deprecated Use |setqflist()|
----
----@param items (table) list of items
-function M.set_qflist(items)
-  vim.deprecate('vim.lsp.util.set_qflist', 'setqflist', '0.8')
-  vim.fn.setqflist({}, ' ', {
-    title = 'Language Server',
-    items = items,
-  })
 end
 
 -- According to LSP spec, if the client set "symbolKind.valueSet",

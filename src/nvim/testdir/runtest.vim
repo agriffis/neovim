@@ -191,6 +191,9 @@ func RunTheTest(test)
     endtry
   endif
 
+  " Align Nvim defaults to Vim.
+  source setup.vim
+
   " Clear any autocommands and put back the catch-all for SwapExists.
   au!
   au SwapExists * call HandleSwapExists()
