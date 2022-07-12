@@ -64,6 +64,66 @@ func Test_ex_mode()
   let &encoding = encoding_save
 endfunc
 
+" Test substitute confirmation prompt :%s/pat/str/c in Ex mode
+func Test_Ex_substitute()
+  CheckRunVimInTerminal
+  let buf = RunVimInTerminal('', {'rows': 6})
+
+  call term_sendkeys(buf, ":call setline(1, ['foo foo', 'foo foo', 'foo foo'])\<CR>")
+  call term_sendkeys(buf, ":set number\<CR>")
+  call term_sendkeys(buf, "gQ")
+  call WaitForAssert({-> assert_match(':', term_getline(buf, 6))}, 1000)
+
+  call term_sendkeys(buf, "%s/foo/bar/gc\<CR>")
+  call WaitForAssert({-> assert_match('  1 foo foo', term_getline(buf, 5))},
+        \ 1000)
+  call WaitForAssert({-> assert_match('    ^^^', term_getline(buf, 6))}, 1000)
+  call term_sendkeys(buf, "N\<CR>")
+  call term_wait(buf)
+  call WaitForAssert({-> assert_match('    ^^^', term_getline(buf, 6))}, 1000)
+  call term_sendkeys(buf, "n\<CR>")
+  call WaitForAssert({-> assert_match('        ^^^', term_getline(buf, 6))},
+        \ 1000)
+  call term_sendkeys(buf, "y\<CR>")
+
+  call term_sendkeys(buf, "q\<CR>")
+  call WaitForAssert({-> assert_match(':', term_getline(buf, 6))}, 1000)
+
+  " Pressing enter in ex mode should print the current line
+  call term_sendkeys(buf, "\<CR>")
+  call WaitForAssert({-> assert_match('  3 foo foo',
+        \ term_getline(buf, 5))}, 1000)
+
+  call term_sendkeys(buf, ":vi\<CR>")
+  call WaitForAssert({-> assert_match('foo bar', term_getline(buf, 1))}, 1000)
+
+  call term_sendkeys(buf, ":q!\n")
+  call StopVimInTerminal(buf)
+endfunc
+
+" Test for displaying lines from an empty buffer in Ex mode
+func Test_Ex_emptybuf()
+  new
+  call assert_fails('call feedkeys("Q\<CR>", "xt")', 'E749:')
+  call setline(1, "abc")
+  call assert_fails('call feedkeys("Q\<CR>", "xt")', 'E501:')
+  call assert_fails('call feedkeys("Q%d\<CR>", "xt")', 'E749:')
+  close!
+endfunc
+
+" Test for the :open command
+func Test_open_command()
+  throw 'Skipped: Nvim does not have :open'
+  new
+  call setline(1, ['foo foo', 'foo bar', 'foo baz'])
+  call feedkeys("Qopen\<CR>j", 'xt')
+  call assert_equal('foo bar', getline('.'))
+  call feedkeys("Qopen /bar/\<CR>", 'xt')
+  call assert_equal(5, col('.'))
+  call assert_fails('call feedkeys("Qopen /baz/\<CR>", "xt")', 'E479:')
+  close!
+endfunc
+
 " Test for :g/pat/visual to run vi commands in Ex mode
 " This used to hang Vim before 8.2.0274.
 func Test_Ex_global()

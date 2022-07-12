@@ -500,6 +500,9 @@ do
         table.insert(buf_state.pending_changes, incremental_changes(client, buf_state))
       end
       buf_state.pending_change = function()
+        if buf_state.pending_change == nil then
+          return
+        end
         buf_state.pending_change = nil
         buf_state.last_flush = uv.hrtime()
         if client.is_stopped() or not vim.api.nvim_buf_is_valid(bufnr) then
@@ -736,13 +739,18 @@ function lsp.start(config, opts)
     end
   config.name = config.name or (config.cmd[1] and vim.fs.basename(config.cmd[1])) or nil
   local bufnr = api.nvim_get_current_buf()
-  for _, client in pairs(lsp.get_active_clients()) do
-    if reuse_client(client, config) then
-      lsp.buf_attach_client(bufnr, client.id)
-      return client.id
+  for _, clients in ipairs({ uninitialized_clients, lsp.get_active_clients() }) do
+    for _, client in pairs(clients) do
+      if reuse_client(client, config) then
+        lsp.buf_attach_client(bufnr, client.id)
+        return client.id
+      end
     end
   end
   local client_id = lsp.start_client(config)
+  if client_id == nil then
+    return nil -- lsp.start_client will have printed an error
+  end
   lsp.buf_attach_client(bufnr, client_id)
   return client_id
 end

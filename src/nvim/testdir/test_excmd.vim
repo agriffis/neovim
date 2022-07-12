@@ -22,6 +22,7 @@ func Test_range_error()
   call assert_fails(':\/echo 1', 'E481:')
   normal vv
   call assert_fails(":'<,'>echo 1", 'E481:')
+  call assert_fails(":\\xcenter", 'E10:')
 endfunc
 
 func Test_buffers_lastused()
@@ -222,12 +223,24 @@ func Test_change_cmd()
   close!
 endfunc
 
+" Test for the :language command
+func Test_language_cmd()
+  CheckNotMSWindows  " FIXME: why does this fail on Windows CI?
+  CheckNotBSD  " FIXME: why does this fail on OpenBSD CI?
+  CheckFeature multi_lang
+
+  call assert_fails('language ctype non_existing_lang', 'E197:')
+  call assert_fails('language time non_existing_lang', 'E197:')
+endfunc
+
 " Test for the :confirm command dialog
 func Test_confirm_cmd()
   CheckNotGui
   CheckRunVimInTerminal
+
   call writefile(['foo1'], 'foo')
   call writefile(['bar1'], 'bar')
+
   " Test for saving all the modified buffers
   let buf = RunVimInTerminal('', {'rows': 20})
   call term_sendkeys(buf, ":set nomore\n")
@@ -240,8 +253,10 @@ func Test_confirm_cmd()
   call WaitForAssert({-> assert_match('\[Y\]es, (N)o, Save (A)ll, (D)iscard All, (C)ancel: ', term_getline(buf, 20))}, 1000)
   call term_sendkeys(buf, "A")
   call StopVimInTerminal(buf)
+
   call assert_equal(['foo2'], readfile('foo'))
   call assert_equal(['bar2'], readfile('bar'))
+
   " Test for discarding all the changes to modified buffers
   let buf = RunVimInTerminal('', {'rows': 20})
   call term_sendkeys(buf, ":set nomore\n")
@@ -254,8 +269,10 @@ func Test_confirm_cmd()
   call WaitForAssert({-> assert_match('\[Y\]es, (N)o, Save (A)ll, (D)iscard All, (C)ancel: ', term_getline(buf, 20))}, 1000)
   call term_sendkeys(buf, "D")
   call StopVimInTerminal(buf)
+
   call assert_equal(['foo2'], readfile('foo'))
   call assert_equal(['bar2'], readfile('bar'))
+
   " Test for saving and discarding changes to some buffers
   let buf = RunVimInTerminal('', {'rows': 20})
   call term_sendkeys(buf, ":set nomore\n")
@@ -270,6 +287,7 @@ func Test_confirm_cmd()
   call WaitForAssert({-> assert_match('\[Y\]es, (N)o, (C)ancel: ', term_getline(buf, 20))}, 1000)
   call term_sendkeys(buf, "Y")
   call StopVimInTerminal(buf)
+
   call assert_equal(['foo4'], readfile('foo'))
   call assert_equal(['bar2'], readfile('bar'))
 
@@ -391,12 +409,78 @@ func Test_confirm_write_partial_file()
   call delete('Xscript')
 endfunc
 
+" Test for the :print command
+func Test_print_cmd()
+  call assert_fails('print', 'E749:')
+endfunc
+
 " Test for the :winsize command
 func Test_winsize_cmd()
   call assert_fails('winsize 1', 'E465:')
   call assert_fails('winsize 1 x', 'E465:')
   call assert_fails('win_getid(1)', 'E475: Invalid argument: _getid(1)')
   " Actually changing the window size would be flaky.
+endfunc
+
+" Test for the :redir command
+func Test_redir_cmd()
+  call assert_fails('redir @@', 'E475:')
+  call assert_fails('redir abc', 'E475:')
+  if has('unix')
+    call mkdir('Xdir')
+    call assert_fails('redir > Xdir', 'E17:')
+    call delete('Xdir', 'd')
+  endif
+  if !has('bsd')
+    call writefile([], 'Xfile')
+    call setfperm('Xfile', 'r--r--r--')
+    call assert_fails('redir! > Xfile', 'E190:')
+    call delete('Xfile')
+  endif
+
+  " Test for redirecting to a register
+  redir @q> | echon 'clean ' | redir END
+  redir @q>> | echon 'water' | redir END
+  call assert_equal('clean water', @q)
+
+  " Test for redirecting to a variable
+  redir => color | echon 'blue ' | redir END
+  redir =>> color | echon 'sky' | redir END
+  call assert_equal('blue sky', color)
+endfunc
+
+" Test for the :filetype command
+func Test_filetype_cmd()
+  call assert_fails('filetype abc', 'E475:')
+endfunc
+
+" Test for the :mode command
+func Test_mode_cmd()
+  call assert_fails('mode abc', 'E359:')
+endfunc
+
+" Test for the :sleep command
+func Test_sleep_cmd()
+  call assert_fails('sleep x', 'E475:')
+endfunc
+
+" Test for the :read command
+func Test_read_cmd()
+  call writefile(['one'], 'Xfile')
+  new
+  call assert_fails('read', 'E32:')
+  edit Xfile
+  read
+  call assert_equal(['one', 'one'], getline(1, '$'))
+  close!
+  new
+  read Xfile
+  call assert_equal(['', 'one'], getline(1, '$'))
+  call deletebufline('', 1, '$')
+  call feedkeys("Qr Xfile\<CR>visual\<CR>", 'xt')
+  call assert_equal(['one'], getline(1, '$'))
+  close!
+  call delete('Xfile')
 endfunc
 
 " Test for running Ex commands when text is locked.
