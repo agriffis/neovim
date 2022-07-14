@@ -165,9 +165,9 @@ set(LIBTERMKEY_SHA256 6945bd3c4aaa83da83d80a045c5563da4edd7d0374c62c0d35aec09eb3
 set(LIBVTERM_URL https://www.leonerd.org.uk/code/libvterm/libvterm-0.1.4.tar.gz)
 set(LIBVTERM_SHA256 bc70349e95559c667672fc8c55b9527d9db9ada0fb80a3beda533418d782d3dd)
 
-set(LUV_VERSION 1.43.0-0)
-set(LUV_URL https://github.com/luvit/luv/archive/9f80386338af7d164ff1f47d480ee1ae775cb0ef.tar.gz)
-set(LUV_SHA256 a6fe420f06944c0d84a173fccff2eb0d14dfd1293bc24666a580b98dd1a7254f)
+set(LUV_VERSION 1.44.2-0)
+set(LUV_URL https://github.com/luvit/luv/archive/1.44.2-0.tar.gz)
+set(LUV_SHA256 44ccda27035bfe683e6325a2a93f2c254be1eb76bde6efc2bd37c56a7af7b00a)
 
 set(LUA_COMPAT53_URL https://github.com/keplerproject/lua-compat-5.3/archive/v0.9.tar.gz)
 set(LUA_COMPAT53_SHA256 ad05540d2d96a48725bb79a1def35cf6652a4e2ec26376e2617c8ce2baa6f416)
@@ -193,8 +193,8 @@ set(LIBICONV_SHA256 ccf536620a45458d26ba83887a983b96827001e92a13847b45e4925cc891
 set(TREESITTER_C_URL https://github.com/tree-sitter/tree-sitter-c/archive/v0.20.1.tar.gz)
 set(TREESITTER_C_SHA256 ffcc2ef0eded59ad1acec9aec4f9b0c7dd209fc1a85d85f8b0e81298e3dddcc2)
 
-set(TREESITTER_URL https://github.com/tree-sitter/tree-sitter/archive/v0.20.6.tar.gz)
-set(TREESITTER_SHA256 4d37eaef8a402a385998ff9aca3e1043b4a3bba899bceeff27a7178e1165b9de)
+set(TREESITTER_URL https://github.com/tree-sitter/tree-sitter/archive/1f1b1eb4501ed0a2d195d37f7de15f72aa10acd0.tar.gz)
+set(TREESITTER_SHA256 a324bdb7ff507cd5157a36b908224d60ba638f8e3363070dd51aa383c7cbd790)
 
 if(USE_BUNDLED_UNIBILIUM)
   include(BuildUnibilium)
