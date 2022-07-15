@@ -603,11 +603,21 @@ func Test_cmdline_paste()
   call feedkeys(":\"one\<C-R>\<C-X>two\<CR>", 'xt')
   call assert_equal('"onetwo', @:)
 
+  " Test for pasting register containing CTRL-H using CTRL-R and CTRL-R CTRL-R
   let @a = "xy\<C-H>z"
   call feedkeys(":\"\<C-R>a\<CR>", 'xt')
   call assert_equal('"xz', @:)
+  call feedkeys(":\"\<C-R>\<C-R>a\<CR>", 'xt')
+  call assert_equal("\"xy\<C-H>z", @:)
   call feedkeys(":\"\<C-R>\<C-O>a\<CR>", 'xt')
   call assert_equal("\"xy\<C-H>z", @:)
+
+  " Test for pasting register containing CTRL-V using CTRL-R and CTRL-R CTRL-R
+  let @a = "xy\<C-V>z"
+  call feedkeys(":\"\<C-R>=@a\<CR>\<cr>", 'xt')
+  call assert_equal('"xyz', @:)
+  call feedkeys(":\"\<C-R>\<C-R>=@a\<CR>\<cr>", 'xt')
+  call assert_equal("\"xy\<C-V>z", @:)
 
   call assert_beeps('call feedkeys(":\<C-R>=\<C-R>=\<Esc>", "xt")')
 
@@ -1268,6 +1278,10 @@ endfunc
 func Test_cmdwin_feedkeys()
   " This should not generate E488
   call feedkeys("q:\<CR>", 'x')
+  " Using feedkeys with q: only should automatically close the cmd window
+  call feedkeys('q:', 'xt')
+  call assert_equal(1, winnr('$'))
+  call assert_equal('', getcmdwintype())
 endfunc
 
 " Tests for the issues fixed in 7.4.441.
@@ -1312,22 +1326,6 @@ func Test_cmdwin_autocmd()
   augroup! CmdWin
 endfunc
 
-func Test_cmdwin_jump_to_win()
-  call assert_fails('call feedkeys("q:\<C-W>\<C-W>\<CR>", "xt")', 'E11:')
-  new
-  set modified
-  call assert_fails('call feedkeys("q/:qall\<CR>", "xt")', 'E162:')
-  close!
-  call feedkeys("q/:close\<CR>", "xt")
-  call assert_equal(1, winnr('$'))
-  call feedkeys("q/:exit\<CR>", "xt")
-  call assert_equal(1, winnr('$'))
-
-  " opening command window twice should fail
-  call assert_beeps('call feedkeys("q:q:\<CR>\<CR>", "xt")')
-  call assert_equal(1, winnr('$'))
-endfunc
-
 func Test_cmdlineclear_tabenter()
   " See test/functional/legacy/cmdline_spec.lua
   CheckScreendump
@@ -1363,6 +1361,22 @@ func Test_cmdline_expand_special()
   close
   call delete('Xfile.cpp')
   call delete('Xfile.java')
+endfunc
+
+func Test_cmdwin_jump_to_win()
+  call assert_fails('call feedkeys("q:\<C-W>\<C-W>\<CR>", "xt")', 'E11:')
+  new
+  set modified
+  call assert_fails('call feedkeys("q/:qall\<CR>", "xt")', 'E162:')
+  close!
+  call feedkeys("q/:close\<CR>", "xt")
+  call assert_equal(1, winnr('$'))
+  call feedkeys("q/:exit\<CR>", "xt")
+  call assert_equal(1, winnr('$'))
+
+  " opening command window twice should fail
+  call assert_beeps('call feedkeys("q:q:\<CR>\<CR>", "xt")')
+  call assert_equal(1, winnr('$'))
 endfunc
 
 " Test for backtick expression in the command line
@@ -1558,6 +1572,7 @@ endfunc
 func Test_cmdline_edit()
   let str = ":one two\<C-U>"
   let str ..= "one two\<C-W>\<C-W>"
+  let str ..= "four\<BS>\<C-H>\<Del>\<kDel>"
   let str ..= "\<Left>five\<Right>"
   let str ..= "\<Home>two "
   let str ..= "\<C-Left>one "
@@ -1576,6 +1591,7 @@ func Test_cmdline_edit_rightleft()
   set rightleftcmd=search
   let str = "/one two\<C-U>"
   let str ..= "one two\<C-W>\<C-W>"
+  let str ..= "four\<BS>\<C-H>\<Del>\<kDel>"
   let str ..= "\<Right>five\<Left>"
   let str ..= "\<Home>two "
   let str ..= "\<C-Right>one "
@@ -1603,6 +1619,63 @@ func Test_cmdline_expr()
   call assert_equal("\"e \<C-\>\<C-Y>", @:)
 endfunc
 
+" Test for 'imcmdline' and 'imsearch'
+" This test doesn't actually test the input method functionality.
+func Test_cmdline_inputmethod()
+  new
+  call setline(1, ['', 'abc', ''])
+  set imcmdline
+
+  call feedkeys(":\"abc\<CR>", 'xt')
+  call assert_equal("\"abc", @:)
+  call feedkeys(":\"\<C-^>abc\<C-^>\<CR>", 'xt')
+  call assert_equal("\"abc", @:)
+  call feedkeys("/abc\<CR>", 'xt')
+  call assert_equal([2, 1], [line('.'), col('.')])
+  call feedkeys("/\<C-^>abc\<C-^>\<CR>", 'xt')
+  call assert_equal([2, 1], [line('.'), col('.')])
+
+  " set imsearch=2
+  call cursor(1, 1)
+  call feedkeys("/abc\<CR>", 'xt')
+  call assert_equal([2, 1], [line('.'), col('.')])
+  call cursor(1, 1)
+  call feedkeys("/\<C-^>abc\<C-^>\<CR>", 'xt')
+  call assert_equal([2, 1], [line('.'), col('.')])
+  set imdisable
+  call feedkeys("/\<C-^>abc\<C-^>\<CR>", 'xt')
+  call assert_equal([2, 1], [line('.'), col('.')])
+  set imdisable&
+  set imsearch&
+
+  set imcmdline&
+  %bwipe!
+endfunc
+
+" Test for recursively getting multiple command line inputs
+func Test_cmdwin_multi_input()
+  call feedkeys(":\<C-R>=input('P: ')\<CR>\"cyan\<CR>\<CR>", 'xt')
+  call assert_equal('"cyan', @:)
+endfunc
+
+" Test for using CTRL-_ in the command line with 'allowrevins'
+func Test_cmdline_revins()
+  CheckNotMSWindows
+  CheckFeature rightleft
+  call feedkeys(":\"abc\<c-_>\<cr>", 'xt')
+  call assert_equal("\"abc\<c-_>", @:)
+  set allowrevins
+  call feedkeys(":\"abc\<c-_>xyz\<c-_>\<CR>", 'xt')
+  call assert_equal('"abcñèæ', @:)
+  set allowrevins&
+endfunc
+
+" Test for typing UTF-8 composing characters in the command line
+func Test_cmdline_composing_chars()
+  call feedkeys(":\"\<C-V>u3046\<C-V>u3099\<CR>", 'xt')
+  call assert_equal('"ゔ', @:)
+endfunc
+
 " Test for normal mode commands not supported in the cmd window
 func Test_cmdwin_blocked_commands()
   call assert_fails('call feedkeys("q:\<C-T>\<CR>", "xt")', 'E11:')
@@ -1611,6 +1684,36 @@ func Test_cmdwin_blocked_commands()
   call assert_fails('call feedkeys("q:Q\<CR>", "xt")', 'E11:')
   call assert_fails('call feedkeys("q:Z\<CR>", "xt")', 'E11:')
   call assert_fails('call feedkeys("q:\<F1>\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>s\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>v\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>^\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>n\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>z\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>o\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>w\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>j\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>k\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>h\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>l\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>T\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>x\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>r\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>R\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>K\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>}\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>]\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>f\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>d\<CR>", "xt")', 'E11:')
+  call assert_fails('call feedkeys("q:\<C-W>g\<CR>", "xt")', 'E11:')
+endfunc
+
+" Close the Cmd-line window in insert mode using CTRL-C
+func Test_cmdwin_insert_mode_close()
+  %bw!
+  let s = ''
+  exe "normal q:a\<C-C>let s='Hello'\<CR>"
+  call assert_equal('Hello', s)
+  call assert_equal(1, winnr('$'))
 endfunc
 
 " test that ";" works to find a match at the start of the first line

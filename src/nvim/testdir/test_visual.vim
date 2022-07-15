@@ -284,6 +284,15 @@ func Test_virtual_replace2()
   call assert_equal(['abcd',
         \ 'efgh',
         \ 'ijkl'], getline(1, '$'))
+
+  " Test for truncating spaces in a newly added line using 'autoindent' if
+  " characters are not added to that line.
+  %d_
+  call setline(1, ['    app', '    bee', '    cat'])
+  setlocal autoindent
+  exe "normal gg$gRt\n\nr"
+  call assert_equal(['    apt', '', '    rat'], getline(1, '$'))
+
   " clean up
   %d_
   set bs&vim
@@ -1169,8 +1178,8 @@ func Test_exclusive_selection()
   close!
 endfunc
 
-" Test for starting visual mode with a count
-" This test should be run withou any previous visual modes. So this should be
+" Test for starting visual mode with a count.
+" This test should be run without any previous visual modes. So this should be
 " run as a first test.
 func Test_AAA_start_visual_mode_with_count()
   new
