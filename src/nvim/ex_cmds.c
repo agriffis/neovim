@@ -1980,17 +1980,14 @@ theend:
 /// @return  OK if it's OK, FAIL if it is not.
 int check_overwrite(exarg_T *eap, buf_T *buf, char *fname, char *ffname, int other)
 {
-  /*
-   * write to other file or b_flags set or not writing the whole file:
-   * overwriting only allowed with '!'
-   */
+  // Write to another file or b_flags set or not writing the whole file:
+  // overwriting only allowed with '!'
   if ((other
        || (buf->b_flags & BF_NOTEDITED)
        || ((buf->b_flags & BF_NEW)
            && vim_strchr(p_cpo, CPO_OVERNEW) == NULL)
        || (buf->b_flags & BF_READERR))
       && !p_wa
-      && !bt_nofile(buf)
       && os_path_exists((char_u *)ffname)) {
     if (!eap->forceit && !eap->append) {
 #ifdef UNIX
@@ -4862,8 +4859,7 @@ void ex_help(exarg_T *eap)
    * Re-use an existing help window or open a new one.
    * Always open a new one for ":tab help".
    */
-  if (!bt_help(curwin->w_buffer)
-      || cmdmod.cmod_tab != 0) {
+  if (!bt_help(curwin->w_buffer) || cmdmod.cmod_tab != 0) {
     if (cmdmod.cmod_tab != 0) {
       wp = NULL;
     } else {

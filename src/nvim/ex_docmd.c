@@ -3028,6 +3028,8 @@ char *find_ex_command(exarg_T *eap, int *full)
       if (ASCII_ISLOWER(c2)) {
         eap->cmdidx += cmdidxs2[CHAR_ORD_LOW(c1)][CHAR_ORD_LOW(c2)];
       }
+    } else if (ASCII_ISUPPER(eap->cmd[0])) {
+      eap->cmdidx = CMD_Next;
     } else {
       eap->cmdidx = CMD_bang;
     }
@@ -4616,8 +4618,9 @@ char *invalid_range(exarg_T *eap)
       }
       break;
     case ADDR_BUFFERS:
-      if (eap->line1 < firstbuf->b_fnum
-          || eap->line2 > lastbuf->b_fnum) {
+      // Only a boundary check, not whether the buffers actually
+      // exist.
+      if (eap->line1 < 1 || eap->line2 > get_highest_fnum()) {
         return _(e_invrange);
       }
       break;
