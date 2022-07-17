@@ -349,8 +349,8 @@ func Test_edit_11_indentexpr()
   bw!
 endfunc
 
+" Test changing indent in replace mode
 func Test_edit_12()
-  " Test changing indent in replace mode
   new
   call setline(1, ["\tabc", "\tdef"])
   call cursor(2, 4)
@@ -389,15 +389,15 @@ func Test_edit_12()
   call feedkeys("R\<c-t>\<c-t>", 'tnix')
   call assert_equal(["\tabc", "\t\t\tdef"], getline(1, '$'))
   call assert_equal([0, 2, 2, 0], getpos('.'))
-  set et
-  set sw& et&
+  set sw&
+
+  " In replace mode, after hitting enter in a line with tab characters,
+  " pressing backspace should restore the tab characters.
   %d
-  call setline(1, ["\t/*"])
-  set formatoptions=croql
-  call cursor(1, 3)
-  call feedkeys("A\<cr>\<cr>/", 'tnix')
-  call assert_equal(["\t/*", " *", " */"], getline(1, '$'))
-  set formatoptions&
+  setlocal autoindent backspace=2
+  call setline(1, "\tone\t\ttwo")
+  exe "normal ggRred\<CR>six" .. repeat("\<BS>", 8)
+  call assert_equal(["\tone\t\ttwo"], getline(1, '$'))
   bw!
 endfunc
 
@@ -420,16 +420,49 @@ func Test_edit_13()
   call assert_equal("", getline(2))
   call assert_equal("    baz", getline(3))
   set autoindent&
+
+  " pressing <C-U> to erase line should keep the indent with 'autoindent'
+  set backspace=2 autoindent
+  %d
+  exe "normal i\tone\<CR>three\<C-U>two"
+  call assert_equal(["\tone", "\ttwo"], getline(1, '$'))
+  set backspace& autoindent&
+
   bwipe!
+endfunc
+
+" Test for autoindent removing indent when insert mode is stopped.  Some parts
+" of the code is exercised only when interactive mode is used. So use Vim in a
+" terminal.
+func Test_autoindent_remove_indent()
+  CheckRunVimInTerminal
+  let buf = RunVimInTerminal('-N Xfile', {'rows': 6, 'cols' : 20})
+  call TermWait(buf)
+  call term_sendkeys(buf, ":set autoindent\n")
+  " leaving insert mode in a new line with indent added by autoindent, should
+  " remove the indent.
+  call term_sendkeys(buf, "i\<Tab>foo\<CR>\<Esc>")
+  " Need to delay for sometime, otherwise the code in getchar.c will not be
+  " exercised.
+  call TermWait(buf, 50)
+  " when a line is wrapped and the cursor is at the start of the second line,
+  " leaving insert mode, should move the cursor back to the first line.
+  call term_sendkeys(buf, "o" .. repeat('x', 20) .. "\<Esc>")
+  " Need to delay for sometime, otherwise the code in getchar.c will not be
+  " exercised.
+  call TermWait(buf, 50)
+  call term_sendkeys(buf, ":w\n")
+  call TermWait(buf)
+  call StopVimInTerminal(buf)
+  call assert_equal(["\tfoo", '', repeat('x', 20)], readfile('Xfile'))
+  call delete('Xfile')
 endfunc
 
 func Test_edit_CR()
   " Test for <CR> in insert mode
   " basically only in quickfix mode ist tested, the rest
   " has been taken care of by other tests
-  if !has("quickfix")
-    return
-  endif
+  CheckFeature quickfix
   botright new
   call writefile(range(1, 10), 'Xqflist.txt')
   call setqflist([{'filename': 'Xqflist.txt', 'lnum': 2}])
