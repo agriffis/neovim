@@ -4,15 +4,15 @@ local lsp_rpc = require('vim.lsp.rpc')
 local protocol = require('vim.lsp.protocol')
 local util = require('vim.lsp.util')
 local sync = require('vim.lsp.sync')
-local api = vim.api
 
 local vim = vim
+local api = vim.api
 local nvim_err_writeln, nvim_buf_get_lines, nvim_command, nvim_buf_get_option, nvim_exec_autocmds =
-  vim.api.nvim_err_writeln,
-  vim.api.nvim_buf_get_lines,
-  vim.api.nvim_command,
-  vim.api.nvim_buf_get_option,
-  vim.api.nvim_exec_autocmds
+  api.nvim_err_writeln,
+  api.nvim_buf_get_lines,
+  api.nvim_command,
+  api.nvim_buf_get_option,
+  api.nvim_exec_autocmds
 local uv = vim.loop
 local tbl_isempty, tbl_extend = vim.tbl_isempty, vim.tbl_extend
 local validate = vim.validate
@@ -79,7 +79,7 @@ end
 local function resolve_bufnr(bufnr)
   validate({ bufnr = { bufnr, 'n', true } })
   if bufnr == nil or bufnr == 0 then
-    return vim.api.nvim_get_current_buf()
+    return api.nvim_get_current_buf()
   end
   return bufnr
 end
@@ -216,7 +216,7 @@ end
 ---@returns (string) the command
 ---@returns (list of strings) its arguments
 function lsp._cmd_parts(input)
-  vim.validate({
+  validate({
     cmd = {
       input,
       function()
@@ -230,7 +230,7 @@ function lsp._cmd_parts(input)
   local cmd_args = {}
   -- Don't mutate our input.
   for i, v in ipairs(input) do
-    vim.validate({ ['cmd argument'] = { v, 's' } })
+    validate({ ['cmd argument'] = { v, 's' } })
     if i > 1 then
       table.insert(cmd_args, v)
     end
@@ -505,7 +505,7 @@ do
         end
         buf_state.pending_change = nil
         buf_state.last_flush = uv.hrtime()
-        if client.is_stopped() or not vim.api.nvim_buf_is_valid(bufnr) then
+        if client.is_stopped() or not api.nvim_buf_is_valid(bufnr) then
           return
         end
         local changes = state.use_incremental_sync and buf_state.pending_changes
@@ -522,7 +522,7 @@ do
       if debounce == 0 then
         buf_state.pending_change()
       else
-        local timer = vim.loop.new_timer()
+        local timer = uv.new_timer()
         buf_state.timer = timer
         -- Must use schedule_wrap because `full_changes()` calls nvim_buf_get_lines
         timer:start(debounce, 0, vim.schedule_wrap(buf_state.pending_change))
@@ -572,7 +572,7 @@ local function text_document_did_open_handler(bufnr, client)
   if not vim.tbl_get(client.server_capabilities, 'textDocumentSync', 'openClose') then
     return
   end
-  if not vim.api.nvim_buf_is_loaded(bufnr) then
+  if not api.nvim_buf_is_loaded(bufnr) then
     return
   end
   local filetype = nvim_buf_get_option(bufnr, 'filetype')
@@ -592,7 +592,7 @@ local function text_document_did_open_handler(bufnr, client)
   vim.schedule(function()
     -- Protect against a race where the buffer disappears
     -- between `did_open_handler` and the scheduled function firing.
-    if vim.api.nvim_buf_is_valid(bufnr) then
+    if api.nvim_buf_is_valid(bufnr) then
       local namespace = vim.lsp.diagnostic.get_namespace(client.id)
       vim.diagnostic.show(namespace, bufnr)
     end
@@ -1234,12 +1234,12 @@ function lsp.start_client(config)
       )
     end, function(request_id)
       client.requests[request_id] = nil
-      nvim_command('doautocmd <nomodeline> User LspRequest')
+      nvim_exec_autocmds('User', { pattern = 'LspRequest', modeline = false })
     end)
 
     if success then
       client.requests[request_id] = { type = 'pending', bufnr = bufnr, method = method }
-      nvim_command('doautocmd <nomodeline> User LspRequest')
+      nvim_exec_autocmds('User', { pattern = 'LspRequest', modeline = false })
     end
 
     return success, request_id
@@ -1308,7 +1308,7 @@ function lsp.start_client(config)
     local request = client.requests[id]
     if request and request.type == 'pending' then
       request.type = 'cancel'
-      nvim_command('doautocmd <nomodeline> User LspRequest')
+      nvim_exec_autocmds('User', { pattern = 'LspRequest', modeline = false })
     end
     return rpc.notify('$/cancelRequest', { id = id })
   end
@@ -1398,8 +1398,9 @@ do
     end
 end
 
--- Buffer lifecycle handler for textDocument/didSave
-function lsp._text_document_did_save_handler(bufnr)
+---@private
+---Buffer lifecycle handler for textDocument/didSave
+local function text_document_did_save_handler(bufnr)
   bufnr = resolve_bufnr(bufnr)
   local uri = vim.uri_from_bufnr(bufnr)
   local text = once(buf_get_full_text)
@@ -1433,7 +1434,7 @@ function lsp.buf_attach_client(bufnr, client_id)
     client_id = { client_id, 'n' },
   })
   bufnr = resolve_bufnr(bufnr)
-  if not vim.api.nvim_buf_is_loaded(bufnr) then
+  if not api.nvim_buf_is_loaded(bufnr) then
     local _ = log.warn()
       and log.warn(string.format('buf_attach_client called on unloaded buffer (id: %d): ', bufnr))
     return false
@@ -1445,15 +1446,17 @@ function lsp.buf_attach_client(bufnr, client_id)
     all_buffer_active_clients[bufnr] = buffer_client_ids
 
     local uri = vim.uri_from_bufnr(bufnr)
-    local buf_did_save_autocommand = [=[
-      augroup lsp_c_%d_b_%d_did_save
-        au!
-        au BufWritePost <buffer=%d> lua vim.lsp._text_document_did_save_handler(0)
-      augroup END
-    ]=]
-    vim.api.nvim_exec(string.format(buf_did_save_autocommand, client_id, bufnr, bufnr), false)
+    local augroup = ('lsp_c_%d_b_%d_did_save'):format(client_id, bufnr)
+    api.nvim_create_autocmd('BufWritePost', {
+      group = api.nvim_create_augroup(augroup, { clear = true }),
+      buffer = bufnr,
+      desc = 'vim.lsp: textDocument/didSave handler',
+      callback = function(ctx)
+        text_document_did_save_handler(ctx.buf)
+      end,
+    })
     -- First time, so attach and set up stuff.
-    vim.api.nvim_buf_attach(bufnr, false, {
+    api.nvim_buf_attach(bufnr, false, {
       on_lines = text_document_did_change_handler,
       on_reload = function()
         local params = { textDocument = { uri = uri } }
@@ -1634,60 +1637,61 @@ function lsp.get_active_clients(filter)
   return clients
 end
 
-function lsp._vim_exit_handler()
-  log.info('exit_handler', active_clients)
-  for _, client in pairs(uninitialized_clients) do
-    client.stop(true)
-  end
-  -- TODO handle v:dying differently?
-  if tbl_isempty(active_clients) then
-    return
-  end
-  for _, client in pairs(active_clients) do
-    client.stop()
-  end
-
-  local timeouts = {}
-  local max_timeout = 0
-  local send_kill = false
-
-  for client_id, client in pairs(active_clients) do
-    local timeout = if_nil(client.config.flags.exit_timeout, 500)
-    if timeout then
-      send_kill = true
-      timeouts[client_id] = timeout
-      max_timeout = math.max(timeout, max_timeout)
+api.nvim_create_autocmd('VimLeavePre', {
+  desc = 'vim.lsp: exit handler',
+  callback = function()
+    log.info('exit_handler', active_clients)
+    for _, client in pairs(uninitialized_clients) do
+      client.stop(true)
     end
-  end
-
-  local poll_time = 50
-
-  ---@private
-  local function check_clients_closed()
-    for client_id, timeout in pairs(timeouts) do
-      timeouts[client_id] = timeout - poll_time
+    -- TODO handle v:dying differently?
+    if tbl_isempty(active_clients) then
+      return
+    end
+    for _, client in pairs(active_clients) do
+      client.stop()
     end
 
-    for client_id, _ in pairs(active_clients) do
-      if timeouts[client_id] ~= nil and timeouts[client_id] > 0 then
-        return false
+    local timeouts = {}
+    local max_timeout = 0
+    local send_kill = false
+
+    for client_id, client in pairs(active_clients) do
+      local timeout = if_nil(client.config.flags.exit_timeout, 500)
+      if timeout then
+        send_kill = true
+        timeouts[client_id] = timeout
+        max_timeout = math.max(timeout, max_timeout)
       end
     end
-    return true
-  end
 
-  if send_kill then
-    if not vim.wait(max_timeout, check_clients_closed, poll_time) then
-      for client_id, client in pairs(active_clients) do
-        if timeouts[client_id] ~= nil then
-          client.stop(true)
+    local poll_time = 50
+
+    ---@private
+    local function check_clients_closed()
+      for client_id, timeout in pairs(timeouts) do
+        timeouts[client_id] = timeout - poll_time
+      end
+
+      for client_id, _ in pairs(active_clients) do
+        if timeouts[client_id] ~= nil and timeouts[client_id] > 0 then
+          return false
+        end
+      end
+      return true
+    end
+
+    if send_kill then
+      if not vim.wait(max_timeout, check_clients_closed, poll_time) then
+        for client_id, client in pairs(active_clients) do
+          if timeouts[client_id] ~= nil then
+            client.stop(true)
+          end
         end
       end
     end
-  end
-end
-
-nvim_command('autocmd VimLeavePre * lua vim.lsp._vim_exit_handler()')
+  end,
+})
 
 --- Sends an async request for all active clients attached to the
 --- buffer.
@@ -1723,7 +1727,7 @@ function lsp.buf_request(bufnr, method, params, handler)
     not tbl_isempty(all_buffer_active_clients[resolve_bufnr(bufnr)] or {}) and not method_supported
   then
     vim.notify(lsp._unsupported_method(method), vim.log.levels.ERROR)
-    vim.api.nvim_command('redraw')
+    nvim_command('redraw')
     return {}, function() end
   end
 
@@ -1888,8 +1892,8 @@ function lsp.omnifunc(findstart, base)
   -- Then, perform standard completion request
   local _ = log.info() and log.info('base ', base)
 
-  local pos = vim.api.nvim_win_get_cursor(0)
-  local line = vim.api.nvim_get_current_line()
+  local pos = api.nvim_win_get_cursor(0)
+  local line = api.nvim_get_current_line()
   local line_to_cursor = line:sub(1, pos[2])
   local _ = log.trace() and log.trace('omnifunc.line', pos, line)
 
