@@ -897,6 +897,8 @@ def fmt_doxygen_xml_as_vimhelp(filename, target):
             doc = fmt_node_as_vimhelp(fn['desc_node'], fmt_vimhelp=True)
         if not doc and fn['brief_desc_node']:
             doc = fmt_node_as_vimhelp(fn['brief_desc_node'])
+        if not doc and name.startswith("nvim__"):
+            continue
         if not doc:
             doc = 'TODO: Documentation'
 
@@ -947,7 +949,8 @@ def fmt_doxygen_xml_as_vimhelp(filename, target):
 
         func_doc = "\n".join(split_lines)
 
-        if name.startswith(CONFIG[target]['fn_name_prefix']):
+        if (name.startswith(CONFIG[target]['fn_name_prefix'])
+           and name != "nvim_error_event"):
             fns_txt[name] = func_doc
 
     return ('\n\n'.join(list(fns_txt.values())),

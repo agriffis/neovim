@@ -28,6 +28,7 @@
 #include "nvim/highlight_group.h"
 #include "nvim/iconv.h"
 #include "nvim/if_cscope.h"
+#include "nvim/insexpand.h"
 #include "nvim/lua/executor.h"
 #include "nvim/main.h"
 #include "nvim/mapping.h"
@@ -202,7 +203,6 @@ void early_init(mparm_T *paramp)
   set_lang_var();               // set v:lang and v:ctype
 
   init_signs();
-  ui_comp_syn_init();
 }
 
 #ifdef MAKE_LIB
@@ -320,6 +320,7 @@ int main(int argc, char **argv)
   no_wait_return = true;
 
   init_highlight(true, false);  // Default highlight groups.
+  ui_comp_syn_init();
   TIME_MSG("init highlight");
 
   // Set the break level after the terminal is initialized.

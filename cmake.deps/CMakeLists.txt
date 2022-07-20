@@ -1,5 +1,5 @@
 # This is not meant to be included by the top-level.
-cmake_minimum_required (VERSION 2.8.12)
+cmake_minimum_required (VERSION 3.10)
 project(NVIM_DEPS C)
 
 # Needed for: check_c_compiler_flag()
@@ -130,6 +130,18 @@ if(CMAKE_OSX_ARCHITECTURES)
       set(DEPS_CXX_COMPILER "${DEPS_CXX_COMPILER} -arch ${ARCH}")
     endif()
   endforeach()
+endif()
+
+# If the macOS deployment target is not set manually (via $MACOSX_DEPLOYMENT_TARGET),
+# fall back to local system version. Needs to be done here and in top-level CMakeLists.txt.
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    execute_process(COMMAND sw_vers -productVersion
+                    OUTPUT_VARIABLE MACOS_VERSION
+                    OUTPUT_STRIP_TRAILING_WHITESPACE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "${MACOS_VERSION}")
+  endif()
+  message("-- Using deployment target ${CMAKE_OSX_DEPLOYMENT_TARGET}")
 endif()
 
 set(HOSTDEPS_INSTALL_DIR "${DEPS_INSTALL_DIR}")
