@@ -467,6 +467,9 @@ EXTERN buf_T *curbuf INIT(= NULL);    // currently active buffer
 #define FOR_ALL_BUFFERS_BACKWARDS(buf) \
   for (buf_T *buf = lastbuf; buf != NULL; buf = buf->b_prev)
 
+#define FOR_ALL_BUF_WININFO(buf, wip) \
+  for ((wip) = (buf)->b_wininfo; (wip) != NULL; (wip) = (wip)->wi_next)   // NOLINT
+
 // Iterate through all the signs placed in a buffer
 #define FOR_ALL_SIGNS_IN_BUF(buf, sign) \
   for ((sign) = (buf)->b_signlist; (sign) != NULL; (sign) = (sign)->se_next)   // NOLINT
@@ -941,6 +944,9 @@ EXTERN char e_loclist[] INIT(= N_("E776: No location list"));
 EXTERN char e_re_damg[] INIT(= N_("E43: Damaged match string"));
 EXTERN char e_re_corr[] INIT(= N_("E44: Corrupted regexp program"));
 EXTERN char e_readonly[] INIT(= N_("E45: 'readonly' option is set (add ! to override)"));
+EXTERN char e_letwrong[] INIT(= N_("E734: Wrong variable type for %s="));
+EXTERN char e_illvar[] INIT(= N_("E461: Illegal variable name: %s"));
+EXTERN char e_cannot_mod[] INIT(= N_("E995: Cannot modify existing variable"));
 EXTERN char e_readonlyvar[] INIT(= N_("E46: Cannot change read-only variable \"%.*s\""));
 EXTERN char e_stringreq[] INIT(= N_("E928: String required"));
 EXTERN char e_dictreq[] INIT(= N_("E715: Dictionary required"));

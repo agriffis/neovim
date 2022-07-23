@@ -13,6 +13,7 @@
 #include "nvim/diff.h"
 #include "nvim/edit.h"
 #include "nvim/eval.h"
+#include "nvim/eval/vars.h"
 #include "nvim/ex_cmds.h"
 #include "nvim/ex_cmds2.h"
 #include "nvim/ex_docmd.h"
@@ -1500,9 +1501,6 @@ int win_split_ins(int size, int flags, win_T *new_wp, int dir)
     }
   }
 
-  // Keep same changelist position in new window.
-  wp->w_changelistidx = oldwin->w_changelistidx;
-
   // make the new window the current window
   win_enter_ext(wp, WEE_TRIGGER_NEW_AUTOCMDS | WEE_TRIGGER_ENTER_AUTOCMDS
                 | WEE_TRIGGER_LEAVE_AUTOCMDS);
@@ -1573,6 +1571,10 @@ static void win_init(win_T *newp, win_T *oldp, int flags)
   }
   newp->w_tagstackidx = oldp->w_tagstackidx;
   newp->w_tagstacklen = oldp->w_tagstacklen;
+
+  // Keep same changelist position in new window.
+  newp->w_changelistidx = oldp->w_changelistidx;
+
   copyFoldingState(oldp, newp);
 
   win_init_some(newp, oldp);

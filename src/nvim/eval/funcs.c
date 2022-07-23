@@ -25,6 +25,7 @@
 #include "nvim/eval/funcs.h"
 #include "nvim/eval/typval.h"
 #include "nvim/eval/userfunc.h"
+#include "nvim/eval/vars.h"
 #include "nvim/ex_docmd.h"
 #include "nvim/ex_getln.h"
 #include "nvim/file_search.h"
@@ -2803,66 +2804,6 @@ static void f_getbufline(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   get_buffer_lines(buf, lnum, end, true, rettv);
 }
 
-/// "getbufvar()" function
-static void f_getbufvar(typval_T *argvars, typval_T *rettv, FunPtr fptr)
-{
-  bool done = false;
-
-  rettv->v_type = VAR_STRING;
-  rettv->vval.v_string = NULL;
-
-  if (!tv_check_str_or_nr(&argvars[0])) {
-    goto f_getbufvar_end;
-  }
-
-  const char *varname = tv_get_string_chk(&argvars[1]);
-  emsg_off++;
-  buf_T *const buf = tv_get_buf(&argvars[0], false);
-
-  if (buf != NULL && varname != NULL) {
-    if (*varname == '&') {  // buffer-local-option
-      buf_T *const save_curbuf = curbuf;
-
-      // set curbuf to be our buf, temporarily
-      curbuf = buf;
-
-      if (varname[1] == NUL) {
-        // get all buffer-local options in a dict
-        dict_T *opts = get_winbuf_options(true);
-
-        if (opts != NULL) {
-          tv_dict_set_ret(rettv, opts);
-          done = true;
-        }
-      } else if (get_option_tv(&varname, rettv, true) == OK) {
-        // buffer-local-option
-        done = true;
-      }
-
-      // restore previous notion of curbuf
-      curbuf = save_curbuf;
-    } else {
-      // Look up the variable.
-      // Let getbufvar({nr}, "") return the "b:" dictionary.
-      dictitem_T *const v = *varname == NUL
-        ? (dictitem_T *)&buf->b_bufvar
-        : find_var_in_ht(&buf->b_vars->dv_hashtab, 'b',
-                         varname, strlen(varname), false);
-      if (v != NULL) {
-        tv_copy(&v->di_tv, rettv);
-        done = true;
-      }
-    }
-  }
-  emsg_off--;
-
-f_getbufvar_end:
-  if (!done && argvars[2].v_type != VAR_UNKNOWN) {
-    // use the default value
-    tv_copy(&argvars[2], rettv);
-  }
-}
-
 /// "getchangelist()" function
 static void f_getchangelist(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
@@ -2883,13 +2824,23 @@ static void f_getchangelist(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 
   list_T *const l = tv_list_alloc(buf->b_changelistlen);
   tv_list_append_list(rettv->vval.v_list, l);
-  // The current window change list index tracks only the position in the
-  // current buffer change list. For other buffers, use the change list
-  // length as the current index.
-  tv_list_append_number(rettv->vval.v_list,
-                        (buf == curwin->w_buffer)
-                        ? curwin->w_changelistidx
-                        : buf->b_changelistlen);
+  // The current window change list index tracks only the position for the
+  // current buffer. For other buffers use the stored index for the current
+  // window, or, if that's not available, the change list length.
+  int changelistindex;
+  if (buf == curwin->w_buffer) {
+    changelistindex = curwin->w_changelistidx;
+  } else {
+    wininfo_T *wip;
+
+    FOR_ALL_BUF_WININFO(buf, wip) {
+      if (wip->wi_win == curwin) {
+        break;
+      }
+    }
+    changelistindex = wip != NULL ? wip->wi_changelistidx : buf->b_changelistlen;
+  }
+  tv_list_append_number(rettv->vval.v_list, (varnumber_T)changelistindex);
 
   for (int i = 0; i < buf->b_changelistlen; i++) {
     if (buf->b_changelist[i].mark.lnum == 0) {
@@ -3707,50 +3658,6 @@ static void f_gettabinfo(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   }
 }
 
-/// "gettabvar()" function
-static void f_gettabvar(typval_T *argvars, typval_T *rettv, FunPtr fptr)
-{
-  bool done = false;
-
-  rettv->v_type = VAR_STRING;
-  rettv->vval.v_string = NULL;
-
-  const char *const varname = tv_get_string_chk(&argvars[1]);
-  tabpage_T *const tp = find_tabpage((int)tv_get_number_chk(&argvars[0], NULL));
-  if (tp != NULL && varname != NULL) {
-    // Set tp to be our tabpage, temporarily.  Also set the window to the
-    // first window in the tabpage, otherwise the window is not valid.
-    win_T *const window = tp == curtab || tp->tp_firstwin == NULL
-        ? firstwin
-        : tp->tp_firstwin;
-    switchwin_T switchwin;
-    if (switch_win(&switchwin, window, tp, true) == OK) {
-      // look up the variable
-      // Let gettabvar({nr}, "") return the "t:" dictionary.
-      const dictitem_T *const v = find_var_in_ht(&tp->tp_vars->dv_hashtab, 't',
-                                                 varname, strlen(varname),
-                                                 false);
-      if (v != NULL) {
-        tv_copy(&v->di_tv, rettv);
-        done = true;
-      }
-    }
-
-    // restore previous notion of curwin
-    restore_win(&switchwin, true);
-  }
-
-  if (!done && argvars[2].v_type != VAR_UNKNOWN) {
-    tv_copy(&argvars[2], rettv);
-  }
-}
-
-/// "gettabwinvar()" function
-static void f_gettabwinvar(typval_T *argvars, typval_T *rettv, FunPtr fptr)
-{
-  getwinvar(argvars, rettv, 1);
-}
-
 /// "gettagstack()" function
 static void f_gettagstack(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
@@ -3972,12 +3879,6 @@ static void f_getwinposx(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 static void f_getwinposy(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
   rettv->vval.v_number = -1;
-}
-
-/// "getwinvar()" function
-static void f_getwinvar(typval_T *argvars, typval_T *rettv, FunPtr fptr)
-{
-  getwinvar(argvars, rettv, 0);
 }
 
 /// "glob()" function
@@ -8390,50 +8291,6 @@ static void f_setbufline(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   }
 }
 
-/// "setbufvar()" function
-static void f_setbufvar(typval_T *argvars, typval_T *rettv, FunPtr fptr)
-{
-  if (check_secure()
-      || !tv_check_str_or_nr(&argvars[0])) {
-    return;
-  }
-  const char *varname = tv_get_string_chk(&argvars[1]);
-  buf_T *const buf = tv_get_buf(&argvars[0], false);
-  typval_T *varp = &argvars[2];
-
-  if (buf != NULL && varname != NULL) {
-    if (*varname == '&') {
-      long numval;
-      bool error = false;
-      aco_save_T aco;
-
-      // set curbuf to be our buf, temporarily
-      aucmd_prepbuf(&aco, buf);
-
-      varname++;
-      numval = tv_get_number_chk(varp, &error);
-      char nbuf[NUMBUFLEN];
-      const char *const strval = tv_get_string_buf_chk(varp, nbuf);
-      if (!error && strval != NULL) {
-        set_option_value(varname, numval, strval, OPT_LOCAL);
-      }
-
-      // reset notion of buffer
-      aucmd_restbuf(&aco);
-    } else {
-      const size_t varname_len = STRLEN(varname);
-      char *const bufvarname = xmalloc(varname_len + 3);
-      buf_T *const save_curbuf = curbuf;
-      curbuf = buf;
-      memcpy(bufvarname, "b:", 2);
-      memcpy(bufvarname + 2, varname, varname_len + 1);
-      set_var(bufvarname, varname_len + 2, varp, true);
-      xfree(bufvarname);
-      curbuf = save_curbuf;
-    }
-  }
-}
-
 /// Set the cursor or mark position.
 /// If 'charpos' is TRUE, then use the column number as a character offset.
 /// Otherwise use the column number as a byte offset.
@@ -8856,43 +8713,6 @@ free_lstval:
   }
 }
 
-/// "settabvar()" function
-static void f_settabvar(typval_T *argvars, typval_T *rettv, FunPtr fptr)
-{
-  rettv->vval.v_number = 0;
-
-  if (check_secure()) {
-    return;
-  }
-
-  tabpage_T *const tp = find_tabpage((int)tv_get_number_chk(&argvars[0], NULL));
-  const char *const varname = tv_get_string_chk(&argvars[1]);
-  typval_T *const varp = &argvars[2];
-
-  if (varname != NULL && tp != NULL) {
-    tabpage_T *const save_curtab = curtab;
-    goto_tabpage_tp(tp, false, false);
-
-    const size_t varname_len = strlen(varname);
-    char *const tabvarname = xmalloc(varname_len + 3);
-    memcpy(tabvarname, "t:", 2);
-    memcpy(tabvarname + 2, varname, varname_len + 1);
-    set_var(tabvarname, varname_len + 2, varp, true);
-    xfree(tabvarname);
-
-    // Restore current tabpage.
-    if (valid_tabpage(save_curtab)) {
-      goto_tabpage_tp(save_curtab, false, false);
-    }
-  }
-}
-
-/// "settabwinvar()" function
-static void f_settabwinvar(typval_T *argvars, typval_T *rettv, FunPtr fptr)
-{
-  setwinvar(argvars, rettv, 1);
-}
-
 /// "settagstack()" function
 static void f_settagstack(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 {
@@ -8944,12 +8764,6 @@ static void f_settagstack(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   if (set_tagstack(wp, d, action) == OK) {
     rettv->vval.v_number = 0;
   }
-}
-
-/// "setwinvar()" function
-static void f_setwinvar(typval_T *argvars, typval_T *rettv, FunPtr fptr)
-{
-  setwinvar(argvars, rettv, 0);
 }
 
 /// f_sha256 - sha256({string}) function
