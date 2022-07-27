@@ -2725,6 +2725,12 @@ int do_ecmd(int fnum, char *ffname, char *sfname, exarg_T *eap, linenr_T newlnum
   // Assume success now
   retval = OK;
 
+  // If the file name was changed, reset the not-edit flag so that ":write"
+  // works.
+  if (!other_file) {
+    curbuf->b_flags &= ~BF_NOTEDITED;
+  }
+
   /*
    * Check if we are editing the w_arg_idx file in the argument list.
    */
@@ -5574,11 +5580,14 @@ static void helptags_one(char *dir, const char *ext, const char *tagfname, bool 
   // Note: We cannot just do `&NameBuff` because it is a statically sized array
   //       so `NameBuff == &NameBuff` according to C semantics.
   char *buff_list[1] = { (char *)NameBuff };
-  if (gen_expand_wildcards(1, (char_u **)buff_list, &filecount, (char_u ***)&files,
-                           EW_FILE|EW_SILENT) == FAIL
-      || filecount == 0) {
+  const int res = gen_expand_wildcards(1, (char_u **)buff_list, &filecount, (char_u ***)&files,
+                                       EW_FILE|EW_SILENT);
+  if (res == FAIL || filecount == 0) {
     if (!got_int) {
       semsg(_("E151: No match: %s"), NameBuff);
+    }
+    if (res != FAIL) {
+      FreeWild(filecount, (char_u **)files);
     }
     return;
   }

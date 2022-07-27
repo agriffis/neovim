@@ -704,6 +704,16 @@ func Test_cmdline_complete_user_cmd()
   delcommand Foo
 endfunc
 
+func Test_complete_user_cmd()
+  command FooBar echo 'global'
+  command -buffer FooBar echo 'local'
+  call feedkeys(":Foo\<C-A>\<Home>\"\<CR>", 'tx')
+  call assert_equal('"FooBar', @:)
+
+  delcommand -buffer FooBar
+  delcommand FooBar
+endfunc
+
 func s:ScriptLocalFunction()
   echo 'yes'
 endfunc
@@ -1844,6 +1854,22 @@ endfunc
 func Test_long_error_message()
   " the error should be truncated, not overrun IObuff
   silent! norm Q00000000000000     000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000                                                                                                                                                                                                                        
+endfunc
+
+func Test_cmdline_redraw_tabline()
+  CheckRunVimInTerminal
+
+  let lines =<< trim END
+      set showtabline=2
+      autocmd CmdlineEnter * set tabline=foo
+  END
+  call writefile(lines, 'Xcmdline_redraw_tabline')
+  let buf = RunVimInTerminal('-S Xcmdline_redraw_tabline', #{rows: 6})
+  call term_sendkeys(buf, ':')
+  call WaitForAssert({-> assert_match('^foo', term_getline(buf, 1))})
+
+  call StopVimInTerminal(buf)
+  call delete('Xcmdline_redraw_tabline')
 endfunc
 
 " vim: shiftwidth=2 sts=2 expandtab
