@@ -514,6 +514,7 @@ static const char *list_arg_vars(exarg_T *eap, const char *arg, int *first)
               const char *const used_name = (arg == arg_subsc
                                              ? name
                                              : name_start);
+              assert(used_name != NULL);
               const ptrdiff_t name_size = (used_name == tofree
                                            ? (ptrdiff_t)strlen(used_name)
                                            : (arg - used_name));
@@ -1617,6 +1618,10 @@ static void set_option_from_tv(const char *varname, typval_T *varp)
   char nbuf[NUMBUFLEN];
 
   if (varp->v_type == VAR_BOOL) {
+    if (is_string_option(varname)) {
+      emsg(_(e_stringreq));
+      return;
+    }
     numval = (long)varp->vval.v_number;
     strval = "0";  // avoid using "false"
   } else {
