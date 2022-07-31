@@ -2899,6 +2899,11 @@ static void getchar_common(typval_T *argvars, typval_T *rettv)
   no_mapping--;
   allow_keys--;
 
+  if (!ui_has_messages()) {
+    // redraw the screen after getchar()
+    update_screen(CLEAR);
+  }
+
   set_vim_var_nr(VV_MOUSE_WIN, 0);
   set_vim_var_nr(VV_MOUSE_WINID, 0);
   set_vim_var_nr(VV_MOUSE_LNUM, 0);
@@ -9498,8 +9503,12 @@ static void f_synIDattr(typval_T *argvars, typval_T *rettv, FunPtr fptr)
       p = highlight_has_attr(id, HL_ITALIC, modec);
     }
     break;
-  case 'n':    // name
-    p = get_highlight_name_ext(NULL, id - 1, false);
+  case 'n':
+    if (TOLOWER_ASC(what[1]) == 'o') {  // nocombine
+      p = highlight_has_attr(id, HL_NOCOMBINE, modec);
+    } else {  // name
+      p = get_highlight_name_ext(NULL, id - 1, false);
+    }
     break;
   case 'r':    // reverse
     p = highlight_has_attr(id, HL_INVERSE, modec);
