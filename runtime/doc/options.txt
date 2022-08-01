@@ -1314,14 +1314,14 @@ A jump table for the options with a short description can be found at |Q_op|.
 
 						*'cmdheight'* *'ch'*
 'cmdheight' 'ch'	number	(default 1)
-			global
+			global or local to tab page
 	Number of screen lines to use for the command-line.  Helps avoiding
 	|hit-enter| prompts.
 	The value of this option is stored with the tab page, so that each tab
 	page can have a different value.
 
-	When 'cmdheight' is zero, it disables echo area and all outputs need
-	|hit-enter| prompt.
+	When 'cmdheight' is zero, there is no command-line unless it is being
+	used.  Any messages will cause the |hit-enter| prompt.
 
 						*'cmdwinheight'* *'cwh'*
 'cmdwinheight' 'cwh'	number	(default 7)
@@ -3571,7 +3571,7 @@ A jump table for the options with a short description can be found at |Q_op|.
 	help.  (Note that previously setting the global option to the empty
 	value did this, which is now deprecated.)
 	When the first character is ":", the command is invoked as a Vim
-	Ex command with [count] added as an argument if it is not zero.
+	Ex command prefixed with [count].
 	When "man" or "man -s" is used, Vim will automatically translate
 	a [count] for the "K" command to a section number.
 	See |option-backslash| about including spaces and backslashes.
@@ -4210,14 +4210,14 @@ A jump table for the options with a short description can be found at |Q_op|.
 
 	The 'mousemodel' option is set by the |:behave| command.
 
-					*mousescroll*
+					*'mousescroll'*
 'mousescroll'		string	(default "ver:3,hor:6")
 			global
 	This option controls the number of lines / columns to scroll by when
 	scrolling with a mouse. The option is a comma separated list of parts.
 	Each part consists of a direction and a count as follows:
 		direction:count,direction:count
-	Direction is one of either "hor" or "ver", "hor" controls horizontal
+	Direction is one of either "hor" or "ver". "hor" controls horizontal
 	scrolling and "ver" controls vertical scrolling. Count sets the amount
 	to scroll by for the given direction, it should be a non negative
 	integer. Each direction should be set at most once. If a direction
@@ -4850,7 +4850,7 @@ A jump table for the options with a short description can be found at |Q_op|.
 	If 'rulerformat' is set, it will determine the contents of the ruler.
 	Each window has its own ruler.  If a window has a status line, the
 	ruler is shown there.  If a window doesn't have a status line and
-	'cmdheight' is 0, the ruler is not shown.  Otherwise it is shown in
+	'cmdheight' is zero, the ruler is not shown.  Otherwise it is shown in
 	the last line of the screen.  If the statusline is given by
 	'statusline' (i.e. not empty), this option takes precedence over
 	'ruler' and 'rulerformat'.
@@ -5559,7 +5559,7 @@ A jump table for the options with a short description can be found at |Q_op|.
 			global
 	Show (partial) command in the last line of the screen.  Set this
 	option off if your terminal is slow.
-	The option is disabled if 'cmdheight' is 0.
+	The option has no effect when 'cmdheight' is zero.
 	In Visual mode the size of the selected area is shown:
 	- When selecting characters within a line, the number of characters.
 	  If the number of bytes is different it is also displayed: "2-6"
@@ -5606,7 +5606,7 @@ A jump table for the options with a short description can be found at |Q_op|.
 			global
 	If in Insert, Replace or Visual mode put a message on the last line.
 	The |hl-ModeMsg| highlight group determines the highlighting.
-	The option is disabled if 'cmdheight' is 0.
+	The option has no effect when 'cmdheight' is zero.
 
 						*'showtabline'* *'stal'*
 'showtabline' 'stal'	number	(default 1)

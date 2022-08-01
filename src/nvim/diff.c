@@ -656,6 +656,7 @@ void diff_redraw(bool dofold)
     if (!wp->w_p_diff || !buf_valid(wp->w_buffer)) {
       continue;
     }
+
     redraw_later(wp, SOME_VALID);
     if (wp != curwin) {
       wp_other = wp;
@@ -664,8 +665,8 @@ void diff_redraw(bool dofold)
       foldUpdateAll(wp);
     }
 
-    // A change may have made filler lines invalid, need to take care
-    // of that for other windows.
+    // A change may have made filler lines invalid, need to take care of
+    // that for other windows.
     int n = diff_check(wp, wp->w_topline);
 
     if (((wp != curwin) && (wp->w_topfill > 0)) || (n > 0)) {
@@ -682,6 +683,7 @@ void diff_redraw(bool dofold)
       check_topfill(wp, false);
     }
   }
+
   if (wp_other != NULL && curwin->w_p_scb) {
     if (used_max_fill_curwin) {
       // The current window was set to use the maximum number of filler
@@ -3066,8 +3068,8 @@ static int parse_diff_ed(char_u *line, diffhunk_T *hunk)
   // change: {first}[,{last}]c{first}[,{last}]
   // append: {first}a{first}[,{last}]
   // delete: {first}[,{last}]d{first}
-  char_u *p = line;
-  linenr_T f1 = getdigits_int32((char **)&p, true, 0);
+  char *p = (char *)line;
+  linenr_T f1 = getdigits_int32(&p, true, 0);
   if (*p == ',') {
     p++;
     l1 = getdigits(&p, true, 0);
@@ -3077,7 +3079,7 @@ static int parse_diff_ed(char_u *line, diffhunk_T *hunk)
   if (*p != 'a' && *p != 'c' && *p != 'd') {
     return FAIL;        // invalid diff format
   }
-  int difftype = *p++;
+  int difftype = (uint8_t)(*p++);
   long f2 = getdigits(&p, true, 0);
   if (*p == ',') {
     p++;
@@ -3114,7 +3116,7 @@ static int parse_diff_unified(char_u *line, diffhunk_T *hunk)
 {
   // Parse unified diff hunk header:
   // @@ -oldline,oldcount +newline,newcount @@
-  char_u *p = line;
+  char *p = (char *)line;
   if (*p++ == '@' && *p++ == '@' && *p++ == ' ' && *p++ == '-') {
     long oldcount;
     long newline;

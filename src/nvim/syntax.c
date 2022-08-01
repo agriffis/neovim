@@ -227,12 +227,10 @@ static int current_sub_char = 0;
 #define MAX_SYN_INC_TAG 999         // maximum before the above overflow
 #define MAX_CLUSTER_ID  (32767 - SYNID_CLUSTER)
 
-/*
- * Annoying Hack(TM):  ":syn include" needs this pointer to pass to
- * expand_filename().  Most of the other syntax commands don't need it, so
- * instead of passing it to them, we stow it here.
- */
-static char_u **syn_cmdlinep;
+// Annoying Hack(TM):  ":syn include" needs this pointer to pass to
+// expand_filename().  Most of the other syntax commands don't need it, so
+// instead of passing it to them, we stow it here.
+static char **syn_cmdlinep;
 
 /*
  * Another Annoying Hack(TM):  To prevent rules from other ":syn include"'d
@@ -1392,24 +1390,21 @@ static bool syn_stack_equal(synstate_T *sp)
     if (bp[i].bs_extmatch == CUR_STATE(i).si_extmatch) {
       continue;
     }
-    // When the extmatch pointers are different, the strings in
-    // them can still be the same.  Check if the extmatch
-    // references are equal.
+    // When the extmatch pointers are different, the strings in them can
+    // still be the same.  Check if the extmatch references are equal.
     bsx = bp[i].bs_extmatch;
     six = CUR_STATE(i).si_extmatch;
-    // If one of the extmatch pointers is NULL the states are
-    // different.
+    // If one of the extmatch pointers is NULL the states are different.
     if (bsx == NULL || six == NULL) {
       break;
     }
     int j;
     for (j = 0; j < NSUBEXP; j++) {
-      // Check each referenced match string. They must all be
-      // equal.
+      // Check each referenced match string. They must all be equal.
       if (bsx->matches[j] != six->matches[j]) {
-        // If the pointer is different it can still be the
-        // same text.  Compare the strings, ignore case when
-        // the start item has the sp_ic flag set.
+        // If the pointer is different it can still be the same text.
+        // Compare the strings, ignore case when the start item has the
+        // sp_ic flag set.
         if (bsx->matches[j] == NULL || six->matches[j] == NULL) {
           break;
         }
@@ -1424,11 +1419,7 @@ static bool syn_stack_equal(synstate_T *sp)
       break;
     }
   }
-  if (i < 0) {
-    return true;
-  }
-
-  return false;
+  return i < 0 ? true : false;
 }
 
 /*
@@ -5602,7 +5593,7 @@ void ex_syntax(exarg_T *eap)
   char_u *arg = (char_u *)eap->arg;
   char_u *subcmd_end;
 
-  syn_cmdlinep = (char_u **)eap->cmdlinep;
+  syn_cmdlinep = eap->cmdlinep;
 
   // isolate subcommand name
   for (subcmd_end = arg; ASCII_ISALPHA(*subcmd_end); subcmd_end++) {}
