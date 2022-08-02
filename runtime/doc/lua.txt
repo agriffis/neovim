@@ -2087,9 +2087,9 @@ add({filetypes})                                          *vim.filetype.add()*
                        priority = -math.huge,
                        function(path, bufnr)
                          local content = vim.filetype.getlines(bufnr, 1)
-                         if vim.filetype.matchregex(content, { [[^#!.*\<mine\>]] }) then
+                         if vim.filetype.matchregex(content, [[^#!.*\<mine\>]]) then
                            return 'mine'
-                         elseif vim.filetype.matchregex(content, { [[\<drawing\>]] }) then
+                         elseif vim.filetype.matchregex(content, [[\<drawing\>]]) then
                            return 'drawing'
                          end
                        end,
@@ -2218,9 +2218,7 @@ set({mode}, {lhs}, {rhs}, {opts})                           *vim.keymap.set()*
                             create mapping on multiple modes.
                     {lhs}   (string) Left-hand side |{lhs}| of the mapping.
                     {rhs}   string|function Right-hand side |{rhs}| of the
-                            mapping. Can also be a Lua function. If a Lua
-                            function and `opts.expr == true`, returning `nil`
-                            is equivalent to an empty string.
+                            mapping. Can also be a Lua function.
                     {opts}  (table) A table of |:map-arguments| such as
                             "silent". In addition to the options listed in
                             |nvim_set_keymap()|, this table also accepts the
@@ -2228,13 +2226,10 @@ set({mode}, {lhs}, {rhs}, {opts})                           *vim.keymap.set()*
                             • buffer: (number or boolean) Add a mapping to the
                               given buffer. When "true" or 0, use the current
                               buffer.
-                            • replace_keycodes: (boolean, default true) When
-                              both this and expr is "true",
-                              |nvim_replace_termcodes()| is applied to the
-                              result of Lua expr maps.
                             • remap: (boolean) Make the mapping recursive.
                               This is the inverse of the "noremap" option from
                               |nvim_set_keymap()|. Default `false`.
+                            • replace_keycodes: (boolean) defaults to true.
 
                 See also: ~
                     |nvim_set_keymap()|
