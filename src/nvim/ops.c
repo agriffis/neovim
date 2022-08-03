@@ -1828,7 +1828,7 @@ static void mb_adjust_opend(oparg_T *oap)
 {
   if (oap->inclusive) {
     char *p = (char *)ml_get(oap->end.lnum);
-    oap->end.col += mb_tail_off(p, p + oap->end.col);
+    oap->end.col += utf_cp_tail_off(p, p + oap->end.col);
   }
 }
 
@@ -4889,7 +4889,7 @@ void op_addsub(oparg_T *oap, linenr_T Prenum1, bool g_cmd)
   linenr_T amount = Prenum1;
 
   // do_addsub() might trigger re-evaluation of 'foldexpr' halfway, when the
-  // buffer is not completly updated yet. Postpone updating folds until before
+  // buffer is not completely updated yet. Postpone updating folds until before
   // the call to changed_lines().
   disable_fold_update++;
 
