@@ -505,6 +505,11 @@ String nvim_cmd(uint64_t channel_id, Dict(cmd) *cmd, Dict(cmd_opts) *opts, Error
 
     OBJ_TO_BOOL(cmdinfo.magic.file, magic.file, ea.argt & EX_XFILE, "'magic.file'");
     OBJ_TO_BOOL(cmdinfo.magic.bar, magic.bar, ea.argt & EX_TRLBAR, "'magic.bar'");
+    if (cmdinfo.magic.file) {
+      ea.argt |= EX_XFILE;
+    } else {
+      ea.argt &= ~EX_XFILE;
+    }
   } else {
     cmdinfo.magic.file = ea.argt & EX_XFILE;
     cmdinfo.magic.bar = ea.argt & EX_TRLBAR;
@@ -939,7 +944,7 @@ void create_user_command(String name, Object command, Dict(user_command) *opts, 
   cmd_addr_T addr_type_arg = ADDR_NONE;
   int compl = EXPAND_NOTHING;
   char *compl_arg = NULL;
-  char *rep = NULL;
+  const char *rep = NULL;
   LuaRef luaref = LUA_NOREF;
   LuaRef compl_luaref = LUA_NOREF;
   LuaRef preview_luaref = LUA_NOREF;
@@ -1111,8 +1116,7 @@ void create_user_command(String name, Object command, Dict(user_command) *opts, 
     if (opts->desc.type == kObjectTypeString) {
       rep = opts->desc.data.string.data;
     } else {
-      snprintf((char *)IObuff, IOSIZE, "<Lua function %d>", luaref);
-      rep = (char *)IObuff;
+      rep = "";
     }
     break;
   case kObjectTypeString:
