@@ -871,7 +871,7 @@ end
 --- - debounce_text_changes (number, default 150): Debounce didChange
 ---       notifications to the server by the given number in milliseconds. No debounce
 ---       occurs if nil
---- - exit_timeout (number, default 500): Milliseconds to wait for server to
+--- - exit_timeout (number|boolean, default false): Milliseconds to wait for server to
 ---       exit cleanly after sending the 'shutdown' request before sending kill -15.
 ---       If set to false, nvim exits immediately after sending the 'shutdown' request to the server.
 ---
@@ -968,11 +968,19 @@ function lsp.start_client(config)
 
   ---@private
   local function set_defaults(client, bufnr)
-    if client.server_capabilities.definitionProvider and vim.bo[bufnr].tagfunc == '' then
+    local capabilities = client.server_capabilities
+    if capabilities.definitionProvider and vim.bo[bufnr].tagfunc == '' then
       vim.bo[bufnr].tagfunc = 'v:lua.vim.lsp.tagfunc'
     end
-    if client.server_capabilities.completionProvider and vim.bo[bufnr].omnifunc == '' then
+    if capabilities.completionProvider and vim.bo[bufnr].omnifunc == '' then
       vim.bo[bufnr].omnifunc = 'v:lua.vim.lsp.omnifunc'
+    end
+    if
+      capabilities.documentRangeFormattingProvider
+      and vim.bo[bufnr].formatprg == ''
+      and vim.bo[bufnr].formatexpr == ''
+    then
+      vim.bo[bufnr].formatexpr = 'v:lua.vim.lsp.formatexpr()'
     end
   end
 
@@ -985,6 +993,9 @@ function lsp.start_client(config)
     end
     if vim.bo[bufnr].omnifunc == 'v:lua.vim.lsp.omnifunc' then
       vim.bo[bufnr].omnifunc = nil
+    end
+    if vim.bo[bufnr].formatexpr == 'v:lua.vim.lsp.formatexpr()' then
+      vim.bo[bufnr].formatexpr = nil
     end
   end
 
@@ -1681,7 +1692,7 @@ api.nvim_create_autocmd('VimLeavePre', {
     local send_kill = false
 
     for client_id, client in pairs(active_clients) do
-      local timeout = if_nil(client.config.flags.exit_timeout, 500)
+      local timeout = if_nil(client.config.flags.exit_timeout, false)
       if timeout then
         send_kill = true
         timeouts[client_id] = timeout
@@ -1982,29 +1993,32 @@ function lsp.formatexpr(opts)
     return 1
   end
 
-  local start_line = vim.v.lnum
-  local end_line = start_line + vim.v.count - 1
+  local start_lnum = vim.v.lnum
+  local end_lnum = start_lnum + vim.v.count - 1
 
-  if start_line > 0 and end_line > 0 then
-    local params = {
-      textDocument = util.make_text_document_params(),
-      range = {
-        start = { line = start_line - 1, character = 0 },
-        ['end'] = { line = end_line - 1, character = 0 },
-      },
-    }
-    params.options = util.make_formatting_params().options
-    local client_results =
-      vim.lsp.buf_request_sync(0, 'textDocument/rangeFormatting', params, timeout_ms)
-
-    -- Apply the text edits from one and only one of the clients.
-    for client_id, response in pairs(client_results) do
+  if start_lnum <= 0 or end_lnum <= 0 then
+    return 0
+  end
+  local bufnr = api.nvim_get_current_buf()
+  for _, client in pairs(lsp.get_active_clients({ bufnr = bufnr })) do
+    if client.supports_method('textDocument/rangeFormatting') then
+      local params = util.make_formatting_params()
+      local end_line = vim.fn.getline(end_lnum)
+      local end_col = util._str_utfindex_enc(end_line, nil, client.offset_encoding)
+      params.range = {
+        start = {
+          line = start_lnum - 1,
+          character = 0,
+        },
+        ['end'] = {
+          line = end_lnum - 1,
+          character = end_col,
+        },
+      }
+      local response =
+        client.request_sync('textDocument/rangeFormatting', params, timeout_ms, bufnr)
       if response.result then
-        vim.lsp.util.apply_text_edits(
-          response.result,
-          0,
-          vim.lsp.get_client_by_id(client_id).offset_encoding
-        )
+        vim.lsp.util.apply_text_edits(response.result, 0, client.offset_encoding)
         return 0
       end
     end
