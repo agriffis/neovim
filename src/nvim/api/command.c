@@ -300,10 +300,10 @@ String nvim_cmd(uint64_t channel_id, Dict(cmd) *cmd, Dict(cmd_opts) *opts, Error
   FUNC_API_SINCE(10)
 {
   exarg_T ea;
-  memset(&ea, 0, sizeof(ea));
+  CLEAR_FIELD(ea);
 
   CmdParseInfo cmdinfo;
-  memset(&cmdinfo, 0, sizeof(cmdinfo));
+  CLEAR_FIELD(cmdinfo);
 
   char *cmdline = NULL;
   char *cmdname = NULL;
@@ -819,9 +819,12 @@ static void build_cmdline_str(char **cmdlinep, exarg_T *eap, CmdParseInfo *cmdin
   char *p = replace_makeprg(eap, eap->arg, cmdlinep);
   if (p != eap->arg) {
     // If replace_makeprg modified the cmdline string, correct the argument pointers.
-    assert(argc == 1);
     eap->arg = p;
-    eap->args[0] = p;
+    // We can only know the position of the first argument because the argument list can be used
+    // multiple times in makeprg / grepprg.
+    if (argc >= 1) {
+      eap->args[0] = p;
+    }
   }
 }
 
