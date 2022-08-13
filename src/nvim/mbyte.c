@@ -1182,6 +1182,11 @@ int utf_class_tab(const int c, const uint64_t *const chartab)
     return 1;               // punctuation
   }
 
+  // emoji
+  if (intable(emoji_all, ARRAY_SIZE(emoji_all), c)) {
+    return 3;
+  }
+
   // binary search in table
   while (top >= bot) {
     mid = (bot + top) / 2;
@@ -1192,11 +1197,6 @@ int utf_class_tab(const int c, const uint64_t *const chartab)
     } else {
       return (int)classes[mid].class;
     }
-  }
-
-  // emoji
-  if (intable(emoji_all, ARRAY_SIZE(emoji_all), c)) {
-    return 3;
   }
 
   // most other characters are "word" characters
@@ -1818,9 +1818,9 @@ bool utf_allow_break(int cc, int ncc)
 ///
 /// @param[in,out]  fp  Source of the character to copy.
 /// @param[in,out]  tp  Destination to copy to.
-void mb_copy_char(const char_u **const fp, char_u **const tp)
+void mb_copy_char(const char **const fp, char **const tp)
 {
-  const size_t l = (size_t)utfc_ptr2len((char *)(*fp));
+  const size_t l = (size_t)utfc_ptr2len(*fp);
 
   memmove(*tp, *fp, l);
   *tp += l;
@@ -2857,4 +2857,13 @@ void f_setcellwidths(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 
   xfree(cw_table_save);
   redraw_all_later(NOT_VALID);
+}
+
+void f_charclass(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+{
+  if (tv_check_for_string(&argvars[0]) == FAIL
+      || argvars[0].vval.v_string == NULL) {
+    return;
+  }
+  rettv->vval.v_number = mb_get_class((const char_u *)argvars[0].vval.v_string);
 }

@@ -44,15 +44,15 @@
 
 #include "nvim/api/private/helpers.h"
 #include "nvim/ascii.h"
+#include "nvim/autocmd.h"
 #include "nvim/buffer.h"
 #include "nvim/change.h"
 #include "nvim/cursor.h"
-#include "nvim/edit.h"
+#include "nvim/eval.h"
 #include "nvim/event/loop.h"
 #include "nvim/event/time.h"
 #include "nvim/ex_cmds.h"
 #include "nvim/ex_docmd.h"
-#include "nvim/fileio.h"
 #include "nvim/getchar.h"
 #include "nvim/highlight.h"
 #include "nvim/highlight_group.h"
@@ -681,7 +681,7 @@ static bool is_filter_char(int c)
   return !!(tpf_flags & flag);
 }
 
-void terminal_paste(long count, char_u **y_array, size_t y_size)
+void terminal_paste(long count, char **y_array, size_t y_size)
 {
   if (y_size == 0) {
     return;
@@ -702,7 +702,7 @@ void terminal_paste(long count, char_u **y_array, size_t y_size)
         buff_len = len;
       }
       char_u *dst = buff;
-      char_u *src = y_array[j];
+      char_u *src = (char_u *)y_array[j];
       while (*src != '\0') {
         len = (size_t)utf_ptr2len((char *)src);
         int c = utf_ptr2char((char *)src);

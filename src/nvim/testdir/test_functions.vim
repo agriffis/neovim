@@ -1769,6 +1769,15 @@ func Test_char2nr()
   call assert_equal(12354, char2nr('あ', 1))
 endfunc
 
+func Test_charclass()
+  call assert_equal(0, charclass(' '))
+  call assert_equal(1, charclass('.'))
+  call assert_equal(2, charclass('x'))
+  call assert_equal(3, charclass("\u203c"))
+  " this used to crash vim
+  call assert_equal(0, "xxx"[-1]->charclass())
+endfunc
+
 func Test_eventhandler()
   call assert_equal(0, eventhandler())
 endfunc

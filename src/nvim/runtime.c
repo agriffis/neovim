@@ -14,6 +14,8 @@
 #include "nvim/eval/userfunc.h"
 #include "nvim/ex_cmds.h"
 #include "nvim/ex_cmds2.h"
+#include "nvim/ex_docmd.h"
+#include "nvim/ex_eval.h"
 #include "nvim/ex_getln.h"
 #include "nvim/lua/executor.h"
 #include "nvim/memline.h"
@@ -119,10 +121,10 @@ int do_in_path(char_u *path, char *name, int flags, DoInRuntimepathCB callback, 
     }
 
     // Loop over all entries in 'runtimepath'.
-    char_u *rtp = rtp_copy;
+    char *rtp = (char *)rtp_copy;
     while (*rtp != NUL && ((flags & DIP_ALL) || !did_one)) {
       // Copy the path from 'runtimepath' to buf[].
-      copy_option_part((char **)&rtp, buf, MAXPATHL, ",");
+      copy_option_part(&rtp, buf, MAXPATHL, ",");
       size_t buflen = STRLEN(buf);
 
       // Skip after or non-after directories.
@@ -143,12 +145,11 @@ int do_in_path(char_u *path, char *name, int flags, DoInRuntimepathCB callback, 
         tail = (char_u *)buf + STRLEN(buf);
 
         // Loop over all patterns in "name"
-        char_u *np = (char_u *)name;
+        char *np = name;
         while (*np != NUL && ((flags & DIP_ALL) || !did_one)) {
           // Append the pattern from "name" to buf[].
           assert(MAXPATHL >= (tail - (char_u *)buf));
-          copy_option_part((char **)&np, (char *)tail, (size_t)(MAXPATHL - (tail - (char_u *)buf)),
-                           "\t ");
+          copy_option_part(&np, (char *)tail, (size_t)(MAXPATHL - (tail - (char_u *)buf)), "\t ");
 
           if (p_verbose > 10) {
             verbose_enter();
@@ -277,11 +278,11 @@ int do_in_cached_path(char_u *name, int flags, DoInRuntimepathCB callback, void 
       tail = buf + STRLEN(buf);
 
       // Loop over all patterns in "name"
-      char_u *np = name;
+      char *np = (char *)name;
       while (*np != NUL && ((flags & DIP_ALL) || !did_one)) {
         // Append the pattern from "name" to buf[].
         assert(MAXPATHL >= (tail - buf));
-        copy_option_part((char **)&np, (char *)tail, (size_t)(MAXPATHL - (tail - buf)), "\t ");
+        copy_option_part(&np, (char *)tail, (size_t)(MAXPATHL - (tail - buf)), "\t ");
 
         if (p_verbose > 10) {
           verbose_enter();
@@ -1043,10 +1044,10 @@ int ExpandRTDir(char_u *pat, int flags, int *num_file, char ***file, char *dirna
     size_t size = STRLEN(dirnames[i]) + pat_len + 7;
     char_u *s = xmalloc(size);
     snprintf((char *)s, size, "%s/%s*.vim", dirnames[i], pat);
-    globpath(p_rtp, s, &ga, 0);
+    globpath((char *)p_rtp, s, &ga, 0);
     if (flags & DIP_LUA) {
       snprintf((char *)s, size, "%s/%s*.lua", dirnames[i], pat);
-      globpath(p_rtp, s, &ga, 0);
+      globpath((char *)p_rtp, s, &ga, 0);
     }
     xfree(s);
   }
@@ -1056,10 +1057,10 @@ int ExpandRTDir(char_u *pat, int flags, int *num_file, char ***file, char *dirna
       size_t size = STRLEN(dirnames[i]) + pat_len + 22;
       char_u *s = xmalloc(size);
       snprintf((char *)s, size, "pack/*/start/*/%s/%s*.vim", dirnames[i], pat);  // NOLINT
-      globpath(p_pp, s, &ga, 0);
+      globpath((char *)p_pp, s, &ga, 0);
       if (flags & DIP_LUA) {
         snprintf((char *)s, size, "pack/*/start/*/%s/%s*.lua", dirnames[i], pat);  // NOLINT
-        globpath(p_pp, s, &ga, 0);
+        globpath((char *)p_pp, s, &ga, 0);
       }
       xfree(s);
     }
@@ -1068,10 +1069,10 @@ int ExpandRTDir(char_u *pat, int flags, int *num_file, char ***file, char *dirna
       size_t size = STRLEN(dirnames[i]) + pat_len + 22;
       char_u *s = xmalloc(size);
       snprintf((char *)s, size, "start/*/%s/%s*.vim", dirnames[i], pat);  // NOLINT
-      globpath(p_pp, s, &ga, 0);
+      globpath((char *)p_pp, s, &ga, 0);
       if (flags & DIP_LUA) {
         snprintf((char *)s, size, "start/*/%s/%s*.lua", dirnames[i], pat);  // NOLINT
-        globpath(p_pp, s, &ga, 0);
+        globpath((char *)p_pp, s, &ga, 0);
       }
       xfree(s);
     }
@@ -1082,10 +1083,10 @@ int ExpandRTDir(char_u *pat, int flags, int *num_file, char ***file, char *dirna
       size_t size = STRLEN(dirnames[i]) + pat_len + 20;
       char_u *s = xmalloc(size);
       snprintf((char *)s, size, "pack/*/opt/*/%s/%s*.vim", dirnames[i], pat);  // NOLINT
-      globpath(p_pp, s, &ga, 0);
+      globpath((char *)p_pp, s, &ga, 0);
       if (flags & DIP_LUA) {
         snprintf((char *)s, size, "pack/*/opt/*/%s/%s*.lua", dirnames[i], pat);  // NOLINT
-        globpath(p_pp, s, &ga, 0);
+        globpath((char *)p_pp, s, &ga, 0);
       }
       xfree(s);
     }
@@ -1094,10 +1095,10 @@ int ExpandRTDir(char_u *pat, int flags, int *num_file, char ***file, char *dirna
       size_t size = STRLEN(dirnames[i]) + pat_len + 20;
       char_u *s = xmalloc(size);
       snprintf((char *)s, size, "opt/*/%s/%s*.vim", dirnames[i], pat);  // NOLINT
-      globpath(p_pp, s, &ga, 0);
+      globpath((char *)p_pp, s, &ga, 0);
       if (flags & DIP_LUA) {
         snprintf((char *)s, size, "opt/*/%s/%s*.lua", dirnames[i], pat);  // NOLINT
-        globpath(p_pp, s, &ga, 0);
+        globpath((char *)p_pp, s, &ga, 0);
       }
       xfree(s);
     }
@@ -1150,9 +1151,9 @@ int ExpandPackAddDir(char_u *pat, int *num_file, char ***file)
   size_t buflen = pat_len + 26;
   char_u *s = xmalloc(buflen);
   snprintf((char *)s, buflen, "pack/*/opt/%s*", pat);  // NOLINT
-  globpath(p_pp, s, &ga, 0);
+  globpath((char *)p_pp, s, &ga, 0);
   snprintf((char *)s, buflen, "opt/%s*", pat);  // NOLINT
-  globpath(p_pp, s, &ga, 0);
+  globpath((char *)p_pp, s, &ga, 0);
   xfree(s);
 
   for (int i = 0; i < ga.ga_len; i++) {

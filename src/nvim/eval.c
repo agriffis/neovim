@@ -15,6 +15,7 @@
 #endif
 
 #include "nvim/ascii.h"
+#include "nvim/autocmd.h"
 #include "nvim/buffer.h"
 #include "nvim/change.h"
 #include "nvim/channel.h"
@@ -30,9 +31,10 @@
 #include "nvim/eval/userfunc.h"
 #include "nvim/eval/vars.h"
 #include "nvim/ex_cmds2.h"
+#include "nvim/ex_docmd.h"
+#include "nvim/ex_eval.h"
 #include "nvim/ex_getln.h"
 #include "nvim/ex_session.h"
-#include "nvim/fileio.h"
 #include "nvim/getchar.h"
 #include "nvim/highlight_group.h"
 #include "nvim/lua/executor.h"
@@ -2257,7 +2259,7 @@ static int eval_func(char **const arg, char *const name, const int name_len, typ
   funcexe.evaluate = evaluate;
   funcexe.partial = partial;
   funcexe.basetv = basetv;
-  int ret = get_func_tv((char_u *)s, len, rettv, (char_u **)arg, &funcexe);
+  int ret = get_func_tv((char_u *)s, len, rettv, arg, &funcexe);
 
   xfree(s);
 
@@ -3113,7 +3115,7 @@ static int eval7(char **arg, typval_T *rettv, int evaluate, int want_string)
   // Lambda: {arg, arg -> expr}
   // Dictionary: {'key': val, 'key': val}
   case '{':
-    ret = get_lambda_tv((char_u **)arg, rettv, evaluate);
+    ret = get_lambda_tv(arg, rettv, evaluate);
     if (ret == NOTDONE) {
       ret = dict_get_tv(arg, rettv, evaluate, false);
     }
@@ -3291,7 +3293,7 @@ static int call_func_rettv(char **const arg, typval_T *const rettv, const bool e
   funcexe.selfdict = selfdict;
   funcexe.basetv = basetv;
   const int ret = get_func_tv((char_u *)funcname, is_lua ? (int)(*arg - funcname) : -1, rettv,
-                              (char_u **)arg, &funcexe);
+                              arg, &funcexe);
 
   // Clear the funcref afterwards, so that deleting it while
   // evaluating the arguments is possible (see test55).
@@ -3319,7 +3321,7 @@ static int eval_lambda(char **const arg, typval_T *const rettv, const bool evalu
   typval_T base = *rettv;
   rettv->v_type = VAR_UNKNOWN;
 
-  int ret = get_lambda_tv((char_u **)arg, rettv, evaluate);
+  int ret = get_lambda_tv(arg, rettv, evaluate);
   if (ret != OK) {
     return FAIL;
   } else if (**arg != '(') {
@@ -3923,11 +3925,11 @@ static int get_string_tv(char **arg, typval_T *rettv, int evaluate)
         FALLTHROUGH;
 
       default:
-        mb_copy_char((const char_u **)&p, (char_u **)&name);
+        mb_copy_char((const char **)&p, &name);
         break;
       }
     } else {
-      mb_copy_char((const char_u **)&p, (char_u **)&name);
+      mb_copy_char((const char **)&p, &name);
     }
   }
   *name = NUL;
@@ -3986,7 +3988,7 @@ static int get_lit_string_tv(char **arg, typval_T *rettv, int evaluate)
       }
       ++p;
     }
-    mb_copy_char((const char_u **)&p, (char_u **)&str);
+    mb_copy_char((const char **)&p, &str);
   }
   *str = NUL;
   *arg = p + 1;
@@ -5091,7 +5093,7 @@ void common_function(typval_T *argvars, typval_T *rettv, bool is_funcref, FunPtr
 
   if ((use_string && vim_strchr(s, AUTOLOAD_CHAR) == NULL) || is_funcref) {
     name = s;
-    trans_name = (char *)trans_function_name((char_u **)&name, false,
+    trans_name = (char *)trans_function_name(&name, false,
                                              TFN_INT | TFN_QUIET | TFN_NO_AUTOLOAD
                                              | TFN_NO_DEREF, NULL, NULL);
     if (*name != NUL) {
