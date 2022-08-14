@@ -1165,10 +1165,10 @@ func Test_type()
     " call assert_equal(0, 0 + v:none)
     call assert_equal(0, 0 + v:null)
 
-    call assert_equal('false', '' . v:false)
-    call assert_equal('true', '' . v:true)
-    " call assert_equal('none', '' . v:none)
-    call assert_equal('null', '' . v:null)
+    call assert_equal('v:false', '' . v:false)
+    call assert_equal('v:true', '' . v:true)
+    " call assert_equal('v:none', '' . v:none)
+    call assert_equal('v:null', '' . v:null)
 
     call assert_true(v:false == 0)
     call assert_false(v:false != 0)
@@ -1571,6 +1571,23 @@ func Test_script_local_func()
   call assert_equal('nothing line', getline(2))
   call assert_equal('last line', getline(3))
   enew! | close
+endfunc
+
+func Test_script_expand_sfile()
+  let lines =<< trim END
+    func s:snr()
+      return expand('<sfile>')
+    endfunc
+    let g:result = s:snr()
+  END
+  call writefile(lines, 'Xexpand')
+  source Xexpand
+  call assert_match('<SNR>\d\+_snr', g:result)
+  source Xexpand
+  call assert_match('<SNR>\d\+_snr', g:result)
+
+  call delete('Xexpand')
+  unlet g:result
 endfunc
 
 func Test_compound_assignment_operators()

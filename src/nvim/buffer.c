@@ -70,6 +70,7 @@
 #include "nvim/plines.h"
 #include "nvim/quickfix.h"
 #include "nvim/regexp.h"
+#include "nvim/runtime.h"
 #include "nvim/screen.h"
 #include "nvim/sign.h"
 #include "nvim/spell.h"
@@ -1533,6 +1534,15 @@ void set_curbuf(buf_T *buf, int action)
 /// be pointing to freed memory.
 void enter_buffer(buf_T *buf)
 {
+  // when closing the current buffer stop Visual mode
+  if (VIsual_active
+#if defined(EXITFREE)
+      && !entered_free_all_mem
+#endif
+      ) {
+    end_visual_mode();
+  }
+
   // Get the buffer in the current window.
   curwin->w_buffer = buf;
   curbuf = buf;
@@ -2596,7 +2606,7 @@ void get_winopts(buf_T *buf)
   }
 
   if (curwin->w_float_config.style == kWinStyleMinimal) {
-    didset_window_options(curwin);
+    didset_window_options(curwin, false);
     win_set_minimal_style(curwin);
   }
 
@@ -2604,7 +2614,7 @@ void get_winopts(buf_T *buf)
   if (p_fdls >= 0) {
     curwin->w_p_fdl = p_fdls;
   }
-  didset_window_options(curwin);
+  didset_window_options(curwin, false);
 }
 
 /// Find the mark for the buffer 'buf' for the current window.
@@ -5140,8 +5150,6 @@ static int chk_modeline(linenr_T lnum, int flags)
   intmax_t vers;
   int end;
   int retval = OK;
-  char *save_sourcing_name;
-  linenr_T save_sourcing_lnum;
 
   prev = -1;
   for (s = (char *)ml_get(lnum); *s != NUL; s++) {
@@ -5186,10 +5194,8 @@ static int chk_modeline(linenr_T lnum, int flags)
 
   s = linecopy = xstrdup(s);      // copy the line, it will change
 
-  save_sourcing_lnum = sourcing_lnum;
-  save_sourcing_name = sourcing_name;
-  sourcing_lnum = lnum;               // prepare for emsg()
-  sourcing_name = "modelines";
+  // prepare for emsg()
+  estack_push(ETYPE_MODELINE, "modelines", lnum);
 
   end = false;
   while (end == false) {
@@ -5229,7 +5235,7 @@ static int chk_modeline(linenr_T lnum, int flags)
       const sctx_T save_current_sctx = current_sctx;
       current_sctx.sc_sid = SID_MODELINE;
       current_sctx.sc_seq = 0;
-      current_sctx.sc_lnum = 0;
+      current_sctx.sc_lnum = lnum;
       // Make sure no risky things are executed as a side effect.
       secure = 1;
 
@@ -5244,9 +5250,7 @@ static int chk_modeline(linenr_T lnum, int flags)
     s = e + 1;                        // advance to next part
   }
 
-  sourcing_lnum = save_sourcing_lnum;
-  sourcing_name = save_sourcing_name;
-
+  estack_pop();
   xfree(linecopy);
 
   return retval;
