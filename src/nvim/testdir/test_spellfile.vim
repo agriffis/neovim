@@ -25,6 +25,18 @@ func Test_spell_normal()
   let cnt=readfile('./Xspellfile.add')
   call assert_equal('goood', cnt[0])
 
+  " zg should fail in operator-pending mode
+  call assert_beeps('norm! czg')
+
+  " zg fails in visual mode when not able to get the visual text
+  call assert_beeps('norm! ggVjzg')
+  norm! V
+
+  " zg fails for a non-identifier word
+  call append(line('$'), '###')
+  call assert_fails('norm! Gzg', 'E349:')
+  $d
+
   " Test for zw
   2
   norm! $zw
@@ -906,6 +918,33 @@ func Test_spellfile_COMMON()
   call delete('XtestCOMMON.aff')
   call delete('XtestCOMMON-utf8.spl')
 endfunc
+
+" Test NOSUGGEST (see :help spell-COMMON)
+func Test_spellfile_NOSUGGEST()
+  call writefile(['2', 'foo/X', 'fog'], 'XtestNOSUGGEST.dic')
+  call writefile(['NOSUGGEST X'], 'XtestNOSUGGEST.aff')
+
+  mkspell! XtestNOSUGGEST-utf8.spl XtestNOSUGGEST
+  set spell spelllang=XtestNOSUGGEST-utf8.spl
+
+  for goodword in ['foo', 'Foo', 'FOO', 'fog', 'Fog', 'FOG']
+    call assert_equal(['', ''], spellbadword(goodword), goodword)
+  endfor
+  for badword in ['foO', 'fOO', 'fooo', 'foog', 'foofog', 'fogfoo']
+    call assert_equal([badword, 'bad'], spellbadword(badword))
+  endfor
+
+  call assert_equal(['fog'], spellsuggest('fooo', 1))
+  call assert_equal(['fog'], spellsuggest('fOo', 1))
+  call assert_equal(['fog'], spellsuggest('foG', 1))
+  call assert_equal(['fog'], spellsuggest('fogg', 1))
+
+  set spell& spelllang&
+  call delete('XtestNOSUGGEST.dic')
+  call delete('XtestNOSUGGEST.aff')
+  call delete('XtestNOSUGGEST-utf8.spl')
+endfunc
+
 
 " Test CIRCUMFIX (see: :help spell-CIRCUMFIX)
 func Test_spellfile_CIRCUMFIX()

@@ -7,6 +7,7 @@
 #include "nvim/api/private/converter.h"
 #include "nvim/api/private/helpers.h"
 #include "nvim/api/vim.h"
+#include "nvim/arglist.h"
 #include "nvim/ascii.h"
 #include "nvim/assert.h"
 #include "nvim/buffer.h"
@@ -33,6 +34,7 @@
 #include "nvim/file_search.h"
 #include "nvim/fileio.h"
 #include "nvim/fold.h"
+#include "nvim/getchar.h"
 #include "nvim/globals.h"
 #include "nvim/highlight_group.h"
 #include "nvim/if_cscope.h"
@@ -55,7 +57,6 @@
 #include "nvim/ops.h"
 #include "nvim/option.h"
 #include "nvim/os/dl.h"
-#include "nvim/os/input.h"
 #include "nvim/os/shell.h"
 #include "nvim/path.h"
 #include "nvim/plines.h"
@@ -371,77 +372,6 @@ static void f_appendbufline(typval_T *argvars, typval_T *rettv, FunPtr fptr)
   } else {
     const linenr_T lnum = tv_get_lnum_buf(&argvars[1], buf);
     set_buffer_lines(buf, lnum, true, &argvars[2], rettv);
-  }
-}
-
-static void f_argc(typval_T *argvars, typval_T *rettv, FunPtr fptr)
-{
-  if (argvars[0].v_type == VAR_UNKNOWN) {
-    // use the current window
-    rettv->vval.v_number = ARGCOUNT;
-  } else if (argvars[0].v_type == VAR_NUMBER
-             && tv_get_number(&argvars[0]) == -1) {
-    // use the global argument list
-    rettv->vval.v_number = GARGCOUNT;
-  } else {
-    // use the argument list of the specified window
-    win_T *wp = find_win_by_nr_or_id(&argvars[0]);
-    if (wp != NULL) {
-      rettv->vval.v_number = WARGCOUNT(wp);
-    } else {
-      rettv->vval.v_number = -1;
-    }
-  }
-}
-
-/// "argidx()" function
-static void f_argidx(typval_T *argvars, typval_T *rettv, FunPtr fptr)
-{
-  rettv->vval.v_number = curwin->w_arg_idx;
-}
-
-/// "arglistid" function
-static void f_arglistid(typval_T *argvars, typval_T *rettv, FunPtr fptr)
-{
-  rettv->vval.v_number = -1;
-  win_T *wp = find_tabwin(&argvars[0], &argvars[1]);
-  if (wp != NULL) {
-    rettv->vval.v_number = wp->w_alist->id;
-  }
-}
-
-/// "argv(nr)" function
-static void f_argv(typval_T *argvars, typval_T *rettv, FunPtr fptr)
-{
-  aentry_T *arglist = NULL;
-  int argcount = -1;
-
-  if (argvars[0].v_type != VAR_UNKNOWN) {
-    if (argvars[1].v_type == VAR_UNKNOWN) {
-      arglist = ARGLIST;
-      argcount = ARGCOUNT;
-    } else if (argvars[1].v_type == VAR_NUMBER
-               && tv_get_number(&argvars[1]) == -1) {
-      arglist = GARGLIST;
-      argcount = GARGCOUNT;
-    } else {
-      win_T *wp = find_win_by_nr_or_id(&argvars[1]);
-      if (wp != NULL) {
-        // Use the argument list of the specified window
-        arglist = WARGLIST(wp);
-        argcount = WARGCOUNT(wp);
-      }
-    }
-    rettv->v_type = VAR_STRING;
-    rettv->vval.v_string = NULL;
-    int idx = (int)tv_get_number_chk(&argvars[0], NULL);
-    if (arglist != NULL && idx >= 0 && idx < argcount) {
-      rettv->vval.v_string = xstrdup((const char *)alist_name(&arglist[idx]));
-    } else if (idx == -1) {
-      get_arglist_as_rettv(arglist, argcount, rettv);
-    }
-  } else {
-    get_arglist_as_rettv(ARGLIST, ARGCOUNT, rettv);
   }
 }
 
@@ -2702,147 +2632,6 @@ static void f_getchangelist(typval_T *argvars, typval_T *rettv, FunPtr fptr)
     tv_dict_add_nr(d, S_LEN("col"), buf->b_changelist[i].mark.col);
     tv_dict_add_nr(d, S_LEN("coladd"), buf->b_changelist[i].mark.coladd);
   }
-}
-
-/// "getchar()" and "getcharstr()" functions
-static void getchar_common(typval_T *argvars, typval_T *rettv)
-  FUNC_ATTR_NONNULL_ALL
-{
-  varnumber_T n;
-  bool error = false;
-
-  no_mapping++;
-  allow_keys++;
-  for (;;) {
-    // Position the cursor.  Needed after a message that ends in a space,
-    // or if event processing caused a redraw.
-    ui_cursor_goto(msg_row, msg_col);
-
-    if (argvars[0].v_type == VAR_UNKNOWN) {
-      // getchar(): blocking wait.
-      // TODO(bfredl): deduplicate shared logic with state_enter ?
-      if (!char_avail()) {
-        (void)os_inchar(NULL, 0, -1, 0, main_loop.events);
-        if (!multiqueue_empty(main_loop.events)) {
-          state_handle_k_event();
-          continue;
-        }
-      }
-      n = safe_vgetc();
-    } else if (tv_get_number_chk(&argvars[0], &error) == 1) {
-      // getchar(1): only check if char avail
-      n = vpeekc_any();
-    } else if (error || vpeekc_any() == NUL) {
-      // illegal argument or getchar(0) and no char avail: return zero
-      n = 0;
-    } else {
-      // getchar(0) and char avail() != NUL: get a character.
-      // Note that vpeekc_any() returns K_SPECIAL for K_IGNORE.
-      n = safe_vgetc();
-    }
-
-    if (n == K_IGNORE
-        || n == K_MOUSEMOVE
-        || n == K_VER_SCROLLBAR
-        || n == K_HOR_SCROLLBAR) {
-      continue;
-    }
-    break;
-  }
-  no_mapping--;
-  allow_keys--;
-
-  if (!ui_has_messages()) {
-    // redraw the screen after getchar()
-    update_screen(CLEAR);
-  }
-
-  set_vim_var_nr(VV_MOUSE_WIN, 0);
-  set_vim_var_nr(VV_MOUSE_WINID, 0);
-  set_vim_var_nr(VV_MOUSE_LNUM, 0);
-  set_vim_var_nr(VV_MOUSE_COL, 0);
-
-  rettv->vval.v_number = n;
-  if (n != 0 && (IS_SPECIAL(n) || mod_mask != 0)) {
-    char_u temp[10];                // modifier: 3, mbyte-char: 6, NUL: 1
-    int i = 0;
-
-    // Turn a special key into three bytes, plus modifier.
-    if (mod_mask != 0) {
-      temp[i++] = K_SPECIAL;
-      temp[i++] = KS_MODIFIER;
-      temp[i++] = (char_u)mod_mask;
-    }
-    if (IS_SPECIAL(n)) {
-      temp[i++] = K_SPECIAL;
-      temp[i++] = (char_u)K_SECOND(n);
-      temp[i++] = K_THIRD(n);
-    } else {
-      i += utf_char2bytes((int)n, (char *)temp + i);
-    }
-    assert(i < 10);
-    temp[i++] = NUL;
-    rettv->v_type = VAR_STRING;
-    rettv->vval.v_string = (char *)vim_strsave(temp);
-
-    if (is_mouse_key((int)n)) {
-      int row = mouse_row;
-      int col = mouse_col;
-      int grid = mouse_grid;
-      linenr_T lnum;
-      win_T *wp;
-      int winnr = 1;
-
-      if (row >= 0 && col >= 0) {
-        // Find the window at the mouse coordinates and compute the
-        // text position.
-        win_T *const win = mouse_find_win(&grid, &row, &col);
-        if (win == NULL) {
-          return;
-        }
-        (void)mouse_comp_pos(win, &row, &col, &lnum);
-        for (wp = firstwin; wp != win; wp = wp->w_next) {
-          winnr++;
-        }
-        set_vim_var_nr(VV_MOUSE_WIN, winnr);
-        set_vim_var_nr(VV_MOUSE_WINID, wp->handle);
-        set_vim_var_nr(VV_MOUSE_LNUM, lnum);
-        set_vim_var_nr(VV_MOUSE_COL, col + 1);
-      }
-    }
-  }
-}
-
-/// "getchar()" function
-static void f_getchar(typval_T *argvars, typval_T *rettv, FunPtr fptr)
-{
-  getchar_common(argvars, rettv);
-}
-
-/// "getcharstr()" function
-static void f_getcharstr(typval_T *argvars, typval_T *rettv, FunPtr fptr)
-{
-  getchar_common(argvars, rettv);
-
-  if (rettv->v_type == VAR_NUMBER) {
-    char temp[7];   // mbyte-char: 6, NUL: 1
-    const varnumber_T n = rettv->vval.v_number;
-    int i = 0;
-
-    if (n != 0) {
-      i += utf_char2bytes((int)n, (char *)temp);
-    }
-    assert(i < 7);
-    temp[i++] = NUL;
-    rettv->v_type = VAR_STRING;
-    rettv->vval.v_string = xstrdup(temp);
-  }
-}
-
-/// "getcharmod()" function
-static void f_getcharmod(typval_T *argvars, typval_T *rettv, FunPtr fptr)
-{
-  rettv->vval.v_number = mod_mask;
 }
 
 static void getpos_both(typval_T *argvars, typval_T *rettv, bool getcurpos, bool charcol)
