@@ -890,9 +890,9 @@ int utf_ptr2len_len(const char_u *p, int size)
   return len;
 }
 
-/// Return the number of bytes occupied by a UTF-8 character in a string
-///
+/// Return the number of bytes occupied by a UTF-8 character in a string.
 /// This includes following composing characters.
+/// Returns zero for NUL.
 int utfc_ptr2len(const char *const p_in)
   FUNC_ATTR_PURE FUNC_ATTR_WARN_UNUSED_RESULT FUNC_ATTR_NONNULL_ALL
 {
@@ -1006,8 +1006,9 @@ int utf_char2len(const int c)
 
 /// Convert Unicode character to UTF-8 string
 ///
-/// @param c character to convert to \p buf
-/// @param[out] buf UTF-8 string generated from \p c, does not add \0
+/// @param c         character to convert to UTF-8 string in \p buf
+/// @param[out] buf  UTF-8 string generated from \p c, does not add \0
+///                  must have room for at least 6 bytes
 /// @return Number of bytes (1-6).
 int utf_char2bytes(const int c, char *const buf)
 {
@@ -1605,7 +1606,7 @@ void show_utf8(void)
     }
     sprintf((char *)IObuff + rlen, "%02x ",
             (line[i] == NL) ? NUL : line[i]);          // NUL is stored as NL
-    --clen;
+    clen--;
     rlen += (int)STRLEN(IObuff + rlen);
     if (rlen > IOSIZE - 20) {
       break;
@@ -1638,7 +1639,7 @@ int utf_head_off(const char_u *base, const char_u *p)
 
     // Move q to the first byte of this char.
     while (q > base && (*q & 0xc0) == 0x80) {
-      --q;
+      q--;
     }
     // Check for illegal sequence. Do allow an illegal byte after where we
     // started.
@@ -1659,10 +1660,10 @@ int utf_head_off(const char_u *base, const char_u *p)
     if (arabic_maycombine(c)) {
       // Advance to get a sneak-peak at the next char
       const char_u *j = q;
-      --j;
+      j--;
       // Move j to the first byte of this char.
       while (j > base && (*j & 0xc0) == 0x80) {
-        --j;
+        j--;
       }
       if (arabic_combine(utf_ptr2char((char *)j), c)) {
         continue;
