@@ -20,6 +20,7 @@
 #include "nvim/ex_docmd.h"
 #include "nvim/fileio.h"
 #include "nvim/garray.h"
+#include "nvim/grid.h"
 #include "nvim/hardcopy.h"
 #include "nvim/highlight_group.h"
 #include "nvim/mbyte.h"
@@ -31,7 +32,6 @@
 #include "nvim/os/os.h"
 #include "nvim/path.h"
 #include "nvim/runtime.h"
-#include "nvim/screen.h"
 #include "nvim/strings.h"
 #include "nvim/syntax.h"
 #include "nvim/ui.h"
@@ -900,7 +900,7 @@ static colnr_T hardcopy_line(prt_settings_T *psettings, int page_line, prt_pos_T
     }
     // syntax highlighting stuff.
     if (psettings->do_syntax) {
-      id = syn_get_id(curwin, ppos->file_line, col, 1, NULL, FALSE);
+      id = syn_get_id(curwin, ppos->file_line, col, 1, NULL, false);
       if (id > 0) {
         id = syn_get_final_id(id);
       } else {

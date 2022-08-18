@@ -3,9 +3,10 @@ local Screen = require('test.functional.ui.screen')
 local os = require('os')
 local clear, feed, insert = helpers.clear, helpers.feed, helpers.insert
 local command, exec = helpers.command, helpers.exec
-local eval, exc_exec = helpers.eval, helpers.exc_exec
+local eval = helpers.eval
 local feed_command, eq = helpers.feed_command, helpers.eq
 local curbufmeths = helpers.curbufmeths
+local meths = helpers.meths
 
 describe('colorscheme compatibility', function()
   before_each(function()
@@ -92,16 +93,22 @@ describe('highlight defaults', function()
   before_each(function()
     clear()
     screen = Screen.new()
+    screen:set_default_attr_ids {
+      [0] = {bold=true, foreground=Screen.colors.Blue};
+      [1] = {reverse = true, bold = true};
+      [2] = {reverse = true};
+      [3] = {bold = true};
+      [4] = {bold = true, foreground = Screen.colors.SeaGreen};
+      [5] = {foreground = Screen.colors.Red1, background = Screen.colors.WebGreen};
+      [6] = {background = Screen.colors.Red1, foreground = Screen.colors.Grey100};
+      [7] = {foreground = Screen.colors.Red};
+      [8] = {foreground = Screen.colors.Blue};
+      [9] = {italic = true};
+    }
     screen:attach()
-    command("set display-=msgsep")
   end)
 
   it('window status bar', function()
-    screen:set_default_attr_ids({
-      [0] = {bold=true, foreground=Screen.colors.Blue},
-      [1] = {reverse = true, bold = true},  -- StatusLine
-      [2] = {reverse = true}                -- StatusLineNC
-    })
     feed_command('sp', 'vsp', 'vsp')
     screen:expect([[
       ^                    │                │               |
@@ -200,31 +207,29 @@ describe('highlight defaults', function()
       ^                                                     |
       {0:~                                                    }|
       {0:~                                                    }|
-      {1:-- INSERT --}                                         |
-    ]], {[0] = {bold=true, foreground=Screen.colors.Blue},
-    [1] = {bold = true}})
+      {3:-- INSERT --}                                         |
+    ]])
   end)
 
   it('end of file markers', function()
     screen:try_resize(53, 4)
     screen:expect([[
       ^                                                     |
-      {1:~                                                    }|
-      {1:~                                                    }|
+      {0:~                                                    }|
+      {0:~                                                    }|
                                                            |
-    ]], {[1] = {bold = true, foreground = Screen.colors.Blue}})
+    ]])
   end)
 
   it('"wait return" text', function()
     screen:try_resize(53, 4)
     feed(':ls<cr>')
     screen:expect([[
-      {0:~                                                    }|
+      {1:                                                     }|
       :ls                                                  |
         1 %a   "[No Name]"                    line 1       |
-      {1:Press ENTER or type command to continue}^              |
-    ]], {[0] = {bold=true, foreground=Screen.colors.Blue},
-    [1] = {bold = true, foreground = Screen.colors.SeaGreen}})
+      {4:Press ENTER or type command to continue}^              |
+    ]])
     feed('<cr>') --  skip the "Press ENTER..." state or tests will hang
   end)
 
@@ -237,8 +242,7 @@ describe('highlight defaults', function()
       {0:~                                                    }|
       {0:~                                                    }|
       -- INSERT --                                         |
-    ]], {[0] = {bold=true, foreground=Screen.colors.Blue},
-    [1] = {bold=true}})
+    ]])
     feed('<esc>')
     feed_command('highlight CustomHLGroup guifg=red guibg=green')
     feed_command('highlight link ModeMsg CustomHLGroup')
@@ -247,9 +251,8 @@ describe('highlight defaults', function()
       ^                                                     |
       {0:~                                                    }|
       {0:~                                                    }|
-      {1:-- INSERT --}                                         |
-    ]], {[0] = {bold=true, foreground=Screen.colors.Blue},
-    [1] = {foreground = Screen.colors.Red, background = Screen.colors.Green}})
+      {5:-- INSERT --}                                         |
+    ]])
   end)
 
   it('can be cleared by assigning NONE', function()
@@ -258,14 +261,11 @@ describe('highlight defaults', function()
     feed_command('hi link TmpKeyword ErrorMsg')
     insert('neovim')
     screen:expect([[
-      {1:neovi^m}                                               |
+      {6:neovi^m}                                               |
       {0:~                                                    }|
       {0:~                                                    }|
                                                            |
-    ]], {
-      [0] = {bold=true, foreground=Screen.colors.Blue},
-      [1] = {foreground = Screen.colors.White, background = Screen.colors.Red}
-    })
+    ]])
     feed_command("hi ErrorMsg term=NONE cterm=NONE ctermfg=NONE ctermbg=NONE"
             .. " gui=NONE guifg=NONE guibg=NONE guisp=NONE")
     screen:expect([[
@@ -273,7 +273,7 @@ describe('highlight defaults', function()
       {0:~                                                    }|
       {0:~                                                    }|
                                                            |
-    ]], {[0] = {bold=true, foreground=Screen.colors.Blue}})
+    ]])
   end)
 
   it('linking updates window highlight immediately #16552', function()
@@ -283,7 +283,7 @@ describe('highlight defaults', function()
       {0:~                                                    }|
       {0:~                                                    }|
                                                            |
-    ]], {[0] = {bold=true, foreground=Screen.colors.Blue}})
+    ]])
     feed_command("hi NonTextAlt guifg=Red")
     feed_command("hi! link NonText NonTextAlt")
     screen:expect([[
@@ -305,56 +305,44 @@ describe('highlight defaults', function()
     feed_command('set listchars=space:.,tab:>-,trail:*,eol:¬ list')
     insert('   ne \t o\tv  im  ')
     screen:expect([[
-      ne{0:.>----.}o{0:>-----}v{0:..}im{0:*^*¬}                             |
-      {0:~                                                    }|
-      {0:~                                                    }|
+      ne{7:.>----.}o{7:>-----}v{7:..}im{7:*^*¬}                             |
+      {7:~                                                    }|
+      {7:~                                                    }|
                                                            |
-    ]], {
-      [0] = {foreground=Screen.colors.Red},
-      [1] = {foreground=Screen.colors.Blue},
-    })
+    ]])
     feed_command('highlight Whitespace gui=NONE guifg=#0000FF')
     screen:expect([[
-      ne{1:.>----.}o{1:>-----}v{1:..}im{1:*^*}{0:¬}                             |
-      {0:~                                                    }|
-      {0:~                                                    }|
+      ne{8:.>----.}o{8:>-----}v{8:..}im{8:*^*}{7:¬}                             |
+      {7:~                                                    }|
+      {7:~                                                    }|
       :highlight Whitespace gui=NONE guifg=#0000FF         |
-    ]], {
-      [0] = {foreground=Screen.colors.Red},
-      [1] = {foreground=Screen.colors.Blue},
-    })
+    ]])
   end)
 
   it('are sent to UIs', function()
     screen:try_resize(53, 4)
-    screen:set_default_attr_ids({
-      [0] = {},
-      [1] = {bold = true, foreground = Screen.colors.Blue1},
-      [2] = {bold = true, reverse = true},
-      [3] = {italic=true}
-    })
     screen:expect{grid=[[
       ^                                                     |
-      {1:~                                                    }|
-      {1:~                                                    }|
+      {0:~                                                    }|
+      {0:~                                                    }|
                                                            |
-    ]], hl_groups={EndOfBuffer=1, MsgSeparator=2}}
+    ]], hl_groups={EndOfBuffer=0, MsgSeparator=1}}
 
     command('highlight EndOfBuffer gui=italic')
     screen:expect{grid=[[
       ^                                                     |
-      {3:~                                                    }|
-      {3:~                                                    }|
+      {9:~                                                    }|
+      {9:~                                                    }|
                                                            |
-    ]], hl_groups={EndOfBuffer=3, MsgSeparator=2}}
+    ]], hl_groups={EndOfBuffer=9, MsgSeparator=1}}
 
     command('highlight clear EndOfBuffer')
     screen:expect{grid=[[
       ^                                                     |
-      {1:~                                                    }|
-      {1:~                                                    }|
+      {0:~                                                    }|
+      {0:~                                                    }|
                                                            |
-    ]], hl_groups={EndOfBuffer=1, MsgSeparator=2}}
+    ]], hl_groups={EndOfBuffer=0, MsgSeparator=1}}
   end)
 end)
 
@@ -1787,6 +1775,7 @@ describe("'winhighlight' highlight", function()
       [26] = {background = Screen.colors.Red},
       [27] = {background = Screen.colors.DarkBlue, bold = true, foreground = Screen.colors.Green1},
       [28] = {bold = true, foreground = Screen.colors.Brown},
+      [29] = {foreground = Screen.colors.Blue1, background = Screen.colors.Red, bold = true};
     })
     command("hi Background1 guibg=DarkBlue")
     command("hi Background2 guibg=DarkGreen")
@@ -1820,7 +1809,7 @@ describe("'winhighlight' highlight", function()
     ]])
   end)
 
-  it('handles invalid values', function()
+  it('handles undefined groups', function()
     command("set winhl=Normal:Background1")
     screen:expect([[
       {1:^                    }|
@@ -1833,19 +1822,44 @@ describe("'winhighlight' highlight", function()
                           |
     ]])
 
-    eq('Vim(set):E474: Invalid argument: winhl=xxx:yyy',
-       exc_exec("set winhl=xxx:yyy"))
-    eq('Normal:Background1', eval('&winhl'))
+    command("set winhl=xxx:yyy")
+    eq('xxx:yyy', eval('&winhl'))
     screen:expect{grid=[[
-      {1:^                    }|
-      {2:~                   }|
-      {2:~                   }|
-      {2:~                   }|
-      {2:~                   }|
-      {2:~                   }|
-      {2:~                   }|
+      ^                    |
+      {0:~                   }|
+      {0:~                   }|
+      {0:~                   }|
+      {0:~                   }|
+      {0:~                   }|
+      {0:~                   }|
                           |
-    ]], unchanged=true}
+    ]]}
+  end)
+
+  it('can be changed to define different groups', function()
+    command("set winhl=EndOfBuffer:Background1")
+    screen:expect{grid=[[
+      ^                    |
+      {1:~                   }|
+      {1:~                   }|
+      {1:~                   }|
+      {1:~                   }|
+      {1:~                   }|
+      {1:~                   }|
+                          |
+    ]]}
+
+    command("set winhl=Normal:ErrorMsg")
+    screen:expect{grid=[[
+      {15:^                    }|
+      {29:~                   }|
+      {29:~                   }|
+      {29:~                   }|
+      {29:~                   }|
+      {29:~                   }|
+      {29:~                   }|
+                          |
+    ]]}
   end)
 
   it('works local to the window', function()
@@ -2269,5 +2283,146 @@ describe("'winhighlight' highlight", function()
       {4:[No Name]           }|
                           |
     ]])
+  end)
+
+
+  it("can override syntax groups", function()
+    command('syntax on')
+    command('syntax keyword Foobar foobar')
+    command('syntax keyword Article the')
+    command('hi Foobar guibg=#FF0000')
+    command('hi Article guifg=#00FF00 gui=bold')
+    insert('the foobar was foobar')
+    screen:expect([[
+      {25:the} {26:foobar} was {26:fooba}|
+      {26:^r}                   |
+      {0:~                   }|
+      {0:~                   }|
+      {0:~                   }|
+      {0:~                   }|
+      {0:~                   }|
+                          |
+    ]])
+
+    command('split')
+    command('set winhl=Foobar:Background1,Article:ErrorMsg')
+    screen:expect{grid=[[
+      {15:the} {1:foobar} was {1:fooba}|
+      {1:^r}                   |
+      {0:~                   }|
+      {3:[No Name] [+]       }|
+      {25:the} {26:foobar} was {26:fooba}|
+      {26:r}                   |
+      {4:[No Name] [+]       }|
+                          |
+    ]]}
+  end)
+end)
+
+describe('highlight namespaces', function()
+  local screen
+  local ns1, ns2
+
+  before_each(function()
+    clear()
+    screen = Screen.new(25,10)
+    screen:attach()
+    screen:set_default_attr_ids {
+      [1] = {foreground = Screen.colors.Blue, bold = true};
+      [2] = {background = Screen.colors.DarkGrey};
+      [3] = {italic = true, foreground = Screen.colors.DarkCyan, background = Screen.colors.DarkOrange4};
+      [4] = {background = Screen.colors.Magenta4};
+      [5] = {background = Screen.colors.Magenta4, foreground = Screen.colors.Crimson};
+      [6] = {bold = true, reverse = true};
+      [7] = {reverse = true};
+    }
+
+    ns1 = meths.create_namespace 'grungy'
+    ns2 = meths.create_namespace 'ultrared'
+
+    meths.set_hl(ns1, 'Normal', {bg='DarkGrey'})
+    meths.set_hl(ns1, 'NonText', {bg='DarkOrange4', fg='DarkCyan', italic=true})
+    meths.set_hl(ns2, 'Normal', {bg='DarkMagenta'})
+    meths.set_hl(ns2, 'NonText', {fg='Crimson'})
+  end)
+
+  it('can be used globally', function()
+    screen:expect{grid=[[
+      ^                         |
+      {1:~                        }|
+      {1:~                        }|
+      {1:~                        }|
+      {1:~                        }|
+      {1:~                        }|
+      {1:~                        }|
+      {1:~                        }|
+      {1:~                        }|
+                               |
+    ]]}
+
+    meths.set_hl_ns(ns1)
+    screen:expect{grid=[[
+      {2:^                         }|
+      {3:~                        }|
+      {3:~                        }|
+      {3:~                        }|
+      {3:~                        }|
+      {3:~                        }|
+      {3:~                        }|
+      {3:~                        }|
+      {3:~                        }|
+                               |
+    ]]}
+
+    meths.set_hl_ns(ns2)
+    screen:expect{grid=[[
+      {4:^                         }|
+      {5:~                        }|
+      {5:~                        }|
+      {5:~                        }|
+      {5:~                        }|
+      {5:~                        }|
+      {5:~                        }|
+      {5:~                        }|
+      {5:~                        }|
+                               |
+    ]]}
+
+    meths.set_hl_ns(0)
+    screen:expect{grid=[[
+      ^                         |
+      {1:~                        }|
+      {1:~                        }|
+      {1:~                        }|
+      {1:~                        }|
+      {1:~                        }|
+      {1:~                        }|
+      {1:~                        }|
+      {1:~                        }|
+                               |
+    ]]}
+  end)
+
+  it('can be used per window', function()
+    local win1 = meths.get_current_win()
+    command 'split'
+    local win2 = meths.get_current_win()
+    command 'split'
+
+    meths.win_set_hl_ns(win1, ns1)
+    meths.win_set_hl_ns(win2, ns2)
+
+    screen:expect{grid=[[
+      ^                         |
+      {1:~                        }|
+      {6:[No Name]                }|
+      {4:                         }|
+      {5:~                        }|
+      {7:[No Name]                }|
+      {2:                         }|
+      {3:~                        }|
+      {7:[No Name]                }|
+                               |
+    ]]}
   end)
 end)
