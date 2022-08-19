@@ -13,7 +13,7 @@
 #include "nvim/map.h"
 #include "nvim/message.h"
 #include "nvim/option.h"
-#include "nvim/popupmnu.h"
+#include "nvim/popupmenu.h"
 #include "nvim/screen.h"
 #include "nvim/ui.h"
 #include "nvim/vim.h"
@@ -303,8 +303,6 @@ int hl_get_ui_attr(int ns_id, int idx, int final_id, bool optional)
     if (pum_drawn()) {
       must_redraw_pum = true;
     }
-  } else if (idx == HLF_MSG && ns_id == -1) {
-    msg_grid.blending = attrs.hl_blend > -1;
   }
 
   if (optional && !available) {
@@ -319,7 +317,7 @@ void update_window_hl(win_T *wp, bool invalid)
   int ns_id = wp->w_ns_hl;
 
   update_ns_hl(ns_id);
-  if (ns_id != wp->w_ns_hl_active) {
+  if (ns_id != wp->w_ns_hl_active || wp->w_ns_hl_attr == NULL) {
     wp->w_ns_hl_active = ns_id;
 
     wp->w_ns_hl_attr = *(NSHlAttr *)pmap_get(handle_T)(&ns_hl_attr, ns_id);
