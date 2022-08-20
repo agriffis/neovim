@@ -5195,29 +5195,6 @@ linenr_T tv_get_lnum_buf(const typval_T *const tv, const buf_T *const buf)
   return (linenr_T)tv_get_number_chk(tv, NULL);
 }
 
-void get_qf_loc_list(int is_qf, win_T *wp, typval_T *what_arg, typval_T *rettv)
-{
-  if (what_arg->v_type == VAR_UNKNOWN) {
-    tv_list_alloc_ret(rettv, kListLenMayKnow);
-    if (is_qf || wp != NULL) {
-      (void)get_errorlist(NULL, wp, -1, 0, rettv->vval.v_list);
-    }
-  } else {
-    tv_dict_alloc_ret(rettv);
-    if (is_qf || wp != NULL) {
-      if (what_arg->v_type == VAR_DICT) {
-        dict_T *d = what_arg->vval.v_dict;
-
-        if (d != NULL) {
-          qf_get_properties(wp, d, rettv->vval.v_dict);
-        }
-      } else {
-        emsg(_(e_dictreq));
-      }
-    }
-  }
-}
-
 /// @return  information (variables, options, etc.) about a tab page
 ///          as a dictionary.
 dict_T *get_tabpage_info(tabpage_T *tp, int tp_idx)
@@ -5865,7 +5842,17 @@ bool callback_call(Callback *const callback, const int argcount_in, typval_T *co
   switch (callback->type) {
   case kCallbackFuncref:
     name = callback->data.funcref;
-    partial = NULL;
+    int len = (int)STRLEN(name);
+    if (len >= 6 && !memcmp(name, "v:lua.", 6)) {
+      name += 6;
+      len = check_luafunc_name(name, false);
+      if (len == 0) {
+        return false;
+      }
+      partial = vvlua_partial;
+    } else {
+      partial = NULL;
+    }
     break;
 
   case kCallbackPartial:

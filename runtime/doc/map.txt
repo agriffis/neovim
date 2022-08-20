@@ -905,6 +905,17 @@ or `unnamedplus`.
 The `mode()` function will return the state as it will be after applying the
 operator.
 
+Here is an example for using a lambda function to create a normal-mode
+operator to add quotes around text in the current line: >
+
+	nnoremap <F4> <Cmd>let &opfunc='{t ->
+				\ getline(".")
+				\ ->split("\\zs")
+				\ ->insert("\"", col("'']"))
+				\ ->insert("\"", col("''[") - 1)
+				\ ->join("")
+				\ ->setline(".")}'<CR>g@
+
 ==============================================================================
 2. Abbreviations			*abbreviations* *Abbreviations*
 
@@ -1466,10 +1477,10 @@ results (for "inccommand=split", or nil for  "inccommand=nosplit").
 
 Your command preview routine must implement this protocol:
 
-1. Modify the current buffer as required for the preview (see
+1. Modify the target buffers as required for the preview (see
    |nvim_buf_set_text()| and |nvim_buf_set_lines()|).
 2. If preview buffer is provided, add necessary text to the preview buffer.
-3. Add required highlights to the current buffer. If preview buffer is
+3. Add required highlights to the target buffers. If preview buffer is
    provided, add required highlights to the preview buffer as well. All
    highlights must be added to the preview namespace which is provided as an
    argument to the preview callback (see |nvim_buf_add_highlight()| and
@@ -1480,8 +1491,8 @@ Your command preview routine must implement this protocol:
    2: Preview is shown and preview window is opened (if "inccommand=split").
       For "inccommand=nosplit" this is the same as 1.
 
-After preview ends, Nvim discards all changes to the buffer and all highlights
-in the preview namespace.
+After preview ends, Nvim discards all changes to all buffers made during the
+preview and clears all highlights in the preview namespace.
 
 Here's an example of a command to trim trailing whitespace from lines that
 supports incremental command preview:

@@ -13,6 +13,7 @@
 #include "nvim/charset.h"
 #include "nvim/cursor.h"
 #include "nvim/diff.h"
+#include "nvim/drawscreen.h"
 #include "nvim/edit.h"
 #include "nvim/eval.h"
 #include "nvim/eval/vars.h"
@@ -47,7 +48,6 @@
 #include "nvim/plines.h"
 #include "nvim/quickfix.h"
 #include "nvim/regexp.h"
-#include "nvim/screen.h"
 #include "nvim/search.h"
 #include "nvim/state.h"
 #include "nvim/strings.h"
@@ -7267,6 +7267,88 @@ static bool frame_check_width(const frame_T *topfrp, int width)
     }
   }
   return true;
+}
+
+/// Simple int comparison function for use with qsort()
+static int int_cmp(const void *a, const void *b)
+{
+  return *(const int *)a - *(const int *)b;
+}
+
+/// Handle setting 'colorcolumn' or 'textwidth' in window "wp".
+///
+/// @return error message, NULL if it's OK.
+char *check_colorcolumn(win_T *wp)
+{
+  char *s;
+  int col;
+  unsigned int count = 0;
+  int color_cols[256];
+  int j = 0;
+
+  if (wp->w_buffer == NULL) {
+    return NULL;      // buffer was closed
+  }
+
+  for (s = (char *)wp->w_p_cc; *s != NUL && count < 255;) {
+    if (*s == '-' || *s == '+') {
+      // -N and +N: add to 'textwidth'
+      col = (*s == '-') ? -1 : 1;
+      s++;
+      if (!ascii_isdigit(*s)) {
+        return e_invarg;
+      }
+      col = col * getdigits_int(&s, true, 0);
+      if (wp->w_buffer->b_p_tw == 0) {
+        goto skip;          // 'textwidth' not set, skip this item
+      }
+      assert((col >= 0
+              && wp->w_buffer->b_p_tw <= INT_MAX - col
+              && wp->w_buffer->b_p_tw + col >= INT_MIN)
+             || (col < 0
+                 && wp->w_buffer->b_p_tw >= INT_MIN - col
+                 && wp->w_buffer->b_p_tw + col <= INT_MAX));
+      col += (int)wp->w_buffer->b_p_tw;
+      if (col < 0) {
+        goto skip;
+      }
+    } else if (ascii_isdigit(*s)) {
+      col = getdigits_int(&s, true, 0);
+    } else {
+      return e_invarg;
+    }
+    color_cols[count++] = col - 1;      // 1-based to 0-based
+skip:
+    if (*s == NUL) {
+      break;
+    }
+    if (*s != ',') {
+      return e_invarg;
+    }
+    if (*++s == NUL) {
+      return e_invarg;        // illegal trailing comma as in "set cc=80,"
+    }
+  }
+
+  xfree(wp->w_p_cc_cols);
+  if (count == 0) {
+    wp->w_p_cc_cols = NULL;
+  } else {
+    wp->w_p_cc_cols = xmalloc(sizeof(int) * (count + 1));
+    // sort the columns for faster usage on screen redraw inside
+    // win_line()
+    qsort(color_cols, count, sizeof(int), int_cmp);
+
+    for (unsigned int i = 0; i < count; i++) {
+      // skip duplicates
+      if (j == 0 || wp->w_p_cc_cols[j - 1] != color_cols[i]) {
+        wp->w_p_cc_cols[j++] = color_cols[i];
+      }
+    }
+    wp->w_p_cc_cols[j] = -1;        // end marker
+  }
+
+  return NULL;    // no error
 }
 
 int win_getid(typval_T *argvars)

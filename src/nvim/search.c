@@ -17,6 +17,7 @@
 #include "nvim/charset.h"
 #include "nvim/cmdhist.h"
 #include "nvim/cursor.h"
+#include "nvim/drawscreen.h"
 #include "nvim/edit.h"
 #include "nvim/eval.h"
 #include "nvim/eval/funcs.h"
@@ -45,7 +46,6 @@
 #include "nvim/path.h"
 #include "nvim/profile.h"
 #include "nvim/regexp.h"
-#include "nvim/screen.h"
 #include "nvim/search.h"
 #include "nvim/strings.h"
 #include "nvim/ui.h"
@@ -2423,7 +2423,7 @@ void showmatch(int c)
       curwin->w_cursor = mpos;          // move to matching char
       *so = 0;                          // don't use 'scrolloff' here
       *siso = 0;                        // don't use 'sidescrolloff' here
-      showruler(false);
+      show_cursor_info(false);
       setcursor();
       ui_flush();
       // Restore dollar_vcol(), because setcursor() may call curs_rows()
