@@ -8,8 +8,8 @@
 
 #include "nvim/ascii.h"
 #include "nvim/charset.h"
+#include "nvim/cmdexpand.h"
 #include "nvim/eval.h"
-#include "nvim/ex_getln.h"
 #include "nvim/macros.h"
 #include "nvim/map.h"
 #include "nvim/memory.h"
@@ -1228,4 +1228,30 @@ bool os_shell_is_cmdexe(const char *sh)
     return true;
   }
   return striequal("cmd.exe", path_tail(sh));
+}
+
+/// Removes environment variable "name" and take care of side effects.
+void vim_unsetenv_ext(const char *var)
+{
+  os_unsetenv(var);
+
+  // "homedir" is not cleared, keep using the old value until $HOME is set.
+  if (STRICMP(var, "VIM") == 0) {
+    didset_vim = false;
+  } else if (STRICMP(var, "VIMRUNTIME") == 0) {
+    didset_vimruntime = false;
+  }
+}
+
+/// Set environment variable "name" and take care of side effects.
+void vim_setenv_ext(const char *name, const char *val)
+{
+  os_setenv(name, val, 1);
+  if (STRICMP(name, "HOME") == 0) {
+    init_homedir();
+  } else if (didset_vim && STRICMP(name, "VIM") == 0) {
+    didset_vim = false;
+  } else if (didset_vimruntime && STRICMP(name, "VIMRUNTIME") == 0) {
+    didset_vimruntime = false;
+  }
 }
