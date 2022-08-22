@@ -3558,12 +3558,12 @@ static int qf_goto_cwindow(const qf_info_T *qi, bool resize, int sz, bool vertsp
 static void qf_set_cwindow_options(void)
 {
   // switch off 'swapfile'
-  set_option_value("swf", 0L, NULL, OPT_LOCAL);
-  set_option_value("bt", 0L, "quickfix", OPT_LOCAL);
-  set_option_value("bh", 0L, "hide", OPT_LOCAL);
+  set_option_value_give_err("swf", 0L, NULL, OPT_LOCAL);
+  set_option_value_give_err("bt", 0L, "quickfix", OPT_LOCAL);
+  set_option_value_give_err("bh", 0L, "hide", OPT_LOCAL);
   RESET_BINDING(curwin);
   curwin->w_p_diff = false;
-  set_option_value("fdm", 0L, "manual", OPT_LOCAL);
+  set_option_value_give_err("fdm", 0L, "manual", OPT_LOCAL);
 }
 
 // Open a new quickfix or location list window, load the quickfix buffer and
@@ -4108,7 +4108,7 @@ static void qf_fill_buffer(qf_list_T *qfl, buf_T *buf, qfline_T *old_last, int q
     // resembles reading a file into a buffer, it's more logical when using
     // autocommands.
     curbuf->b_ro_locked++;
-    set_option_value("ft", 0L, "qf", OPT_LOCAL);
+    set_option_value_give_err("ft", 0L, "qf", OPT_LOCAL);
     curbuf->b_p_ma = false;
 
     keep_filetype = true;                 // don't detect 'filetype'
@@ -7062,6 +7062,7 @@ void ex_helpgrep(exarg_T *eap)
     }
   }
 
+  bool updated = false;
   // Make 'cpoptions' empty, the 'l' flag should not be used here.
   char *const save_cpo = p_cpo;
   p_cpo = (char *)empty_option;
@@ -7092,14 +7093,24 @@ void ex_helpgrep(exarg_T *eap)
     qfl->qf_ptr = qfl->qf_start;
     qfl->qf_index = 1;
     qf_list_changed(qfl);
-    qf_update_buffer(qi, NULL);
+    updated = true;
   }
 
   if ((char_u *)p_cpo == empty_option) {
     p_cpo = save_cpo;
   } else {
-    // Darn, some plugin changed the value.
+    // Darn, some plugin changed the value.  If it's still empty it was
+    // changed and restored, need to restore in the complicated way.
+    if (*p_cpo == NUL) {
+      set_option_value_give_err("cpo", 0L, save_cpo, 0);
+    }
     free_string_option((char_u *)save_cpo);
+  }
+
+  if (updated) {
+    // This may open a window and source scripts, do this after 'cpo' was
+    // restored.
+    qf_update_buffer(qi, NULL);
   }
 
   if (au_name != NULL) {

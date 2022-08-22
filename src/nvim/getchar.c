@@ -2112,7 +2112,7 @@ static int handle_mapping(int *keylenp, bool *timedout, int *mapdepth)
       }
 
       del_typebuf(mlen, 0);  // remove the chars
-      set_option_value("paste", !p_paste, NULL, 0);
+      set_option_value_give_err("paste", !p_paste, NULL, 0);
       if (!(State & MODE_INSERT)) {
         msg_col = 0;
         msg_row = Rows - 1;
@@ -2400,7 +2400,8 @@ static int vgetorpeek(bool advance)
   vgetc_busy++;
 
   if (advance) {
-    KeyStuffed = FALSE;
+    KeyStuffed = false;
+    typebuf_was_empty = false;
   }
 
   init_typebuf();
@@ -2625,6 +2626,11 @@ static int vgetorpeek(bool advance)
             c = ESC;
           }
           tc = c;
+
+          // set a flag to indicate this wasn't a normal char
+          if (advance) {
+            typebuf_was_empty = true;
+          }
 
           // return 0 in normal_check()
           if (pending_exmode_active) {
