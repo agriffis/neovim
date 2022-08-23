@@ -1420,12 +1420,15 @@ func Test_trim()
   call assert_equal("vim", trim("  vim  ", " ", 0))
   call assert_equal("vim  ", trim("  vim  ", " ", 1))
   call assert_equal("  vim", trim("  vim  ", " ", 2))
-  call assert_fails('call trim("  vim  ", " ", [])', 'E745:')
-  call assert_fails('call trim("  vim  ", " ", -1)', 'E475:')
-  call assert_fails('call trim("  vim  ", " ", 3)', 'E475:')
+  call assert_fails('eval trim("  vim  ", " ", [])', 'E745:')
+  call assert_fails('eval trim("  vim  ", " ", -1)', 'E475:')
+  call assert_fails('eval trim("  vim  ", " ", 3)', 'E475:')
+  call assert_fails('eval trim("  vim  ", 0)', 'E475:')
 
   let chars = join(map(range(1, 0x20) + [0xa0], {n -> n->nr2char()}), '')
   call assert_equal("x", trim(chars . "x" . chars))
+
+  call assert_fails('let c=trim([])', 'E730:')
 endfunc
 
 " Test for reg_recording() and reg_executing()
@@ -1697,6 +1700,63 @@ func Test_platform_name()
   endif
 endfunc
 
+" Test confirm({msg} [, {choices} [, {default} [, {type}]]])
+func Test_confirm()
+  " requires a UI to be active
+  throw 'Skipped: use test/functional/vimscript/input_spec.lua'
+  if !has('unix') || has('gui_running')
+    return
+  endif
+
+  call feedkeys('o', 'L')
+  let a = confirm('Press O to proceed')
+  call assert_equal(1, a)
+
+  call feedkeys('y', 'L')
+  let a = 'Are you sure?'->confirm("&Yes\n&No")
+  call assert_equal(1, a)
+
+  call feedkeys('n', 'L')
+  let a = confirm('Are you sure?', "&Yes\n&No")
+  call assert_equal(2, a)
+
+  " confirm() should return 0 when pressing CTRL-C.
+  call feedkeys("\<C-c>", 'L')
+  let a = confirm('Are you sure?', "&Yes\n&No")
+  call assert_equal(0, a)
+
+  " <Esc> requires another character to avoid it being seen as the start of an
+  " escape sequence.  Zero should be harmless.
+  eval "\<Esc>0"->feedkeys('L')
+  let a = confirm('Are you sure?', "&Yes\n&No")
+  call assert_equal(0, a)
+
+  " Default choice is returned when pressing <CR>.
+  call feedkeys("\<CR>", 'L')
+  let a = confirm('Are you sure?', "&Yes\n&No")
+  call assert_equal(1, a)
+
+  call feedkeys("\<CR>", 'L')
+  let a = confirm('Are you sure?', "&Yes\n&No", 2)
+  call assert_equal(2, a)
+
+  call feedkeys("\<CR>", 'L')
+  let a = confirm('Are you sure?', "&Yes\n&No", 0)
+  call assert_equal(0, a)
+
+  " Test with the {type} 4th argument
+  for type in ['Error', 'Question', 'Info', 'Warning', 'Generic']
+    call feedkeys('y', 'L')
+    let a = confirm('Are you sure?', "&Yes\n&No\n", 1, type)
+    call assert_equal(1, a)
+  endfor
+
+  call assert_fails('call confirm([])', 'E730:')
+  call assert_fails('call confirm("Are you sure?", [])', 'E730:')
+  call assert_fails('call confirm("Are you sure?", "&Yes\n&No\n", [])', 'E745:')
+  call assert_fails('call confirm("Are you sure?", "&Yes\n&No\n", 0, [])', 'E730:')
+endfunc
+
 func Test_readdir()
   call mkdir('Xdir')
   call writefile([], 'Xdir/foo.txt')
@@ -1724,7 +1784,7 @@ func Test_readdir()
   let files = readdir('Xdir', {x -> len(add(l, x)) == 2 ? -1 : 1})
   call assert_equal(1, len(files))
 
-  call delete('Xdir', 'rf')
+  eval 'Xdir'->delete('rf')
 endfunc
 
 func Test_delete_rf()
@@ -1767,6 +1827,7 @@ endfunc
 
 func Test_char2nr()
   call assert_equal(12354, char2nr('あ', 1))
+  call assert_equal(120, 'x'->char2nr())
 endfunc
 
 func Test_charclass()
