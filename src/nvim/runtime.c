@@ -100,15 +100,36 @@ void estack_pop(void)
 }
 
 /// Get the current value for <sfile> in allocated memory.
-/// @param which  ESTACK_SFILE for <sfile> and ESTACK_STACK for <stack>.
+/// @param which  ESTACK_SFILE for <sfile>, ESTACK_STACK for <stack> or
+///               ESTACK_SCRIPT for <script>.
 char *estack_sfile(estack_arg_T which)
 {
-  estack_T *entry = ((estack_T *)exestack.ga_data) + exestack.ga_len - 1;
+  const estack_T *entry = ((estack_T *)exestack.ga_data) + exestack.ga_len - 1;
   if (which == ESTACK_SFILE && entry->es_type != ETYPE_UFUNC) {
     if (entry->es_name == NULL) {
       return NULL;
     }
     return xstrdup(entry->es_name);
+  }
+
+  // If evaluated in a function or autocommand, return the path of the script
+  // where it is defined, at script level the current script path is returned
+  // instead.
+  if (which == ESTACK_SCRIPT) {
+    // Walk the stack backwards, starting from the current frame.
+    for (int idx = exestack.ga_len - 1; idx >= 0; idx--, entry--) {
+      if (entry->es_type == ETYPE_UFUNC || entry->es_type == ETYPE_AUCMD) {
+        const sctx_T *const def_ctx = (entry->es_type == ETYPE_UFUNC
+                                       ? &entry->es_info.ufunc->uf_script_ctx
+                                       : &entry->es_info.aucmd->script_ctx);
+        return def_ctx->sc_sid > 0
+                ? xstrdup((char *)(SCRIPT_ITEM(def_ctx->sc_sid).sn_name))
+                : NULL;
+      } else if (entry->es_type == ETYPE_SCRIPT) {
+        return xstrdup(entry->es_name);
+      }
+    }
+    return NULL;
   }
 
   // Give information about each stack entry up to the root.
