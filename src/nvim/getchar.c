@@ -1810,13 +1810,13 @@ static void getchar_common(typval_T *argvars, typval_T *rettv)
 }
 
 /// "getchar()" function
-void f_getchar(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+void f_getchar(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
   getchar_common(argvars, rettv);
 }
 
 /// "getcharstr()" function
-void f_getcharstr(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+void f_getcharstr(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
   getchar_common(argvars, rettv);
 
@@ -1836,7 +1836,7 @@ void f_getcharstr(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 }
 
 /// "getcharmod()" function
-void f_getcharmod(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+void f_getcharmod(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
   rettv->vval.v_number = mod_mask;
 }
@@ -1881,7 +1881,7 @@ static bool at_ins_compl_key(void)
     c = p[3] & 0x1f;
   }
   return (ctrl_x_mode_not_default() && vim_is_ctrl_x_key(c))
-         || ((compl_cont_status & CONT_LOCAL) && (c == Ctrl_N || c == Ctrl_P));
+         || (compl_status_local() && (c == Ctrl_N || c == Ctrl_P));
 }
 
 /// Check if typebuf.tb_buf[] contains a modifier plus key that can be changed

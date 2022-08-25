@@ -5140,6 +5140,7 @@ static bool vgr_match_buflines(qf_list_T *qfl, char *fname, buf_T *buf, char *sp
   FUNC_ATTR_NONNULL_ARG(1, 3, 4, 5, 6)
 {
   bool found_match = false;
+  const size_t pat_len = STRLEN(spat);
 
   for (linenr_T lnum = 1; lnum <= buf->b_ml.ml_line_count && *tomatch > 0; lnum++) {
     colnr_T col = 0;
@@ -5181,7 +5182,6 @@ static bool vgr_match_buflines(qf_list_T *qfl, char *fname, buf_T *buf, char *sp
         }
       }
     } else {
-      const size_t pat_len = STRLEN(spat);
       char *const str = (char *)ml_get_buf(buf, lnum, false);
       int score;
       uint32_t matches[MAX_FUZZY_MATCHES];
@@ -7169,14 +7169,14 @@ static void get_qf_loc_list(int is_qf, win_T *wp, typval_T *what_arg, typval_T *
 }
 
 /// "getloclist()" function
-void f_getloclist(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+void f_getloclist(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
   win_T *wp = find_win_by_nr_or_id(&argvars[0]);
   get_qf_loc_list(false, wp, &argvars[1], rettv);
 }
 
 /// "getqflist()" functions
-void f_getqflist(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+void f_getqflist(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
   get_qf_loc_list(true, NULL, &argvars[0], rettv);
 }
@@ -7263,7 +7263,7 @@ skip_args:
 }
 
 /// "setloclist()" function
-void f_setloclist(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+void f_setloclist(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
   rettv->vval.v_number = -1;
 
@@ -7274,7 +7274,7 @@ void f_setloclist(typval_T *argvars, typval_T *rettv, FunPtr fptr)
 }
 
 /// "setqflist()" function
-void f_setqflist(typval_T *argvars, typval_T *rettv, FunPtr fptr)
+void f_setqflist(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
   set_qf_ll_list(NULL, argvars, rettv);
 }

@@ -4968,7 +4968,7 @@ theend:
   return retval;
 }
 
-void common_function(typval_T *argvars, typval_T *rettv, bool is_funcref, FunPtr fptr)
+void common_function(typval_T *argvars, typval_T *rettv, bool is_funcref)
 {
   char *s;
   char *name;
@@ -5228,12 +5228,12 @@ dict_T *get_win_info(win_T *wp, int16_t tpnr, int16_t winnr)
   tv_dict_add_nr(dict, S_LEN("tabnr"), tpnr);
   tv_dict_add_nr(dict, S_LEN("winnr"), winnr);
   tv_dict_add_nr(dict, S_LEN("winid"), wp->handle);
-  tv_dict_add_nr(dict, S_LEN("height"), wp->w_height);
+  tv_dict_add_nr(dict, S_LEN("height"), wp->w_height_inner);
   tv_dict_add_nr(dict, S_LEN("winrow"), wp->w_winrow + 1);
   tv_dict_add_nr(dict, S_LEN("topline"), wp->w_topline);
   tv_dict_add_nr(dict, S_LEN("botline"), wp->w_botline - 1);
   tv_dict_add_nr(dict, S_LEN("winbar"), wp->w_winbar_height);
-  tv_dict_add_nr(dict, S_LEN("width"), wp->w_width);
+  tv_dict_add_nr(dict, S_LEN("width"), wp->w_width_inner);
   tv_dict_add_nr(dict, S_LEN("bufnr"), wp->w_buffer->b_fnum);
   tv_dict_add_nr(dict, S_LEN("wincol"), wp->w_wincol + 1);
   tv_dict_add_nr(dict, S_LEN("textoff"), win_col_off(wp));
@@ -8148,6 +8148,7 @@ repeat:
         // Only replace it when it starts with '~'
         if (*dirname == '~') {
           s = xstrdup(dirname);
+          assert(s != NULL);  // suppress clang "Argument with 'nonnull' attribute passed null"
           *fnamep = s;
           xfree(*bufp);
           *bufp = s;
