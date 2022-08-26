@@ -1260,7 +1260,7 @@ static int command_line_execute(VimState *state, int key)
     }
 
     if (s->wim_index < 3) {
-      ++s->wim_index;
+      s->wim_index++;
     }
 
     if (s->c == ESC) {
@@ -1477,7 +1477,7 @@ static int command_line_handle_key(CommandLineState *s)
     // delete current character is the same as backspace on next
     // character, except at end of line
     if (s->c == K_DEL && ccline.cmdpos != ccline.cmdlen) {
-      ++ccline.cmdpos;
+      ccline.cmdpos++;
     }
 
     if (s->c == K_DEL) {
@@ -4073,17 +4073,27 @@ static int open_cmdwin(void)
     ga_clear(&winsizes);
     return K_IGNORE;
   }
+  // Don't let quitting the More prompt make this fail.
+  got_int = false;
+
+  // Set "cmdwin_type" before any autocommands may mess things up.
   cmdwin_type = get_cmdline_type();
   cmdwin_level = ccline.level;
 
   // Create empty command-line buffer.
-  buf_open_scratch(0, _("[Command Line]"));
+  if (buf_open_scratch(0, _("[Command Line]")) == FAIL) {
+    // Some autocommand messed it up?
+    win_close(curwin, true, false);
+    ga_clear(&winsizes);
+    cmdwin_type = 0;
+    return Ctrl_C;
+  }
   // Command-line buffer has bufhidden=wipe, unlike a true "scratch" buffer.
   set_option_value_give_err("bh", 0L, "wipe", OPT_LOCAL);
-  curwin->w_p_rl = cmdmsg_rl;
-  cmdmsg_rl = false;
   curbuf->b_p_ma = true;
   curwin->w_p_fen = false;
+  curwin->w_p_rl = cmdmsg_rl;
+  cmdmsg_rl = false;
 
   // Don't allow switching to another buffer.
   curbuf->b_ro_locked++;

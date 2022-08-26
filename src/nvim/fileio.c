@@ -583,7 +583,7 @@ int readfile(char *fname, char *sfname, linenr_T from, linenr_T lines_to_skip,
     return FAIL;
   }
 
-  ++no_wait_return;         // don't wait for return yet
+  no_wait_return++;         // don't wait for return yet
 
   // Set '[ mark to the line above where the lines go (line 1 if zero).
   orig_start = curbuf->b_op_start;
@@ -708,7 +708,7 @@ int readfile(char *fname, char *sfname, linenr_T from, linenr_T lines_to_skip,
 
     fenc_alloced = false;
   } else if (*p_fencs == NUL) {
-    fenc = (char *)curbuf->b_p_fenc;            // use format from buffer
+    fenc = curbuf->b_p_fenc;            // use format from buffer
     fenc_alloced = false;
   } else {
     fenc_next = (char *)p_fencs;                // try items in 'fileencodings'
@@ -1011,7 +1011,7 @@ retry:
                 // Change NL to NUL to reverse the effect done
                 // below.
                 n = (int)(size - tlen);
-                for (ni = 0; ni < n; ++ni) {
+                for (ni = 0; ni < n; ni++) {
                   if (p[ni] == NL) {
                     ptr[tlen++] = NUL;
                   } else {
@@ -1729,7 +1729,7 @@ failed:
     os_remove(tmpname);  // delete converted file
     xfree(tmpname);
   }
-  --no_wait_return;                     // may wait for return now
+  no_wait_return--;                     // may wait for return now
 
   /*
    * In recovery mode everything but autocommands is skipped.
@@ -1948,7 +1948,7 @@ failed:
       if (!au_did_filetype && *curbuf->b_p_ft != NUL) {
         // EVENT_FILETYPE was not triggered but the buffer already has a
         // filetype.  Trigger EVENT_FILETYPE using the existing filetype.
-        apply_autocmds(EVENT_FILETYPE, (char *)curbuf->b_p_ft, curbuf->b_fname, true, curbuf);
+        apply_autocmds(EVENT_FILETYPE, curbuf->b_p_ft, curbuf->b_fname, true, curbuf);
       }
     } else {
       apply_autocmds_exarg(EVENT_FILEREADPOST, sfname, sfname,
@@ -1999,7 +1999,7 @@ static linenr_T readfile_linenr(linenr_T linecnt, char_u *p, char_u *endp)
   linenr_T lnum;
 
   lnum = curbuf->b_ml.ml_line_count - linecnt + 1;
-  for (s = p; s < endp; ++s) {
+  for (s = p; s < endp; s++) {
     if (*s == '\n') {
       lnum++;
     }
@@ -2317,7 +2317,7 @@ int buf_write(buf_T *buf, char *fname, char *sfname, linenr_T start, linenr_T en
     overwriting = FALSE;
   }
 
-  ++no_wait_return;                 // don't wait for return yet
+  no_wait_return++;                 // don't wait for return yet
 
   /*
    * Set '[ and '] marks to the lines to be written.
@@ -3052,7 +3052,7 @@ nobackup:
     fenc = (char *)enc_canonize((char_u *)fenc);
     fenc_tofree = fenc;
   } else {
-    fenc = (char *)buf->b_p_fenc;
+    fenc = buf->b_p_fenc;
   }
 
   // Check if the file needs to be converted.
@@ -3485,7 +3485,7 @@ restore_backup:
   }
 
   lnum -= start;            // compute number of written lines
-  --no_wait_return;         // may wait for return now
+  no_wait_return--;         // may wait for return now
 
 #if !defined(UNIX)
   fname = sfname;           // use shortname now, for the messages
@@ -3624,7 +3624,7 @@ restore_backup:
    * Finish up.  We get here either after failure or success.
    */
 fail:
-  --no_wait_return;             // may wait for return now
+  no_wait_return--;             // may wait for return now
 nofail:
 
   // Done saving, we accept changed buffer warnings again
@@ -3998,7 +3998,7 @@ static int buf_write_bytes(struct bw_info *ip)
           ip->bw_conv_error_lnum = ip->bw_start_lnum;
         }
         if (c == NL) {
-          ++ip->bw_start_lnum;
+          ip->bw_start_lnum++;
         }
       }
       if (flags & FIO_LATIN1) {

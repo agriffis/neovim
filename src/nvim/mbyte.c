@@ -882,7 +882,7 @@ int utf_ptr2len_len(const char_u *p, int size)
   } else {
     m = len;
   }
-  for (i = 1; i < m; ++i) {
+  for (i = 1; i < m; i++) {
     if ((p[i] & 0xc0) != 0x80) {
       return 1;
     }
@@ -1595,7 +1595,7 @@ void show_utf8(void)
   }
 
   clen = 0;
-  for (i = 0; i < len; ++i) {
+  for (i = 0; i < len; i++) {
     if (clen == 0) {
       // start of (composing) character, get its length
       if (i > 0) {
@@ -1632,10 +1632,10 @@ int utf_head_off(const char_u *base, const char_u *p)
   // Skip backwards over trailing bytes: 10xx.xxxx
   // Skip backwards again if on a composing char.
   const char_u *q;
-  for (q = p;; --q) {
+  for (q = p;; q--) {
     // Move s to the last byte of this char.
     const char_u *s;
-    for (s = q; (s[1] & 0xc0) == 0x80; ++s) {}
+    for (s = q; (s[1] & 0xc0) == 0x80; s++) {}
 
     // Move q to the first byte of this char.
     while (q > base && (*q & 0xc0) == 0x80) {
@@ -1932,11 +1932,11 @@ void utf_find_illegal(void)
   char_u *tofree = NULL;
 
   vimconv.vc_type = CONV_NONE;
-  if (enc_canon_props(curbuf->b_p_fenc) & ENC_8BIT) {
+  if (enc_canon_props((char_u *)curbuf->b_p_fenc) & ENC_8BIT) {
     // 'encoding' is "utf-8" but we are editing a 8-bit encoded file,
     // possibly a utf-8 file with illegal bytes.  Setup for conversion
     // from utf-8 to 'fileencoding'.
-    convert_setup(&vimconv, p_enc, curbuf->b_p_fenc);
+    convert_setup(&vimconv, p_enc, (char_u *)curbuf->b_p_fenc);
   }
 
   curwin->w_cursor.coladd = 0;
@@ -1975,7 +1975,7 @@ void utf_find_illegal(void)
     if (curwin->w_cursor.lnum == curbuf->b_ml.ml_line_count) {
       break;
     }
-    ++curwin->w_cursor.lnum;
+    curwin->w_cursor.lnum++;
     curwin->w_cursor.col = 0;
   }
 
@@ -1989,8 +1989,7 @@ theend:
 }
 
 /// @return  true if string "s" is a valid utf-8 string.
-/// When "end" is NULL stop at the first NUL.
-/// When "end" is positive stop there.
+/// When "end" is NULL stop at the first NUL.  Otherwise stop at "end".
 bool utf_valid_string(const char_u *s, const char_u *end)
 {
   const char_u *p = s;
@@ -2181,7 +2180,7 @@ char_u *enc_canonize(char_u *enc) FUNC_ATTR_NONNULL_RET
   char_u *r = xmalloc(STRLEN(enc) + 3);
   // Make it all lower case and replace '_' with '-'.
   p = r;
-  for (s = enc; *s != NUL; ++s) {
+  for (s = enc; *s != NUL; s++) {
     if (*s == '_') {
       *p++ = '-';
     } else {
@@ -2234,7 +2233,7 @@ static int enc_alias_search(const char_u *name)
 {
   int i;
 
-  for (i = 0; enc_alias_table[i].name != NULL; ++i) {
+  for (i = 0; enc_alias_table[i].name != NULL; i++) {
     if (STRCMP(name, enc_alias_table[i].name) == 0) {
       return enc_alias_table[i].canon;
     }
@@ -2567,7 +2566,7 @@ char_u *string_convert_ext(const vimconv_T *const vcp, char_u *ptr, size_t *lenp
   case CONV_TO_UTF8:            // latin1 to utf-8 conversion
     retval = xmalloc(len * 2 + 1);
     d = retval;
-    for (size_t i = 0; i < len; ++i) {
+    for (size_t i = 0; i < len; i++) {
       c = ptr[i];
       if (c < 0x80) {
         *d++ = (char_u)c;
@@ -2585,7 +2584,7 @@ char_u *string_convert_ext(const vimconv_T *const vcp, char_u *ptr, size_t *lenp
   case CONV_9_TO_UTF8:          // latin9 to utf-8 conversion
     retval = xmalloc(len * 3 + 1);
     d = retval;
-    for (size_t i = 0; i < len; ++i) {
+    for (size_t i = 0; i < len; i++) {
       c = ptr[i];
       switch (c) {
       case 0xa4:

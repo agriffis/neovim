@@ -223,7 +223,7 @@ bool cin_is_cinword(const char_u *line)
   char_u *cinw_buf = xmalloc(cinw_len);
   line = (char_u *)skipwhite((char *)line);
 
-  for (char *cinw = (char *)curbuf->b_p_cinw; *cinw;) {
+  for (char *cinw = curbuf->b_p_cinw; *cinw;) {
     size_t len = copy_option_part(&cinw, (char *)cinw_buf, cinw_len, ",");
     if (STRNCMP(line, cinw_buf, len) == 0
         && (!vim_iswordc(line[len]) || !vim_iswordc(line[len - 1]))) {
@@ -383,7 +383,7 @@ bool cin_islabel(void)  // XXX
 
   cursor_save = curwin->w_cursor;
   while (curwin->w_cursor.lnum > 1) {
-    --curwin->w_cursor.lnum;
+    curwin->w_cursor.lnum--;
 
     /*
      * If we're in a comment or raw string now, skip to the start of
@@ -434,7 +434,7 @@ static int cin_isinit(void)
   for (;;) {
     int i, l;
 
-    for (i = 0; i < (int)ARRAY_SIZE(skip); ++i) {
+    for (i = 0; i < (int)ARRAY_SIZE(skip); i++) {
       l = (int)strlen(skip[i]);
       if (cin_starts_with(s, skip[i])) {
         s = cin_skipcomment(s + l);
@@ -465,7 +465,7 @@ bool cin_iscase(const char_u *s, bool strict)
 {
   s = cin_skipcomment(s);
   if (cin_starts_with(s, "case")) {
-    for (s += 4; *s; ++s) {
+    for (s += 4; *s; s++) {
       s = cin_skipcomment(s);
       if (*s == NUL) {
         break;
@@ -519,7 +519,7 @@ bool cin_isscopedecl(const char_u *p)
 
   bool found = false;
 
-  for (char *cinsd = (char *)curbuf->b_p_cinsd; *cinsd;) {
+  for (char *cinsd = curbuf->b_p_cinsd; *cinsd;) {
     const size_t len = copy_option_part(&cinsd, (char *)cinsd_buf, cinsd_len, ",");
     if (STRNCMP(s, cinsd_buf, len) == 0) {
       const char_u *skip = cin_skipcomment(s + len);
@@ -588,7 +588,7 @@ static bool cin_is_cpp_namespace(const char_u *s)
  */
 static const char_u *after_label(const char_u *l)
 {
-  for (; *l; ++l) {
+  for (; *l; l++) {
     if (*l == ':') {
       if (l[1] == ':') {            // skip over "::" for C++
         l++;
@@ -1740,7 +1740,7 @@ void parse_cino(buf_T *buf)
   // Handle C #pragma directives
   buf->b_ind_pragma = 0;
 
-  for (p = (char *)buf->b_p_cino; *p;) {
+  for (p = buf->b_p_cino; *p;) {
     l = p++;
     if (*p == '-') {
       p++;
@@ -2063,7 +2063,7 @@ int get_c_indent(void)
     *lead_start = NUL;
     *lead_middle = NUL;
 
-    p = (char *)curbuf->b_p_com;
+    p = curbuf->b_p_com;
     while (*p != NUL) {
       int align = 0;
       int off = 0;
@@ -2330,7 +2330,7 @@ int get_c_indent(void)
               /* look for opening unmatched paren, indent one level
                * for each additional level */
               n = 1;
-              for (col = 0; col < our_paren_pos.col; ++col) {
+              for (col = 0; col < our_paren_pos.col; col++) {
                 switch (l[col]) {
                 case '(':
                 case '{':
@@ -2388,7 +2388,7 @@ int get_c_indent(void)
            * but ignore (void) before the line (ignore_paren_col). */
           col = our_paren_pos.col;
           while ((int)our_paren_pos.col > ignore_paren_col) {
-            --our_paren_pos.col;
+            our_paren_pos.col--;
             switch (*ml_get_pos(&our_paren_pos)) {
             case '(':
               amount += curbuf->b_ind_unclosed2;

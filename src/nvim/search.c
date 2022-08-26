@@ -513,7 +513,7 @@ void last_pat_prog(regmmatch_T *regmatch)
     regmatch->regprog = NULL;
     return;
   }
-  ++emsg_off;           // So it doesn't beep if bad expr
+  emsg_off++;           // So it doesn't beep if bad expr
   (void)search_regcomp((char_u *)"", 0, last_idx, SEARCH_KEEP, regmatch);
   emsg_off--;
 }
@@ -632,7 +632,7 @@ int searchit(win_T *win, buf_T *buf, pos_T *pos, pos_T *end_pos, Direction dir, 
       lnum = pos->lnum;
     }
 
-    for (loop = 0; loop <= 1; ++loop) {     // loop twice if 'wrapscan' set
+    for (loop = 0; loop <= 1; loop++) {     // loop twice if 'wrapscan' set
       for (; lnum > 0 && lnum <= buf->b_ml.ml_line_count;
            lnum += dir, at_first_line = FALSE) {
         // Stop after checking "stop_lnum", if it's set.
@@ -991,7 +991,7 @@ static int first_submatch(regmmatch_T *rp)
 {
   int submatch;
 
-  for (submatch = 1;; ++submatch) {
+  for (submatch = 1;; submatch++) {
     if (rp->startpos[submatch].lnum >= 0) {
       break;
     }
@@ -1298,7 +1298,7 @@ int do_search(oparg_T *oap, int dirc, int search_delim, char_u *pat, long count,
      */
     if (!spats[0].off.line && spats[0].off.off && pos.col < MAXCOL - 2) {
       if (spats[0].off.off > 0) {
-        for (c = spats[0].off.off; c; --c) {
+        for (c = spats[0].off.off; c; c--) {
           if (decl(&pos) == -1) {
             break;
           }
@@ -1308,7 +1308,7 @@ int do_search(oparg_T *oap, int dirc, int search_delim, char_u *pat, long count,
           pos.col = MAXCOL;
         }
       } else {
-        for (c = spats[0].off.off; c; ++c) {
+        for (c = spats[0].off.off; c; c++) {
           if (incl(&pos) == -1) {
             break;
           }
@@ -1696,34 +1696,34 @@ static bool find_rawstring_end(char_u *linep, pos_T *startpos, pos_T *endpos)
 static void find_mps_values(int *initc, int *findc, bool *backwards, bool switchit)
   FUNC_ATTR_NONNULL_ALL
 {
-  char_u *ptr = curbuf->b_p_mps;
+  char *ptr = curbuf->b_p_mps;
 
   while (*ptr != NUL) {
-    if (utf_ptr2char((char *)ptr) == *initc) {
+    if (utf_ptr2char(ptr) == *initc) {
       if (switchit) {
         *findc = *initc;
-        *initc = utf_ptr2char((char *)ptr + utfc_ptr2len((char *)ptr) + 1);
+        *initc = utf_ptr2char(ptr + utfc_ptr2len(ptr) + 1);
         *backwards = true;
       } else {
-        *findc = utf_ptr2char((char *)ptr + utfc_ptr2len((char *)ptr) + 1);
+        *findc = utf_ptr2char(ptr + utfc_ptr2len(ptr) + 1);
         *backwards = false;
       }
       return;
     }
-    char_u *prev = ptr;
-    ptr += utfc_ptr2len((char *)ptr) + 1;
-    if (utf_ptr2char((char *)ptr) == *initc) {
+    char *prev = ptr;
+    ptr += utfc_ptr2len(ptr) + 1;
+    if (utf_ptr2char(ptr) == *initc) {
       if (switchit) {
         *findc = *initc;
-        *initc = utf_ptr2char((char *)prev);
+        *initc = utf_ptr2char(prev);
         *backwards = false;
       } else {
-        *findc = utf_ptr2char((char *)prev);
+        *findc = utf_ptr2char(prev);
         *backwards = true;
       }
       return;
     }
-    ptr += utfc_ptr2len((char *)ptr);
+    ptr += utfc_ptr2len(ptr);
     if (*ptr == ',') {
       ptr++;
     }
@@ -1867,7 +1867,7 @@ pos_T *findmatchlimit(oparg_T *oap, int initc, int flags, int64_t maxtravel)
          * the line.
          */
         if (linep[pos.col] == NUL && pos.col) {
-          --pos.col;
+          pos.col--;
         }
         for (;;) {
           initc = utf_ptr2char((char *)linep + pos.col);
@@ -2001,7 +2001,7 @@ pos_T *findmatchlimit(oparg_T *oap, int initc, int flags, int64_t maxtravel)
         if (pos.lnum == 1) {            // start of file
           break;
         }
-        --pos.lnum;
+        pos.lnum--;
 
         if (maxtravel > 0 && ++traveled > maxtravel) {
           break;
@@ -2036,7 +2036,7 @@ pos_T *findmatchlimit(oparg_T *oap, int initc, int flags, int64_t maxtravel)
             || lispcomm) {
           break;
         }
-        ++pos.lnum;
+        pos.lnum++;
 
         if (maxtravel && traveled++ > maxtravel) {
           break;
@@ -2131,7 +2131,7 @@ pos_T *findmatchlimit(oparg_T *oap, int initc, int flags, int64_t maxtravel)
        * Watch out for "\\".
        */
       at_start = do_quotes;
-      for (ptr = linep; *ptr; ++ptr) {
+      for (ptr = linep; *ptr; ptr++) {
         if (ptr == linep + pos.col + backwards) {
           at_start = (do_quotes & 1);
         }
@@ -2211,7 +2211,7 @@ pos_T *findmatchlimit(oparg_T *oap, int initc, int flags, int64_t maxtravel)
       if (do_quotes) {
         int col;
 
-        for (col = pos.col - 1; col >= 0; --col) {
+        for (col = pos.col - 1; col >= 0; col--) {
           if (linep[col] != '\\') {
             break;
           }
@@ -2376,7 +2376,7 @@ void showmatch(int c)
    * Only show match for chars in the 'matchpairs' option.
    */
   // 'matchpairs' is "x:y,x:y"
-  for (p = curbuf->b_p_mps; *p != NUL; p++) {
+  for (p = (char_u *)curbuf->b_p_mps; *p != NUL; p++) {
     if (utf_ptr2char((char *)p) == c && (curwin->w_p_rl ^ p_ri)) {
       break;
     }
@@ -2522,7 +2522,7 @@ int findsent(Direction dir, long count)
       c = gchar_pos(&pos);
       if (c == NUL || (pos.col == 0 && startPS(pos.lnum, NUL, FALSE))) {
         if (dir == BACKWARD && pos.lnum != startlnum) {
-          ++pos.lnum;
+          pos.lnum++;
         }
         break;
       }
@@ -3298,7 +3298,7 @@ extend:
       }
       findsent_forward(count, at_start_sent);
       if (*p_sel == 'e') {
-        ++curwin->w_cursor.col;
+        curwin->w_cursor.col++;
       }
     }
     return OK;
@@ -3356,7 +3356,7 @@ extend:
       goto extend;
     }
     if (*p_sel == 'e') {
-      ++curwin->w_cursor.col;
+      curwin->w_cursor.col++;
     }
     VIsual = start_pos;
     VIsual_mode = 'v';
@@ -3409,7 +3409,7 @@ int current_block(oparg_T *oap, long count, int include, int what, int other)
     }
     if (gchar_cursor() == what) {
       // cursor on '(' or '{', move cursor just after it
-      ++curwin->w_cursor.col;
+      curwin->w_cursor.col++;
     }
   } else if (lt(VIsual, curwin->w_cursor)) {
     old_start = VIsual;
@@ -3803,7 +3803,7 @@ extend:
       }
 
       prev_start_is_white = -1;
-      for (t = 0; t < 2; ++t) {
+      for (t = 0; t < 2; t++) {
         start_lnum += dir;
         start_is_white = linewhite(start_lnum);
         if (prev_start_is_white == start_is_white) {
@@ -4090,8 +4090,7 @@ bool current_quote(oparg_T *oap, long count, bool include, int quotechar)
       if (col_start < 0) {
         goto abort_search;
       }
-      col_end = find_next_quote(line, col_start + 1, quotechar,
-                                curbuf->b_p_qe);
+      col_end = find_next_quote(line, col_start + 1, quotechar, (char_u *)curbuf->b_p_qe);
       if (col_end < 0) {
         // We were on a starting quote perhaps?
         col_end = col_start;
@@ -4102,8 +4101,7 @@ bool current_quote(oparg_T *oap, long count, bool include, int quotechar)
       if (line[col_end] != quotechar) {
         goto abort_search;
       }
-      col_start = find_prev_quote(line, col_end, quotechar,
-                                  curbuf->b_p_qe);
+      col_start = find_prev_quote(line, col_end, quotechar, (char_u *)curbuf->b_p_qe);
       if (line[col_start] != quotechar) {
         // We were on an ending quote perhaps?
         col_start = col_end;
@@ -4132,8 +4130,7 @@ bool current_quote(oparg_T *oap, long count, bool include, int quotechar)
         goto abort_search;
       }
       // Find close quote character.
-      col_end = find_next_quote(line, col_start + 1, quotechar,
-                                curbuf->b_p_qe);
+      col_end = find_next_quote(line, col_start + 1, quotechar, (char_u *)curbuf->b_p_qe);
       if (col_end < 0) {
         goto abort_search;
       }
@@ -4146,7 +4143,7 @@ bool current_quote(oparg_T *oap, long count, bool include, int quotechar)
     }
   } else {
     // Search backward for a starting quote.
-    col_start = find_prev_quote(line, col_start, quotechar, curbuf->b_p_qe);
+    col_start = find_prev_quote(line, col_start, quotechar, (char_u *)curbuf->b_p_qe);
     if (line[col_start] != quotechar) {
       // No quote before the cursor, look after the cursor.
       col_start = find_next_quote(line, col_start, quotechar, NULL);
@@ -4156,8 +4153,7 @@ bool current_quote(oparg_T *oap, long count, bool include, int quotechar)
     }
 
     // Find close quote character.
-    col_end = find_next_quote(line, col_start + 1, quotechar,
-                              curbuf->b_p_qe);
+    col_end = find_next_quote(line, col_start + 1, quotechar, (char_u *)curbuf->b_p_qe);
     if (col_end < 0) {
       goto abort_search;
     }
@@ -5375,7 +5371,7 @@ void find_pattern_in_path(char_u *ptr, Direction dir, size_t len, bool whole, bo
       goto fpip_end;
     }
   }
-  inc_opt = (*curbuf->b_p_inc == NUL) ? p_inc : curbuf->b_p_inc;
+  inc_opt = (*curbuf->b_p_inc == NUL) ? p_inc : (char_u *)curbuf->b_p_inc;
   if (*inc_opt != NUL) {
     incl_regmatch.regprog = vim_regcomp((char *)inc_opt, p_magic ? RE_MAGIC : 0);
     if (incl_regmatch.regprog == NULL) {
@@ -5385,7 +5381,7 @@ void find_pattern_in_path(char_u *ptr, Direction dir, size_t len, bool whole, bo
   }
   if (type == FIND_DEFINE && (*curbuf->b_p_def != NUL || *p_def != NUL)) {
     def_regmatch.regprog = vim_regcomp(*curbuf->b_p_def == NUL
-                                       ? (char *)p_def : (char *)curbuf->b_p_def,
+                                       ? (char *)p_def : curbuf->b_p_def,
                                        p_magic ? RE_MAGIC : 0);
     if (def_regmatch.regprog == NULL) {
       goto fpip_end;
@@ -5638,7 +5634,7 @@ search_line:
             p = (char_u *)skipwhite((char *)line);
             if (matched
                 || (p[0] == '/' && p[1] == '*') || p[0] == '*') {
-              for (p = line; *p && p < startp; ++p) {
+              for (p = line; *p && p < startp; p++) {
                 if (matched
                     && p[0] == '/'
                     && (p[1] == '*' || p[1] == '/')) {
