@@ -937,8 +937,8 @@ char *vim_getenv(const char *name)
   // - the directory name from 'helpfile' (unless it contains '$')
   // - the executable name from argv[0]
   if (vim_path == NULL) {
-    if (p_hf != NULL && vim_strchr((char *)p_hf, '$') == NULL) {
-      vim_path = (char *)p_hf;
+    if (p_hf != NULL && vim_strchr(p_hf, '$') == NULL) {
+      vim_path = p_hf;
     }
 
     char exe_name[MAXPATHL];
@@ -957,7 +957,7 @@ char *vim_getenv(const char *name)
       char *vim_path_end = path_tail(vim_path);
 
       // remove "doc/" from 'helpfile', if present
-      if (vim_path == (char *)p_hf) {
+      if (vim_path == p_hf) {
         vim_path_end = remove_tail(vim_path, vim_path_end, "doc");
       }
 
@@ -1156,15 +1156,12 @@ char *home_replace_save(buf_T *buf, const char *src)
 /// Function given to ExpandGeneric() to obtain an environment variable name.
 char *get_env_name(expand_T *xp, int idx)
 {
-#define ENVNAMELEN 100
-  // this static buffer is needed to avoid a memory leak in ExpandGeneric
-  static char_u name[ENVNAMELEN];
   assert(idx >= 0);
   char *envname = os_getenvname_at_index((size_t)idx);
   if (envname) {
-    STRLCPY(name, envname, ENVNAMELEN);
+    STRLCPY(xp->xp_buf, envname, EXPAND_BUF_LEN);
     xfree(envname);
-    return (char *)name;
+    return xp->xp_buf;
   }
   return NULL;
 }

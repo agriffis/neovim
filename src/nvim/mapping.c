@@ -293,7 +293,7 @@ static bool set_maparg_lhs_rhs(const char *const orig_lhs, const size_t orig_lhs
       replaced = replace_termcodes(orig_rhs, orig_rhs_len, &rhs_buf, REPTERM_DO_LT, NULL,
                                    cpo_flags);
       mapargs->rhs_len = STRLEN(replaced);
-      // XXX: replace_termcodes may produce an empty string even if orig_rhs is non-empty
+      // NB: replace_termcodes may produce an empty string even if orig_rhs is non-empty
       // (e.g. a single ^V, see :h map-empty-rhs)
       mapargs->rhs_is_noop = orig_rhs_len != 0 && mapargs->rhs_len == 0;
       mapargs->rhs = (char_u *)replaced;
@@ -2322,7 +2322,7 @@ void langmap_set(void)
   ga_clear(&langmap_mapga);                 // clear the previous map first
   langmap_init();                           // back to one-to-one map
 
-  for (p = p_langmap; p[0] != NUL;) {
+  for (p = (char_u *)p_langmap; p[0] != NUL;) {
     for (p2 = p; p2[0] != NUL && p2[0] != ',' && p2[0] != ';';
          MB_PTR_ADV(p2)) {
       if (p2[0] == '\\' && p2[1] != NUL) {

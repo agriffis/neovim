@@ -23,6 +23,7 @@
 #include "nvim/help.h"
 #include "nvim/highlight_group.h"
 #include "nvim/if_cscope.h"
+#include "nvim/locale.h"
 #include "nvim/lua/executor.h"
 #include "nvim/mapping.h"
 #include "nvim/menu.h"
@@ -2059,7 +2060,7 @@ static int ExpandOther(expand_T *xp, regmatch_T *rmp, int *num_file, char ***fil
     { EXPAND_MENUNAMES, get_menu_names, false, true },
     { EXPAND_SYNTAX, get_syntax_name, true, true },
     { EXPAND_SYNTIME, get_syntime_arg, true, true },
-    { EXPAND_HIGHLIGHT, (ExpandFunc)get_highlight_name, true, true },
+    { EXPAND_HIGHLIGHT, (ExpandFunc)get_highlight_name, true, false },
     { EXPAND_EVENTS, expand_get_event_name, true, false },
     { EXPAND_AUGROUP, expand_get_augroup_name, true, false },
     { EXPAND_CSCOPE, get_cscope_name, true, true },

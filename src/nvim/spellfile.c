@@ -440,7 +440,7 @@ typedef struct spellinfo_S {
 
   sblock_T *si_blocks;       // memory blocks used
   long si_blocks_cnt;           // memory blocks allocated
-  int si_did_emsg;              // TRUE when ran out of memory
+  int si_did_emsg;              // true when ran out of memory
 
   long si_compress_cnt;         // words to add before lowering
                                 // compression limit
@@ -454,7 +454,7 @@ typedef struct spellinfo_S {
 
   int si_ascii;                 // handling only ASCII words
   int si_add;                   // addition file
-  int si_clear_chartab;             // when TRUE clear char tables
+  int si_clear_chartab;             // when true clear char tables
   int si_region;                // region mask
   vimconv_T si_conv;            // for conversion to 'encoding'
   int si_memtot;                // runtime memory used
@@ -1863,7 +1863,7 @@ static long compress_added = 500000;    // word count
 // Sets "sps_flags".
 int spell_check_msm(void)
 {
-  char *p = (char *)p_msm;
+  char *p = p_msm;
   long start = 0;
   long incr = 0;
   long added = 0;
@@ -1924,7 +1924,7 @@ static void spell_clear_flags(wordnode_T *node)
   wordnode_T *np;
 
   for (np = node; np != NULL; np = np->wn_sibling) {
-    np->wn_u1.index = FALSE;
+    np->wn_u1.index = false;
     spell_clear_flags(np->wn_child);
   }
 }
@@ -1940,7 +1940,7 @@ static void spell_print_node(wordnode_T *node, int depth)
     msg((char_u *)line2);
     msg((char_u *)line3);
   } else {
-    node->wn_u1.index = TRUE;
+    node->wn_u1.index = true;
 
     if (node->wn_byte != NUL) {
       if (node->wn_child != NULL) {
@@ -2123,8 +2123,7 @@ static afffile_T *spell_read_aff(spellinfo_T *spin, char_u *fname)
         // Setup for conversion from "ENC" to 'encoding'.
         aff->af_enc = enc_canonize(items[1]);
         if (!spin->si_ascii
-            && convert_setup(&spin->si_conv, aff->af_enc,
-                             p_enc) == FAIL) {
+            && convert_setup(&spin->si_conv, aff->af_enc, (char_u *)p_enc) == FAIL) {
           smsg(_("Conversion in %s not supported: from %s to %s"),
                fname, aff->af_enc, p_enc);
         }
@@ -3731,8 +3730,7 @@ static int spell_read_wordfile(spellinfo_T *spin, char_u *fname)
           line += 9;
           enc = enc_canonize(line);
           if (!spin->si_ascii
-              && convert_setup(&spin->si_conv, enc,
-                               p_enc) == FAIL) {
+              && convert_setup(&spin->si_conv, enc, (char_u *)p_enc) == FAIL) {
             smsg(_("Conversion in %s not supported: from %s to %s"),
                  fname, line, p_enc);
           }
@@ -5697,7 +5695,7 @@ static void init_spellfile(void)
 
     // Loop over all entries in 'runtimepath'.  Use the first one where we
     // are allowed to write.
-    rtp = p_rtp;
+    rtp = (char_u *)p_rtp;
     while (*rtp != NUL) {
       if (aspath) {
         // Use directory of an entry with path, e.g., for

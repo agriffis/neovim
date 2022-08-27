@@ -30,6 +30,7 @@
 #include "nvim/arglist.h"
 #include "nvim/ascii.h"
 #include "nvim/buffer.h"
+#include "nvim/change.h"
 #include "nvim/charset.h"
 #include "nvim/cursor_shape.h"
 #include "nvim/decoration_provider.h"
@@ -38,7 +39,6 @@
 #include "nvim/edit.h"
 #include "nvim/eval.h"
 #include "nvim/eval/typval.h"
-#include "nvim/ex_cmds2.h"
 #include "nvim/ex_docmd.h"
 #include "nvim/ex_getln.h"
 #include "nvim/ex_session.h"
@@ -52,6 +52,7 @@
 #include "nvim/indent.h"
 #include "nvim/indent_c.h"
 #include "nvim/keycodes.h"
+#include "nvim/locale.h"
 #include "nvim/macros.h"
 #include "nvim/mapping.h"
 #include "nvim/mbyte.h"
@@ -71,6 +72,7 @@
 #include "nvim/popupmenu.h"
 #include "nvim/regexp.h"
 #include "nvim/screen.h"
+#include "nvim/search.h"
 #include "nvim/spell.h"
 #include "nvim/spellfile.h"
 #include "nvim/spellsuggest.h"
@@ -437,7 +439,7 @@ void set_init_1(bool clean_arg)
 #ifdef HAVE_WORKING_LIBINTL
   // GNU gettext 0.10.37 supports this feature: set the codeset used for
   // translated messages independently from the current locale.
-  (void)bind_textdomain_codeset(PROJECT_NAME, (char *)p_enc);
+  (void)bind_textdomain_codeset(PROJECT_NAME, p_enc);
 #endif
 
   // Set the default for 'helplang'.
@@ -1481,7 +1483,7 @@ int do_set(char *arg, int opt_flags)
               // for ":set" on local options. Note: when setting
               // 'syntax' or 'filetype' autocommands may be
               // triggered that can cause havoc.
-              errmsg = did_set_string_option(opt_idx, (char_u **)varp, oldval,
+              errmsg = did_set_string_option(opt_idx, (char **)varp, (char *)oldval,
                                              errbuf, sizeof(errbuf),
                                              opt_flags, &value_checked);
 
@@ -1600,7 +1602,7 @@ void did_set_option(int opt_idx, int opt_flags, int new_value, int value_checked
 
 /// Convert a key name or string into a key value.
 /// Used for 'wildchar' and 'cedit' options.
-static int string_to_key(char_u *arg)
+int string_to_key(char_u *arg)
 {
   if (*arg == '<') {
     return find_key_option(arg + 1, true);
@@ -1609,24 +1611,6 @@ static int string_to_key(char_u *arg)
     return CTRL_CHR(arg[1]);
   }
   return *arg;
-}
-
-/// Check value of 'cedit' and set cedit_key.
-/// Returns NULL if value is OK, error message otherwise.
-char *check_cedit(void)
-{
-  int n;
-
-  if (*p_cedit == NUL) {
-    cedit_key = -1;
-  } else {
-    n = string_to_key(p_cedit);
-    if (vim_isprintc(n)) {
-      return e_invarg;
-    }
-    cedit_key = n;
-  }
-  return NULL;
 }
 
 // When changing 'title', 'titlestring', 'icon' or 'iconstring', call
@@ -1715,16 +1699,14 @@ int get_shada_parameter(int type)
 /// Return NULL if the parameter is not specified in the string.
 char_u *find_shada_parameter(int type)
 {
-  char_u *p;
-
-  for (p = p_shada; *p; p++) {
+  for (char *p = p_shada; *p; p++) {
     if (*p == type) {
-      return p + 1;
+      return (char_u *)p + 1;
     }
     if (*p == 'n') {                // 'n' is always the last one
       break;
     }
-    p = (char_u *)vim_strchr((char *)p, ',');         // skip until next ','
+    p = vim_strchr(p, ',');         // skip until next ','
     if (p == NULL) {                // hit the end without finding parameter
       break;
     }
@@ -1761,7 +1743,7 @@ static char_u *option_expand(int opt_idx, char_u *val)
    */
   expand_env_esc(val, NameBuff, MAXPATHL,
                  (char_u **)options[opt_idx].var == &p_tags, false,
-                 (char_u **)options[opt_idx].var == &p_sps ? (char_u *)"file:" :
+                 (char_u **)options[opt_idx].var == (char_u **)&p_sps ? (char_u *)"file:" :
                  NULL);
   if (STRCMP(NameBuff, val) == 0) {   // they are the same
     return NULL;
@@ -2899,7 +2881,7 @@ bool set_tty_option(const char *name, char *value)
 
 void set_tty_background(const char *value)
 {
-  if (option_was_set("bg") || strequal((char *)p_bg, value)) {
+  if (option_was_set("bg") || strequal(p_bg, value)) {
     // background is already set... ignore
     return;
   }
@@ -4465,7 +4447,7 @@ void buf_copy_options(buf_T *buf, int flags)
       if (!buf->b_p_initialized) {
         free_buf_options(buf, true);
         buf->b_p_ro = false;                    // don't copy readonly
-        buf->b_p_fenc = (char *)vim_strsave(p_fenc);
+        buf->b_p_fenc = xstrdup(p_fenc);
         switch (*p_ffs) {
         case 'm':
           buf->b_p_ff = xstrdup(FF_MAC);
@@ -4477,7 +4459,7 @@ void buf_copy_options(buf_T *buf, int flags)
           buf->b_p_ff = xstrdup(FF_UNIX);
           break;
         default:
-          buf->b_p_ff = (char *)vim_strsave(p_ff);
+          buf->b_p_ff = xstrdup(p_ff);
           break;
         }
         buf->b_p_bh = empty_option;
@@ -4528,9 +4510,9 @@ void buf_copy_options(buf_T *buf, int flags)
       buf->b_p_csl = vim_strsave(p_csl);
       COPY_OPT_SCTX(buf, BV_CSL);
 #endif
-      buf->b_p_cfu = (char *)vim_strsave(p_cfu);
+      buf->b_p_cfu = xstrdup(p_cfu);
       COPY_OPT_SCTX(buf, BV_CFU);
-      buf->b_p_ofu = (char *)vim_strsave(p_ofu);
+      buf->b_p_ofu = xstrdup(p_ofu);
       COPY_OPT_SCTX(buf, BV_OFU);
       buf->b_p_tfu = (char *)vim_strsave(p_tfu);
       COPY_OPT_SCTX(buf, BV_TFU);
@@ -4547,7 +4529,7 @@ void buf_copy_options(buf_T *buf, int flags)
       buf->b_p_vsts_nopaste = p_vsts_nopaste
                                 ? (char *)vim_strsave(p_vsts_nopaste)
                                 : NULL;
-      buf->b_p_com = (char *)vim_strsave(p_com);
+      buf->b_p_com = xstrdup(p_com);
       COPY_OPT_SCTX(buf, BV_COM);
       buf->b_p_cms = (char *)vim_strsave(p_cms);
       COPY_OPT_SCTX(buf, BV_CMS);
@@ -4567,18 +4549,18 @@ void buf_copy_options(buf_T *buf, int flags)
       COPY_OPT_SCTX(buf, BV_CI);
       buf->b_p_cin = p_cin;
       COPY_OPT_SCTX(buf, BV_CIN);
-      buf->b_p_cink = (char *)vim_strsave(p_cink);
+      buf->b_p_cink = xstrdup(p_cink);
       COPY_OPT_SCTX(buf, BV_CINK);
-      buf->b_p_cino = (char *)vim_strsave(p_cino);
+      buf->b_p_cino = xstrdup(p_cino);
       COPY_OPT_SCTX(buf, BV_CINO);
-      buf->b_p_cinsd = (char *)vim_strsave(p_cinsd);
+      buf->b_p_cinsd = xstrdup(p_cinsd);
       COPY_OPT_SCTX(buf, BV_CINSD);
 
       // Don't copy 'filetype', it must be detected
       buf->b_p_ft = empty_option;
       buf->b_p_pi = p_pi;
       COPY_OPT_SCTX(buf, BV_PI);
-      buf->b_p_cinw = (char *)vim_strsave(p_cinw);
+      buf->b_p_cinw = xstrdup(p_cinw);
       COPY_OPT_SCTX(buf, BV_CINW);
       buf->b_p_lisp = p_lisp;
       COPY_OPT_SCTX(buf, BV_LISP);
@@ -4603,7 +4585,7 @@ void buf_copy_options(buf_T *buf, int flags)
       buf->b_p_fp = empty_option;
       buf->b_p_fex = (char *)vim_strsave(p_fex);
       COPY_OPT_SCTX(buf, BV_FEX);
-      buf->b_p_sua = (char *)vim_strsave(p_sua);
+      buf->b_p_sua = xstrdup(p_sua);
       COPY_OPT_SCTX(buf, BV_SUA);
       buf->b_p_keymap = (char *)vim_strsave(p_keymap);
       COPY_OPT_SCTX(buf, BV_KMAP);
@@ -4658,7 +4640,7 @@ void buf_copy_options(buf_T *buf, int flags)
           buf->b_p_vts_array = NULL;
         }
       } else {
-        buf->b_p_isk = (char *)vim_strsave(p_isk);
+        buf->b_p_isk = xstrdup(p_isk);
         COPY_OPT_SCTX(buf, BV_ISK);
         did_isk = true;
         buf->b_p_ts = p_ts;
@@ -5063,24 +5045,13 @@ static int wc_use_keyname(char_u *varp, long *wcp)
   return false;
 }
 
-/// Return true if format option 'x' is in effect.
-/// Take care of no formatting when 'paste' is set.
-bool has_format_option(int x)
-  FUNC_ATTR_PURE FUNC_ATTR_WARN_UNUSED_RESULT
-{
-  if (p_paste) {
-    return false;
-  }
-  return vim_strchr(curbuf->b_p_fo, x) != NULL;
-}
-
 /// @returns true if "x" is present in 'shortmess' option, or
 /// 'shortmess' contains 'a' and "x" is present in SHM_ALL_ABBREVIATIONS.
 bool shortmess(int x)
 {
   return (p_shm != NULL
-          && (vim_strchr((char *)p_shm, x) != NULL
-              || (vim_strchr((char *)p_shm, 'a') != NULL
+          && (vim_strchr(p_shm, x) != NULL
+              || (vim_strchr(p_shm, 'a') != NULL
                   && vim_strchr((char *)SHM_ALL_ABBREVIATIONS, x) != NULL)));
 }
 
@@ -5364,59 +5335,6 @@ int option_set_callback_func(char_u *optval, Callback *optcb)
   return OK;
 }
 
-/// Read the 'wildmode' option, fill wim_flags[].
-int check_opt_wim(void)
-{
-  char_u new_wim_flags[4];
-  char_u *p;
-  int i;
-  int idx = 0;
-
-  for (i = 0; i < 4; i++) {
-    new_wim_flags[i] = 0;
-  }
-
-  for (p = p_wim; *p; p++) {
-    for (i = 0; ASCII_ISALPHA(p[i]); i++) {}
-    if (p[i] != NUL && p[i] != ',' && p[i] != ':') {
-      return FAIL;
-    }
-    if (i == 7 && STRNCMP(p, "longest", 7) == 0) {
-      new_wim_flags[idx] |= WIM_LONGEST;
-    } else if (i == 4 && STRNCMP(p, "full", 4) == 0) {
-      new_wim_flags[idx] |= WIM_FULL;
-    } else if (i == 4 && STRNCMP(p, "list", 4) == 0) {
-      new_wim_flags[idx] |= WIM_LIST;
-    } else if (i == 8 && STRNCMP(p, "lastused", 8) == 0) {
-      new_wim_flags[idx] |= WIM_BUFLASTUSED;
-    } else {
-      return FAIL;
-    }
-    p += i;
-    if (*p == NUL) {
-      break;
-    }
-    if (*p == ',') {
-      if (idx == 3) {
-        return FAIL;
-      }
-      idx++;
-    }
-  }
-
-  // fill remaining entries with last flag
-  while (idx < 3) {
-    new_wim_flags[idx + 1] = new_wim_flags[idx];
-    idx++;
-  }
-
-  // only when there are no errors, wim_flags[] is changed
-  for (i = 0; i < 4; i++) {
-    wim_flags[i] = new_wim_flags[i];
-  }
-  return OK;
-}
-
 /// Check if backspacing over something is allowed.
 /// @param  what  BS_INDENT, BS_EOL, BS_START, or BS_NOSTOP
 bool can_bs(int what)
@@ -5434,99 +5352,7 @@ bool can_bs(int what)
   case '0':
     return false;
   }
-  return vim_strchr((char *)p_bs, what) != NULL;
-}
-
-/// Save the current values of 'fileformat' and 'fileencoding', so that we know
-/// the file must be considered changed when the value is different.
-void save_file_ff(buf_T *buf)
-{
-  buf->b_start_ffc = (unsigned char)(*buf->b_p_ff);
-  buf->b_start_eol = buf->b_p_eol;
-  buf->b_start_bomb = buf->b_p_bomb;
-
-  // Only use free/alloc when necessary, they take time.
-  if (buf->b_start_fenc == NULL
-      || STRCMP(buf->b_start_fenc, buf->b_p_fenc) != 0) {
-    xfree(buf->b_start_fenc);
-    buf->b_start_fenc = xstrdup(buf->b_p_fenc);
-  }
-}
-
-/// Return true if 'fileformat' and/or 'fileencoding' has a different value
-/// from when editing started (save_file_ff() called).
-/// Also when 'endofline' was changed and 'binary' is set, or when 'bomb' was
-/// changed and 'binary' is not set.
-/// Also when 'endofline' was changed and 'fixeol' is not set.
-/// When "ignore_empty" is true don't consider a new, empty buffer to be
-/// changed.
-bool file_ff_differs(buf_T *buf, bool ignore_empty)
-  FUNC_ATTR_NONNULL_ALL FUNC_ATTR_WARN_UNUSED_RESULT
-{
-  // In a buffer that was never loaded the options are not valid.
-  if (buf->b_flags & BF_NEVERLOADED) {
-    return false;
-  }
-  if (ignore_empty
-      && (buf->b_flags & BF_NEW)
-      && buf->b_ml.ml_line_count == 1
-      && *ml_get_buf(buf, (linenr_T)1, false) == NUL) {
-    return false;
-  }
-  if (buf->b_start_ffc != *buf->b_p_ff) {
-    return true;
-  }
-  if ((buf->b_p_bin || !buf->b_p_fixeol) && buf->b_start_eol != buf->b_p_eol) {
-    return true;
-  }
-  if (!buf->b_p_bin && buf->b_start_bomb != buf->b_p_bomb) {
-    return true;
-  }
-  if (buf->b_start_fenc == NULL) {
-    return *buf->b_p_fenc != NUL;
-  }
-  return STRCMP(buf->b_start_fenc, buf->b_p_fenc) != 0;
-}
-
-/// This is called when 'breakindentopt' is changed and when a window is
-/// initialized
-bool briopt_check(win_T *wp)
-{
-  int bri_shift = 0;
-  int bri_min = 20;
-  bool bri_sbr = false;
-  int bri_list = 0;
-
-  char *p = wp->w_p_briopt;
-  while (*p != NUL) {
-    if (STRNCMP(p, "shift:", 6) == 0
-        && ((p[6] == '-' && ascii_isdigit(p[7])) || ascii_isdigit(p[6]))) {
-      p += 6;
-      bri_shift = getdigits_int(&p, true, 0);
-    } else if (STRNCMP(p, "min:", 4) == 0 && ascii_isdigit(p[4])) {
-      p += 4;
-      bri_min = getdigits_int(&p, true, 0);
-    } else if (STRNCMP(p, "sbr", 3) == 0) {
-      p += 3;
-      bri_sbr = true;
-    } else if (STRNCMP(p, "list:", 5) == 0) {
-      p += 5;
-      bri_list = (int)getdigits(&p, false, 0);
-    }
-    if (*p != ',' && *p != NUL) {
-      return false;
-    }
-    if (*p == ',') {
-      p++;
-    }
-  }
-
-  wp->w_briopt_shift = bri_shift;
-  wp->w_briopt_min = bri_min;
-  wp->w_briopt_sbr = bri_sbr;
-  wp->w_briopt_list  = bri_list;
-
-  return true;
+  return vim_strchr(p_bs, what) != NULL;
 }
 
 /// Get the local or global value of 'backupcopy'.
@@ -5551,7 +5377,7 @@ char_u *get_showbreak_value(win_T *const win)
   FUNC_ATTR_WARN_UNUSED_RESULT
 {
   if (win->w_p_sbr == NULL || *win->w_p_sbr == NUL) {
-    return p_sbr;
+    return (char_u *)p_sbr;
   }
   if (STRCMP(win->w_p_sbr, "NONE") == 0) {
     return (char_u *)empty_option;

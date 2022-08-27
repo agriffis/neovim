@@ -25,23 +25,19 @@
 #include "nvim/ex_getln.h"
 #include "nvim/fileio.h"
 #include "nvim/fold.h"
+#include "nvim/garray.h"
+#include "nvim/grid.h"
 #include "nvim/hashtab.h"
 #include "nvim/highlight.h"
 #include "nvim/highlight_group.h"
 #include "nvim/iconv.h"
 #include "nvim/if_cscope.h"
 #include "nvim/insexpand.h"
+#include "nvim/locale.h"
+#include "nvim/log.h"
 #include "nvim/lua/executor.h"
 #include "nvim/main.h"
 #include "nvim/mapping.h"
-#include "nvim/ui_client.h"
-#include "nvim/vim.h"
-#ifdef HAVE_LOCALE_H
-# include <locale.h>
-#endif
-#include "nvim/garray.h"
-#include "nvim/grid.h"
-#include "nvim/log.h"
 #include "nvim/mark.h"
 #include "nvim/mbyte.h"
 #include "nvim/memline.h"
@@ -70,8 +66,10 @@
 #include "nvim/strings.h"
 #include "nvim/syntax.h"
 #include "nvim/ui.h"
+#include "nvim/ui_client.h"
 #include "nvim/ui_compositor.h"
 #include "nvim/version.h"
+#include "nvim/vim.h"
 #include "nvim/window.h"
 #ifdef WIN32
 # include "nvim/os/os_win_console.h"
@@ -508,7 +506,7 @@ int main(int argc, char **argv)
 
   // When started with "-q errorfile" jump to first error now.
   if (params.edit_type == EDIT_QF) {
-    qf_jump(NULL, 0, 0, FALSE);
+    qf_jump(NULL, 0, 0, false);
     TIME_MSG("jump to first error");
   }
 
@@ -520,7 +518,7 @@ int main(int argc, char **argv)
   if (params.diff_mode) {
     // set options in each window for "nvim -d".
     FOR_ALL_WINDOWS_IN_TAB(wp, curtab) {
-      diff_win_options(wp, TRUE);
+      diff_win_options(wp, true);
     }
   }
 
@@ -713,8 +711,8 @@ void getout(int exitval)
 
   if (did_emsg) {
     // give the user a chance to read the (error) message
-    no_wait_return = FALSE;
-    wait_return(FALSE);
+    no_wait_return = false;
+    wait_return(false);
   }
 
   // Position the cursor again, the autocommands may have moved it
@@ -800,30 +798,6 @@ static int get_number_arg(const char *p, int *idx, int def)
   }
   return def;
 }
-
-#if defined(HAVE_LOCALE_H)
-/// Setup to use the current locale (for ctype() and many other things).
-static void init_locale(void)
-{
-  setlocale(LC_ALL, "");
-
-# ifdef LC_NUMERIC
-  // Make sure strtod() uses a decimal point, not a comma.
-  setlocale(LC_NUMERIC, "C");
-# endif
-
-  char localepath[MAXPATHL] = { 0 };
-  snprintf(localepath, sizeof(localepath), "%s", get_vim_var_str(VV_PROGPATH));
-  char *tail = path_tail_with_sep(localepath);
-  *tail = NUL;
-  tail = path_tail(localepath);
-  xstrlcpy(tail, "share/locale",
-           sizeof(localepath) - (size_t)(tail - localepath));
-  bindtextdomain(PROJECT_NAME, localepath);
-  textdomain(PROJECT_NAME);
-  TIME_MSG("locale set");
-}
-#endif
 
 static uint64_t server_connect(char *server_addr, const char **errmsg)
 {
@@ -1638,7 +1612,7 @@ static void create_windows(mparm_T *parmp)
         }
         curwin = curwin->w_next;
       }
-      dorewind = FALSE;
+      dorewind = false;
       curbuf = curwin->w_buffer;
       if (curbuf->b_ml.ml_mfp == NULL) {
         // Set 'foldlevel' to 'foldlevelstart' if it's not negative..
@@ -1647,15 +1621,15 @@ static void create_windows(mparm_T *parmp)
         }
         // When getting the ATTENTION prompt here, use a dialog.
         swap_exists_action = SEA_DIALOG;
-        set_buflisted(TRUE);
+        set_buflisted(true);
 
         // create memfile, read file
-        (void)open_buffer(FALSE, NULL, 0);
+        (void)open_buffer(false, NULL, 0);
 
         if (swap_exists_action == SEA_QUIT) {
           if (got_int || only_one_window()) {
             // abort selected or quit and only one window
-            did_emsg = FALSE;               // avoid hit-enter prompt
+            did_emsg = false;               // avoid hit-enter prompt
             getout(1);
           }
           // We can't close the window, it would disturb what
@@ -1667,7 +1641,7 @@ static void create_windows(mparm_T *parmp)
         } else {
           handle_swap_exists(NULL);
         }
-        dorewind = TRUE;                        // start again
+        dorewind = true;                        // start again
       }
       os_breakcheck();
       if (got_int) {
@@ -1733,7 +1707,7 @@ static void edit_buffers(mparm_T *parmp, char_u *cwd)
         if (i == 1) {
           char buf[100];
 
-          p_shm_save = xstrdup((char *)p_shm);
+          p_shm_save = xstrdup(p_shm);
           snprintf(buf, sizeof(buf), "F%s", p_shm);
           set_option_value_give_err("shm", 0L, buf, 0);
         }
@@ -1760,7 +1734,7 @@ static void edit_buffers(mparm_T *parmp, char_u *cwd)
         // abort or quit selected
         if (got_int || only_one_window()) {
           // abort selected and only one window
-          did_emsg = FALSE;             // avoid hit-enter prompt
+          did_emsg = false;             // avoid hit-enter prompt
           getout(1);
         }
         win_close(curwin, true, false);
@@ -1841,7 +1815,7 @@ static void exe_commands(mparm_T *parmp)
    * pattern on line 1.  But don't move the cursor when an autocommand
    * with g`" was used.
    */
-  msg_scroll = TRUE;
+  msg_scroll = true;
   if (parmp->tagname == NULL && curwin->w_cursor.lnum <= 1) {
     curwin->w_cursor.lnum = 0;
   }
@@ -1861,12 +1835,12 @@ static void exe_commands(mparm_T *parmp)
   }
 
   if (!exmode_active) {
-    msg_scroll = FALSE;
+    msg_scroll = false;
   }
 
   // When started with "-q errorfile" jump to first error again.
   if (parmp->edit_type == EDIT_QF) {
-    qf_jump(NULL, 0, 0, FALSE);
+    qf_jump(NULL, 0, 0, false);
   }
   TIME_MSG("executing command arguments");
 }
