@@ -674,7 +674,7 @@ static void fname2fnum(xfmark_T *fm)
                                 )) {
       int len;
 
-      expand_env((char_u *)"~/", NameBuff, MAXPATHL);
+      expand_env("~/", NameBuff, MAXPATHL);
       len = (int)STRLEN(NameBuff);
       STRLCPY(NameBuff + len, fm->fname + 2, MAXPATHL - len);
     } else {
@@ -683,7 +683,7 @@ static void fname2fnum(xfmark_T *fm)
 
     // Try to shorten the file name.
     os_dirname(IObuff, IOSIZE);
-    p = path_shorten_fname(NameBuff, IObuff);
+    p = path_shorten_fname((char_u *)NameBuff, IObuff);
 
     // buflist_new() will call fmarks_check_names()
     (void)buflist_new((char *)NameBuff, (char *)p, (linenr_T)1, 0);
@@ -911,7 +911,7 @@ static void show_one_mark(int c, char_u *arg, pos_T *p, char_u *name_arg, int cu
       name = mark_line(p, 15);
       mustfree = true;
     }
-    if (!message_filtered(name)) {
+    if (!message_filtered((char *)name)) {
       if (!did_title) {
         // Highlight title
         msg_puts_title(_("\nmark line  col file/text"));
@@ -1037,7 +1037,7 @@ void ex_jumps(exarg_T *eap)
         name = vim_strsave((char_u *)"-invalid-");
       }
       // apply :filter /pat/ or file name not available
-      if (name == NULL || message_filtered(name)) {
+      if (name == NULL || message_filtered((char *)name)) {
         xfree(name);
         continue;
       }

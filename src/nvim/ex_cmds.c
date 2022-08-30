@@ -120,7 +120,7 @@ void do_ascii(const exarg_T *const eap)
 {
   char *dig;
   int cc[MAX_MCO];
-  int c = utfc_ptr2char(get_cursor_pos_ptr(), cc);
+  int c = utfc_ptr2char((char *)get_cursor_pos_ptr(), cc);
   if (c == NUL) {
     msg("NUL");
     return;
@@ -513,7 +513,7 @@ void ex_sort(exarg_T *eap)
       eap->nextcmd = (char *)check_nextcmd((char_u *)p);
       break;
     } else if (!ASCII_ISALPHA(*p) && regmatch.regprog == NULL) {
-      s = (char *)skip_regexp((char_u *)p + 1, *p, true, NULL);
+      s = skip_regexp(p + 1, *p, true, NULL);
       if (*s != *p) {
         emsg(_(e_invalpat));
         goto sortend;
@@ -743,7 +743,7 @@ void ex_retab(exarg_T *eap)
   curwin->w_p_list = 0;             // don't want list mode here
 
   new_ts_str = eap->arg;
-  if (!tabstop_set((char_u *)eap->arg, &new_vts_array)) {
+  if (!tabstop_set(eap->arg, &new_vts_array)) {
     return;
   }
   while (ascii_isdigit(*(eap->arg)) || *(eap->arg) == ',') {
@@ -841,7 +841,7 @@ void ex_retab(exarg_T *eap)
       if (ptr[col] == NUL) {
         break;
       }
-      vcol += win_chartabsize(curwin, (char_u *)ptr + col, (colnr_T)vcol);
+      vcol += win_chartabsize(curwin, ptr + col, (colnr_T)vcol);
       if (vcol >= MAXCOL) {
         emsg(_(e_resulting_text_too_long));
         break;
@@ -1347,7 +1347,8 @@ static void do_filter(linenr_T line1, linenr_T line2, exarg_T *eap, char *cmd, b
     msg_putchar('\n');  // Keep message from buf_write().
     no_wait_return--;
     if (!aborting()) {
-      semsg(_("E482: Can't create file %s"), itmp);  // Will call wait_return.
+      // will call wait_return()
+      semsg(_("E482: Can't create file %s"), itmp);
     }
     goto filterend;
   }
@@ -1656,7 +1657,7 @@ char *make_filter_cmd(char *cmd, char *itmp, char *otmp)
   }
 #endif
   if (otmp != NULL) {
-    append_redir(buf, len, (char *)p_srr, otmp);
+    append_redir(buf, len, p_srr, otmp);
   }
   return buf;
 }
@@ -1709,7 +1710,7 @@ void print_line(linenr_T lnum, int use_number, int list)
   int save_silent = silent_mode;
 
   // apply :filter /pat/
-  if (message_filtered(ml_get(lnum))) {
+  if (message_filtered((char *)ml_get(lnum))) {
     return;
   }
 
@@ -3546,7 +3547,7 @@ static int do_sub(exarg_T *eap, proftime_T timeout, long cmdpreview_ns, handle_T
       which_pat = RE_LAST;                  // use last used regexp
       delimiter = (char_u)(*cmd++);                   // remember delimiter character
       pat = cmd;                            // remember start of search pat
-      cmd = (char *)skip_regexp((char_u *)cmd, delimiter, p_magic, &eap->arg);
+      cmd = skip_regexp(cmd, delimiter, p_magic, &eap->arg);
       if (cmd[0] == delimiter) {            // end delimiter found
         *cmd++ = NUL;                       // replace it with a NUL
         has_second_delim = true;
@@ -4631,7 +4632,7 @@ void ex_global(exarg_T *eap)
     delim = *cmd;               // get the delimiter
     cmd++;                      // skip delimiter if there is one
     pat = cmd;                  // remember start of pattern
-    cmd = (char *)skip_regexp((char_u *)cmd, delim, p_magic, &eap->arg);
+    cmd = skip_regexp(cmd, delim, p_magic, &eap->arg);
     if (cmd[0] == delim) {                  // end delimiter found
       *cmd++ = NUL;                         // replace it with a NUL
     }
@@ -4948,7 +4949,7 @@ char *skip_vimgrep_pat(char *p, char **s, int *flags)
       *s = p + 1;
     }
     c = (char_u)(*p);
-    p = (char *)skip_regexp((char_u *)p + 1, c, true, NULL);
+    p = skip_regexp(p + 1, c, true, NULL);
     if (*p != c) {
       return NULL;
     }
@@ -4993,7 +4994,7 @@ void ex_oldfiles(exarg_T *eap)
       }
       nr++;
       const char *fname = tv_get_string(TV_LIST_ITEM_TV(li));
-      if (!message_filtered((char_u *)fname)) {
+      if (!message_filtered((char *)fname)) {
         msg_outnum(nr);
         msg_puts(": ");
         msg_outtrans((char *)tv_get_string(TV_LIST_ITEM_TV(li)));

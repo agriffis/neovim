@@ -1523,8 +1523,7 @@ void edit_unputchar(void)
     if (pc_status == PC_STATUS_RIGHT || pc_status == PC_STATUS_LEFT) {
       redrawWinline(curwin, curwin->w_cursor.lnum);
     } else {
-      grid_puts(&curwin->w_grid, pc_bytes, pc_row - msg_scrolled, pc_col,
-                pc_attr);
+      grid_puts(&curwin->w_grid, (char *)pc_bytes, pc_row - msg_scrolled, pc_col, pc_attr);
     }
   }
 }
@@ -1665,28 +1664,28 @@ void change_indent(int type, int amount, int round, int replaced, int call_chang
   } else if (!(State & MODE_INSERT)) {
     new_cursor_col = curwin->w_cursor.col;
   } else {
-    /*
-     * Compute the screen column where the cursor should be.
-     */
+    // Compute the screen column where the cursor should be.
     vcol = get_indent() - vcol;
     curwin->w_virtcol = (colnr_T)((vcol < 0) ? 0 : vcol);
 
-    /*
-     * Advance the cursor until we reach the right screen column.
-     */
-    vcol = last_vcol = 0;
-    new_cursor_col = -1;
+    // Advance the cursor until we reach the right screen column.
+    last_vcol = 0;
     ptr = get_cursor_line_ptr();
-    while (vcol <= (int)curwin->w_virtcol) {
-      last_vcol = vcol;
-      if (new_cursor_col >= 0) {
-        new_cursor_col += utfc_ptr2len((char *)ptr + new_cursor_col);
-      } else {
-        new_cursor_col++;
+    chartabsize_T cts;
+    init_chartabsize_arg(&cts, curwin, 0, 0, ptr, ptr);
+    while (cts.cts_vcol <= (int)curwin->w_virtcol) {
+      last_vcol = cts.cts_vcol;
+      if (cts.cts_vcol > 0) {
+        MB_PTR_ADV(cts.cts_ptr);
       }
-      vcol += lbr_chartabsize(ptr, ptr + new_cursor_col, (colnr_T)vcol);
+      if (*cts.cts_ptr == NUL) {
+        break;
+      }
+      cts.cts_vcol += lbr_chartabsize(&cts);
     }
     vcol = last_vcol;
+    new_cursor_col = (int)(cts.cts_ptr - cts.cts_line);
+    clear_chartabsize_arg(&cts);
 
     /*
      * May need to insert spaces to be able to position the cursor on
@@ -1698,7 +1697,7 @@ void change_indent(int type, int amount, int round, int replaced, int call_chang
       ptr = xmallocz(i);
       memset(ptr, ' ', i);
       new_cursor_col += (int)i;
-      ins_str(ptr);
+      ins_str((char *)ptr);
       xfree(ptr);
     }
 
@@ -1797,7 +1796,7 @@ void change_indent(int type, int amount, int round, int replaced, int call_chang
 /// Truncate the space at the end of a line.  This is to be used only in an
 /// insert mode.  It handles fixing the replace stack for MODE_REPLACE and
 /// MODE_VREPLACE modes.
-void truncate_spaces(char_u *line)
+void truncate_spaces(char *line)
 {
   int i;
 
@@ -1989,7 +1988,7 @@ static void insert_special(int c, int allow_modmask, int ctrlv)
         return;
       }
       p[len - 1] = NUL;
-      ins_str(p);
+      ins_str((char *)p);
       AppendToRedobuffLit((char *)p, -1);
       ctrlv = false;
     }
@@ -2117,7 +2116,7 @@ void insertchar(int c, int flags, int second_indent)
 
         // Insert the end-comment string, except for the last
         // character, which will get inserted as normal later.
-        ins_bytes_len(lead_end, (size_t)(end_len - 1));
+        ins_bytes_len((char *)lead_end, (size_t)(end_len - 1));
       }
     }
   }
@@ -2177,7 +2176,7 @@ void insertchar(int c, int flags, int second_indent)
     do_digraph(-1);                     // clear digraphs
     do_digraph(buf[i - 1]);               // may be the start of a digraph
     buf[i] = NUL;
-    ins_str(buf);
+    ins_str((char *)buf);
     if (flags & INSCHAR_CTRLV) {
       redo_literal(*buf);
       i = 1;
@@ -2195,7 +2194,7 @@ void insertchar(int c, int flags, int second_indent)
 
       utf_char2bytes(c, (char *)buf);
       buf[cc] = NUL;
-      ins_char_bytes((char_u *)buf, (size_t)cc);
+      ins_char_bytes(buf, (size_t)cc);
       AppendCharToRedobuff(c);
     } else {
       ins_char(c);
@@ -2848,14 +2847,13 @@ void replace_push(int c)
   replace_stack_nr++;
 }
 
-/*
- * Push a character onto the replace stack.  Handles a multi-byte character in
- * reverse byte order, so that the first byte is popped off first.
- * Return the number of bytes done (includes composing characters).
- */
-int replace_push_mb(char_u *p)
+/// Push a character onto the replace stack.  Handles a multi-byte character in
+/// reverse byte order, so that the first byte is popped off first.
+///
+/// @return  the number of bytes done (includes composing characters).
+int replace_push_mb(char *p)
 {
-  int l = utfc_ptr2len((char *)p);
+  int l = utfc_ptr2len(p);
   int j;
 
   for (j = l - 1; j >= 0; j--) {
@@ -2919,7 +2917,7 @@ static void mb_replace_pop_ins(int cc)
     for (i = 1; i < n; i++) {
       buf[i] = (char_u)replace_pop();
     }
-    ins_bytes_len(buf, (size_t)n);
+    ins_bytes_len((char *)buf, (size_t)n);
   } else {
     ins_char(cc);
   }
@@ -2942,7 +2940,7 @@ static void mb_replace_pop_ins(int cc)
       buf[i] = (char_u)replace_pop();
     }
     if (utf_iscomposing(utf_ptr2char((char *)buf))) {
-      ins_bytes_len(buf, (size_t)n);
+      ins_bytes_len((char *)buf, (size_t)n);
     } else {
       // Not a composing char, put it back.
       for (i = n - 1; i >= 0; i--) {
@@ -2991,7 +2989,7 @@ static void replace_do_bs(int limit_col)
       // Get the number of screen cells used by the character we are
       // going to delete.
       getvcol(curwin, &curwin->w_cursor, NULL, &start_vcol, NULL);
-      orig_vcols = win_chartabsize(curwin, get_cursor_pos_ptr(), start_vcol);
+      orig_vcols = win_chartabsize(curwin, (char *)get_cursor_pos_ptr(), start_vcol);
     }
     (void)del_char_after_col(limit_col);
     if (l_State & VREPLACE_FLAG) {
@@ -3006,7 +3004,7 @@ static void replace_do_bs(int limit_col)
       ins_len = (int)STRLEN(p) - orig_len;
       vcol = start_vcol;
       for (i = 0; i < ins_len; i++) {
-        vcol += win_chartabsize(curwin, p + i, vcol);
+        vcol += win_chartabsize(curwin, (char *)p + i, vcol);
         i += utfc_ptr2len((char *)p) - 1;
       }
       vcol -= start_vcol;
@@ -3282,10 +3280,8 @@ bool in_cinkeys(int keytyped, int when, bool line_is_empty)
       }
     }
 
-    /*
-     * Skip over ", ".
-     */
-    look = skip_to_option_part(look);
+    // Skip over ", ".
+    look = (char_u *)skip_to_option_part((char *)look);
   }
   return false;
 }
@@ -4080,7 +4076,7 @@ static bool ins_bs(int c, int mode, int *inserted_space_p)
         if (State & VREPLACE_FLAG) {
           ins_char(' ');
         } else {
-          ins_str((char_u *)" ");
+          ins_str(" ");
           if ((State & REPLACE_FLAG)) {
             replace_push(NUL);
           }
@@ -4124,7 +4120,7 @@ static bool ins_bs(int c, int mode, int *inserted_space_p)
         } else {
           const int l_p_deco = p_deco;
           if (l_p_deco) {
-            (void)utfc_ptr2char(get_cursor_pos_ptr(), cpc);
+            (void)utfc_ptr2char((char *)get_cursor_pos_ptr(), cpc);
           }
           (void)del_char(false);
           // If there are combining characters and 'delcombine' is set
@@ -4586,7 +4582,7 @@ static bool ins_tab(void)
     if (State & VREPLACE_FLAG) {
       ins_char(' ');
     } else {
-      ins_str((char_u *)" ");
+      ins_str(" ");
       if (State & REPLACE_FLAG) {            // no char replaced
         replace_push(NUL);
       }
@@ -4644,11 +4640,15 @@ static bool ins_tab(void)
     getvcol(curwin, &fpos, &vcol, NULL, NULL);
     getvcol(curwin, cursor, &want_vcol, NULL, NULL);
 
+    char_u *tab = (char_u *)"\t";
+    chartabsize_T cts;
+    init_chartabsize_arg(&cts, curwin, 0, vcol, tab, tab);
+
     // Use as many TABs as possible.  Beware of 'breakindent', 'showbreak'
     // and 'linebreak' adding extra virtual columns.
     while (ascii_iswhite(*ptr)) {
-      i = lbr_chartabsize(NULL, (char_u *)"\t", vcol);
-      if (vcol + i > want_vcol) {
+      i = lbr_chartabsize(&cts);
+      if (cts.cts_vcol + i > want_vcol) {
         break;
       }
       if (*ptr != TAB) {
@@ -4663,19 +4663,24 @@ static bool ins_tab(void)
       }
       fpos.col++;
       ptr++;
-      vcol += i;
+      cts.cts_vcol += i;
     }
+    vcol = cts.cts_vcol;
+    clear_chartabsize_arg(&cts);
 
     if (change_col >= 0) {
       int repl_off = 0;
-      char_u *line = ptr;
-
       // Skip over the spaces we need.
-      while (vcol < want_vcol && *ptr == ' ') {
-        vcol += lbr_chartabsize(line, ptr, vcol);
-        ptr++;
+      init_chartabsize_arg(&cts, curwin, 0, vcol, ptr, ptr);
+      while (cts.cts_vcol < want_vcol && *cts.cts_ptr == ' ') {
+        cts.cts_vcol += lbr_chartabsize(&cts);
+        cts.cts_ptr++;
         repl_off++;
       }
+      ptr = (char_u *)cts.cts_ptr;
+      vcol = cts.cts_vcol;
+      clear_chartabsize_arg(&cts);
+
       if (vcol > want_vcol) {
         // Must have a char with 'showbreak' just before it.
         ptr--;
@@ -4711,7 +4716,7 @@ static bool ins_tab(void)
 
         // Insert each char in saved_line from changed_col to
         // ptr-cursor
-        ins_bytes_len(saved_line + change_col, (size_t)(cursor->col - change_col));
+        ins_bytes_len((char *)saved_line + change_col, (size_t)(cursor->col - change_col));
       }
     }
 
@@ -4855,7 +4860,6 @@ static int ins_digraph(void)
 int ins_copychar(linenr_T lnum)
 {
   int c;
-  int temp;
   char_u *ptr, *prev_ptr;
   char_u *line;
 
@@ -4865,17 +4869,23 @@ int ins_copychar(linenr_T lnum)
   }
 
   // try to advance to the cursor column
-  temp = 0;
-  line = ptr = ml_get(lnum);
-  prev_ptr = ptr;
+  line = ml_get(lnum);
+  prev_ptr = line;
   validate_virtcol();
-  while ((colnr_T)temp < curwin->w_virtcol && *ptr != NUL) {
-    prev_ptr = ptr;
-    temp += lbr_chartabsize_adv(line, &ptr, (colnr_T)temp);
+
+  chartabsize_T cts;
+  init_chartabsize_arg(&cts, curwin, lnum, 0, line, line);
+  while (cts.cts_vcol < curwin->w_virtcol && *cts.cts_ptr != NUL) {
+    prev_ptr = (char_u *)cts.cts_ptr;
+    cts.cts_vcol += lbr_chartabsize_adv(&cts);
   }
-  if ((colnr_T)temp > curwin->w_virtcol) {
+
+  if (cts.cts_vcol > curwin->w_virtcol) {
     ptr = prev_ptr;
+  } else {
+    ptr = (char_u *)cts.cts_ptr;
   }
+  clear_chartabsize_arg(&cts);
 
   c = utf_ptr2char((char *)ptr);
   if (c == NUL) {

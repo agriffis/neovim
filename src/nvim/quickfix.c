@@ -607,7 +607,7 @@ static efm_T *parse_efm_option(char *efm)
       goto parse_efm_error;
     }
     // Advance to next part
-    efm = (char *)skip_to_option_part((char_u *)efm + len);       // skip comma and spaces
+    efm = skip_to_option_part(efm + len);       // skip comma and spaces
   }
 
   if (fmt_first == NULL) {      // nothing found
@@ -1000,7 +1000,7 @@ static int qf_setup_state(qfstate_T *pstate, char *restrict enc, const char *res
 {
   pstate->vc.vc_type = CONV_NONE;
   if (enc != NULL && *enc != NUL) {
-    convert_setup(&pstate->vc, (char_u *)enc, (char_u *)p_enc);
+    convert_setup(&pstate->vc, enc, p_enc);
   }
 
   if (efile != NULL
@@ -1244,7 +1244,7 @@ static int qf_parse_fmt_f(regmatch_T *rmp, int midx, qffields_T *fields, int pre
   // Expand ~/file and $HOME/file to full path.
   char c = (char)(*rmp->endp[midx]);
   *rmp->endp[midx] = NUL;
-  expand_env(rmp->startp[midx], (char_u *)fields->namebuf, CMDBUFFSIZE);
+  expand_env((char *)rmp->startp[midx], fields->namebuf, CMDBUFFSIZE);
   *rmp->endp[midx] = (char_u)c;
 
   // For separate filename patterns (%O, %P and %Q), the specified file
@@ -3038,16 +3038,16 @@ static void qf_list_entry(qfline_T *qfp, int qf_idx, bool cursel)
   // text of the entry.
   bool filter_entry = true;
   if (qfp->qf_module != NULL && *qfp->qf_module != NUL) {
-    filter_entry &= message_filtered((char_u *)qfp->qf_module);
+    filter_entry &= message_filtered(qfp->qf_module);
   }
   if (filter_entry && fname != NULL) {
-    filter_entry &= message_filtered((char_u *)fname);
+    filter_entry &= message_filtered(fname);
   }
   if (filter_entry && qfp->qf_pattern != NULL) {
-    filter_entry &= message_filtered((char_u *)qfp->qf_pattern);
+    filter_entry &= message_filtered(qfp->qf_pattern);
   }
   if (filter_entry) {
-    filter_entry &= message_filtered((char_u *)qfp->qf_text);
+    filter_entry &= message_filtered(qfp->qf_text);
   }
   if (filter_entry) {
     return;
@@ -4222,7 +4222,7 @@ static char *make_get_fullcmd(const char *makecmd, const char *fname)
 
   // If 'shellpipe' empty: don't redirect to 'errorfile'.
   if (*p_sp != NUL) {
-    append_redir(cmd, len, (char *)p_sp, (char *)fname);
+    append_redir(cmd, len, p_sp, (char *)fname);
   }
 
   // Display the fully formed command.  Output a newline if there's something
@@ -4241,7 +4241,7 @@ static char *make_get_fullcmd(const char *makecmd, const char *fname)
 // Used for ":make", ":lmake", ":grep", ":lgrep", ":grepadd", and ":lgrepadd"
 void ex_make(exarg_T *eap)
 {
-  char *enc = (*curbuf->b_p_menc != NUL) ? curbuf->b_p_menc : (char *)p_menc;
+  char *enc = (*curbuf->b_p_menc != NUL) ? curbuf->b_p_menc : p_menc;
 
   // Redirect ":grep" to ":vimgrep" if 'grepprg' is "internal".
   if (grep_internal(eap->cmdidx)) {
@@ -4981,7 +4981,7 @@ void ex_cfile(exarg_T *eap)
     set_string_option_direct("ef", -1, eap->arg, OPT_FREE, 0);
   }
 
-  char *enc = (*curbuf->b_p_menc != NUL) ? curbuf->b_p_menc : (char *)p_menc;
+  char *enc = (*curbuf->b_p_menc != NUL) ? curbuf->b_p_menc : p_menc;
 
   if (is_loclist_cmd(eap->cmdidx)) {
     wp = curwin;

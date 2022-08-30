@@ -849,11 +849,12 @@ static void get_col(typval_T *argvars, typval_T *rettv, bool charcol)
       // col(".") when the cursor is on the NUL at the end of the line
       // because of "coladd" can be seen as an extra column.
       if (virtual_active() && fp == &curwin->w_cursor) {
-        char_u *p = get_cursor_pos_ptr();
+        char *p = (char *)get_cursor_pos_ptr();
         if (curwin->w_cursor.coladd >=
-            (colnr_T)win_chartabsize(curwin, p, curwin->w_virtcol - curwin->w_cursor.coladd)) {
+            (colnr_T)win_chartabsize(curwin, p,
+                                     curwin->w_virtcol - curwin->w_cursor.coladd)) {
           int l;
-          if (*p != NUL && p[(l = utfc_ptr2len((char *)p))] == NUL) {
+          if (*p != NUL && p[(l = utfc_ptr2len(p))] == NUL) {
             col += l;
           }
         }
@@ -2720,40 +2721,6 @@ static void f_getcharsearch(typval_T *argvars, typval_T *rettv, EvalFuncData fpt
   tv_dict_add_nr(dict, S_LEN("until"), last_csearch_until());
 }
 
-/// "getcmdcompltype()" function
-static void f_getcmdcompltype(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
-{
-  rettv->v_type = VAR_STRING;
-  rettv->vval.v_string = (char *)get_cmdline_completion();
-}
-
-/// "getcmdline()" function
-static void f_getcmdline(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
-{
-  rettv->v_type = VAR_STRING;
-  rettv->vval.v_string = (char *)get_cmdline_str();
-}
-
-/// "getcmdpos()" function
-static void f_getcmdpos(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
-{
-  rettv->vval.v_number = get_cmdline_pos() + 1;
-}
-
-/// "getcmdscreenpos()" function
-static void f_getcmdscreenpos(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
-{
-  rettv->vval.v_number = get_cmdline_screen_pos() + 1;
-}
-
-/// "getcmdtype()" function
-static void f_getcmdtype(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
-{
-  rettv->v_type = VAR_STRING;
-  rettv->vval.v_string = xmallocz(1);
-  rettv->vval.v_string[0] = (char)get_cmdline_type();
-}
-
 /// "getcmdwintype()" function
 static void f_getcmdwintype(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
@@ -3895,11 +3862,13 @@ static void f_iconv(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 
   const char *const str = tv_get_string(&argvars[0]);
   char buf1[NUMBUFLEN];
-  char_u *const from = enc_canonize(enc_skip((char_u *)tv_get_string_buf(&argvars[1], buf1)));
+  char_u *const from =
+    (char_u *)enc_canonize(enc_skip((char *)tv_get_string_buf(&argvars[1], buf1)));
   char buf2[NUMBUFLEN];
-  char_u *const to = enc_canonize(enc_skip((char_u *)tv_get_string_buf(&argvars[2], buf2)));
+  char_u *const to =
+    (char_u *)enc_canonize(enc_skip((char *)tv_get_string_buf(&argvars[2], buf2)));
   vimconv.vc_type = CONV_NONE;
-  convert_setup(&vimconv, from, to);
+  convert_setup(&vimconv, (char *)from, (char *)to);
 
   // If the encodings are equal, no conversion needed.
   if (vimconv.vc_type == CONV_NONE) {
@@ -7070,7 +7039,7 @@ static void f_screenchars(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     return;
   }
   int pcc[MAX_MCO];
-  int c = utfc_ptr2char(grid->chars[grid->line_offset[row] + (size_t)col], pcc);
+  int c = utfc_ptr2char((char *)grid->chars[grid->line_offset[row] + (size_t)col], pcc);
   int composing_len = 0;
   while (pcc[composing_len] != 0) {
     composing_len++;
@@ -7603,7 +7572,7 @@ static void f_setcharsearch(typval_T *argvars, typval_T *rettv, EvalFuncData fpt
     char_u *const csearch = (char_u *)tv_dict_get_string(d, "char", false);
     if (csearch != NULL) {
       int pcc[MAX_MCO];
-      const int c = utfc_ptr2char(csearch, pcc);
+      const int c = utfc_ptr2char((char *)csearch, pcc);
       set_last_csearch(c, csearch, utfc_ptr2len((char *)csearch));
     }
 
@@ -7616,41 +7585,6 @@ static void f_setcharsearch(typval_T *argvars, typval_T *rettv, EvalFuncData fpt
     if (di != NULL) {
       set_csearch_until(!!tv_get_number(&di->di_tv));
     }
-  }
-}
-
-/// "setcmdline()" function
-static void f_setcmdline(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
-{
-  if (argvars[0].v_type != VAR_STRING || argvars[0].vval.v_string == NULL) {
-    emsg(_(e_stringreq));
-    return;
-  }
-
-  int pos = -1;
-  if (argvars[1].v_type != VAR_UNKNOWN) {
-    bool error = false;
-
-    pos = (int)tv_get_number_chk(&argvars[1], &error) - 1;
-    if (error) {
-      return;
-    }
-    if (pos < 0) {
-      emsg(_(e_positive));
-      return;
-    }
-  }
-
-  rettv->vval.v_number = set_cmdline_str(argvars[0].vval.v_string, pos);
-}
-
-/// "setcmdpos()" function
-static void f_setcmdpos(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
-{
-  const int pos = (int)tv_get_number(&argvars[0]) - 1;
-
-  if (pos >= 0) {
-    rettv->vval.v_number = set_cmdline_pos(pos);
   }
 }
 
@@ -8400,11 +8334,10 @@ static void f_strftime(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     rettv->vval.v_string = xstrdup(_("(Invalid)"));
   } else {
     vimconv_T conv;
-    char_u *enc;
 
     conv.vc_type = CONV_NONE;
-    enc = enc_locale();
-    convert_setup(&conv, (char_u *)p_enc, enc);
+    char *enc = (char *)enc_locale();
+    convert_setup(&conv, p_enc, enc);
     if (conv.vc_type != CONV_NONE) {
       p = (char *)string_convert(&conv, (char_u *)p, NULL);
     }
@@ -8418,7 +8351,7 @@ static void f_strftime(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     if (conv.vc_type != CONV_NONE) {
       xfree(p);
     }
-    convert_setup(&conv, enc, (char_u *)p_enc);
+    convert_setup(&conv, enc, p_enc);
     if (conv.vc_type != CONV_NONE) {
       rettv->vval.v_string = (char *)string_convert(&conv, (char_u *)result_buf, NULL);
     } else {
@@ -8537,7 +8470,7 @@ static void f_strdisplaywidth(typval_T *argvars, typval_T *rettv, EvalFuncData f
     col = (int)tv_get_number(&argvars[1]);
   }
 
-  rettv->vval.v_number = (varnumber_T)(linetabsize_col(col, (char_u *)s) - col);
+  rettv->vval.v_number = (varnumber_T)(linetabsize_col(col, (char *)s) - col);
 }
 
 /// "strwidth()" function
@@ -8663,8 +8596,8 @@ static void f_strptime(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   vimconv_T conv = {
     .vc_type = CONV_NONE,
   };
-  char_u *enc = enc_locale();
-  convert_setup(&conv, (char_u *)p_enc, enc);
+  char *enc = (char *)enc_locale();
+  convert_setup(&conv, p_enc, enc);
   if (conv.vc_type != CONV_NONE) {
     fmt = (char *)string_convert(&conv, (char_u *)fmt, NULL);
   }

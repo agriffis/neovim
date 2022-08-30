@@ -223,7 +223,7 @@ int ns_get_hl(NS *ns_hl, int hl_id, bool link, bool nodefault)
       }
     }
 
-    it.attr_id = fallback ? -1 : hl_get_syn_attr((int)ns_id, hl_id, attrs);
+    it.attr_id = fallback ? -1 : hl_get_syn_attr(ns_id, hl_id, attrs);
     it.version = p->hl_valid - tmp;
     it.is_default = attrs.rgb_ae_attr & HL_DEFAULT;
     it.link_global = attrs.rgb_ae_attr & HL_GLOBAL;
@@ -406,7 +406,7 @@ void update_ns_hl(int ns_id)
   }
   int *hl_attrs = **alloc;
 
-  for (int hlf = 0; hlf < (int)HLF_COUNT; hlf++) {
+  for (int hlf = 0; hlf < HLF_COUNT; hlf++) {
     int id = syn_check_group(hlf_names[hlf], STRLEN(hlf_names[hlf]));
     bool optional = (hlf == HLF_INACTIVE || hlf == HLF_NFLOAT);
     hl_attrs[hlf] = hl_get_ui_attr(ns_id, hlf, id, optional);
@@ -729,7 +729,7 @@ static int hl_cterm2rgb_color(int nr)
     0x08, 0x12, 0x1C, 0x26, 0x30, 0x3A, 0x44, 0x4E, 0x58, 0x62, 0x6C, 0x76,
     0x80, 0x8A, 0x94, 0x9E, 0xA8, 0xB2, 0xBC, 0xC6, 0xD0, 0xDA, 0xE4, 0xEE
   };
-  static char_u ansi_table[16][4] = {
+  static uint8_t ansi_table[16][4] = {
     //  R    G    B   idx
     {   0,   0,   0,  1 },  // black
     { 224,   0,   0,  2 },  // dark red

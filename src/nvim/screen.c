@@ -277,7 +277,7 @@ static int wildmenu_match_len(expand_T *xp, char_u *s)
 /// These are backslashes used for escaping.  Do show backslashes in help tags.
 static int skip_wildmenu_char(expand_T *xp, char_u *s)
 {
-  if ((rem_backslash(s) && xp->xp_context != EXPAND_HELP)
+  if ((rem_backslash((char *)s) && xp->xp_context != EXPAND_HELP)
       || ((xp->xp_context == EXPAND_MENUS
            || xp->xp_context == EXPAND_MENUNAMES)
           && (s[0] == '\t'
@@ -469,10 +469,10 @@ void redraw_wildmenu(expand_T *xp, int num_matches, char **matches, int match, i
     ScreenGrid *grid = (wild_menu_showing == WM_SCROLLED)
                         ? &msg_grid_adj : &default_grid;
 
-    grid_puts(grid, buf, row, 0, attr);
+    grid_puts(grid, (char *)buf, row, 0, attr);
     if (selstart != NULL && highlight) {
       *selend = NUL;
-      grid_puts(grid, selstart, row, selstart_col, HL_ATTR(HLF_WM));
+      grid_puts(grid, (char *)selstart, row, selstart_col, HL_ATTR(HLF_WM));
     }
 
     grid_fill(grid, row, row + 1, clen, Columns,
@@ -734,13 +734,13 @@ int showmode(void)
           length = (Rows - msg_row) * Columns - 3;
         }
         if (edit_submode_extra != NULL) {
-          length -= vim_strsize((char *)edit_submode_extra);
+          length -= vim_strsize(edit_submode_extra);
         }
         if (length > 0) {
           if (edit_submode_pre != NULL) {
-            length -= vim_strsize((char *)edit_submode_pre);
+            length -= vim_strsize(edit_submode_pre);
           }
-          if (length - vim_strsize((char *)edit_submode) > 0) {
+          if (length - vim_strsize(edit_submode) > 0) {
             if (edit_submode_pre != NULL) {
               msg_puts_attr((const char *)edit_submode_pre, attr);
             }
@@ -1031,7 +1031,7 @@ void draw_tabline(void)
           col += len;
         }
         if (modified) {
-          grid_puts_len(&default_grid, (char_u *)"+", 1, 0, col++, attr);
+          grid_puts_len(&default_grid, "+", 1, 0, col++, attr);
         }
         grid_putchar(&default_grid, ' ', 0, col++, attr);
       }
@@ -1042,7 +1042,7 @@ void draw_tabline(void)
         get_trans_bufname(cwp->w_buffer);
         shorten_dir(NameBuff);
         len = vim_strsize((char *)NameBuff);
-        p = NameBuff;
+        p = (char_u *)NameBuff;
         while (len > room) {
           len -= ptr2cells((char *)p);
           MB_PTR_ADV(p);
@@ -1051,7 +1051,7 @@ void draw_tabline(void)
           len = Columns - col - 1;
         }
 
-        grid_puts_len(&default_grid, p, (int)STRLEN(p), 0, col, attr);
+        grid_puts_len(&default_grid, (char *)p, (int)STRLEN(p), 0, col, attr);
         col += len;
       }
       grid_putchar(&default_grid, ' ', 0, col++, attr);
@@ -1295,13 +1295,13 @@ static int get_encoded_char_adv(const char_u **p)
 /// @param varp   either the global or the window-local value.
 /// @param apply  if false, do not store the flags, only check for errors.
 /// @return error message, NULL if it's OK.
-char *set_chars_option(win_T *wp, char_u **varp, bool apply)
+char *set_chars_option(win_T *wp, char **varp, bool apply)
 {
   const char_u *last_multispace = NULL;   // Last occurrence of "multispace:"
   const char_u *last_lmultispace = NULL;  // Last occurrence of "leadmultispace:"
   int multispace_len = 0;           // Length of lcs-multispace string
   int lead_multispace_len = 0;      // Length of lcs-leadmultispace string
-  const bool is_listchars = (varp == (char_u **)&p_lcs || varp == (char_u **)&wp->w_p_lcs);
+  const bool is_listchars = (varp == &p_lcs || varp == &wp->w_p_lcs);
 
   struct chars_tab {
     int *cp;     ///< char value
@@ -1344,17 +1344,17 @@ char *set_chars_option(win_T *wp, char_u **varp, bool apply)
 
   struct chars_tab *tab;
   int entries;
-  const char_u *value = *varp;
+  const char_u *value = (char_u *)(*varp);
   if (is_listchars) {
     tab = lcs_tab;
     entries = ARRAY_SIZE(lcs_tab);
-    if (varp == (char_u **)&wp->w_p_lcs && wp->w_p_lcs[0] == NUL) {
+    if (varp == &wp->w_p_lcs && wp->w_p_lcs[0] == NUL) {
       value = (char_u *)p_lcs;  // local value is empty, use the global value
     }
   } else {
     tab = fcs_tab;
     entries = ARRAY_SIZE(fcs_tab);
-    if (varp == (char_u **)&wp->w_p_fcs && wp->w_p_fcs[0] == NUL) {
+    if (varp == &wp->w_p_fcs && wp->w_p_fcs[0] == NUL) {
       value = (char_u *)p_fcs;  // local value is empty, use the global value
     }
   }
@@ -1520,17 +1520,17 @@ char *set_chars_option(win_T *wp, char_u **varp, bool apply)
 /// @return  an untranslated error message if any of them is invalid, NULL otherwise.
 char *check_chars_options(void)
 {
-  if (set_chars_option(curwin, (char_u **)&p_lcs, false) != NULL) {
+  if (set_chars_option(curwin, &p_lcs, false) != NULL) {
     return e_conflicts_with_value_of_listchars;
   }
-  if (set_chars_option(curwin, (char_u **)&p_fcs, false) != NULL) {
+  if (set_chars_option(curwin, &p_fcs, false) != NULL) {
     return e_conflicts_with_value_of_fillchars;
   }
   FOR_ALL_TAB_WINDOWS(tp, wp) {
-    if (set_chars_option(wp, (char_u **)&wp->w_p_lcs, true) != NULL) {
+    if (set_chars_option(wp, &wp->w_p_lcs, true) != NULL) {
       return e_conflicts_with_value_of_listchars;
     }
-    if (set_chars_option(wp, (char_u **)&wp->w_p_fcs, true) != NULL) {
+    if (set_chars_option(wp, &wp->w_p_fcs, true) != NULL) {
       return e_conflicts_with_value_of_fillchars;
     }
   }

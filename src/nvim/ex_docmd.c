@@ -516,7 +516,7 @@ int do_cmdline(char *cmdline, LineGetter fgetline, void *cookie, int flags)
                                       cstack.cs_idx <
                                       0 ? 0 : (cstack.cs_idx + 1) * 2,
                                       true)) == NULL) {
-        // Don't call wait_return for aborted command line.  The NULL
+        // Don't call wait_return() for aborted command line.  The NULL
         // returned for the end of a sourced file or executed function
         // doesn't do this.
         if (KeyTyped && !(flags & DOCMD_REPEAT)) {
@@ -531,7 +531,7 @@ int do_cmdline(char *cmdline, LineGetter fgetline, void *cookie, int flags)
       if (flags & DOCMD_KEEPLINE) {
         xfree(repeat_cmdline);
         if (count == 0) {
-          repeat_cmdline = vim_strsave((char_u *)next_cmdline);
+          repeat_cmdline = (char *)vim_strsave((char_u *)next_cmdline);
         } else {
           repeat_cmdline = NULL;
         }
@@ -851,8 +851,8 @@ int do_cmdline(char *cmdline, LineGetter fgetline, void *cookie, int flags)
          || getline_equal(fgetline, cookie, get_func_line))
         && ex_nesting_level + 1 <= debug_break_level) {
       do_debug(getline_equal(fgetline, cookie, getsourceline)
-               ? (char_u *)_("End of sourced file")
-               : (char_u *)_("End of function"));
+               ? _("End of sourced file")
+               : _("End of function"));
     }
   }
 
@@ -888,7 +888,7 @@ int do_cmdline(char *cmdline, LineGetter fgetline, void *cookie, int flags)
       need_wait_return = false;
       msg_didany = false;               // don't wait when restarting edit
     } else if (need_wait_return) {
-      // The msg_start() above clears msg_didout. The wait_return we do
+      // The msg_start() above clears msg_didout. The wait_return() we do
       // here should not overwrite the command that may be shown before
       // doing that.
       msg_didout |= msg_didout_before_start;
@@ -3088,7 +3088,7 @@ cmdidx_T excmd_get_cmdidx(const char *cmd, size_t len)
 {
   cmdidx_T idx;
 
-  for (idx = (cmdidx_T)0; (int)idx < (int)CMD_SIZE; idx = (cmdidx_T)((int)idx + 1)) {
+  for (idx = (cmdidx_T)0; (int)idx < CMD_SIZE; idx = (cmdidx_T)((int)idx + 1)) {
     if (strncmp(cmdnames[(int)idx].cmd_name, cmd, len) == 0) {
       break;
     }
@@ -3310,7 +3310,7 @@ static linenr_T get_address(exarg_T *eap, char **ptr, cmd_addr_T addr_type, int 
         goto error;
       }
       if (skip) {                       // skip "/pat/"
-        cmd = (char *)skip_regexp((char_u *)cmd, c, p_magic, NULL);
+        cmd = skip_regexp(cmd, c, p_magic, NULL);
         if (*cmd == c) {
           cmd++;
         }
@@ -3791,8 +3791,8 @@ int expand_filename(exarg_T *eap, char **cmdlinep, char **errormsgp)
       // if there are still wildcards present.
       if (vim_strchr(eap->arg, '$') != NULL
           || vim_strchr(eap->arg, '~') != NULL) {
-        expand_env_esc((char_u *)eap->arg, NameBuff, MAXPATHL, true, true, NULL);
-        has_wildcards = path_has_wildcard(NameBuff);
+        expand_env_esc((char_u *)eap->arg, (char_u *)NameBuff, MAXPATHL, true, true, NULL);
+        has_wildcards = path_has_wildcard((char_u *)NameBuff);
         p = (char *)NameBuff;
       } else {
         p = NULL;
@@ -4061,7 +4061,7 @@ static int getargopt(exarg_T *eap)
   *arg = NUL;
 
   if (pp == &eap->force_ff) {
-    if (check_ff_value((char_u *)eap->cmd + eap->force_ff) == FAIL) {
+    if (check_ff_value(eap->cmd + eap->force_ff) == FAIL) {
       return FAIL;
     }
     eap->force_ff = (char_u)eap->cmd[eap->force_ff];
@@ -4295,7 +4295,7 @@ int ends_excmd(int c) FUNC_ATTR_CONST
 
 /// @return  the next command, after the first '|' or '\n' or,
 ///          NULL if not found.
-char_u *find_nextcmd(const char_u *p)
+char *find_nextcmd(const char *p)
 {
   while (*p != '|' && *p != '\n') {
     if (*p == NUL) {
@@ -4303,7 +4303,7 @@ char_u *find_nextcmd(const char_u *p)
     }
     p++;
   }
-  return (char_u *)p + 1;
+  return (char *)p + 1;
 }
 
 /// Check if *p is a separator between Ex commands, skipping over white space.
@@ -5485,8 +5485,8 @@ bool changedir_func(char *new_dir, CdScope scope)
     new_dir = pdir;
   }
 
-  if (os_dirname(NameBuff, MAXPATHL) == OK) {
-    pdir = (char *)vim_strsave(NameBuff);
+  if (os_dirname((char_u *)NameBuff, MAXPATHL) == OK) {
+    pdir = xstrdup(NameBuff);
   } else {
     pdir = NULL;
   }
@@ -5499,7 +5499,7 @@ bool changedir_func(char *new_dir, CdScope scope)
   if (*new_dir == NUL && p_cdh) {
 #endif
     // Use NameBuff for home directory name.
-    expand_env((char_u *)"$HOME", NameBuff, MAXPATHL);
+    expand_env("$HOME", NameBuff, MAXPATHL);
     new_dir = (char *)NameBuff;
   }
 
@@ -5568,7 +5568,7 @@ void ex_cd(exarg_T *eap)
 /// ":pwd".
 static void ex_pwd(exarg_T *eap)
 {
-  if (os_dirname(NameBuff, MAXPATHL) == OK) {
+  if (os_dirname((char_u *)NameBuff, MAXPATHL) == OK) {
 #ifdef BACKSLASH_IN_FILENAME
     slash_adjust(NameBuff);
 #endif
@@ -6454,7 +6454,7 @@ static void ex_findpat(exarg_T *eap)
   if (*eap->arg == '/') {   // Match regexp, not just whole words
     whole = false;
     eap->arg++;
-    char *p = (char *)skip_regexp((char_u *)eap->arg, '/', p_magic, NULL);
+    char *p = skip_regexp(eap->arg, '/', p_magic, NULL);
     if (*p) {
       *p++ = NUL;
       p = skipwhite(p);

@@ -1302,7 +1302,7 @@ void openscript(char_u *name, bool directly)
     curscript++;
   }
   // use NameBuff for expanded name
-  expand_env(name, NameBuff, MAXPATHL);
+  expand_env((char *)name, NameBuff, MAXPATHL);
   int error;
   if ((scriptin[curscript] = file_open_new(&error, (char *)NameBuff,
                                            kFileReadOnly, 0)) == NULL) {
@@ -1768,7 +1768,7 @@ static void getchar_common(typval_T *argvars, typval_T *rettv)
 
   if (!ui_has_messages()) {
     // redraw the screen after getchar()
-    update_screen(UPD_CLEAR);
+    update_screen(UPD_NOT_VALID);
   }
 
   set_vim_var_nr(VV_MOUSE_WIN, 0);
@@ -2120,7 +2120,7 @@ static int handle_mapping(int *keylenp, bool *timedout, int *mapdepth)
 
   // Check for match with 'pastetoggle'
   if (*p_pt != NUL && mp == NULL && (State & (MODE_INSERT | MODE_NORMAL))) {
-    bool match = typebuf_match_len(p_pt, &mlen);
+    bool match = typebuf_match_len((char_u *)p_pt, &mlen);
     if (match) {
       // write chars to script file(s)
       if (mlen > typebuf.tb_maplen) {
@@ -2547,7 +2547,7 @@ static int vgetorpeek(bool advance)
             && (State & MODE_INSERT)
             && (p_timeout || (keylen == KEYLEN_PART_KEY && p_ttimeout))
             && (c = inchar(typebuf.tb_buf + typebuf.tb_off + typebuf.tb_len, 3, 25L)) == 0) {
-          colnr_T col = 0, vcol;
+          colnr_T col = 0;
           char_u *ptr;
 
           if (mode_displayed) {
@@ -2565,15 +2565,20 @@ static int vgetorpeek(bool advance)
                 // We are expecting to truncate the trailing
                 // white-space, so find the last non-white
                 // character -- webb
-                col = vcol = curwin->w_wcol = 0;
+                curwin->w_wcol = 0;
                 ptr = get_cursor_line_ptr();
-                while (col < curwin->w_cursor.col) {
-                  if (!ascii_iswhite(ptr[col])) {
-                    curwin->w_wcol = vcol;
+                chartabsize_T cts;
+                init_chartabsize_arg(&cts, curwin,
+                                     curwin->w_cursor.lnum, 0, ptr, ptr);
+                while ((char_u *)cts.cts_ptr < ptr + curwin->w_cursor.col) {
+                  if (!ascii_iswhite(*cts.cts_ptr)) {
+                    curwin->w_wcol = cts.cts_vcol;
                   }
-                  vcol += lbr_chartabsize(ptr, ptr + col, vcol);
-                  col += utfc_ptr2len((char *)ptr + col);
+                  cts.cts_vcol += lbr_chartabsize(&cts);
+                  cts.cts_ptr += utfc_ptr2len(cts.cts_ptr);
                 }
+                clear_chartabsize_arg(&cts);
+
                 curwin->w_wrow = curwin->w_cline_row
                                  + curwin->w_wcol / curwin->w_width_inner;
                 curwin->w_wcol %= curwin->w_width_inner;
