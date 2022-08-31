@@ -177,7 +177,7 @@ EXTERN bool msg_scrolled_ign INIT(= false);
 // is reset before the screen is redrawn, so we need to keep track of this.
 EXTERN bool msg_did_scroll INIT(= false);
 
-EXTERN char_u *keep_msg INIT(= NULL);       // msg to be shown after redraw
+EXTERN char *keep_msg INIT(= NULL);         // msg to be shown after redraw
 EXTERN int keep_msg_attr INIT(= 0);         // highlight attr for keep_msg
 EXTERN bool need_fileinfo INIT(= false);    // do fileinfo() after redraw
 EXTERN int msg_scroll INIT(= false);        // msg_start() will scroll
@@ -241,8 +241,12 @@ EXTERN int do_profiling INIT(= PROF_NONE);      ///< PROF_ values
 
 /// Exception currently being thrown.  Used to pass an exception to a different
 /// cstack.  Also used for discarding an exception before it is caught or made
-/// pending.
+/// pending.  Only valid when did_throw is true.
 EXTERN except_T *current_exception;
+
+/// An exception is being thrown.  Reset when the exception is caught or as
+/// long as it is pending in a finally clause.
+EXTERN bool did_throw INIT(= false);
 
 /// Set when a throw that cannot be handled in do_cmdline() must be propagated
 /// to the cstack of the previously called do_cmdline().

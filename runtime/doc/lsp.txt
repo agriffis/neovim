@@ -126,13 +126,14 @@ FAQ                                                     *lsp-faq*
      "after/ftplugin/python.vim".
 
 - Q: How do I run a request synchronously (e.g. for formatting on file save)?
-  A: Use the `_sync` variant of the function provided by |lsp-buf|, if it
-     exists.
+  A: Check if the function has an `async` parameter and set the value to
+  false.
 
      E.g. code formatting: >
 
      " Auto-format *.rs (rust) files prior to saving them
-     autocmd BufWritePre *.rs lua vim.lsp.buf.formatting_sync(nil, 1000)
+     " (async = false is the default for format)
+     autocmd BufWritePre *.rs lua vim.lsp.buf.format({ async = false })
 
 <
                                                            *lsp-vs-treesitter*
@@ -1981,11 +1982,8 @@ start({cmd}, {cmd_args}, {dispatchers}, {extra_spawn_params})
         Methods:
         • `notify()` |vim.lsp.rpc.notify()|
         • `request()` |vim.lsp.rpc.request()|
-
-        Members:
-        • {pid} (number) The LSP server's PID.
-        • {handle} A handle for low-level interaction with the LSP server
-          process |vim.loop|.
+        • `is_closing()` returns a boolean indicating if the RPC is closing.
+        • `terminate()` terminates the RPC client.
 
 
 ==============================================================================
