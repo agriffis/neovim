@@ -174,7 +174,7 @@ static void showmap(mapblock_T *mp, bool local)
   }
 
   // Display the LHS.  Get length of what we write.
-  len = (size_t)msg_outtrans_special(mp->m_keys, true, 0);
+  len = (size_t)msg_outtrans_special((char *)mp->m_keys, true, 0);
   do {
     msg_putchar(' ');                   // padd with blanks
     len++;
@@ -203,7 +203,7 @@ static void showmap(mapblock_T *mp, bool local)
   } else if (mp->m_str[0] == NUL) {
     msg_puts_attr("<Nop>", HL_ATTR(HLF_8));
   } else {
-    msg_outtrans_special((char_u *)mp->m_str, false, 0);
+    msg_outtrans_special(mp->m_str, false, 0);
   }
 
   if (mp->m_desc != NULL) {
@@ -277,21 +277,29 @@ static bool set_maparg_lhs_rhs(const char *const orig_lhs, const size_t orig_lhs
     mapargs->alt_lhs_len = 0;
   }
 
+  set_maparg_rhs(orig_rhs, orig_rhs_len, rhs_lua, cpo_flags, mapargs);
+
+  return true;
+}
+
+/// @see set_maparg_lhs_rhs
+static void set_maparg_rhs(const char *const orig_rhs, const size_t orig_rhs_len,
+                           const LuaRef rhs_lua, const int cpo_flags, MapArguments *const mapargs)
+{
   mapargs->rhs_lua = rhs_lua;
 
   if (rhs_lua == LUA_NOREF) {
     mapargs->orig_rhs_len = orig_rhs_len;
     mapargs->orig_rhs = xcalloc(mapargs->orig_rhs_len + 1, sizeof(char_u));
     STRLCPY(mapargs->orig_rhs, orig_rhs, mapargs->orig_rhs_len + 1);
-
     if (STRICMP(orig_rhs, "<nop>") == 0) {  // "<Nop>" means nothing
-      mapargs->rhs = xcalloc(1, sizeof(char_u));  // single null-char
+      mapargs->rhs = xcalloc(1, sizeof(char_u));  // single NUL-char
       mapargs->rhs_len = 0;
       mapargs->rhs_is_noop = true;
     } else {
       char *rhs_buf = NULL;
-      replaced = replace_termcodes(orig_rhs, orig_rhs_len, &rhs_buf, REPTERM_DO_LT, NULL,
-                                   cpo_flags);
+      char *replaced = replace_termcodes(orig_rhs, orig_rhs_len, &rhs_buf, REPTERM_DO_LT, NULL,
+                                         cpo_flags);
       mapargs->rhs_len = STRLEN(replaced);
       // NB: replace_termcodes may produce an empty string even if orig_rhs is non-empty
       // (e.g. a single ^V, see :h map-empty-rhs)
@@ -308,7 +316,6 @@ static bool set_maparg_lhs_rhs(const char *const orig_lhs, const size_t orig_lhs
                                             (char_u)KS_EXTRA, KE_LUA, rhs_lua);
     mapargs->rhs = vim_strsave((char_u *)tmp_buf);
   }
-  return true;
 }
 
 /// Parse a string of |:map-arguments| into a @ref MapArguments struct.
@@ -1989,18 +1996,19 @@ void f_hasmapto(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   }
 }
 
-/// Fill a dictionary with all applicable maparg() like dictionaries
+/// Fill a Dictionary with all applicable maparg() like dictionaries
 ///
-/// @param dict          The dictionary to be filled
 /// @param mp            The maphash that contains the mapping information
 /// @param buffer_value  The "buffer" value
 /// @param compatible    True for compatible with old maparg() dict
-static void mapblock_fill_dict(dict_T *const dict, const mapblock_T *const mp,
-                               const char *lhsrawalt, long buffer_value, bool compatible)
-  FUNC_ATTR_NONNULL_ARG(1, 2)
+///
+/// @return  A Dictionary.
+static Dictionary mapblock_fill_dict(const mapblock_T *const mp, const char *lhsrawalt,
+                                     const long buffer_value, const bool compatible)
+  FUNC_ATTR_NONNULL_ARG(1)
 {
-  char *const lhs = str2special_save((const char *)mp->m_keys,
-                                     compatible, !compatible);
+  Dictionary dict = ARRAY_DICT_INIT;
+  char *const lhs = str2special_save((const char *)mp->m_keys, compatible, !compatible);
   char *const mapmode = map_mode_to_chars(mp->m_mode);
   varnumber_T noremap_value;
 
@@ -2015,37 +2023,35 @@ static void mapblock_fill_dict(dict_T *const dict, const mapblock_T *const mp,
   }
 
   if (mp->m_luaref != LUA_NOREF) {
-    tv_dict_add_nr(dict, S_LEN("callback"), mp->m_luaref);
+    PUT(dict, "callback", LUAREF_OBJ(api_new_luaref(mp->m_luaref)));
   } else {
-    if (compatible) {
-      tv_dict_add_str(dict, S_LEN("rhs"), (const char *)mp->m_orig_str);
-    } else {
-      tv_dict_add_allocated_str(dict, S_LEN("rhs"),
-                                str2special_save((const char *)mp->m_str, false,
-                                                 true));
-    }
+    PUT(dict, "rhs", STRING_OBJ(compatible
+                                ? cstr_to_string(mp->m_orig_str)
+                                : cstr_as_string(str2special_save(mp->m_str, false, true))));
   }
   if (mp->m_desc != NULL) {
-    tv_dict_add_allocated_str(dict, S_LEN("desc"), xstrdup(mp->m_desc));
+    PUT(dict, "desc", STRING_OBJ(cstr_to_string(mp->m_desc)));
   }
-  tv_dict_add_allocated_str(dict, S_LEN("lhs"), lhs);
-  tv_dict_add_str(dict, S_LEN("lhsraw"), (const char *)mp->m_keys);
+  PUT(dict, "lhs", STRING_OBJ(cstr_as_string(lhs)));
+  PUT(dict, "lhsraw", STRING_OBJ(cstr_to_string((const char *)mp->m_keys)));
   if (lhsrawalt != NULL) {
     // Also add the value for the simplified entry.
-    tv_dict_add_str(dict, S_LEN("lhsrawalt"), lhsrawalt);
+    PUT(dict, "lhsrawalt", STRING_OBJ(cstr_to_string(lhsrawalt)));
   }
-  tv_dict_add_nr(dict, S_LEN("noremap"), noremap_value);
-  tv_dict_add_nr(dict, S_LEN("script"), mp->m_noremap == REMAP_SCRIPT ? 1 : 0);
-  tv_dict_add_nr(dict, S_LEN("expr"),  mp->m_expr ? 1 : 0);
-  tv_dict_add_nr(dict, S_LEN("silent"), mp->m_silent ? 1 : 0);
-  tv_dict_add_nr(dict, S_LEN("sid"), (varnumber_T)mp->m_script_ctx.sc_sid);
-  tv_dict_add_nr(dict, S_LEN("lnum"), (varnumber_T)mp->m_script_ctx.sc_lnum);
-  tv_dict_add_nr(dict, S_LEN("buffer"), (varnumber_T)buffer_value);
-  tv_dict_add_nr(dict, S_LEN("nowait"), mp->m_nowait ? 1 : 0);
+  PUT(dict, "noremap", INTEGER_OBJ(noremap_value));
+  PUT(dict, "script", INTEGER_OBJ(mp->m_noremap == REMAP_SCRIPT ? 1 : 0));
+  PUT(dict, "expr", INTEGER_OBJ(mp->m_expr ? 1 : 0));
+  PUT(dict, "silent", INTEGER_OBJ(mp->m_silent ? 1 : 0));
+  PUT(dict, "sid", INTEGER_OBJ((varnumber_T)mp->m_script_ctx.sc_sid));
+  PUT(dict, "lnum", INTEGER_OBJ((varnumber_T)mp->m_script_ctx.sc_lnum));
+  PUT(dict, "buffer", INTEGER_OBJ((varnumber_T)buffer_value));
+  PUT(dict, "nowait", INTEGER_OBJ(mp->m_nowait ? 1 : 0));
   if (mp->m_replace_keycodes) {
-    tv_dict_add_nr(dict, S_LEN("replace_keycodes"), 1);
+    PUT(dict, "replace_keycodes", INTEGER_OBJ(1));
   }
-  tv_dict_add_allocated_str(dict, S_LEN("mode"), mapmode);
+  PUT(dict, "mode", STRING_OBJ(cstr_as_string(mapmode)));
+
+  return dict;
 }
 
 static void get_maparg(typval_T *argvars, typval_T *rettv, int exact)
@@ -2114,11 +2120,16 @@ static void get_maparg(typval_T *argvars, typval_T *rettv, int exact)
       rettv->vval.v_string = nlua_funcref_str(mp->m_luaref);
     }
   } else {
-    tv_dict_alloc_ret(rettv);
+    // Return a dictionary.
     if (mp != NULL && (rhs != NULL || rhs_lua != LUA_NOREF)) {
-      // Return a dictionary.
-      mapblock_fill_dict(rettv->vval.v_dict, mp, did_simplify ? (char *)keys_simplified : NULL,
-                         buffer_local, true);
+      Dictionary dict = mapblock_fill_dict(mp,
+                                           did_simplify ? (char *)keys_simplified : NULL,
+                                           buffer_local, true);
+      (void)object_to_vim(DICTIONARY_OBJ(dict), rettv, NULL);
+      api_free_dictionary(dict);
+    } else {
+      // Return an empty dictionary.
+      tv_dict_alloc_ret(rettv);
     }
   }
 
@@ -2147,29 +2158,36 @@ void f_mapset(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   char *lhs = tv_dict_get_string(d, "lhs", false);
   char *lhsraw = tv_dict_get_string(d, "lhsraw", false);
   char *lhsrawalt = tv_dict_get_string(d, "lhsrawalt", false);
-  char *rhs = tv_dict_get_string(d, "rhs", false);
-  if (lhs == NULL || lhsraw == NULL || rhs == NULL) {
+  char *orig_rhs = tv_dict_get_string(d, "rhs", false);
+  LuaRef rhs_lua = LUA_NOREF;
+  dictitem_T *callback_di = tv_dict_find(d, S_LEN("callback"));
+  if (callback_di != NULL) {
+    Object callback_obj = vim_to_object(&callback_di->di_tv);
+    if (callback_obj.type == kObjectTypeLuaRef && callback_obj.data.luaref != LUA_NOREF) {
+      rhs_lua = callback_obj.data.luaref;
+      orig_rhs = "";
+      callback_obj.data.luaref = LUA_NOREF;
+    }
+    api_free_object(callback_obj);
+  }
+  if (lhs == NULL || lhsraw == NULL || orig_rhs == NULL) {
     emsg(_("E460: entries missing in mapset() dict argument"));
+    api_free_luaref(rhs_lua);
     return;
   }
-  char *orig_rhs = rhs;
-  char *arg_buf = NULL;
-  rhs = replace_termcodes(rhs, STRLEN(rhs), &arg_buf, REPTERM_DO_LT, NULL, CPO_TO_CPO_FLAGS);
 
-  int noremap = tv_dict_get_number(d, "noremap") ? REMAP_NONE : 0;
+  int noremap = tv_dict_get_number(d, "noremap") != 0 ? REMAP_NONE : 0;
   if (tv_dict_get_number(d, "script") != 0) {
     noremap = REMAP_SCRIPT;
   }
-  MapArguments args = {  // TODO(zeertzjq): support restoring "callback"?
-    .rhs = (char_u *)rhs,
-    .rhs_lua = LUA_NOREF,
-    .orig_rhs = vim_strsave((char_u *)orig_rhs),
+  MapArguments args = {
     .expr = tv_dict_get_number(d, "expr") != 0,
     .silent = tv_dict_get_number(d, "silent") != 0,
     .nowait = tv_dict_get_number(d, "nowait") != 0,
     .replace_keycodes = tv_dict_get_number(d, "replace_keycodes") != 0,
     .desc = tv_dict_get_string(d, "desc", false),
   };
+  set_maparg_rhs(orig_rhs, strlen(orig_rhs), rhs_lua, CPO_TO_CPO_FLAGS, &args);
   scid_T sid = (scid_T)tv_dict_get_number(d, "sid");
   linenr_T lnum = (linenr_T)tv_dict_get_number(d, "lnum");
   bool buffer = tv_dict_get_number(d, "buffer") != 0;
@@ -2180,7 +2198,7 @@ void f_mapset(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 
   // Delete any existing mapping for this lhs and mode.
   MapArguments unmap_args = MAP_ARGUMENTS_INIT;
-  set_maparg_lhs_rhs(lhs, strlen(lhs), rhs, strlen(rhs), LUA_NOREF, 0, &unmap_args);
+  set_maparg_lhs_rhs(lhs, strlen(lhs), "", 0, LUA_NOREF, 0, &unmap_args);
   unmap_args.buffer = buffer;
   buf_do_map(MAPTYPE_UNMAP, &unmap_args, mode, false, curbuf);
   xfree(unmap_args.rhs);
@@ -2599,12 +2617,10 @@ fail_and_free:
 ///
 /// @param  mode  The abbreviation for the mode
 /// @param  buf  The buffer to get the mapping array. NULL for global
-/// @param  from_lua  Whether it is called from internal Lua api.
 /// @returns Array of maparg()-like dictionaries describing mappings
-ArrayOf(Dictionary) keymap_array(String mode, buf_T *buf, bool from_lua)
+ArrayOf(Dictionary) keymap_array(String mode, buf_T *buf)
 {
   Array mappings = ARRAY_DICT_INIT;
-  dict_T *const dict = tv_dict_alloc();
 
   // Convert the string mode to the integer mode
   // that is stored within each mapblock
@@ -2623,25 +2639,11 @@ ArrayOf(Dictionary) keymap_array(String mode, buf_T *buf, bool from_lua)
       }
       // Check for correct mode
       if (int_mode & current_maphash->m_mode) {
-        mapblock_fill_dict(dict, current_maphash, NULL, buffer_value, false);
-        Object api_dict = vim_to_object((typval_T[]) { { .v_type = VAR_DICT,
-                                                         .vval.v_dict = dict } });
-        if (from_lua) {
-          Dictionary d = api_dict.data.dictionary;
-          for (size_t j = 0; j < d.size; j++) {
-            if (strequal("callback", d.items[j].key.data)) {
-              d.items[j].value.type = kObjectTypeLuaRef;
-              d.items[j].value.data.luaref = api_new_luaref((LuaRef)d.items[j].value.data.integer);
-              break;
-            }
-          }
-        }
-        ADD(mappings, api_dict);
-        tv_dict_clear(dict);
+        ADD(mappings,
+            DICTIONARY_OBJ(mapblock_fill_dict(current_maphash, NULL, buffer_value, false)));
       }
     }
   }
-  tv_dict_free(dict);
 
   return mappings;
 }

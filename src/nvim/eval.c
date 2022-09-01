@@ -5858,13 +5858,8 @@ bool callback_call(Callback *const callback, const int argcount_in, typval_T *co
     break;
 
   case kCallbackLua:
-    rv = nlua_call_ref(callback->data.luaref, NULL, args, true, NULL);
-    switch (rv.type) {
-    case kObjectTypeBoolean:
-      return rv.data.boolean;
-    default:
-      return false;
-    }
+    rv = nlua_call_ref(callback->data.luaref, NULL, args, false, NULL);
+    return (rv.type == kObjectTypeBoolean && rv.data.boolean == true);
 
   case kCallbackNone:
     return false;
@@ -6369,7 +6364,7 @@ pos_T *var2fpos(const typval_T *const tv, const bool dollar_lnum, int *const ret
     }
     int len;
     if (charcol) {
-      len = mb_charlen(ml_get(pos.lnum));
+      len = mb_charlen((char_u *)ml_get(pos.lnum));
     } else {
       len = (int)STRLEN(ml_get(pos.lnum));
     }
@@ -8630,7 +8625,7 @@ void invoke_prompt_callback(void)
   if (curbuf->b_prompt_callback.type == kCallbackNone) {
     return;
   }
-  char *text = (char *)ml_get(lnum);
+  char *text = ml_get(lnum);
   char *prompt = (char *)prompt_text();
   if (STRLEN(text) >= STRLEN(prompt)) {
     text += STRLEN(prompt);
