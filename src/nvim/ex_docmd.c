@@ -1757,6 +1757,7 @@ static bool skip_cmd(const exarg_T *eap)
     case CMD_filter:
     case CMD_help:
     case CMD_hide:
+    case CMD_horizontal:
     case CMD_ijump:
     case CMD_ilist:
     case CMD_isearch:
@@ -1929,7 +1930,7 @@ static char *do_one_cmd(char **cmdlinep, int flags, cstack_T *cstack, LineGetter
   // If we got a line, but no command, then go to the line.
   // If we find a '|' or '\n' we set ea.nextcmd.
   if (*ea.cmd == NUL || *ea.cmd == '"'
-      || (ea.nextcmd = (char *)check_nextcmd((char_u *)ea.cmd)) != NULL) {
+      || (ea.nextcmd = check_nextcmd(ea.cmd)) != NULL) {
     // strange vi behaviour:
     // ":3"     jumps to line 3
     // ":3|..." prints line 3
@@ -2438,8 +2439,12 @@ int parse_command_modifiers(exarg_T *eap, char **errormsg, cmdmod_T *cmod, bool 
       continue;
     }
 
-    // ":hide" and ":hide | cmd" are not modifiers
     case 'h':
+      if (checkforcmd(&eap->cmd, "horizontal", 3)) {
+        cmod->cmod_split |= WSP_HOR;
+        continue;
+      }
+      // ":hide" and ":hide | cmd" are not modifiers
       if (p != eap->cmd || !checkforcmd(&p, "hide", 3)
           || *p == NUL || ends_excmd(*p)) {
         break;
@@ -3934,7 +3939,7 @@ void separate_nextcmd(exarg_T *eap)
         STRMOVE(p - 1, p);  // remove the '\'
         p--;
       } else {
-        eap->nextcmd = (char *)check_nextcmd((char_u *)p);
+        eap->nextcmd = check_nextcmd(p);
         *p = NUL;
         break;
       }
@@ -4311,12 +4316,12 @@ char *find_nextcmd(const char *p)
 /// Check if *p is a separator between Ex commands, skipping over white space.
 ///
 /// @return  NULL if it isn't, the following character if it is.
-char_u *check_nextcmd(char_u *p)
+char *check_nextcmd(char *p)
 {
-  char *s = skipwhite((char *)p);
+  char *s = skipwhite(p);
 
   if (*s == '|' || *s == '\n') {
-    return (char_u *)(s + 1);
+    return s + 1;
   } else {
     return NULL;
   }
@@ -4833,7 +4838,6 @@ static void ex_print(exarg_T *eap)
       if (++eap->line1 > eap->line2) {
         break;
       }
-      ui_flush();                  // show one line at a time
     }
     setpcmark();
     // put cursor at last line
@@ -5035,7 +5039,6 @@ static void ex_tabs(exarg_T *eap)
     msg_putchar('\n');
     vim_snprintf((char *)IObuff, IOSIZE, _("Tab page %d"), tabcount++);
     msg_outtrans_attr((char *)IObuff, HL_ATTR(HLF_T));
-    ui_flush();            // output one line at a time
     os_breakcheck();
 
     FOR_ALL_WINDOWS_IN_TAB(wp, tp) {
@@ -5054,7 +5057,6 @@ static void ex_tabs(exarg_T *eap)
         home_replace(wp->w_buffer, wp->w_buffer->b_fname, (char *)IObuff, IOSIZE, true);
       }
       msg_outtrans((char *)IObuff);
-      ui_flush();                  // output one line at a time
       os_breakcheck();
     }
   }
@@ -5674,7 +5676,7 @@ static void ex_wincmd(exarg_T *eap)
     p = eap->arg + 1;
   }
 
-  eap->nextcmd = (char *)check_nextcmd((char_u *)p);
+  eap->nextcmd = check_nextcmd(p);
   p = skipwhite(p);
   if (*p != NUL && *p != '"' && eap->nextcmd == NULL) {
     emsg(_(e_invarg));
@@ -6465,7 +6467,7 @@ static void ex_findpat(exarg_T *eap)
       if (!ends_excmd(*p)) {
         eap->errmsg = ex_errmsg(e_trailing_arg, p);
       } else {
-        eap->nextcmd = (char *)check_nextcmd((char_u *)p);
+        eap->nextcmd = check_nextcmd(p);
       }
     }
   }

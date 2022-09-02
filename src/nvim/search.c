@@ -1504,7 +1504,7 @@ int search_for_exact_line(buf_T *buf, pos_T *pos, Direction dir, char_u *pat)
     } else if (*p != NUL) {  // Ignore empty lines.
       // Expanding lines or words.
       assert(ins_compl_len() >= 0);
-      if ((p_ic ? mb_strnicmp(p, pat, (size_t)ins_compl_len())
+      if ((p_ic ? mb_strnicmp((char *)p, (char *)pat, (size_t)ins_compl_len())
            : STRNCMP(p, pat, ins_compl_len())) == 0) {
         return OK;
       }
@@ -3714,7 +3714,6 @@ void find_pattern_in_path(char_u *ptr, Direction dir, size_t len, bool whole, bo
             }
           }
         }
-        ui_flush();                // output each line directly
       }
 
       if (new_fname != NULL) {
@@ -3792,7 +3791,7 @@ search_line:
           // compare the first "len" chars from "ptr"
           startp = (char_u *)skipwhite((char *)p);
           if (p_ic) {
-            matched = !mb_strnicmp(startp, ptr, len);
+            matched = !mb_strnicmp((char *)startp, (char *)ptr, len);
           } else {
             matched = !STRNCMP(startp, ptr, len);
           }
@@ -4147,7 +4146,6 @@ static void show_pat_in_path(char_u *line, int type, bool did_show, int action, 
       msg_puts(" ");
     }
     msg_prt_line((char *)line, false);
-    ui_flush();                        // show one line at a time
 
     // Definition continues until line that doesn't end with '\'
     if (got_int || type != FIND_DEFINE || p < line || *p != '\\') {

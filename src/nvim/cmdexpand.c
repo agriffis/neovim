@@ -717,7 +717,6 @@ int showmatches(expand_T *xp, int wildmenu)
         msg_clr_eos();
         msg_putchar('\n');
       }
-      ui_flush();                          // show one line at a time
       if (got_int) {
         got_int = false;
         break;
@@ -1204,6 +1203,7 @@ static const char *set_context_by_cmdname(const char *cmd, cmdidx_T cmdidx, cons
   case CMD_folddoclosed:
   case CMD_folddoopen:
   case CMD_hide:
+  case CMD_horizontal:
   case CMD_keepalt:
   case CMD_keepjumps:
   case CMD_keepmarks:
@@ -1424,7 +1424,7 @@ static const char *set_context_by_cmdname(const char *cmd, cmdidx_T cmdidx, cons
     set_context_in_cscope_cmd(xp, arg, cmdidx);
     break;
   case CMD_sign:
-    set_context_in_sign_cmd(xp, (char_u *)arg);
+    set_context_in_sign_cmd(xp, (char *)arg);
     break;
   case CMD_bdelete:
   case CMD_bwipeout:
@@ -2890,7 +2890,7 @@ void f_getcompletion(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   }
 
   if (xpc.xp_context == EXPAND_SIGN) {
-    set_context_in_sign_cmd(&xpc, (char_u *)xpc.xp_pattern);
+    set_context_in_sign_cmd(&xpc, xpc.xp_pattern);
     xpc.xp_pattern_len = STRLEN(xpc.xp_pattern);
   }
 
