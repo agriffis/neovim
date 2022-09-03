@@ -59,43 +59,28 @@ char_u *vim_strsave(const char_u *string)
 /// Copy up to `len` bytes of `string` into newly allocated memory and
 /// terminate with a NUL. The allocated memory always has size `len + 1`, even
 /// when `string` is shorter.
-char_u *vim_strnsave(const char_u *string, size_t len)
-  FUNC_ATTR_NONNULL_RET FUNC_ATTR_MALLOC FUNC_ATTR_NONNULL_ALL
-{
-  // strncpy is intentional: some parts of Vim use `string` shorter than `len`
-  // and expect the remainder to be zeroed out.
-  return (char_u *)strncpy(xmallocz(len), (char *)string, len);
-}
-
-/// A clone of vim_strnsave() that uses char* instead of char_u*
 char *xstrnsave(const char *string, size_t len)
   FUNC_ATTR_NONNULL_RET FUNC_ATTR_MALLOC FUNC_ATTR_NONNULL_ALL
 {
   return strncpy(xmallocz(len), string, len);  // NOLINT(runtime/printf)
 }
 
-/*
- * Same as vim_strsave(), but any characters found in esc_chars are preceded
- * by a backslash.
- */
+// Same as vim_strsave(), but any characters found in esc_chars are preceded
+// by a backslash.
 char_u *vim_strsave_escaped(const char_u *string, const char_u *esc_chars)
   FUNC_ATTR_NONNULL_RET FUNC_ATTR_MALLOC FUNC_ATTR_NONNULL_ALL
 {
   return vim_strsave_escaped_ext(string, esc_chars, '\\', false);
 }
 
-/*
- * Same as vim_strsave_escaped(), but when "bsl" is true also escape
- * characters where rem_backslash() would remove the backslash.
- * Escape the characters with "cc".
- */
+// Same as vim_strsave_escaped(), but when "bsl" is true also escape
+// characters where rem_backslash() would remove the backslash.
+// Escape the characters with "cc".
 char_u *vim_strsave_escaped_ext(const char_u *string, const char_u *esc_chars, char_u cc, bool bsl)
   FUNC_ATTR_NONNULL_RET FUNC_ATTR_MALLOC FUNC_ATTR_NONNULL_ALL
 {
-  /*
-   * First count the number of backslashes required.
-   * Then allocate the memory and insert them.
-   */
+  // First count the number of backslashes required.
+  // Then allocate the memory and insert them.
   size_t length = 1;                    // count the trailing NUL
   for (const char_u *p = string; *p; p++) {
     const size_t l = (size_t)(utfc_ptr2len((char *)p));
@@ -178,16 +163,14 @@ char *vim_strnsave_unquoted(const char *const string, const size_t length)
   return ret;
 }
 
-/*
- * Escape "string" for use as a shell argument with system().
- * This uses single quotes, except when we know we need to use double quotes
- * (MS-Windows without 'shellslash' set).
- * Escape a newline, depending on the 'shell' option.
- * When "do_special" is true also replace "!", "%", "#" and things starting
- * with "<" like "<cfile>".
- * When "do_newline" is false do not escape newline unless it is csh shell.
- * Returns the result in allocated memory.
- */
+// Escape "string" for use as a shell argument with system().
+// This uses single quotes, except when we know we need to use double quotes
+// (MS-Windows without 'shellslash' set).
+// Escape a newline, depending on the 'shell' option.
+// When "do_special" is true also replace "!", "%", "#" and things starting
+// with "<" like "<cfile>".
+// When "do_newline" is false do not escape newline unless it is csh shell.
+// Returns the result in allocated memory.
 char_u *vim_strsave_shellescape(const char_u *string, bool do_special, bool do_newline)
   FUNC_ATTR_NONNULL_RET FUNC_ATTR_MALLOC FUNC_ATTR_NONNULL_ALL
 {
@@ -304,10 +287,8 @@ char_u *vim_strsave_shellescape(const char_u *string, bool do_special, bool do_n
   return escaped_string;
 }
 
-/*
- * Like vim_strsave(), but make all characters uppercase.
- * This uses ASCII lower-to-upper case translation, language independent.
- */
+// Like vim_strsave(), but make all characters uppercase.
+// This uses ASCII lower-to-upper case translation, language independent.
 char_u *vim_strsave_up(const char_u *string)
   FUNC_ATTR_NONNULL_RET FUNC_ATTR_MALLOC FUNC_ATTR_NONNULL_ALL
 {
@@ -318,21 +299,17 @@ char_u *vim_strsave_up(const char_u *string)
   return p1;
 }
 
-/*
- * Like vim_strnsave(), but make all characters uppercase.
- * This uses ASCII lower-to-upper case translation, language independent.
- */
-char_u *vim_strnsave_up(const char_u *string, size_t len)
+/// Like xstrnsave(), but make all characters uppercase.
+/// This uses ASCII lower-to-upper case translation, language independent.
+char *vim_strnsave_up(const char *string, size_t len)
   FUNC_ATTR_NONNULL_RET FUNC_ATTR_MALLOC FUNC_ATTR_NONNULL_ALL
 {
-  char_u *p1 = vim_strnsave(string, len);
-  vim_strup(p1);
+  char *p1 = xstrnsave(string, len);
+  vim_strup((char_u *)p1);
   return p1;
 }
 
-/*
- * ASCII lower-to-upper case translation, language independent.
- */
+// ASCII lower-to-upper case translation, language independent.
 void vim_strup(char_u *p)
   FUNC_ATTR_NONNULL_ALL
 {
@@ -386,9 +363,7 @@ char *strcase_save(const char *const orig, bool upper)
   return res;
 }
 
-/*
- * delete spaces at the end of a string
- */
+// delete spaces at the end of a string
 void del_trailing_spaces(char_u *ptr)
   FUNC_ATTR_NONNULL_ALL
 {
@@ -413,11 +388,9 @@ size_t xstrnlen(const char *s, size_t n)
 #endif
 
 #if (!defined(HAVE_STRCASECMP) && !defined(HAVE_STRICMP))
-/*
- * Compare two strings, ignoring case, using current locale.
- * Doesn't work for multi-byte characters.
- * return 0 for match, < 0 for smaller, > 0 for bigger
- */
+// Compare two strings, ignoring case, using current locale.
+// Doesn't work for multi-byte characters.
+// return 0 for match, < 0 for smaller, > 0 for bigger
 int vim_stricmp(const char *s1, const char *s2)
   FUNC_ATTR_NONNULL_ALL FUNC_ATTR_PURE
 {
@@ -439,11 +412,9 @@ int vim_stricmp(const char *s1, const char *s2)
 #endif
 
 #if (!defined(HAVE_STRNCASECMP) && !defined(HAVE_STRNICMP))
-/*
- * Compare two strings, for length "len", ignoring case, using current locale.
- * Doesn't work for multi-byte characters.
- * return 0 for match, < 0 for smaller, > 0 for bigger
- */
+// Compare two strings, for length "len", ignoring case, using current locale.
+// Doesn't work for multi-byte characters.
+// return 0 for match, < 0 for smaller, > 0 for bigger
 int vim_strnicmp(const char *s1, const char *s2, size_t len)
   FUNC_ATTR_NONNULL_ALL FUNC_ATTR_PURE
 {
@@ -488,9 +459,7 @@ char *vim_strchr(const char *const string, const int c)
   }
 }
 
-/*
- * Sort an array of strings.
- */
+// Sort an array of strings.
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "strings.c.generated.h"
@@ -506,10 +475,8 @@ void sort_strings(char **files, int count)
   qsort((void *)files, (size_t)count, sizeof(char *), sort_compare);
 }
 
-/*
- * Return true if string "s" contains a non-ASCII character (128 or higher).
- * When "s" is NULL false is returned.
- */
+// Return true if string "s" contains a non-ASCII character (128 or higher).
+// When "s" is NULL false is returned.
 bool has_non_ascii(const char_u *s)
   FUNC_ATTR_PURE
 {
