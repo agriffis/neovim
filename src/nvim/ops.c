@@ -681,9 +681,9 @@ void op_reindent(oparg_T *oap, Indenter how)
   curwin->w_cursor.lnum = start_lnum;
   beginline(BL_SOL | BL_FIX);
 
-  /* Mark changed lines so that they will be redrawn.  When Visual
-   * highlighting was present, need to continue until the last line.  When
-   * there is no change still need to remove the Visual highlighting. */
+  // Mark changed lines so that they will be redrawn.  When Visual
+  // highlighting was present, need to continue until the last line.  When
+  // there is no change still need to remove the Visual highlighting.
   if (last_changed != 0) {
     changed_lines(first_changed, 0,
                   oap->is_VIsual ? start_lnum + (linenr_T)oap->line_count :
@@ -722,56 +722,56 @@ int get_expr_register(void)
   if (*new_line == NUL) {  // use previous line
     xfree(new_line);
   } else {
-    set_expr_line(new_line);
+    set_expr_line((char *)new_line);
   }
   return '=';
 }
 
 /// Set the expression for the '=' register.
 /// Argument must be an allocated string.
-void set_expr_line(char_u *new_line)
+void set_expr_line(char *new_line)
 {
   xfree(expr_line);
-  expr_line = new_line;
+  expr_line = (char_u *)new_line;
 }
 
 /// Get the result of the '=' register expression.
 ///
 /// @return  a pointer to allocated memory, or NULL for failure.
-char_u *get_expr_line(void)
+char *get_expr_line(void)
 {
-  char_u *expr_copy;
-  char_u *rv;
+  char *expr_copy;
+  char *rv;
   static int nested = 0;
 
   if (expr_line == NULL) {
     return NULL;
   }
 
-  /* Make a copy of the expression, because evaluating it may cause it to be
-   * changed. */
-  expr_copy = vim_strsave(expr_line);
+  // Make a copy of the expression, because evaluating it may cause it to be
+  // changed.
+  expr_copy = xstrdup((char *)expr_line);
 
-  /* When we are invoked recursively limit the evaluation to 10 levels.
-   * Then return the string as-is. */
+  // When we are invoked recursively limit the evaluation to 10 levels.
+  // Then return the string as-is.
   if (nested >= 10) {
     return expr_copy;
   }
 
   nested++;
-  rv = (char_u *)eval_to_string((char *)expr_copy, NULL, true);
+  rv = eval_to_string(expr_copy, NULL, true);
   nested--;
   xfree(expr_copy);
   return rv;
 }
 
 /// Get the '=' register expression itself, without evaluating it.
-char_u *get_expr_line_src(void)
+char *get_expr_line_src(void)
 {
   if (expr_line == NULL) {
     return NULL;
   }
-  return vim_strsave(expr_line);
+  return xstrdup((char *)expr_line);
 }
 
 /// @return  whether `regname` is a valid name of a yank register.
@@ -1070,11 +1070,11 @@ static char_u *execreg_line_continuation(char **lines, size_t *idx)
     }
   }
   ga_append(&ga, NUL);
-  char_u *str = vim_strsave(ga.ga_data);
+  char *str = xstrdup(ga.ga_data);
   ga_clear(&ga);
 
   *idx = i;
-  return str;
+  return (char_u *)str;
 }
 
 /// Execute a yank register: copy it into the stuff buffer
@@ -1130,7 +1130,7 @@ int do_execreg(int regname, int colon, int addcr, int silent)
     }
     xfree(p);
   } else if (regname == '=') {
-    p = get_expr_line();
+    p = (char_u *)get_expr_line();
     if (p == NULL) {
       return FAIL;
     }
@@ -1338,7 +1338,7 @@ bool get_spec_reg(int regname, char **argp, bool *allocated, bool errmsg)
     return true;
 
   case '=':                     // result of expression
-    *argp = (char *)get_expr_line();
+    *argp = get_expr_line();
     *allocated = true;
     return true;
 
@@ -1392,7 +1392,7 @@ bool get_spec_reg(int regname, char **argp, bool *allocated, bool errmsg)
       return false;
     }
 
-    *argp = (char *)ml_get_buf(curwin->w_buffer, curwin->w_cursor.lnum, false);
+    *argp = ml_get_buf(curwin->w_buffer, curwin->w_cursor.lnum, false);
     return true;
 
   case '_':                     // black hole: always empty
@@ -1431,8 +1431,8 @@ bool cmdline_paste_reg(int regname, bool literally_arg, bool remcr)
       cmdline_paste_str((char_u *)"\r", literally);
     }
 
-    /* Check for CTRL-C, in case someone tries to paste a few thousand
-     * lines and gets bored. */
+    // Check for CTRL-C, in case someone tries to paste a few thousand
+    // lines and gets bored.
     os_breakcheck();
     if (got_int) {
       return FAIL;
@@ -1801,7 +1801,7 @@ static void mb_adjust_opend(oparg_T *oap)
 static inline void pbyte(pos_T lp, int c)
 {
   assert(c <= UCHAR_MAX);
-  *(ml_get_buf(curbuf, lp.lnum, true) + lp.col) = (char_u)c;
+  *(ml_get_buf(curbuf, lp.lnum, true) + lp.col) = (char)c;
   if (!curbuf_splice_pending) {
     extmark_splice_cols(curbuf, (int)lp.lnum - 1, lp.col, 1, 1, kExtmarkUndo);
   }
@@ -1978,7 +1978,7 @@ static int op_replace(oparg_T *oap, int c)
       n = gchar_cursor();
       if (n != NUL) {
         int new_byte_len = utf_char2len(c);
-        int old_byte_len = utfc_ptr2len((char *)get_cursor_pos_ptr());
+        int old_byte_len = utfc_ptr2len(get_cursor_pos_ptr());
 
         if (new_byte_len > 1 || old_byte_len > 1) {
           // This is slow, but it handles replacing a single-byte
@@ -2199,7 +2199,7 @@ bool swapchar(int op_type, pos_T *pos)
 
       curwin->w_cursor = *pos;
       // don't use del_char(), it also removes composing chars
-      del_bytes(utf_ptr2len((char *)get_cursor_pos_ptr()), false, false);
+      del_bytes(utf_ptr2len(get_cursor_pos_ptr()), false, false);
       ins_char(nc);
       curwin->w_cursor = sp;
     } else {
@@ -2677,8 +2677,7 @@ static void op_yank_reg(oparg_T *oap, bool message, yankreg_T *reg, bool append)
         if (virtual_op) {
           getvcol(curwin, &oap->start, &cs, NULL, &ce);
           if (ce != cs && oap->start.coladd > 0) {
-            /* Part of a tab selected -- but don't
-             * double-count it. */
+            // Part of a tab selected -- but don't double-count it.
             bd.startspaces = (ce - cs + 1)
                              - oap->start.coladd;
             startcol++;
@@ -2996,7 +2995,7 @@ void do_put(int regname, yankreg_T *reg, int dir, long count, int flags)
         // STRLEN(ml_get(curwin->w_cursor.lnum)). With 'virtualedit' and the
         // cursor past the end of the line, curwin->w_cursor.coladd is
         // incremented instead of curwin->w_cursor.col.
-        char_u *cursor_pos = get_cursor_pos_ptr();
+        char_u *cursor_pos = (char_u *)get_cursor_pos_ptr();
         bool one_past_line = (*cursor_pos == NUL);
         bool eol = false;
         if (!one_past_line) {
@@ -3043,9 +3042,9 @@ void do_put(int regname, yankreg_T *reg, int dir, long count, int flags)
   if (insert_string != NULL) {
     y_type = kMTCharWise;
     if (regname == '=') {
-      /* For the = register we need to split the string at NL
-       * characters.
-       * Loop twice: count the number of lines and save them. */
+      // For the = register we need to split the string at NL
+      // characters.
+      // Loop twice: count the number of lines and save them.
       for (;;) {
         y_size = 0;
         ptr = insert_string;
@@ -3102,7 +3101,7 @@ void do_put(int regname, yankreg_T *reg, int dir, long count, int flags)
       if (u_save_cursor() == FAIL) {
         goto end;
       }
-      char *p = (char *)get_cursor_pos_ptr();
+      char *p = get_cursor_pos_ptr();
       if (dir == FORWARD && *p != NUL) {
         MB_PTR_ADV(p);
       }
@@ -3211,7 +3210,7 @@ void do_put(int regname, yankreg_T *reg, int dir, long count, int flags)
       }
 
       // move to start of next multi-byte character
-      curwin->w_cursor.col += utfc_ptr2len((char *)get_cursor_pos_ptr());
+      curwin->w_cursor.col += utfc_ptr2len(get_cursor_pos_ptr());
       col++;
     } else {
       getvcol(curwin, &curwin->w_cursor, &col, NULL, &endcol2);
@@ -3285,9 +3284,9 @@ void do_put(int regname, yankreg_T *reg, int dir, long count, int flags)
         delcount = 1;
         bd.textcol -= utf_head_off(oldp, oldp + bd.textcol);
         if (oldp[bd.textcol] != TAB) {
-          /* Only a Tab can be split into spaces.  Other
-           * characters will have to be moved to after the
-           * block, causing misalignment. */
+          // Only a Tab can be split into spaces.  Other
+          // characters will have to be moved to after the
+          // block, causing misalignment.
           delcount = 0;
           bd.endspaces = 0;
         }
@@ -3394,7 +3393,7 @@ void do_put(int regname, yankreg_T *reg, int dir, long count, int flags)
       // if type is kMTCharWise, FORWARD is the same as BACKWARD on the next
       // char
       if (dir == FORWARD && gchar_cursor() != NUL) {
-        int bytelen = utfc_ptr2len((char *)get_cursor_pos_ptr());
+        int bytelen = utfc_ptr2len(get_cursor_pos_ptr());
 
         // put it on the next of the multi-byte character.
         col += bytelen;
@@ -4854,13 +4853,13 @@ void format_reg_type(MotionType reg_type, colnr_T reg_width, char *buf, size_t b
 /// Otherwise just return `s`.
 ///
 /// @return  a void * for use in get_reg_contents().
-static void *get_reg_wrap_one_line(char_u *s, int flags)
+static void *get_reg_wrap_one_line(char *s, int flags)
 {
   if (!(flags & kGRegList)) {
     return s;
   }
   list_T *const list = tv_list_alloc(1);
-  tv_list_append_allocated_string(list, (char *)s);
+  tv_list_append_allocated_string(list, s);
   return list;
 }
 
@@ -4902,9 +4901,9 @@ void *get_reg_contents(int regname, int flags)
       return NULL;
     }
     if (allocated) {
-      return get_reg_wrap_one_line((char_u *)retval, flags);
+      return get_reg_wrap_one_line(retval, flags);
     }
-    return get_reg_wrap_one_line(vim_strsave((char_u *)retval), flags);
+    return get_reg_wrap_one_line(xstrdup(retval), flags);
   }
 
   yankreg_T *reg = get_yank_register(regname, YREG_PASTE);
@@ -5575,7 +5574,7 @@ static Callback opfunc_cb;
 /// @return  OK or FAIL
 int set_operatorfunc_option(void)
 {
-  return option_set_callback_func((char_u *)p_opfunc, &opfunc_cb);
+  return option_set_callback_func(p_opfunc, &opfunc_cb);
 }
 
 #if defined(EXITFREE)

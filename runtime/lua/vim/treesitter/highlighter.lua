@@ -86,7 +86,7 @@ function TSHighlighter.new(tree, opts)
     end
   end
 
-  a.nvim_buf_set_option(self.bufnr, 'syntax', '')
+  vim.bo[self.bufnr].syntax = ''
 
   TSHighlighter.active[self.bufnr] = self
 
@@ -95,8 +95,12 @@ function TSHighlighter.new(tree, opts)
   -- syntax FileType autocmds. Later on we should integrate with the
   -- `:syntax` and `set syntax=...` machinery properly.
   if vim.g.syntax_on ~= 1 then
-    vim.api.nvim_command('runtime! syntax/synload.vim')
+    vim.cmd.runtime({ 'syntax/synload.vim', bang = true })
   end
+
+  a.nvim_buf_call(self.bufnr, function()
+    vim.opt_local.spelloptions:append('noplainbuffer')
+  end)
 
   self.tree:parse()
 
@@ -156,7 +160,7 @@ function TSHighlighter:get_query(lang)
 end
 
 ---@private
-local function on_line_impl(self, buf, line)
+local function on_line_impl(self, buf, line, spell)
   self.tree:for_each_tree(function(tstree, tree)
     if not tstree then
       return
@@ -193,7 +197,9 @@ local function on_line_impl(self, buf, line)
       local start_row, start_col, end_row, end_col = node:range()
       local hl = highlighter_query.hl_cache[capture]
 
-      if hl and end_row >= line then
+      local is_spell = highlighter_query:query().captures[capture] == 'spell'
+
+      if hl and end_row >= line and (not spell or is_spell) then
         a.nvim_buf_set_extmark(buf, ns, start_row, start_col, {
           end_line = end_row,
           end_col = end_col,
@@ -201,6 +207,7 @@ local function on_line_impl(self, buf, line)
           ephemeral = true,
           priority = tonumber(metadata.priority) or 100, -- Low but leaves room below
           conceal = metadata.conceal,
+          spell = is_spell,
         })
       end
       if start_row > line then
@@ -217,7 +224,21 @@ function TSHighlighter._on_line(_, _win, buf, line, _)
     return
   end
 
-  on_line_impl(self, buf, line)
+  on_line_impl(self, buf, line, false)
+end
+
+---@private
+function TSHighlighter._on_spell_nav(_, _, buf, srow, _, erow, _)
+  local self = TSHighlighter.active[buf]
+  if not self then
+    return
+  end
+
+  self:reset_highlight_state()
+
+  for row = srow, erow do
+    on_line_impl(self, buf, row, true)
+  end
 end
 
 ---@private
@@ -244,6 +265,7 @@ a.nvim_set_decoration_provider(ns, {
   on_buf = TSHighlighter._on_buf,
   on_win = TSHighlighter._on_win,
   on_line = TSHighlighter._on_line,
+  _on_spell_nav = TSHighlighter._on_spell_nav,
 })
 
 return TSHighlighter

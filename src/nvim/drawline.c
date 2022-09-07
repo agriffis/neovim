@@ -11,9 +11,11 @@
 
 #include "nvim/arabic.h"
 #include "nvim/buffer.h"
+#include "nvim/buffer_defs.h"
 #include "nvim/charset.h"
 #include "nvim/cursor.h"
 #include "nvim/cursor_shape.h"
+#include "nvim/decoration.h"
 #include "nvim/diff.h"
 #include "nvim/drawline.h"
 #include "nvim/fold.h"
@@ -654,7 +656,7 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool nochange, 
 
     has_decor = decor_redraw_line(buf, lnum - 1, &decor_state);
 
-    providers_invoke_line(wp, providers, lnum - 1, &has_decor, provider_err);
+    decor_providers_invoke_line(wp, providers, lnum - 1, &has_decor, provider_err);
 
     if (*provider_err) {
       provider_err_virt_text(lnum, *provider_err);
@@ -687,7 +689,7 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool nochange, 
       // Trick: skip a few chars for C/shell/Vim comments
       nextline[SPWORDLEN] = NUL;
       if (lnum < wp->w_buffer->b_ml.ml_line_count) {
-        line = ml_get_buf(wp->w_buffer, lnum + 1, false);
+        line = (char_u *)ml_get_buf(wp->w_buffer, lnum + 1, false);
         spell_cat_line(nextline + SPWORDLEN, line, SPWORDLEN);
       }
 
@@ -864,7 +866,7 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool nochange, 
     line_attr_lowprio_save = line_attr_lowprio;
   }
 
-  line = end_fill ? (char_u *)"" : ml_get_buf(wp->w_buffer, lnum, false);
+  line = end_fill ? (char_u *)"" : (char_u *)ml_get_buf(wp->w_buffer, lnum, false);
   ptr = line;
 
   if (has_spell && !number_only) {
@@ -1004,7 +1006,7 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool nochange, 
       len = spell_move_to(wp, FORWARD, true, true, &spell_hlf);
 
       // spell_move_to() may call ml_get() and make "line" invalid
-      line = ml_get_buf(wp->w_buffer, lnum, false);
+      line = (char_u *)ml_get_buf(wp->w_buffer, lnum, false);
       ptr = line + linecol;
 
       if (len == 0 || (int)wp->w_cursor.col > ptr - line) {
@@ -1222,7 +1224,7 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool nochange, 
           c_extra = ' ';
           c_final = NUL;
           n_extra =
-            get_breakindent_win(wp, ml_get_buf(wp->w_buffer, lnum, false));
+            get_breakindent_win(wp, (char_u *)ml_get_buf(wp->w_buffer, lnum, false));
           if (row == startrow) {
             n_extra -= win_col_off2(wp);
             if (n_extra < 0) {
@@ -1646,7 +1648,8 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool nochange, 
       ptr++;
 
       if (extra_check) {
-        bool can_spell = true;
+        bool no_plain_buffer = (wp->w_s->b_p_spo_flags & SPO_NPBUFFER) != 0;
+        bool can_spell = !no_plain_buffer;
 
         // Get syntax attribute, unless still at the start of the line
         // (double-wide char that doesn't fit).
@@ -1673,7 +1676,7 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool nochange, 
 
           // Need to get the line again, a multi-line regexp may
           // have made it invalid.
-          line = ml_get_buf(wp->w_buffer, lnum, false);
+          line = (char_u *)ml_get_buf(wp->w_buffer, lnum, false);
           ptr = line + v;
 
           if (!attr_pri) {
@@ -1698,6 +1701,29 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool nochange, 
           char_attr = 0;
         }
 
+        if (has_decor && v > 0) {
+          bool selected = (area_active || (area_highlighting && noinvcur
+                                           && (colnr_T)vcol == wp->w_virtcol));
+          int extmark_attr = decor_redraw_col(wp->w_buffer, (colnr_T)v - 1, off,
+                                              selected, &decor_state);
+          if (extmark_attr != 0) {
+            if (!attr_pri) {
+              char_attr = hl_combine_attr(char_attr, extmark_attr);
+            } else {
+              char_attr = hl_combine_attr(extmark_attr, char_attr);
+            }
+          }
+
+          decor_conceal = decor_state.conceal;
+          if (decor_conceal && decor_state.conceal_char) {
+            decor_conceal = 2;  // really??
+          }
+
+          if (decor_state.spell) {
+            can_spell = true;
+          }
+        }
+
         // Check spelling (unless at the end of the line).
         // Only do this when there is no syntax highlighting, the
         // @Spell cluster is not used or the current syntax item
@@ -1706,9 +1732,9 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool nochange, 
         if (has_spell && v >= word_end && v > cur_checked_col) {
           spell_attr = 0;
           if (!attr_pri) {
-            char_attr = syntax_attr;
+            char_attr = hl_combine_attr(char_attr, syntax_attr);
           }
-          if (c != 0 && (!has_syntax || can_spell)) {
+          if (c != 0 && ((!has_syntax && !no_plain_buffer) || can_spell)) {
             char_u *prev_ptr;
             char_u *p;
             int len;
@@ -1779,25 +1805,6 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool nochange, 
 
         if (wp->w_buffer->terminal) {
           char_attr = hl_combine_attr(term_attrs[vcol], char_attr);
-        }
-
-        if (has_decor && v > 0) {
-          bool selected = (area_active || (area_highlighting && noinvcur
-                                           && (colnr_T)vcol == wp->w_virtcol));
-          int extmark_attr = decor_redraw_col(wp->w_buffer, (colnr_T)v - 1, off,
-                                              selected, &decor_state);
-          if (extmark_attr != 0) {
-            if (!attr_pri) {
-              char_attr = hl_combine_attr(char_attr, extmark_attr);
-            } else {
-              char_attr = hl_combine_attr(extmark_attr, char_attr);
-            }
-          }
-
-          decor_conceal = decor_state.conceal;
-          if (decor_conceal && decor_state.conceal_char) {
-            decor_conceal = 2;  // really??
-          }
         }
 
         // Found last space before word: check for line break.

@@ -32,12 +32,6 @@ function(BuildLibvterm)
 endfunction()
 
 if(WIN32)
-  if(MSVC)
-    set(LIBVTERM_PATCH_COMMAND
-    ${GIT_EXECUTABLE} -C ${DEPS_BUILD_DIR}/src/libvterm init
-      COMMAND ${GIT_EXECUTABLE} -C ${DEPS_BUILD_DIR}/src/libvterm apply --ignore-whitespace
-        ${CMAKE_CURRENT_SOURCE_DIR}/patches/libvterm-Remove-VLAs-for-MSVC.patch)
-  endif()
   set(LIBVTERM_CONFIGURE_COMMAND ${CMAKE_COMMAND} -E copy
       ${CMAKE_CURRENT_SOURCE_DIR}/cmake/LibvtermCMakeLists.txt
       ${DEPS_BUILD_DIR}/src/libvterm/CMakeLists.txt
@@ -49,14 +43,13 @@ if(WIN32)
       -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
       -DCMAKE_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
       -DCMAKE_GENERATOR=${CMAKE_GENERATOR})
-
   if(MSVC)
     list(APPEND LIBVTERM_CONFIGURE_COMMAND "-DCMAKE_C_FLAGS:STRING=${CMAKE_C_COMPILER_ARG1}")
   else()
     list(APPEND LIBVTERM_CONFIGURE_COMMAND "-DCMAKE_C_FLAGS:STRING=${CMAKE_C_COMPILER_ARG1} -fPIC")
   endif()
-  set(LIBVTERM_BUILD_COMMAND ${CMAKE_COMMAND} --build . --config ${CMAKE_BUILD_TYPE})
-  set(LIBVTERM_INSTALL_COMMAND ${CMAKE_COMMAND} --build . --target install --config ${CMAKE_BUILD_TYPE})
+  set(LIBVTERM_BUILD_COMMAND ${CMAKE_COMMAND} --build . --config $<CONFIG>)
+  set(LIBVTERM_INSTALL_COMMAND ${CMAKE_COMMAND} --build . --target install --config $<CONFIG>)
 else()
   set(LIBVTERM_INSTALL_COMMAND ${MAKE_PRG} CC=${DEPS_C_COMPILER}
                                            PREFIX=${DEPS_INSTALL_DIR}

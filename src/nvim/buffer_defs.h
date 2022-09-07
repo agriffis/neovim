@@ -462,6 +462,9 @@ typedef struct {
   char *b_p_spf;              // 'spellfile'
   char *b_p_spl;              // 'spelllang'
   char *b_p_spo;              // 'spelloptions'
+#define SPO_CAMEL  0x1
+#define SPO_NPBUFFER 0x2
+  unsigned b_p_spo_flags;      // 'spelloptions' flags
   int b_cjk;                  // all CJK letters as OK
   uint8_t b_syn_chartab[32];  // syntax iskeyword option
   char *b_syn_isk;            // iskeyword option
@@ -786,8 +789,8 @@ struct file_buffer {
   int b_ind_cpp_extern_c;
   int b_ind_pragma;
 
-  linenr_T b_no_eol_lnum;       /* non-zero lnum when last line of next binary
-                                 * write should not have an end-of-line */
+  linenr_T b_no_eol_lnum;       // non-zero lnum when last line of next binary
+                                // write should not have an end-of-line
 
   int b_start_eol;              // last line had eol when it was read
   int b_start_ffc;              // first char of 'ff' when edit started
@@ -802,8 +805,8 @@ struct file_buffer {
   // then set to indicate that a swap file may be opened later.  It is reset
   // if a swap file could not be opened.
   bool b_may_swap;
-  bool b_did_warn;              /* Set to true if user has been warned on first
-                                   change of a read-only file */
+  bool b_did_warn;              // Set to true if user has been warned on first
+                                // change of a read-only file
 
   // Two special kinds of buffers:
   // help buffer  - used for help files, won't use a swap file.
@@ -1234,8 +1237,7 @@ struct window_S {
   // w_valid is a bitfield of flags, which indicate if specific values are
   // valid or need to be recomputed.
   int w_valid;
-  pos_T w_valid_cursor;             /* last known position of w_cursor, used
-                                       to adjust w_valid */
+  pos_T w_valid_cursor;             // last known position of w_cursor, used to adjust w_valid
   colnr_T w_valid_leftcol;          // last known w_leftcol
 
   bool w_viewport_invalid;
@@ -1380,8 +1382,7 @@ struct window_S {
   int w_fraction;
   int w_prev_fraction_row;
 
-  linenr_T w_nrwidth_line_count;        /* line count when ml_nrwidth_width
-                                         * was computed. */
+  linenr_T w_nrwidth_line_count;        // line count when ml_nrwidth_width was computed.
   int w_nrwidth_width;                  // nr of chars to print line count.
 
   qf_info_T *w_llist;                 // Location list for this window
@@ -1404,4 +1405,4 @@ struct window_S {
 #define CHANGEDTICK(buf) \
   (=== Include buffer.h & use buf_(get|set|inc) _changedtick ===)
 
-#endif // NVIM_BUFFER_DEFS_H
+#endif  // NVIM_BUFFER_DEFS_H

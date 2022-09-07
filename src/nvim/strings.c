@@ -49,13 +49,6 @@
 #include "nvim/vim.h"
 #include "nvim/window.h"
 
-/// Copy "string" into newly allocated memory.
-char_u *vim_strsave(const char_u *string)
-  FUNC_ATTR_NONNULL_RET FUNC_ATTR_MALLOC FUNC_ATTR_NONNULL_ALL
-{
-  return (char_u *)xstrdup((char *)string);
-}
-
 /// Copy up to `len` bytes of `string` into newly allocated memory and
 /// terminate with a NUL. The allocated memory always has size `len + 1`, even
 /// when `string` is shorter.
@@ -180,10 +173,10 @@ char_u *vim_strsave_shellescape(const char_u *string, bool do_special, bool do_n
   int csh_like;
   bool fish_like;
 
-  /* Only csh and similar shells expand '!' within single quotes.  For sh and
-   * the like we must not put a backslash before it, it will be taken
-   * literally.  If do_special is set the '!' will be escaped twice.
-   * Csh also needs to have "\n" escaped twice when do_special is set. */
+  // Only csh and similar shells expand '!' within single quotes.  For sh and
+  // the like we must not put a backslash before it, it will be taken
+  // literally.  If do_special is set the '!' will be escaped twice.
+  // Csh also needs to have "\n" escaped twice when do_special is set.
   csh_like = csh_like_shell();
 
   // Fish shell uses '\' as an escape character within single quotes, so '\'
@@ -292,11 +285,11 @@ char_u *vim_strsave_shellescape(const char_u *string, bool do_special, bool do_n
 char_u *vim_strsave_up(const char_u *string)
   FUNC_ATTR_NONNULL_RET FUNC_ATTR_MALLOC FUNC_ATTR_NONNULL_ALL
 {
-  char_u *p1;
+  char *p1;
 
-  p1 = vim_strsave(string);
-  vim_strup(p1);
-  return p1;
+  p1 = xstrdup((char *)string);
+  vim_strup((char_u *)p1);
+  return (char_u *)p1;
 }
 
 /// Like xstrnsave(), but make all characters uppercase.
