@@ -176,9 +176,9 @@ set(LIBTERMKEY_SHA256 6945bd3c4aaa83da83d80a045c5563da4edd7d0374c62c0d35aec09eb3
 set(LIBVTERM_URL https://www.leonerd.org.uk/code/libvterm/libvterm-0.3-RC1.tar.gz)
 set(LIBVTERM_SHA256 441d1c372b84a0df12525100ab06c0366260fb4f6252abd1665ee4fa571b5134)
 
-set(LUV_VERSION 1.44.2-0)
-set(LUV_URL https://github.com/luvit/luv/archive/1.44.2-0.tar.gz)
-set(LUV_SHA256 44ccda27035bfe683e6325a2a93f2c254be1eb76bde6efc2bd37c56a7af7b00a)
+set(LUV_VERSION 1.44.2-1)
+set(LUV_URL https://github.com/luvit/luv/archive/1.44.2-1.tar.gz)
+set(LUV_SHA256 f8c69908e17ec8ab370253d1508e23deaecfc0c4752d2efb77e427e579501104)
 
 set(LUA_COMPAT53_URL https://github.com/keplerproject/lua-compat-5.3/archive/v0.9.tar.gz)
 set(LUA_COMPAT53_SHA256 ad05540d2d96a48725bb79a1def35cf6652a4e2ec26376e2617c8ce2baa6f416)
@@ -207,8 +207,8 @@ set(TREESITTER_C_SHA256 af66fde03feb0df4faf03750102a0d265b007e5d957057b6b293c131
 set(TREESITTER_LUA_URL https://github.com/MunifTanjim/tree-sitter-lua/archive/v0.0.12.tar.gz)
 set(TREESITTER_LUA_SHA256 b6d7c6d04e9101a2e589d25f1d61668301e776c0b8defa6eae8dd86272e9e7c3)
 
-set(TREESITTER_VIM_URL https://github.com/vigoux/tree-sitter-viml/archive/v0.1.0.tar.gz)
-set(TREESITTER_VIM_SHA256 ea64fa211ccc7197669017b55911fdb56e8d4b6de96ba25c32b9586ec1c4f4c5)
+set(TREESITTER_VIM_URL https://github.com/vigoux/tree-sitter-viml/archive/v0.2.0.tar.gz)
+set(TREESITTER_VIM_SHA256 608dcc31a7948cb66ae7f45494620e2e9face1af75598205541f80d782ec4501)
 
 set(TREESITTER_URL https://github.com/tree-sitter/tree-sitter/archive/v0.20.7.tar.gz)
 set(TREESITTER_SHA256 b355e968ec2d0241bbd96748e00a9038f83968f85d822ecb9940cbe4c42e182e)

@@ -418,6 +418,42 @@ describe('LSP', function()
       }
     end)
 
+    it('should detach buffer on bufwipe', function()
+      local result = exec_lua([[
+        local server = function(dispatchers)
+          local closing = false
+          return {
+            request = function(method, params, callback)
+              if method == 'initialize' then
+                callback(nil, { capabilities = {} })
+              end
+            end,
+            notify = function(...)
+            end,
+            is_closing = function() return closing end,
+            terminate = function() closing = true end
+          }
+        end
+        local bufnr = vim.api.nvim_create_buf(false, true)
+        vim.api.nvim_set_current_buf(bufnr)
+        local client_id = vim.lsp.start({ name = 'detach-dummy', cmd = server })
+        assert(client_id, "lsp.start must return client_id")
+        local client = vim.lsp.get_client_by_id(client_id)
+        local num_attached_before = vim.tbl_count(client.attached_buffers)
+        vim.api.nvim_buf_delete(bufnr, { force = true })
+        local num_attached_after = vim.tbl_count(client.attached_buffers)
+        return {
+          bufnr = bufnr,
+          client_id = client_id,
+          num_attached_before = num_attached_before,
+          num_attached_after = num_attached_after,
+        }
+      ]])
+      eq(true, result ~= nil, "exec_lua must return result")
+      eq(1, result.num_attached_before)
+      eq(0, result.num_attached_after)
+    end)
+
     it('client should return settings via workspace/configuration handler', function()
       local expected_handlers = {
         {NIL, {}, {method="shutdown", client_id=1}};
@@ -3180,8 +3216,54 @@ describe('LSP', function()
         end,
       }
     end)
+    it('format formats range in visual mode', function()
+      local result = exec_lua([[
+        local messages = {}
+        local server = function(dispatchers)
+          local closing = false
+          return {
+            request = function(method, params, callback)
+              table.insert(messages, {
+                method = method,
+                params = params,
+              })
+              if method == 'initialize' then
+                callback(nil, {
+                  capabilities = {
+                    documentFormattingProvider = true,
+                    documentRangeFormattingProvider = true,
+                  }
+                })
+              end
+            end,
+            notify = function(...)
+            end,
+            is_closing = function()
+              return closing
+            end,
+            terminate = function()
+              closing = true
+            end
+          }
+        end
+        local bufnr = vim.api.nvim_get_current_buf()
+        local client_id = vim.lsp.start({ name = 'dummy', cmd = server })
+        vim.api.nvim_win_set_buf(0, bufnr)
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, true, {'foo', 'bar'})
+        vim.api.nvim_win_set_cursor(0, { 1, 0 })
+        vim.cmd.normal('v')
+        vim.api.nvim_win_set_cursor(0, { 2, 3 })
+        vim.lsp.buf.format({ bufnr = bufnr, false })
+        return messages
+      ]])
+      eq("textDocument/rangeFormatting", result[2].method)
+      local expected_range = {
+        start = { line = 0, character = 0 },
+        ['end'] = { line = 1, character = 4 },
+      }
+      eq(expected_range, result[2].params.range)
+    end)
   end)
-
   describe('cmd', function()
     it('can connect to lsp server via rpc.connect', function()
       local result = exec_lua [[
