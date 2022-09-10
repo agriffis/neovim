@@ -721,7 +721,11 @@ au BufNewFile,BufRead *.git/worktrees/*/config.worktree		setf gitconfig
 au BufNewFile,BufRead .gitmodules,*.git/modules/*/config	setf gitconfig
 if !empty($XDG_CONFIG_HOME)
   au BufNewFile,BufRead $XDG_CONFIG_HOME/git/config		setf gitconfig
+  au BufNewFile,BufRead $XDG_CONFIG_HOME/git/attributes		setf gitattributes
 endif
+au BufNewFile,BufRead .gitattributes,*.git/info/attributes	setf gitattributes
+au BufNewFile,BufRead */.config/git/attributes  		setf gitattributes
+au BufNewFile,BufRead */etc/gitattributes  			setf gitattributes
 au BufNewFile,BufRead git-rebase-todo		setf gitrebase
 au BufRead,BufNewFile .gitsendemail.msg.??????	setf gitsendemail
 au BufNewFile,BufRead *.git/*
@@ -1320,7 +1324,7 @@ au BufNewFile,BufRead *.or				setf openroad
 au BufNewFile,BufRead *.[Oo][Pp][Ll]			setf opl
 
 " OpenSCAD
-au BufNewFile,BufRead *.scad				setf openscad		
+au BufNewFile,BufRead *.scad				setf openscad
 
 " Oracle config file
 au BufNewFile,BufRead *.ora				setf ora
@@ -1395,7 +1399,8 @@ au BufNewFile,BufRead *.pod			setf pod
 " Also Phtml (was used for PHP 2 in the past).
 " Also .ctp for Cake template file.
 " Also .phpt for php tests.
-au BufNewFile,BufRead *.php,*.php\d,*.phtml,*.ctp,*.phpt	setf php
+" Also .theme for Drupal theme files.
+au BufNewFile,BufRead *.php,*.php\d,*.phtml,*.ctp,*.phpt,*.theme	setf php
 
 " PHP config
 au BufNewFile,BufRead php.ini-*			setf dosini
