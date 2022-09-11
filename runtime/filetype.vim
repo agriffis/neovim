@@ -1,7 +1,7 @@
 " Vim support file to detect file types
 "
 " Maintainer:	Bram Moolenaar <Bram@vim.org>
-" Last Change:	2022 Jul 5
+" Last Change:	2022 Sep 09
 
 " Only run this if enabled
 if !exists("do_legacy_filetype")
@@ -722,12 +722,15 @@ au BufNewFile,BufRead .gitmodules,*.git/modules/*/config	setf gitconfig
 if !empty($XDG_CONFIG_HOME)
   au BufNewFile,BufRead $XDG_CONFIG_HOME/git/config		setf gitconfig
   au BufNewFile,BufRead $XDG_CONFIG_HOME/git/attributes		setf gitattributes
+  au BufNewFile,BufRead $XDG_CONFIG_HOME/git/ignore		setf gitignore
 endif
 au BufNewFile,BufRead .gitattributes,*.git/info/attributes	setf gitattributes
-au BufNewFile,BufRead */.config/git/attributes  		setf gitattributes
-au BufNewFile,BufRead */etc/gitattributes  			setf gitattributes
-au BufNewFile,BufRead git-rebase-todo		setf gitrebase
-au BufRead,BufNewFile .gitsendemail.msg.??????	setf gitsendemail
+au BufNewFile,BufRead */.config/git/attributes			setf gitattributes
+au BufNewFile,BufRead */etc/gitattributes			setf gitattributes
+au BufNewFile,BufRead .gitignore,*.git/info/exclude		setf gitignore
+au BufNewFile,BufRead */.config/git/ignore			setf gitignore
+au BufNewFile,BufRead git-rebase-todo				setf gitrebase
+au BufRead,BufNewFile .gitsendemail.msg.??????			setf gitsendemail
 au BufNewFile,BufRead *.git/*
       \ if getline(1) =~# '^\x\{40,\}\>\|^ref: ' |
       \   setf git |
