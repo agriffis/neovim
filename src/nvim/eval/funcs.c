@@ -840,7 +840,7 @@ static void get_col(typval_T *argvars, typval_T *rettv, bool charcol)
     if (fp->col == MAXCOL) {
       // '> can be MAXCOL, get the length of the line then
       if (fp->lnum <= curbuf->b_ml.ml_line_count) {
-        col = (colnr_T)STRLEN(ml_get(fp->lnum)) + 1;
+        col = (colnr_T)strlen(ml_get(fp->lnum)) + 1;
       } else {
         col = MAXCOL;
       }
@@ -4673,6 +4673,20 @@ static void f_json_encode(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   rettv->vval.v_string = encode_tv2json(&argvars[0], NULL);
 }
 
+/// "keytrans()" function
+static void f_keytrans(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
+{
+  rettv->v_type = VAR_STRING;
+  if (tv_check_for_string_arg(argvars, 0) == FAIL
+      || argvars[0].vval.v_string == NULL) {
+    return;
+  }
+  // Need to escape K_SPECIAL for mb_unescape().
+  char *escaped = vim_strsave_escape_ks(argvars[0].vval.v_string);
+  rettv->vval.v_string = str2special_save(escaped, true, true);
+  xfree(escaped);
+}
+
 /// "last_buffer_nr()" function.
 static void f_last_buffer_nr(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
@@ -7057,32 +7071,6 @@ static void f_screencol(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   rettv->vval.v_number = ui_current_col() + 1;
 }
 
-/// "screenpos({winid}, {lnum}, {col})" function
-static void f_screenpos(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
-{
-  tv_dict_alloc_ret(rettv);
-  dict_T *dict = rettv->vval.v_dict;
-
-  win_T *wp = find_win_by_nr_or_id(&argvars[0]);
-  if (wp == NULL) {
-    return;
-  }
-
-  pos_T pos = {
-    .lnum   = (linenr_T)tv_get_number(&argvars[1]),
-    .col    = (colnr_T)tv_get_number(&argvars[2]) - 1,
-    .coladd = 0
-  };
-  int row = 0;
-  int scol = 0, ccol = 0, ecol = 0;
-  textpos2screenpos(wp, &pos, &row, &scol, &ccol, &ecol, false);
-
-  tv_dict_add_nr(dict, S_LEN("row"), row);
-  tv_dict_add_nr(dict, S_LEN("col"), scol);
-  tv_dict_add_nr(dict, S_LEN("curscol"), ccol);
-  tv_dict_add_nr(dict, S_LEN("endcol"), ecol);
-}
-
 /// "screenrow()" function
 static void f_screenrow(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
@@ -7808,7 +7796,7 @@ free_lstval:
     if (strval == NULL) {
       return;
     }
-    write_reg_contents_ex(regname, strval, (ssize_t)STRLEN(strval),
+    write_reg_contents_ex(regname, strval, (ssize_t)strlen(strval),
                           append, yank_type, (colnr_T)block_len);
   }
   if (pointreg != 0) {
@@ -8377,7 +8365,7 @@ static void f_strgetchar(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     return;
   }
 
-  const size_t len = STRLEN(str);
+  const size_t len = strlen(str);
   size_t byteidx = 0;
 
   while (charidx >= 0 && byteidx < len) {
@@ -8483,7 +8471,7 @@ static void f_strwidth(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 static void f_strcharpart(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
   const char *const p = tv_get_string(&argvars[0]);
-  const size_t slen = STRLEN(p);
+  const size_t slen = strlen(p);
 
   int nbyte = 0;
   bool error = false;
@@ -8623,7 +8611,7 @@ static void f_strridx(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     return;  // Type error; errmsg already given.
   }
 
-  const size_t haystack_len = STRLEN(haystack);
+  const size_t haystack_len = strlen(haystack);
   ptrdiff_t end_idx;
   if (argvars[2].v_type != VAR_UNKNOWN) {
     // Third argument: upper limit for index.
@@ -8754,7 +8742,7 @@ static void f_synID(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 
   int id = 0;
   if (!transerr && lnum >= 1 && lnum <= curbuf->b_ml.ml_line_count
-      && col >= 0 && (size_t)col < STRLEN(ml_get(lnum))) {
+      && col >= 0 && (size_t)col < strlen(ml_get(lnum))) {
     id = syn_get_id(curwin, lnum, col, trans, NULL, false);
   }
 
@@ -8820,7 +8808,7 @@ static void f_synIDattr(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     }
     break;
   case 'u':
-    if (STRLEN(what) >= 9) {
+    if (strlen(what) >= 9) {
       if (TOLOWER_ASC(what[5]) == 'l') {
         // underline
         p = highlight_has_attr(id, HL_UNDERLINE, modec);
@@ -8879,7 +8867,7 @@ static void f_synconcealed(typval_T *argvars, typval_T *rettv, EvalFuncData fptr
   CLEAR_FIELD(str);
 
   if (lnum >= 1 && lnum <= curbuf->b_ml.ml_line_count && col >= 0
-      && (size_t)col <= STRLEN(ml_get(lnum)) && curwin->w_p_cole > 0) {
+      && (size_t)col <= strlen(ml_get(lnum)) && curwin->w_p_cole > 0) {
     (void)syn_get_id(curwin, lnum, col, false, NULL, false);
     syntax_flags = get_syntax_info(&matchid);
 
@@ -8916,7 +8904,7 @@ static void f_synstack(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   if (lnum >= 1
       && lnum <= curbuf->b_ml.ml_line_count
       && col >= 0
-      && (size_t)col <= STRLEN(ml_get(lnum))) {
+      && (size_t)col <= strlen(ml_get(lnum))) {
     tv_list_alloc_ret(rettv, kListLenMayKnow);
     (void)syn_get_id(curwin, lnum, col, false, NULL, true);
 
@@ -9470,7 +9458,7 @@ static void f_trim(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     }
   }
 
-  const char *tail = head + STRLEN(head);
+  const char *tail = head + strlen(head);
   if (dir == 0 || dir == 2) {
     // Trim trailing characters
     for (; tail > head; tail = prev) {
@@ -9578,7 +9566,7 @@ static void f_virtcol(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     if (fp->col < 0) {
       fp->col = 0;
     } else {
-      const size_t len = STRLEN(ml_get(fp->lnum));
+      const size_t len = strlen(ml_get(fp->lnum));
       if (fp->col > (colnr_T)len) {
         fp->col = (colnr_T)len;
       }

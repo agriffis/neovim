@@ -220,7 +220,7 @@ void ex_menu(exarg_T *eap)
       map_buf = NULL;  // Menu tips are plain text.
     } else {
       map_buf = NULL;
-      map_to = replace_termcodes(map_to, STRLEN(map_to), &map_buf,
+      map_to = replace_termcodes(map_to, strlen(map_to), &map_buf,
                                  REPTERM_DO_LT, NULL, CPO_TO_CPO_FLAGS);
     }
     menuarg.modes = modes;
@@ -286,7 +286,7 @@ static int add_menu_path(const char *const menu_path, vimmenu_T *menuarg, const 
     // Get name of this element in the menu hierarchy, and the simplified
     // name (without mnemonic and accelerator text).
     next_name = menu_name_skip(name);
-    map_to = menutrans_lookup(name, (int)STRLEN(name));
+    map_to = menutrans_lookup(name, (int)strlen(name));
     if (map_to != NULL) {
       en_name = name;
       name = map_to;
@@ -424,7 +424,7 @@ static int add_menu_path(const char *const menu_path, vimmenu_T *menuarg, const 
         }
 
         if (c != 0) {
-          menu->strings[i] = xmalloc(STRLEN(call_data) + 5);
+          menu->strings[i] = xmalloc(strlen(call_data) + 5);
           menu->strings[i][0] = c;
           if (d == 0) {
             STRCPY(menu->strings[i] + 1, call_data);
@@ -433,7 +433,7 @@ static int add_menu_path(const char *const menu_path, vimmenu_T *menuarg, const 
             STRCPY(menu->strings[i] + 2, call_data);
           }
           if (c == Ctrl_C) {
-            int len = (int)STRLEN(menu->strings[i]);
+            int len = (int)strlen(menu->strings[i]);
 
             menu->strings[i][len] = Ctrl_BSL;
             menu->strings[i][len + 1] = Ctrl_G;
@@ -685,8 +685,7 @@ static dict_T *menu_get_recursive(const vimmenu_T *menu, int modes)
       if ((menu->modes & modes & (1 << bit)) != 0) {
         dict_T *impl = tv_dict_alloc();
         tv_dict_add_allocated_str(impl, S_LEN("rhs"),
-                                  str2special_save(menu->strings[bit],
-                                                   false, false));
+                                  str2special_save(menu->strings[bit], false, false));
         tv_dict_add_nr(impl, S_LEN("silent"), menu->silent[bit]);
         tv_dict_add_nr(impl, S_LEN("enabled"),
                        (menu->enabled & (1 << bit)) ? 1 : 0);
@@ -1054,7 +1053,7 @@ char *get_menu_names(expand_T *xp, int idx)
   while (menu != NULL
          && (menu_is_hidden(menu->dname)
              || (expand_emenu && menu_is_separator(menu->dname))
-             || menu->dname[STRLEN(menu->dname) - 1] == '.')) {
+             || menu->dname[strlen(menu->dname) - 1] == '.')) {
     menu = menu->next;
   }
 
@@ -1276,7 +1275,7 @@ static char *get_menu_mode_str(int modes)
 // Returns the name in allocated memory.
 static char *popup_mode_name(char *name, int idx)
 {
-  size_t len = STRLEN(name);
+  size_t len = strlen(name);
   assert(len >= 4);
 
   char *mode_chars = menu_mode_chars[idx];
@@ -1365,7 +1364,7 @@ bool menu_is_toolbar(const char *const name)
 /// with '-'
 int menu_is_separator(char *name)
 {
-  return name[0] == '-' && name[STRLEN(name) - 1] == '-';
+  return name[0] == '-' && name[strlen(name) - 1] == '-';
 }
 
 /// True if a popup menu or starts with \ref MNU_HIDDEN_CHAR
