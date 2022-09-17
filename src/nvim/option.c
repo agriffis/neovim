@@ -1891,14 +1891,15 @@ void set_option_sctx_idx(int opt_idx, int opt_flags, sctx_T script_ctx)
   int both = (opt_flags & (OPT_LOCAL | OPT_GLOBAL)) == 0;
   int indir = (int)options[opt_idx].indir;
   nlua_set_sctx(&script_ctx);
-  const LastSet last_set = {
-    .script_ctx = {
-      script_ctx.sc_sid,
-      script_ctx.sc_seq,
-      script_ctx.sc_lnum + SOURCING_LNUM
-    },
-    current_channel_id
+  LastSet last_set = {
+    .script_ctx = script_ctx,
+    .channel_id = current_channel_id,
   };
+
+  // Modeline already has the line number set.
+  if (!(opt_flags & OPT_MODELINE)) {
+    last_set.script_ctx.sc_lnum += SOURCING_LNUM;
+  }
 
   // Remember where the option was set.  For local options need to do that
   // in the buffer or window structure.
@@ -2570,9 +2571,10 @@ static char *set_num_option(int opt_idx, char_u *varp, long value, char *errbuf,
       Rows = (int)p_lines;
       Columns = (int)p_columns;
       check_screensize();
-      if (cmdline_row > Rows - p_ch && Rows > p_ch) {
-        assert(p_ch >= 0 && Rows - p_ch <= INT_MAX);
-        cmdline_row = (int)(Rows - p_ch);
+      int new_row = (int)(Rows - MAX(p_ch, 1));
+      if (cmdline_row > new_row && Rows > p_ch) {
+        assert(p_ch >= 0 && new_row <= INT_MAX);
+        cmdline_row = new_row;
       }
     }
     if (p_window >= Rows || !option_was_set("window")) {

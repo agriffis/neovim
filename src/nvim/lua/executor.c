@@ -1110,9 +1110,9 @@ int nlua_call(lua_State *lstate)
     try_start();
     typval_T rettv;
     funcexe_T funcexe = FUNCEXE_INIT;
-    funcexe.firstline = curwin->w_cursor.lnum;
-    funcexe.lastline = curwin->w_cursor.lnum;
-    funcexe.evaluate = true;
+    funcexe.fe_firstline = curwin->w_cursor.lnum;
+    funcexe.fe_lastline = curwin->w_cursor.lnum;
+    funcexe.fe_evaluate = true;
     // call_func() retval is deceptive, ignore it.  Instead we set `msg_list`
     // (TRY_WRAP) to capture abort-causing non-exception errors.
     (void)call_func((char *)name, (int)name_len, &rettv, nargs, vim_args, &funcexe);
@@ -1435,12 +1435,12 @@ int typval_exec_lua_callable(LuaRef lua_cb, int argcount, typval_T *argvars, typ
 
   if (nlua_pcall(lstate, argcount, 1)) {
     nlua_print(lstate);
-    return ERROR_OTHER;
+    return FCERR_OTHER;
   }
 
   nlua_pop_typval(lstate, rettv);
 
-  return ERROR_NONE;
+  return FCERR_NONE;
 }
 
 /// Execute Lua string

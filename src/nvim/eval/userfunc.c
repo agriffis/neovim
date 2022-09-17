@@ -425,12 +425,12 @@ int get_func_tv(const char_u *name, int len, typval_T *rettv, char **arg, funcex
   // Get the arguments.
   argp = *arg;
   while (argcount < MAX_FUNC_ARGS
-         - (funcexe->partial == NULL ? 0 : funcexe->partial->pt_argc)) {
+         - (funcexe->fe_partial == NULL ? 0 : funcexe->fe_partial->pt_argc)) {
     argp = skipwhite(argp + 1);             // skip the '(' or ','
     if (*argp == ')' || *argp == ',' || *argp == NUL) {
       break;
     }
-    if (eval1(&argp, &argvars[argcount], funcexe->evaluate) == FAIL) {
+    if (eval1(&argp, &argvars[argcount], funcexe->fe_evaluate) == FAIL) {
       ret = FAIL;
       break;
     }
@@ -524,7 +524,7 @@ static char *fname_trans_sid(const char *const name, char *const fname_buf, char
     int i = 3;
     if (eval_fname_sid(name)) {  // "<SID>" or "s:"
       if (current_sctx.sc_sid <= 0) {
-        *error = ERROR_SCRIPT;
+        *error = FCERR_SCRIPT;
       } else {
         snprintf(fname_buf + i, (size_t)(FLEN_FIXED + 1 - i), "%" PRId64 "_",
                  (int64_t)current_sctx.sc_sid);
@@ -1199,6 +1199,34 @@ static bool func_name_refcount(char_u *name)
   return isdigit(*name) || *name == '<';
 }
 
+/// Call a user function after checking the arguments.
+static int call_user_func_check(ufunc_T *fp, int argcount, typval_T *argvars, typval_T *rettv,
+                                funcexe_T *funcexe, dict_T *selfdict)
+  FUNC_ATTR_NONNULL_ARG(1, 3, 4, 5)
+{
+  if (fp->uf_flags & FC_LUAREF) {
+    return typval_exec_lua_callable(fp->uf_luaref, argcount, argvars, rettv);
+  }
+
+  if ((fp->uf_flags & FC_RANGE) && funcexe->fe_doesrange != NULL) {
+    *funcexe->fe_doesrange = true;
+  }
+  int error;
+  if (argcount < fp->uf_args.ga_len - fp->uf_def_args.ga_len) {
+    error = FCERR_TOOFEW;
+  } else if (!fp->uf_varargs && argcount > fp->uf_args.ga_len) {
+    error = FCERR_TOOMANY;
+  } else if ((fp->uf_flags & FC_DICT) && selfdict == NULL) {
+    error = FCERR_DICT;
+  } else {
+    // Call the user function.
+    call_user_func(fp, argcount, argvars, rettv, funcexe->fe_firstline, funcexe->fe_lastline,
+                   (fp->uf_flags & FC_DICT) ? selfdict : NULL);
+    error = FCERR_NONE;
+  }
+  return error;
+}
+
 static funccal_entry_T *funccal_stack = NULL;
 
 /// Save the current function call pointer, and set it to NULL.
@@ -1339,11 +1367,11 @@ int func_call(char_u *name, typval_T *args, partial_T *partial, dict_T *selfdict
   });
 
   funcexe_T funcexe = FUNCEXE_INIT;
-  funcexe.firstline = curwin->w_cursor.lnum;
-  funcexe.lastline = curwin->w_cursor.lnum;
-  funcexe.evaluate = true;
-  funcexe.partial = partial;
-  funcexe.selfdict = selfdict;
+  funcexe.fe_firstline = curwin->w_cursor.lnum;
+  funcexe.fe_lastline = curwin->w_cursor.lnum;
+  funcexe.fe_evaluate = true;
+  funcexe.fe_partial = partial;
+  funcexe.fe_selfdict = selfdict;
   r = call_func((char *)name, -1, rettv, argc, argv, &funcexe);
 
 func_call_skip_call:
@@ -1361,27 +1389,27 @@ static void user_func_error(int error, const char_u *name)
   FUNC_ATTR_NONNULL_ALL
 {
   switch (error) {
-  case ERROR_UNKNOWN:
+  case FCERR_UNKNOWN:
     emsg_funcname(N_("E117: Unknown function: %s"), name);
     break;
-  case ERROR_NOTMETHOD:
+  case FCERR_NOTMETHOD:
     emsg_funcname(N_("E276: Cannot use function as a method: %s"), name);
     break;
-  case ERROR_DELETED:
+  case FCERR_DELETED:
     emsg_funcname(N_("E933: Function was deleted: %s"), name);
     break;
-  case ERROR_TOOMANY:
+  case FCERR_TOOMANY:
     emsg_funcname(_(e_toomanyarg), name);
     break;
-  case ERROR_TOOFEW:
+  case FCERR_TOOFEW:
     emsg_funcname(N_("E119: Not enough arguments for function: %s"),
                   name);
     break;
-  case ERROR_SCRIPT:
+  case FCERR_SCRIPT:
     emsg_funcname(N_("E120: Using <SID> not in a script context: %s"),
                   name);
     break;
-  case ERROR_DICT:
+  case FCERR_DICT:
     emsg_funcname(N_("E725: Calling dict function without Dictionary: %s"),
                   name);
     break;
@@ -1421,7 +1449,7 @@ int call_func(const char *funcname, int len, typval_T *rettv, int argcount_in, t
   FUNC_ATTR_NONNULL_ARG(1, 3, 5, 6)
 {
   int ret = FAIL;
-  int error = ERROR_NONE;
+  int error = FCERR_NONE;
   ufunc_T *fp = NULL;
   char fname_buf[FLEN_FIXED + 1];
   char *tofree = NULL;
@@ -1429,12 +1457,12 @@ int call_func(const char *funcname, int len, typval_T *rettv, int argcount_in, t
   char *name = NULL;
   int argcount = argcount_in;
   typval_T *argvars = argvars_in;
-  dict_T *selfdict = funcexe->selfdict;
+  dict_T *selfdict = funcexe->fe_selfdict;
   typval_T argv[MAX_FUNC_ARGS + 1];  // used when "partial" or
-                                     // "funcexe->basetv" is not NULL
+                                     // "funcexe->fe_basetv" is not NULL
   int argv_clear = 0;
   int argv_base = 0;
-  partial_T *partial = funcexe->partial;
+  partial_T *partial = funcexe->fe_partial;
 
   // Initialize rettv so that it is safe for caller to invoke clear_tv(rettv)
   // even when call_func() returns FAIL.
@@ -1453,8 +1481,8 @@ int call_func(const char *funcname, int len, typval_T *rettv, int argcount_in, t
     fname = fname_trans_sid(name, (char *)fname_buf, &tofree, &error);
   }
 
-  if (funcexe->doesrange != NULL) {
-    *funcexe->doesrange = false;
+  if (funcexe->fe_doesrange != NULL) {
+    *funcexe->fe_doesrange = false;
   }
 
   if (partial != NULL) {
@@ -1464,10 +1492,10 @@ int call_func(const char *funcname, int len, typval_T *rettv, int argcount_in, t
     if (partial->pt_dict != NULL && (selfdict == NULL || !partial->pt_auto)) {
       selfdict = partial->pt_dict;
     }
-    if (error == ERROR_NONE && partial->pt_argc > 0) {
+    if (error == FCERR_NONE && partial->pt_argc > 0) {
       for (argv_clear = 0; argv_clear < partial->pt_argc; argv_clear++) {
         if (argv_clear + argcount_in >= MAX_FUNC_ARGS) {
-          error = ERROR_TOOMANY;
+          error = FCERR_TOOMANY;
           goto theend;
         }
         tv_copy(&partial->pt_argv[argv_clear], &argv[argv_clear]);
@@ -1480,7 +1508,7 @@ int call_func(const char *funcname, int len, typval_T *rettv, int argcount_in, t
     }
   }
 
-  if (error == ERROR_NONE && funcexe->evaluate) {
+  if (error == FCERR_NONE && funcexe->fe_evaluate) {
     char *rfname = fname;
 
     // Ignore "g:" before a function name.
@@ -1490,12 +1518,12 @@ int call_func(const char *funcname, int len, typval_T *rettv, int argcount_in, t
 
     rettv->v_type = VAR_NUMBER;         // default rettv is number zero
     rettv->vval.v_number = 0;
-    error = ERROR_UNKNOWN;
+    error = FCERR_UNKNOWN;
 
     if (is_luafunc(partial)) {
       if (len > 0) {
-        error = ERROR_NONE;
-        argv_add_base(funcexe->basetv, &argvars, &argcount, argv, &argv_base);
+        error = FCERR_NONE;
+        argv_add_base(funcexe->fe_basetv, &argvars, &argcount, argv, &argv_base);
         nlua_typval_call(funcname, (size_t)len, argvars, argcount, rettv);
       } else {
         // v:lua was called directly; show its name in the emsg
@@ -1523,40 +1551,22 @@ int call_func(const char *funcname, int len, typval_T *rettv, int argcount_in, t
       }
 
       if (fp != NULL && (fp->uf_flags & FC_DELETED)) {
-        error = ERROR_DELETED;
-      } else if (fp != NULL && (fp->uf_flags & FC_LUAREF)) {
-        error = typval_exec_lua_callable(fp->uf_luaref, argcount, argvars, rettv);
+        error = FCERR_DELETED;
       } else if (fp != NULL) {
-        if (funcexe->argv_func != NULL) {
+        if (funcexe->fe_argv_func != NULL) {
           // postponed filling in the arguments, do it now
-          argcount = funcexe->argv_func(argcount, argvars, argv_clear,
-                                        fp->uf_args.ga_len);
+          argcount = funcexe->fe_argv_func(argcount, argvars, argv_clear, fp);
         }
 
-        argv_add_base(funcexe->basetv, &argvars, &argcount, argv, &argv_base);
+        argv_add_base(funcexe->fe_basetv, &argvars, &argcount, argv, &argv_base);
 
-        if (fp->uf_flags & FC_RANGE && funcexe->doesrange != NULL) {
-          *funcexe->doesrange = true;
-        }
-        if (argcount < fp->uf_args.ga_len - fp->uf_def_args.ga_len) {
-          error = ERROR_TOOFEW;
-        } else if (!fp->uf_varargs && argcount > fp->uf_args.ga_len) {
-          error = ERROR_TOOMANY;
-        } else if ((fp->uf_flags & FC_DICT) && selfdict == NULL) {
-          error = ERROR_DICT;
-        } else {
-          // Call the user function.
-          call_user_func(fp, argcount, argvars, rettv, funcexe->firstline,
-                         funcexe->lastline,
-                         (fp->uf_flags & FC_DICT) ? selfdict : NULL);
-          error = ERROR_NONE;
-        }
+        error = call_user_func_check(fp, argcount, argvars, rettv, funcexe, selfdict);
       }
-    } else if (funcexe->basetv != NULL) {
+    } else if (funcexe->fe_basetv != NULL) {
       // expr->method(): Find the method name in the table, call its
       // implementation with the base as one of the arguments.
       error = call_internal_method((char_u *)fname, argcount, argvars, rettv,
-                                   funcexe->basetv);
+                                   funcexe->fe_basetv);
     } else {
       // Find the function name in the table, call its implementation.
       error = call_internal_func((char_u *)fname, argcount, argvars, rettv);
@@ -1571,7 +1581,7 @@ int call_func(const char *funcname, int len, typval_T *rettv, int argcount_in, t
     // update that flag first to make aborting() reliable.
     update_force_abort();
   }
-  if (error == ERROR_NONE) {
+  if (error == FCERR_NONE) {
     ret = OK;
   }
 
@@ -2941,12 +2951,12 @@ void ex_call(exarg_T *eap)
     arg = startarg;
 
     funcexe_T funcexe = FUNCEXE_INIT;
-    funcexe.firstline = eap->line1;
-    funcexe.lastline = eap->line2;
-    funcexe.doesrange = &doesrange;
-    funcexe.evaluate = true;
-    funcexe.partial = partial;
-    funcexe.selfdict = fudi.fd_dict;
+    funcexe.fe_firstline = eap->line1;
+    funcexe.fe_lastline = eap->line2;
+    funcexe.fe_doesrange = &doesrange;
+    funcexe.fe_evaluate = true;
+    funcexe.fe_partial = partial;
+    funcexe.fe_selfdict = fudi.fd_dict;
     if (get_func_tv(name, -1, &rettv, (char **)&arg, &funcexe) == FAIL) {
       failed = true;
       break;
@@ -3515,7 +3525,7 @@ bool set_ref_in_func(char_u *name, ufunc_T *fp_in, int copyID)
 {
   ufunc_T *fp = fp_in;
   funccall_T *fc;
-  int error = ERROR_NONE;
+  int error = FCERR_NONE;
   char_u fname_buf[FLEN_FIXED + 1];
   char_u *tofree = NULL;
   char_u *fname;

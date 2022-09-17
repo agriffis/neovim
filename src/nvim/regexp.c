@@ -1605,12 +1605,12 @@ static regsubmatch_T rsm;  // can only be used when can_f_submatch is true
 
 /// Put the submatches in "argv[argskip]" which is a list passed into
 /// call_func() by vim_regsub_both().
-static int fill_submatch_list(int argc FUNC_ATTR_UNUSED, typval_T *argv, int argskip, int argcount)
+static int fill_submatch_list(int argc FUNC_ATTR_UNUSED, typval_T *argv, int argskip, ufunc_T *fp)
   FUNC_ATTR_NONNULL_ALL
 {
   typval_T *listarg = argv + argskip;
 
-  if (argcount == argskip) {
+  if (!fp->uf_varargs && fp->uf_args.ga_len <= argskip) {
     // called function doesn't take a submatches argument
     return argskip;
   }
@@ -1803,8 +1803,8 @@ static int vim_regsub_both(char_u *source, typval_T *expr, char_u *dest, int des
         argv[0].v_type = VAR_LIST;
         argv[0].vval.v_list = &matchList.sl_list;
         funcexe_T funcexe = FUNCEXE_INIT;
-        funcexe.argv_func = fill_submatch_list;
-        funcexe.evaluate = true;
+        funcexe.fe_argv_func = fill_submatch_list;
+        funcexe.fe_evaluate = true;
         if (expr->v_type == VAR_FUNC) {
           s = (char_u *)expr->vval.v_string;
           call_func((char *)s, -1, &rettv, 1, argv, &funcexe);
@@ -1812,7 +1812,7 @@ static int vim_regsub_both(char_u *source, typval_T *expr, char_u *dest, int des
           partial_T *partial = expr->vval.v_partial;
 
           s = (char_u *)partial_name(partial);
-          funcexe.partial = partial;
+          funcexe.fe_partial = partial;
           call_func((char *)s, -1, &rettv, 1, argv, &funcexe);
         }
         if (tv_list_len(&matchList.sl_list) > 0) {
