@@ -596,10 +596,10 @@ void msg_source(int attr)
   }
   recursive = true;
 
-  msg_scroll = true;  // this will take more than one line
   no_wait_return++;
   char *p = get_emsg_source();
   if (p != NULL) {
+    msg_scroll = true;  // this will take more than one line
     msg_attr(p, attr);
     xfree(p);
   }
@@ -739,7 +739,7 @@ static bool emsg_multiline(const char *s, bool multiline)
   }
 
   // Display name and line number for the source of the error.
-  // Sets "msg_scroll".
+  msg_scroll = true;
   msg_source(attr);
 
   // Display the error message itself.
@@ -934,15 +934,6 @@ void hl_msg_free(HlMessage hl_msg)
     xfree(kv_A(hl_msg, i).text.data);
   }
   kv_destroy(hl_msg);
-}
-
-#define LINE_BUFFER_SIZE 4096
-
-void add_hl_msg_hist(HlMessage hl_msg)
-{
-  if (kv_size(hl_msg)) {
-    add_msg_hist_multiattr(NULL, 0, 0, true, hl_msg);
-  }
 }
 
 /// @param[in]  len  Length of s or -1.
