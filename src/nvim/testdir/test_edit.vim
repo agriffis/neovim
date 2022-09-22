@@ -1927,4 +1927,76 @@ func Test_read_invalid()
   set encoding=utf-8
 endfunc
 
+" Test for the 'revins' option
+func Test_edit_revins()
+  CheckFeature rightleft
+  new
+  set revins
+  exe "normal! ione\ttwo three"
+  call assert_equal("eerht owt\teno", getline(1))
+  call setline(1, "one\ttwo three")
+  normal! gg$bi a
+  call assert_equal("one\ttwo a three", getline(1))
+  exe "normal! $bi\<BS>\<BS>"
+  call assert_equal("one\ttwo a ree", getline(1))
+  exe "normal! 0wi\<C-W>"
+  call assert_equal("one\t a ree", getline(1))
+  exe "normal! 0wi\<C-U>"
+  call assert_equal("one\t ", getline(1))
+  " newline in insert mode starts at the end of the line
+  call setline(1, 'one two three')
+  exe "normal! wi\nfour"
+  call assert_equal(['one two three', 'ruof'], getline(1, '$'))
+  set revins&
+  bw!
+endfunc
+
+" Test for getting the character of the line below after "p"
+func Test_edit_put_CTRL_E()
+  " set encoding=latin1
+  new
+  let @" = ''
+  sil! norm orggRx
+  sil! norm pr
+  call assert_equal(['r', 'r'], getline(1, 2))
+  bwipe!
+  set encoding=utf-8
+endfunc
+
+" Test toggling of input method. See :help i_CTRL-^
+func Test_edit_CTRL_hat()
+  CheckFeature xim
+
+  " FIXME: test fails with Motif GUI.
+  "        test also fails when running in the GUI.
+  CheckFeature gui_gtk
+  CheckNotGui
+
+  new
+
+  call assert_equal(0, &iminsert)
+  call feedkeys("i\<C-^>", 'xt')
+  call assert_equal(2, &iminsert)
+  call feedkeys("i\<C-^>", 'xt')
+  call assert_equal(0, &iminsert)
+
+  bwipe!
+endfunc
+
+" Weird long file name was going over the end of NameBuff
+func Test_edit_overlong_file_name()
+  CheckUnix
+
+  file 0000000000000000000000000000
+  file %%%%%%%%%%%%%%%%%%%%%%%%%%
+  file %%%%%%
+  set readonly
+  set ls=2 
+
+  redraw!
+  set noreadonly ls&
+  bwipe!
+endfunc
+
+
 " vim: shiftwidth=2 sts=2 expandtab
