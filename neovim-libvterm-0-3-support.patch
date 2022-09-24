@@ -1,0 +1,143 @@
+From 74db632c978cc391c70d13673b468f80c452d932 Mon Sep 17 00:00:00 2001
+From: Andreas Schneider <asn@cryptomilk.org>
+Date: Tue, 8 Feb 2022 18:58:36 +0100
+Subject: refactor(term): Support libvterm 0.3
+
+---
+ src/nvim/terminal.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+Index: neovim-0.7.2/src/nvim/terminal.c
+===================================================================
+--- neovim-0.7.2.orig/src/nvim/terminal.c	2022-06-26 17:08:22.000000000 +0200
++++ neovim-0.7.2/src/nvim/terminal.c	2022-09-21 13:22:20.456525182 +0200
+@@ -118,6 +118,10 @@ struct terminal {
+   // window height has increased) and must be deleted from the terminal buffer
+   int sb_pending;
+ 
++  char *title;     // VTermStringFragment buffer
++  size_t title_len;    // number of rows pushed to sb_buffer
++  size_t title_size;   // sb_buffer size
++
+   // buf_T instance that acts as a "drawing surface" for libvterm
+   // we can't store a direct reference to the buffer because the
+   // refresh_timer_cb may be called after the buffer was freed, and there's
+@@ -228,7 +232,7 @@ Terminal *terminal_open(buf_T *buf, Term
+   set_option_value("wrap", false, NULL, OPT_LOCAL);
+   set_option_value("list", false, NULL, OPT_LOCAL);
+   if (buf->b_ffname != NULL) {
+-    buf_set_term_title(buf, (char *)buf->b_ffname);
++    buf_set_term_title(buf, buf->b_ffname, strlen((char *)buf->b_ffname));
+   }
+   RESET_BINDING(curwin);
+   // Reset cursor in current window.
+@@ -605,6 +609,7 @@ void terminal_destroy(Terminal *term)
+       xfree(term->sb_buffer[i]);
+     }
+     xfree(term->sb_buffer);
++    xfree(term->title);
+     vterm_free(term->vt);
+     xfree(term);
+   }
+@@ -827,13 +832,13 @@ static int term_movecursor(VTermPos new,
+   return 1;
+ }
+ 
+-static void buf_set_term_title(buf_T *buf, char *title)
++static void buf_set_term_title(buf_T *buf, const char *title, size_t len)
+   FUNC_ATTR_NONNULL_ALL
+ {
+   Error err = ERROR_INIT;
+   dict_set_var(buf->b_vars,
+                STATIC_CSTR_AS_STRING("term_title"),
+-               STRING_OBJ(cstr_as_string(title)),
++               STRING_OBJ(((String){ .data = (char *)title, .size = len })),
+                false,
+                false,
+                &err);
+@@ -856,7 +861,34 @@ static int term_settermprop(VTermProp pr
+ 
+   case VTERM_PROP_TITLE: {
+     buf_T *buf = handle_get_buffer(term->buf_handle);
+-    buf_set_term_title(buf, val->string);
++#if VTERM_VERSION_MAJOR > 0 || (VTERM_VERSION_MAJOR == 0 && VTERM_VERSION_MINOR >= 2)
++    VTermStringFragment frag = val->string;
++
++    if (frag.initial && frag.final) {
++      buf_set_term_title(buf, frag.str, frag.len);
++      break;
++    }
++
++    if (frag.initial) {
++      term->title_len = 0;
++      term->title_size = MAX(frag.len, 1024);
++      term->title = xmalloc(sizeof(char *) * term->title_size);
++    } else if (term->title_len + frag.len > term->title_size) {
++      term->title_size *= 2;
++      term->title = xrealloc(term->title, sizeof(char *) * term->title_size);
++    }
++
++    memcpy(term->title + term->title_len, frag.str, frag.len);
++    term->title_len += frag.len;
++
++    if (frag.final) {
++      buf_set_term_title(buf, term->title, term->title_len);
++      xfree(term->title);
++      term->title = NULL;
++    }
++#else
++    buf_set_term_title(buf, val->string, strlen(val->string));
++#endif
+     break;
+   }
+ 
+Index: neovim-0.7.2/test/functional/terminal/altscreen_spec.lua
+===================================================================
+--- neovim-0.7.2.orig/test/functional/terminal/altscreen_spec.lua	2022-06-26 17:08:22.000000000 +0200
++++ neovim-0.7.2/test/functional/terminal/altscreen_spec.lua	2022-09-21 13:22:20.457525181 +0200
+@@ -126,13 +126,13 @@ describe(':terminal altscreen', function
+       wait_removal()
+       feed('<c-\\><c-n>4k')
+       screen:expect([[
+-        ^line3                                             |
++        ^                                                  |
+                                                           |
+                                                           |
+         rows: 4, cols: 50                                 |
+                                                           |
+       ]])
+-      eq(8, curbuf('line_count'))
++      eq(9, curbuf('line_count'))
+     end)
+ 
+     describe('and after exit', function()
+@@ -142,15 +142,11 @@ describe(':terminal altscreen', function
+       end)
+ 
+       it('restore buffer state', function()
+-        -- FIXME(tarruda): Note that the last line was lost after restoring the
+-        -- screen. This is a libvterm bug: When the main screen is restored it
+-        -- seems to "cut" lines that would have been left below the new visible
+-        -- screen.
+         screen:expect([[
+-          line4                                             |
+           line5                                             |
+           line6                                             |
+           line7                                             |
++          line8                                             |
+           {3:-- TERMINAL --}                                    |
+         ]])
+       end)
+Index: neovim-0.7.2/CMakeLists.txt
+===================================================================
+--- neovim-0.7.2.orig/CMakeLists.txt	2022-06-26 17:08:22.000000000 +0200
++++ neovim-0.7.2/CMakeLists.txt	2022-09-21 13:22:24.923523896 +0200
+@@ -501,7 +501,7 @@ if(FEAT_TUI)
+   include_directories(SYSTEM ${LIBTERMKEY_INCLUDE_DIRS})
+ endif()
+ 
+-find_package(LIBVTERM 0.1 REQUIRED)
++find_package(LIBVTERM 0.3 REQUIRED)
+ include_directories(SYSTEM ${LIBVTERM_INCLUDE_DIRS})
+ 
+ if(WIN32)

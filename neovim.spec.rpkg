@@ -6,6 +6,7 @@
 %endif
 
 %global luv_min_ver 1.42.0
+%global tree_sitter_min_ver 0.20.3
 
 %if %{with luajit}
 %global luajit_version 2.1
@@ -33,7 +34,8 @@ Source0:        {{{git_repo_pack}}}
 Source1:        sysinit.vim
 Source2:        spec-template
 
-Patch0:         neovim-libvterm-0-2-support.patch
+# Based on  https://github.com/neovim/neovim/pull/20222.patch
+Patch0:         neovim-libvterm-0-3-support.patch
 
 Patch1000:      neovim-lua-bit32.patch
 Patch1001:      neovim-cmake-lua-5.1.patch
@@ -68,11 +70,14 @@ BuildRequires:  jemalloc-devel
 BuildRequires:  msgpack-devel >= 3.1.0
 BuildRequires:  libtermkey-devel
 BuildRequires:  libuv-devel >= 1.42.0
-BuildRequires:  libvterm-devel >= 0.2
+BuildRequires:  libvterm-devel >= 0.3
 # need the build with the fix for the resize buffer issue
-Requires:       libvterm >= 0.2-3
+Requires:       libvterm >= 0.3
 BuildRequires:  unibilium-devel
-BuildRequires:  libtree-sitter-devel >= 0.20.0
+BuildRequires:  libtree-sitter-devel >= %{tree_sitter_min_ver}
+# tree-sitter didn't do an soname bump. enforce the min version
+# see https://github.com/nvim-treesitter/nvim-treesitter/pull/3055/files
+Requires:       libtree-sitter >= %{tree_sitter_min_ver}
 Suggests:       (python2-neovim if python2)
 Suggests:       (python3-neovim if python3)
 # XSel provides access to the system clipboard
@@ -145,6 +150,12 @@ find %{buildroot}%{_datadir} \( -name "*.bat" -o -name "*.awk" \) \
 %changelog
 * {{{git_changelog_date}}} Aron Griffis <aron@scampersand.com> - {{{git_changelog_version}}}
 - Nightly build from git master
+
+* Wed Sep 21 2022 Andreas Schneider <asn@redhat.com> - 0.7.2-4
+- Build with libvterm 0.3
+
+* Thu Aug 25 2022 Michel Alexandre Salim <salimma@fedoraproject.org> - 0.7.2-3
+- Enforce the minimum tree-sitter version at runtime (Fixes: rhbz#2100577)
 
 * Fri Jul 22 2022 Fedora Release Engineering <releng@fedoraproject.org> - 0.7.2-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_37_Mass_Rebuild
