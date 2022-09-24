@@ -34,9 +34,6 @@ Source0:        {{{git_repo_pack}}}
 Source1:        sysinit.vim
 Source2:        spec-template
 
-# Based on  https://github.com/neovim/neovim/pull/20222.patch
-Patch0:         neovim-libvterm-0-3-support.patch
-
 Patch1000:      neovim-lua-bit32.patch
 Patch1001:      neovim-cmake-lua-5.1.patch
 
@@ -95,8 +92,6 @@ parts of Vim, without compromise, and more.
 
 %prep
 {{{git_setup_macro path="$GIT_ROOT"}}}
-
-%patch0 -p1
 
 %if %{without luajit}
 %patch1000 -p1
