@@ -255,6 +255,7 @@ let s:filename_checks = {
     \ 'hex': ['file.hex', 'file.h32'],
     \ 'hgcommit': ['hg-editor-file.txt'],
     \ 'hjson': ['file.hjson'],
+    \ 'hlsplaylist': ['file.m3u8'],
     \ 'hog': ['file.hog', 'snort.conf', 'vision.conf'],
     \ 'hollywood': ['file.hws'],
     \ 'hoon': ['file.hoon'],
@@ -385,6 +386,7 @@ let s:filename_checks = {
     \ 'neomuttrc': ['Neomuttrc', '.neomuttrc', '.neomuttrc-file', '/.neomutt/neomuttrc', '/.neomutt/neomuttrc-file', 'Neomuttrc', 'Neomuttrc-file', 'any/.neomutt/neomuttrc', 'any/.neomutt/neomuttrc-file', 'neomuttrc', 'neomuttrc-file'],
     \ 'netrc': ['.netrc'],
     \ 'nginx': ['file.nginx', 'nginxfile.conf', 'filenginx.conf', 'any/etc/nginx/file', 'any/usr/local/nginx/conf/file', 'any/nginx/file.conf'],
+    \ 'nim': ['file.nim', 'file.nims', 'file.nimble'],
     \ 'ninja': ['file.ninja'],
     \ 'nix': ['file.nix'],
     \ 'nqc': ['file.nqc'],
@@ -930,7 +932,9 @@ func Test_d_file()
   call assert_equal('d', &filetype)
   bwipe!
 
+  " clean up
   filetype off
+  call delete('Xfile.d')
 endfunc
 
 func Test_dat_file()
