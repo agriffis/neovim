@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "klib/kvec.h"
 #include "nvim/api/extmark.h"
 #include "nvim/api/vim.h"
 #include "nvim/arabic.h"
@@ -40,7 +41,6 @@
 #include "nvim/highlight_group.h"
 #include "nvim/indent.h"
 #include "nvim/keycodes.h"
-#include "nvim/lib/kvec.h"
 #include "nvim/log.h"
 #include "nvim/main.h"
 #include "nvim/mapping.h"
@@ -136,6 +136,7 @@ typedef struct cmdpreview_win_info {
 
 typedef struct cmdpreview_buf_info {
   buf_T *buf;
+  bool save_b_u_synced;
   time_t save_b_u_time_cur;
   long save_b_u_seq_cur;
   u_header_T *save_b_u_newhead;
@@ -2131,6 +2132,7 @@ static void cmdpreview_prepare(CpInfo *cpinfo)
     CpBufInfo cp_bufinfo;
     cp_bufinfo.buf = buf;
 
+    cp_bufinfo.save_b_u_synced = buf->b_u_synced;
     cp_bufinfo.save_b_u_time_cur = buf->b_u_time_cur;
     cp_bufinfo.save_b_u_seq_cur = buf->b_u_seq_cur;
     cp_bufinfo.save_b_u_newhead = buf->b_u_newhead;
@@ -2168,6 +2170,8 @@ static void cmdpreview_prepare(CpInfo *cpinfo)
   cmdmod.cmod_split = 0;         // Disable :leftabove/botright modifiers
   cmdmod.cmod_tab = 0;           // Disable :tab modifier
   cmdmod.cmod_flags |= CMOD_NOSWAPFILE;  // Disable swap for preview buffer
+
+  u_sync(true);
 }
 
 // Restore the state of buffers and windows before command preview.
@@ -2190,7 +2194,7 @@ static void cmdpreview_restore_state(CpInfo *cpinfo)
       aco_save_T aco;
       aucmd_prepbuf(&aco, buf);
       // Undo invisibly. This also moves the cursor!
-      if (!u_undo_and_forget(count)) {
+      if (!u_undo_and_forget(count, false)) {
         abort();
       }
       aucmd_restbuf(&aco);
@@ -2200,6 +2204,11 @@ static void cmdpreview_restore_state(CpInfo *cpinfo)
       buf->b_u_newhead = cp_bufinfo.save_b_u_newhead;
       buf->b_u_time_cur = cp_bufinfo.save_b_u_time_cur;
     }
+
+    if (buf->b_u_curhead == NULL) {
+      buf->b_u_synced = cp_bufinfo.save_b_u_synced;
+    }
+
     if (cp_bufinfo.save_changedtick != buf_get_changedtick(buf)) {
       buf_set_changedtick(buf, cp_bufinfo.save_changedtick);
     }

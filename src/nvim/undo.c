@@ -81,6 +81,7 @@
 #include <string.h>
 
 #include "auto/config.h"
+#include "klib/kvec.h"
 #include "nvim/ascii.h"
 #include "nvim/buffer.h"
 #include "nvim/buffer_updates.h"
@@ -94,7 +95,6 @@
 #include "nvim/fold.h"
 #include "nvim/garray.h"
 #include "nvim/getchar.h"
-#include "nvim/lib/kvec.h"
 #include "nvim/mark.h"
 #include "nvim/memline.h"
 #include "nvim/memory.h"
@@ -1771,16 +1771,16 @@ void u_redo(int count)
 
 /// Undo and remove the branch from the undo tree.
 /// Also moves the cursor (as a "normal" undo would).
-bool u_undo_and_forget(int count)
+///
+/// @param do_buf_event If `true`, send the changedtick with the buffer updates
+bool u_undo_and_forget(int count, bool do_buf_event)
 {
   if (curbuf->b_u_synced == false) {
     u_sync(true);
     count = 1;
   }
   undo_undoes = true;
-  u_doit(count, true,
-         // Don't send nvim_buf_lines_event for u_undo_and_forget().
-         false);
+  u_doit(count, true, do_buf_event);
 
   if (curbuf->b_u_curhead == NULL) {
     // nothing was undone.
