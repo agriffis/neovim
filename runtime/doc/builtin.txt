@@ -1131,13 +1131,14 @@ chdir({dir})						*chdir()*
 			  directory (|:tcd|) then changes the tabpage local
 			  directory.
 			- Otherwise, changes the global directory.
+		{dir} must be a String.
 		If successful, returns the previous working directory.  Pass
 		this to another chdir() to restore the directory.
 		On failure, returns an empty string.
 
 		Example: >
 			let save_dir = chdir(newdir)
-			if save_dir
+			if save_dir != ""
 			   " ... do some work
 			   call chdir(save_dir)
 			endif
@@ -2627,7 +2628,7 @@ get({dict}, {key} [, {default}])
 		{default} is omitted.  Useful example: >
 			let val = get(g:, 'var_name', 'default')
 <		This gets the value of g:var_name if it exists, and uses
-		'default' when it does not exist.
+		"default" when it does not exist.
 get({func}, {what})
 		Get item {what} from Funcref {func}.  Possible values for
 		{what} are:
@@ -3034,7 +3035,7 @@ getcurpos([{winid}])
 		cursor vertically.  Also see |getcursorcharpos()| and
 		|getpos()|.
 		The first "bufnum" item is always zero. The byte position of
-		the cursor is returned in 'col'. To get the character
+		the cursor is returned in "col". To get the character
 		position, use |getcursorcharpos()|.
 
 		The optional {winid} argument can specify the window.  It can
@@ -3240,7 +3241,7 @@ getloclist({nr} [, {what}])				*getloclist()*
 		In addition to the items supported by |getqflist()| in {what},
 		the following item is supported by |getloclist()|:
 
-			filewinid 	id of the window used to display files
+			filewinid	id of the window used to display files
 					from the location list. This field is
 					applicable only when called from a
 					location list window. See
@@ -3413,7 +3414,7 @@ getqflist([{what}])					*getqflist()*
 				|quickfix-ID|; zero means the id for the
 				current list or the list specified by "nr"
 			idx	get information for the quickfix entry at this
-				index in the list specified by 'id' or 'nr'.
+				index in the list specified by "id" or "nr".
 				If set to zero, then uses the current entry.
 				See |quickfix-index|
 			items	quickfix list entries
@@ -6069,6 +6070,8 @@ rand([{expr}])						*rand()*
 							*readdir()*
 readdir({directory} [, {expr}])
 		Return a list with file and directory names in {directory}.
+		You can also use |glob()| if you don't need to do complicated
+		things, such as limiting the number of matches.
 
 		When {expr} is omitted all entries are included.
 		When {expr} is given, it is evaluated to check what to do:
@@ -7223,7 +7226,7 @@ setqflist({list} [, {action} [, {what}]])		*setqflist()*
 				See |quickfix-parse|
 		    id		quickfix list identifier |quickfix-ID|
 		    idx		index of the current entry in the quickfix
-				list specified by 'id' or 'nr'. If set to '$',
+				list specified by "id" or "nr". If set to '$',
 				then the last entry in the list is set as the
 				current entry.  See |quickfix-index|
 		    items	list of quickfix entries. Same as the {list}
@@ -8303,12 +8306,12 @@ synconcealed({lnum}, {col})				*synconcealed()*
 		   the text is "123456" and both "23" and "45" are concealed
 		   and replaced by the character "X", then:
 			call			returns ~
-		   	synconcealed(lnum, 1)   [0, '', 0]
-		   	synconcealed(lnum, 2)   [1, 'X', 1]
-		   	synconcealed(lnum, 3)   [1, 'X', 1]
-		   	synconcealed(lnum, 4)   [1, 'X', 2]
-		   	synconcealed(lnum, 5)   [1, 'X', 2]
-		   	synconcealed(lnum, 6)   [0, '', 0]
+			synconcealed(lnum, 1)   [0, '', 0]
+			synconcealed(lnum, 2)   [1, 'X', 1]
+			synconcealed(lnum, 3)   [1, 'X', 1]
+			synconcealed(lnum, 4)   [1, 'X', 2]
+			synconcealed(lnum, 5)   [1, 'X', 2]
+			synconcealed(lnum, 6)   [0, '', 0]
 
 
 synstack({lnum}, {col})					*synstack()*
