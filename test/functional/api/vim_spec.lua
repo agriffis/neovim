@@ -1,6 +1,7 @@
 local helpers = require('test.functional.helpers')(after_each)
 local Screen = require('test.functional.ui.screen')
 local lfs = require('lfs')
+local luv = require('luv')
 
 local fmt = string.format
 local assert_alive = helpers.assert_alive
@@ -14,6 +15,7 @@ local funcs = helpers.funcs
 local iswin = helpers.iswin
 local meths = helpers.meths
 local matches = helpers.matches
+local pesc = helpers.pesc
 local mkdir_p = helpers.mkdir_p
 local ok, nvim_async, feed = helpers.ok, helpers.nvim_async, helpers.feed
 local is_os = helpers.is_os
@@ -3176,9 +3178,6 @@ describe('API', function()
         cmd = 'echo',
         args = { 'foo' },
         bang = false,
-        range = {},
-        count = -1,
-        reg = '',
         addr = 'none',
         magic = {
             file = false,
@@ -3219,8 +3218,6 @@ describe('API', function()
         args = { '/math.random/math.max/' },
         bang = false,
         range = { 4, 6 },
-        count = -1,
-        reg = '',
         addr = 'line',
         magic = {
             file = false,
@@ -3262,7 +3259,6 @@ describe('API', function()
         bang = false,
         range = { 1 },
         count = 1,
-        reg = '',
         addr = 'buf',
         magic = {
             file = false,
@@ -3303,7 +3299,6 @@ describe('API', function()
         args = {},
         bang = false,
         range = {},
-        count = -1,
         reg = '+',
         addr = 'line',
         magic = {
@@ -3338,6 +3333,45 @@ describe('API', function()
           vertical = false,
         }
       }, meths.parse_cmd('put +', {}))
+      eq({
+        cmd = 'put',
+        args = {},
+        bang = false,
+        range = {},
+        reg = '',
+        addr = 'line',
+        magic = {
+            file = false,
+            bar = true
+        },
+        nargs = '0',
+        nextcmd = '',
+        mods = {
+          browse = false,
+          confirm = false,
+          emsg_silent = false,
+          filter = {
+              pattern = "",
+              force = false
+          },
+          hide = false,
+          horizontal = false,
+          keepalt = false,
+          keepjumps = false,
+          keepmarks = false,
+          keeppatterns = false,
+          lockmarks = false,
+          noautocmd = false,
+          noswapfile = false,
+          sandbox = false,
+          silent = false,
+          split = "",
+          tab = -1,
+          unsilent = false,
+          verbose = -1,
+          vertical = false,
+        }
+      }, meths.parse_cmd('put', {}))
     end)
     it('works with range, count and register', function()
       eq({
@@ -3387,8 +3421,6 @@ describe('API', function()
         args = {},
         bang = true,
         range = {},
-        count = -1,
-        reg = '',
         addr = 'line',
         magic = {
             file = true,
@@ -3429,8 +3461,6 @@ describe('API', function()
         args = { 'foo.txt' },
         bang = false,
         range = {},
-        count = -1,
-        reg = '',
         addr = '?',
         magic = {
             file = true,
@@ -3469,8 +3499,6 @@ describe('API', function()
         args = { 'foo.txt' },
         bang = false,
         range = {},
-        count = -1,
-        reg = '',
         addr = '?',
         magic = {
             file = true,
@@ -3512,8 +3540,6 @@ describe('API', function()
         args = { 'test', 'it' },
         bang = true,
         range = { 4, 6 },
-        count = -1,
-        reg = '',
         addr = 'line',
         magic = {
             file = false,
@@ -3554,8 +3580,6 @@ describe('API', function()
         args = { 'a.txt' },
         bang = false,
         range = {},
-        count = -1,
-        reg = '',
         addr = 'arg',
         magic = {
             file = true,
@@ -3596,9 +3620,6 @@ describe('API', function()
         cmd = 'MyCommand',
         args = { 'test it' },
         bang = false,
-        range = {},
-        count = -1,
-        reg = '',
         addr = 'none',
         magic = {
             file = false,
@@ -3690,8 +3711,6 @@ describe('API', function()
         args = {'x'},
         bang = true,
         range = {3, 4},
-        count = -1,
-        reg = '',
         addr = 'line',
         magic = {
           file = false,
@@ -3728,6 +3747,11 @@ describe('API', function()
       eq({1, 0}, meths.win_get_cursor(0))
       eq('', funcs.getreg('/'))
       eq('', funcs.histget('search'))
+    end)
+    it('result can be used directly by nvim_cmd #20051', function()
+      eq("foo", meths.cmd(meths.parse_cmd('echo "foo"', {}), { output = true }))
+      meths.cmd(meths.parse_cmd("set cursorline", {}), {})
+      eq(true, meths.get_option_value("cursorline", {}))
     end)
   end)
   describe('nvim_cmd', function()
@@ -3912,11 +3936,23 @@ describe('API', function()
       eq({'aa'}, meths.buf_get_lines(0, 0, 1, false))
       assert_alive()
     end)
+    it('supports filename expansion', function()
+      meths.cmd({ cmd = 'argadd', args = { '%:p:h:t', '%:p:h:t' } }, {})
+      local arg = funcs.expand('%:p:h:t')
+      eq({ arg, arg }, funcs.argv())
+    end)
     it("'make' command works when argument count isn't 1 #19696", function()
       command('set makeprg=echo')
-      meths.cmd({ cmd = 'make' }, {})
+      command('set shellquote=')
+      matches('^:!echo ',
+              meths.cmd({ cmd = 'make' }, { output = true }))
       assert_alive()
-      meths.cmd({ cmd = 'make', args = { 'foo', 'bar' } }, {})
+      matches('^:!echo foo bar',
+              meths.cmd({ cmd = 'make', args = { 'foo', 'bar' } }, { output = true }))
+      assert_alive()
+      local arg_pesc = pesc(funcs.expand('%:p:h:t'))
+      matches(('^:!echo %s %s'):format(arg_pesc, arg_pesc),
+              meths.cmd({ cmd = 'make', args = { '%:p:h:t', '%:p:h:t' } }, { output = true }))
       assert_alive()
     end)
     it('doesn\'t display messages when output=true', function()
@@ -3948,6 +3984,24 @@ describe('API', function()
         {0:~                                       }|
         15                                      |
       ]]}
+    end)
+    it('works with non-String args', function()
+      eq('2', meths.cmd({cmd = 'echo', args = {2}}, {output = true}))
+      eq('1', meths.cmd({cmd = 'echo', args = {true}}, {output = true}))
+    end)
+    describe('first argument as count', function()
+      before_each(clear)
+
+      it('works', function()
+        command('vsplit | enew')
+        meths.cmd({cmd = 'bdelete', args = {meths.get_current_buf()}}, {})
+        eq(1, meths.get_current_buf().id)
+      end)
+      it('works with :sleep using milliseconds', function()
+        local start = luv.now()
+        meths.cmd({cmd = 'sleep', args = {'100m'}}, {})
+        ok(luv.now() - start <= 300)
+      end)
     end)
   end)
 end)
