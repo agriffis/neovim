@@ -532,8 +532,8 @@ if(WIN32)
                       translations/qt_uk.qm
                       D3Dcompiler_47.dll
                       libEGL.dll
-                      libgcc_s_dw2-1.dll
-                      libGLESV2.dll
+                      libgcc_s_seh-1.dll
+                      libGLESv2.dll
                       libstdc++-6.dll
                       libwinpthread-1.dll
                       nvim-qt.exe
