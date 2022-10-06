@@ -881,7 +881,7 @@ void do_autocmd(char *arg_in, int forceit)
     }
   } else {
     if (*arg == '*' || *arg == NUL || *arg == '|') {
-      if (!forceit && *cmd != NUL) {
+      if (*cmd != NUL) {
         emsg(_(e_cannot_define_autocommands_for_all_events));
       } else {
         do_all_autocmd_events(pat, once, nested, cmd, forceit, group);
@@ -2720,7 +2720,7 @@ static void do_autocmd_focusgained(bool gained)
       redrawcmdline();
     } else if ((State & MODE_NORMAL) || (State & MODE_INSERT)) {
       if (must_redraw != 0) {
-        update_screen(0);
+        update_screen();
       }
 
       setcursor();

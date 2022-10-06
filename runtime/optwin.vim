@@ -1,7 +1,7 @@
 " These commands create the option window.
 "
 " Maintainer:	Bram Moolenaar <Bram@vim.org>
-" Last Change:	2022 Sep 11
+" Last Change:	2022 Oct 02
 
 " If there already is an option window, jump to that one.
 let buf = bufnr('option-window')
@@ -511,6 +511,8 @@ call append("$", "\tto a buffer")
 call <SID>OptionG("swb", &swb)
 call append("$", "splitbelow\ta new window is put below the current one")
 call <SID>BinOptionG("sb", &sb)
+call append("$", "splitkeep\ta determines scroll behavior for split windows")
+call <SID>BinOptionG("spk", &spk)
 call append("$", "splitright\ta new window is put right of the current one")
 call <SID>BinOptionG("spr", &spr)
 call append("$", "scrollbind\tthis window scrolls together with other bound windows")

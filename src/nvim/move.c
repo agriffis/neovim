@@ -130,16 +130,6 @@ static void redraw_for_cursorcolumn(win_T *wp)
   }
 }
 
-// Update curwin->w_topline and redraw if necessary.
-// Used to update the screen before printing a message.
-void update_topline_redraw(void)
-{
-  update_topline(curwin);
-  if (must_redraw) {
-    update_screen(0);
-  }
-}
-
 // Update curwin->w_topline to move the cursor onto the screen.
 void update_topline(win_T *wp)
 {
@@ -149,6 +139,11 @@ void update_topline(win_T *wp)
   bool check_botline = false;
   long *so_ptr = wp->w_p_so >= 0 ? &wp->w_p_so : &p_so;
   long save_so = *so_ptr;
+
+  // Cursor is updated instead when this is true for 'splitkeep'.
+  if (skip_update_topline) {
+    return;
+  }
 
   // If there is no valid screen and when the window height is zero just use
   // the cursor line.
