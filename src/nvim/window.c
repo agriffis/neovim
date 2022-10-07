@@ -4300,7 +4300,7 @@ static void enter_tabpage(tabpage_T *tp, buf_T *old_curbuf, bool trigger_enter_a
   // When cmdheight is changed in a tab page with '<C-w>-', cmdline_row is
   // changed but p_ch and tp_ch_used are not changed. Thus we also need to
   // check cmdline_row.
-  if ((row < cmdline_row) && (cmdline_row <= Rows - p_ch)) {
+  if (row < cmdline_row && cmdline_row <= Rows - p_ch) {
     clear_cmdline = true;
   }
 
@@ -6409,7 +6409,7 @@ void command_height(void)
   curtab->tp_ch_used = p_ch;
 
   // Update cmdline_row to what it should be: just below the last window.
-  cmdline_row = topframe->fr_height;
+  cmdline_row = topframe->fr_height + tabline_height() + global_stl_height();
 
   // If cmdline_row is smaller than what it is supposed to be for 'cmdheight'
   // then set old_p_ch to what it would be, so that the windows get resized
@@ -6545,7 +6545,7 @@ char_u *file_name_in_line(char_u *line, int col, int options, long count, char_u
 
   // search forward for what could be the start of a file name
   ptr = (char *)line + col;
-  while (*ptr != NUL && !vim_isfilec(*ptr)) {
+  while (*ptr != NUL && !vim_isfilec((uint8_t)(*ptr))) {
     MB_PTR_ADV(ptr);
   }
   if (*ptr == NUL) {            // nothing found
@@ -6560,7 +6560,8 @@ char_u *file_name_in_line(char_u *line, int col, int options, long count, char_u
   while ((char_u *)ptr > line) {
     if ((len = (size_t)(utf_head_off((char *)line, ptr - 1))) > 0) {
       ptr -= len + 1;
-    } else if (vim_isfilec(ptr[-1]) || ((options & FNAME_HYP) && path_is_url(ptr - 1))) {
+    } else if (vim_isfilec((uint8_t)ptr[-1])
+               || ((options & FNAME_HYP) && path_is_url(ptr - 1))) {
       ptr--;
     } else {
       break;
@@ -6570,7 +6571,7 @@ char_u *file_name_in_line(char_u *line, int col, int options, long count, char_u
   // Search forward for the last char of the file name.
   // Also allow ":/" when ':' is not in 'isfname'.
   len = 0;
-  while (vim_isfilec(ptr[len]) || (ptr[len] == '\\' && ptr[len + 1] == ' ')
+  while (vim_isfilec((uint8_t)ptr[len]) || (ptr[len] == '\\' && ptr[len + 1] == ' ')
          || ((options & FNAME_HYP) && path_is_url(ptr + len))
          || (is_url && vim_strchr(":?&=", ptr[len]) != NULL)) {
     // After type:// we also include :, ?, & and = as valid characters, so that
