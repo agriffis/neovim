@@ -1,6 +1,6 @@
 local api, fn = vim.api, vim.fn
 
-local find_arg = '-w'
+local FIND_ARG = '-w'
 local localfile_arg = true -- Always use -l if possible. #6683
 local buf_hls = {}
 
@@ -12,7 +12,7 @@ local function man_error(msg)
 end
 
 -- Run a system command and timeout after 30 seconds.
-local function man_system(cmd, silent)
+local function system(cmd, silent, env)
   local stdout_data = {}
   local stderr_data = {}
   local stdout = vim.loop.new_pipe(false)
@@ -25,6 +25,7 @@ local function man_system(cmd, silent)
   handle = vim.loop.spawn(cmd[1], {
     args = vim.list_slice(cmd, 2),
     stdio = { nil, stdout, stderr },
+    env = env,
   }, function(code)
     exit_code = code
     stdout:close()
@@ -44,7 +45,8 @@ local function man_system(cmd, silent)
     stdout:close()
     stderr:close()
     if not silent then
-      man_error(string.format('command error: %s', table.concat(cmd)))
+      local cmd_str = table.concat(cmd, ' ')
+      man_error(string.format('command error: %s', cmd_str))
     end
   end
 
@@ -58,13 +60,13 @@ local function man_system(cmd, silent)
       stdout:close()
       stderr:close()
     end
-    man_error(string.format('command timed out: %s', table.concat(cmd, ' ')))
+    local cmd_str = table.concat(cmd, ' ')
+    man_error(string.format('command timed out: %s', cmd_str))
   end
 
   if exit_code ~= 0 and not silent then
-    man_error(
-      string.format("command error '%s': %s", table.concat(cmd, ' '), table.concat(stderr_data))
-    )
+    local cmd_str = table.concat(cmd, ' ')
+    man_error(string.format("command error '%s': %s", cmd_str, table.concat(stderr_data)))
   end
 
   return table.concat(stdout_data)
@@ -269,17 +271,13 @@ local function get_path(sect, name, silent)
   -- inconsistently supported. Instead, call -w with a section and a name.
   local cmd
   if sect == '' then
-    cmd = { 'man', find_arg, name }
+    cmd = { 'man', FIND_ARG, name }
   else
-    cmd = { 'man', find_arg, sect, name }
+    cmd = { 'man', FIND_ARG, sect, name }
   end
 
-  local lines = man_system(cmd, silent)
-  if lines == nil then
-    return nil
-  end
-
-  local results = vim.split(lines, '\n', { trimempty = true })
+  local lines = system(cmd, silent)
+  local results = vim.split(lines or {}, '\n', { trimempty = true })
 
   if #results == 0 then
     return
@@ -344,7 +342,7 @@ end
 -- 2. If it still could not be found, then we try again without a section.
 -- 3. If still not found but $MANSECT is set, then we try again with $MANSECT
 --    unset.
-local function verify_exists(sect, name)
+local function verify_exists(sect, name, silent)
   if sect and sect ~= '' then
     local ret = get_path(sect, name, true)
     if ret then
@@ -380,8 +378,10 @@ local function verify_exists(sect, name)
     end
   end
 
-  -- finally, if that didn't work, there is no hope
-  man_error('no manual entry for ' .. name)
+  if not silent then
+    -- finally, if that didn't work, there is no hope
+    man_error('no manual entry for ' .. name)
+  end
 end
 
 local EXT_RE = vim.regex([[\.\%([glx]z\|bz2\|lzma\|Z\)$]])
@@ -435,15 +435,17 @@ local function get_page(path, silent)
   else
     manwidth = api.nvim_win_get_width(0)
   end
+
+  local cmd = localfile_arg and { 'man', '-l', path } or { 'man', path }
+
   -- Force MANPAGER=cat to ensure Vim is not recursively invoked (by man-db).
   -- http://comments.gmane.org/gmane.editors.vim.devel/29085
   -- Set MAN_KEEP_FORMATTING so Debian man doesn't discard backspaces.
-  local cmd = { 'env', 'MANPAGER=cat', 'MANWIDTH=' .. manwidth, 'MAN_KEEP_FORMATTING=1', 'man' }
-  if localfile_arg then
-    cmd[#cmd + 1] = '-l'
-  end
-  cmd[#cmd + 1] = path
-  return man_system(cmd, silent)
+  return system(cmd, silent, {
+    'MANPAGER=cat',
+    'MANWIDTH=' .. manwidth,
+    'MAN_KEEP_FORMATTING=1',
+  })
 end
 
 local function put_page(page)
@@ -480,38 +482,40 @@ local function format_candidate(path, psect)
   return ''
 end
 
-local function get_paths(sect, name, do_fallback)
-  -- callers must try-catch this, as some `man` implementations don't support `s:find_arg`
-  local ok, ret = pcall(function()
-    local mandirs =
-      table.concat(vim.split(man_system({ 'man', find_arg }), '[:\n]', { trimempty = true }), ',')
-    local paths = fn.globpath(mandirs, 'man?/' .. name .. '*.' .. sect .. '*', false, true)
-    pcall(function()
-      -- Prioritize the result from verify_exists as it obeys b:man_default_sects.
-      local first = verify_exists(sect, name)
-      paths = vim.tbl_filter(function(v)
-        return v ~= first
-      end, paths)
-      paths = { first, unpack(paths) }
-    end)
-    return paths
-  end)
+local function move_elem_to_head(list, elem)
+  local list1 = vim.tbl_filter(function(v)
+    return v ~= elem
+  end, list)
+  return { elem, unpack(list1) }
+end
 
-  if not ok then
-    if not do_fallback then
-      error(ret)
-    end
+local function get_paths(sect, name)
+  -- Try several sources for getting the list man directories:
+  --   1. `man -w` (works on most systems)
+  --   2. `manpath`
+  --   3. $MANPATH
+  local mandirs_raw = vim.F.npcall(system, { 'man', FIND_ARG })
+    or vim.F.npcall(system, { 'manpath', '-q' })
+    or vim.env.MANPATH
 
-    -- Fallback to a single path, with the page we're trying to find.
-    ok, ret = pcall(verify_exists, sect, name)
-
-    return { ok and ret or nil }
+  if not mandirs_raw then
+    man_error("Could not determine man directories from: 'man -w', 'manpath' or $MANPATH")
   end
-  return ret or {}
+
+  local mandirs = table.concat(vim.split(mandirs_raw, '[:\n]', { trimempty = true }), ',')
+  local paths = fn.globpath(mandirs, 'man?/' .. name .. '*.' .. sect .. '*', false, true)
+
+  -- Prioritize the result from verify_exists as it obeys b:man_default_sects.
+  local first = verify_exists(sect, name, true)
+  if first then
+    paths = move_elem_to_head(paths, first)
+  end
+
+  return paths
 end
 
 local function complete(sect, psect, name)
-  local pages = get_paths(sect, name, false)
+  local pages = get_paths(sect, name)
   -- We remove duplicates in case the same manpage in different languages was found.
   return fn.uniq(fn.sort(vim.tbl_map(function(v)
     return format_candidate(v, psect)
@@ -587,7 +591,7 @@ end
 function M.goto_tag(pattern, _, _)
   local sect, name = extract_sect_and_name_ref(pattern)
 
-  local paths = get_paths(sect, name, true)
+  local paths = get_paths(sect, name)
   local structured = {}
 
   for _, path in ipairs(paths) do
