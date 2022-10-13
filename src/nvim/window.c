@@ -2583,7 +2583,7 @@ static bool close_last_window_tabpage(win_T *win, bool free_buf, tabpage_T *prev
 
   // save index for tabclosed event
   char_u prev_idx[NUMBUFLEN];
-  sprintf((char *)prev_idx, "%i", tabpage_index(prev_curtab));
+  snprintf((char *)prev_idx, NUMBUFLEN, "%i", tabpage_index(prev_curtab));
 
   // Safety check: Autocommands may have closed the window when jumping
   // to the other tab page.
@@ -4913,7 +4913,7 @@ win_T *buf_jump_open_win(buf_T *buf)
 }
 
 /// Jump to the first open window in any tab page that contains buffer "buf",
-/// if one exists.
+/// if one exists. First search in the windows present in the current tab page.
 /// @return the found window, or NULL.
 win_T *buf_jump_open_tab(buf_T *buf)
 {
