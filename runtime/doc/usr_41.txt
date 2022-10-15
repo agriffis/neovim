@@ -1051,7 +1051,6 @@ Various:					*various-functions*
 	exists()		check if a variable, function, etc. exists
 	has()			check if a feature is supported in Vim
 	changenr()		return number of most recent change
-	cscope_connection()	check if a cscope connection exists
 	did_filetype()		check if a FileType autocommand was used
 	eventhandler()		check if invoked by an event handler
 	getpid()		get process ID of Vim
@@ -2624,7 +2623,7 @@ Further reading: |autoload|.
 ==============================================================================
 *41.16*	Distributing Vim scripts			*distribute-script*
 
-Vim users will look for scripts on the Vim website: http://www.vim.org.
+Vim users will look for scripts on the Vim website: https://www.vim.org.
 If you made something that is useful for others, share it!
 
 Vim scripts can be used on any system.  There might not be a tar or gzip

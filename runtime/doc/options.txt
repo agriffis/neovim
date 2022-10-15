@@ -621,7 +621,7 @@ A jump table for the options with a short description can be found at |Q_op|.
 	by Vim with the width of glyphs in the font.  Perhaps it also has
 	to be set to "double" under CJK MS-Windows when the system locale is
 	set to one of CJK locales.  See Unicode Standard Annex #11
-	(http://www.unicode.org/reports/tr11).
+	(https://www.unicode.org/reports/tr11).
 
 			*'autochdir'* *'acd'* *'noautochdir'* *'noacd'*
 'autochdir' 'acd'	boolean (default off)
@@ -1791,43 +1791,6 @@ A jump table for the options with a short description can be found at |Q_op|.
 								*cpo-_*
 		_	When using |cw| on a word, do not include the
 			whitespace following the word in the motion.
-
-						*'cscopepathcomp'* *'cspc'*
-'cscopepathcomp' 'cspc'	number	(default 0)
-			global
-	Determines how many components of the path to show in a list of tags.
-	See |cscopepathcomp|.
-
-						*'cscopeprg'* *'csprg'*
-'cscopeprg' 'csprg'	string	(default "cscope")
-			global
-	Specifies the command to execute cscope.  See |cscopeprg|.
-	This option cannot be set from a |modeline| or in the |sandbox|, for
-	security reasons.
-
-						*'cscopequickfix'* *'csqf'*
-'cscopequickfix' 'csqf' string	(default "")
-			global
-	Specifies whether to use quickfix window to show cscope results.
-	See |cscopequickfix|.
-
-		*'cscoperelative'* *'csre'* *'nocscoperelative'* *'nocsre'*
-'cscoperelative' 'csre' boolean (default off)
-			global
-	In the absence of a prefix (-P) for cscope. setting this option enables
-	to use the basename of cscope.out path as the prefix.
-	See |cscoperelative|.
-
-				*'cscopetag'* *'cst'* *'nocscopetag'* *'nocst'*
-'cscopetag' 'cst'	boolean (default off)
-			global
-	Use cscope for tag commands.  See |cscope-options|.
-
-						*'cscopetagorder'* *'csto'*
-'cscopetagorder' 'csto'	number	(default 0)
-			global
-	Determines the order in which ":cstag" performs a search.  See
-	|cscopetagorder|.
 
 			*'cursorbind'* *'crb'* *'nocursorbind'* *'nocrb'*
 'cursorbind' 'crb'	boolean  (default off)
@@ -4573,7 +4536,7 @@ A jump table for the options with a short description can be found at |Q_op|.
 <	- A directory name may end in a ':' or '/'.
 	- Environment variables are expanded |:set_env|.
 	- When using |netrw.vim| URLs can be used.  For example, adding
-	  "http://www.vim.org" will make ":find index.html" work.
+	  "https://www.vim.org" will make ":find index.html" work.
 	- Search upwards and downwards in a directory tree using "*", "**" and
 	  ";".  See |file-searching| for info and syntax.
 	- Careful with '\' characters, type two to get one in the option: >
