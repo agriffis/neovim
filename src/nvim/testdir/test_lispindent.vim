@@ -86,6 +86,37 @@ func Test_lisp_indent()
   set nolisp
 endfunc
 
+func Test_lispindent_negative()
+  " in legacy script there is no error
+  call assert_equal(-1, lispindent(-1))
+endfunc
+
+func Test_lispindent_with_indentexpr()
+  enew
+  setl ai lisp nocin indentexpr=11
+  exe "normal a(x\<CR>1\<CR>2)\<Esc>"
+  let expected = ['(x', '  1', '  2)']
+  call assert_equal(expected, getline(1, 3))
+  " with Lisp indenting the first line is not indented
+  normal 1G=G
+  call assert_equal(expected, getline(1, 3))
+
+  %del
+  setl lispoptions=expr:1 indentexpr=5
+  exe "normal a(x\<CR>1\<CR>2)\<Esc>"
+  let expected_expr = ['(x', '     1', '     2)']
+  call assert_equal(expected_expr, getline(1, 3))
+  normal 2G2<<=G
+  call assert_equal(expected_expr, getline(1, 3))
+
+  setl lispoptions=expr:0
+  " with Lisp indenting the first line is not indented
+  normal 1G3<<=G
+  call assert_equal(expected, getline(1, 3))
+
+  bwipe!
+endfunc
+
 func Test_lisp_indent_works()
   " This was reading beyond the end of the line
   new
