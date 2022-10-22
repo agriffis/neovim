@@ -252,8 +252,7 @@ void do_tag(char *tag, int type, int count, int forceit, int verbose)
 
       new_tag = true;
     } else {
-      if (
-          g_do_tagpreview != 0 ? ptag_entry.tagname == NULL :
+      if (g_do_tagpreview != 0 ? ptag_entry.tagname == NULL :
           tagstacklen == 0) {
         // empty stack
         emsg(_(e_tagstack));
@@ -643,8 +642,6 @@ end_do_tag:
   }
   postponed_split = 0;          // don't split next time
   g_do_tagpreview = 0;          // don't do tag preview next time
-
-  return;
 }
 
 // List all the matching tags.
@@ -1495,7 +1492,7 @@ int find_tags(char *pat, int *num_matches, char ***matchesp, int flags, int minc
 
     // Try tag file names from tags option one by one.
     for (first_file = true;
-         get_tagfname(&tn, first_file, (char *)tag_fname) == OK;
+         get_tagfname(&tn, first_file, tag_fname) == OK;
          first_file = false) {
       // A file that doesn't exist is silently ignored.  Only when not a
       // single file is found, an error message is given (further on).
@@ -1553,7 +1550,7 @@ int find_tags(char *pat, int *num_matches, char ***matchesp, int flags, int minc
         }
       }
 
-      if ((fp = os_fopen((char *)tag_fname, "r")) == NULL) {
+      if ((fp = os_fopen(tag_fname, "r")) == NULL) {
         continue;
       }
 
@@ -1647,7 +1644,7 @@ int find_tags(char *pat, int *num_matches, char ***matchesp, int flags, int minc
           // skip empty and blank lines
           do {
             eof = vim_fgets((char_u *)lbuf, lbuf_size, fp);
-          } while (!eof && vim_isblankline((char *)lbuf));
+          } while (!eof && vim_isblankline(lbuf));
 
           if (eof) {
             break;                                  // end of file
@@ -1953,7 +1950,7 @@ parse_line:
 
           // Decide in which array to store this match.
           is_current = test_for_current((char *)tagp.fname, (char *)tagp.fname_end,
-                                        (char *)tag_fname,
+                                        tag_fname,
                                         buf_ffname);
           is_static = test_for_static(&tagp);
 
