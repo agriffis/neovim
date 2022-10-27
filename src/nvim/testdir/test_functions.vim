@@ -67,9 +67,11 @@ func Test_len()
   call assert_equal(2, len('ab'))
 
   call assert_equal(0, len([]))
+  call assert_equal(0, len(v:_null_list))
   call assert_equal(2, len([2, 1]))
 
   call assert_equal(0, len({}))
+  call assert_equal(0, len(v:_null_dict))
   call assert_equal(2, len({'a': 1, 'b': 2}))
 
   " call assert_fails('call len(v:none)', 'E701:')
@@ -771,6 +773,9 @@ func Test_append()
   split
   only
   undo
+
+  " Using $ instead of '$' must give an error
+  call assert_fails("call append($, 'foobar')", 'E116:')
 endfunc
 
 func Test_getbufvar()
@@ -1013,7 +1018,9 @@ func Test_charidx()
   call assert_equal(2, charidx(a, 4))
   call assert_equal(3, charidx(a, 7))
   call assert_equal(-1, charidx(a, 8))
+  call assert_equal(-1, charidx(a, -1))
   call assert_equal(-1, charidx('', 0))
+  call assert_equal(-1, charidx(v:_null_string, 0))
 
   " count composing characters
   call assert_equal(0, charidx(a, 0, 1))
@@ -1320,6 +1327,9 @@ func Test_balloon_show()
 
   " This won't do anything but must not crash either.
   call balloon_show('hi!')
+  if !has('gui_running')
+    call balloon_show(range(3))
+  endif
 endfunc
 
 func Test_shellescape()
@@ -1737,9 +1747,8 @@ endfunc
 func Test_confirm()
   " requires a UI to be active
   throw 'Skipped: use test/functional/vimscript/input_spec.lua'
-  if !has('unix') || has('gui_running')
-    return
-  endif
+  CheckUnix
+  CheckNotGui
 
   call feedkeys('o', 'L')
   let a = confirm('Press O to proceed')
@@ -1856,6 +1865,7 @@ func Test_call()
   let mydict = {'data': [0, 1, 2, 3], 'len': function("Mylen")}
   eval mydict.len->call([], mydict)->assert_equal(4)
   call assert_fails("call call('Mylen', [], 0)", 'E715:')
+  call assert_fails('call foo', 'E107:')
 endfunc
 
 func Test_char2nr()
@@ -2035,15 +2045,10 @@ func Test_range()
   call assert_equal(1, index(range(1, 5), 2))
 
   " inputlist()
-  " call test_feedinput("1\<CR>")
-  call nvim_input('1<CR>')
-  call assert_equal(1, inputlist(range(10)))
-  " call test_feedinput("1\<CR>")
-  call nvim_input('1<CR>')
-  call assert_equal(1, inputlist(range(3, 10)))
-
-  " call assert_equal('[0,1,2,3]', json_encode(range(4)))
-  call assert_equal('[0, 1, 2, 3]', json_encode(range(4)))
+  call feedkeys(":let result = inputlist(range(10))\<CR>1\<CR>", 'x')
+  call assert_equal(1, result)
+  call feedkeys(":let result = inputlist(range(3, 10))\<CR>1\<CR>", 'x')
+  call assert_equal(1, result)
 
   " insert()
   call assert_equal([42, 1, 2, 3, 4, 5], insert(range(1, 5), 42))
@@ -2056,6 +2061,10 @@ func Test_range()
   " join()
   call assert_equal('0 1 2 3 4', join(range(5)))
 
+  " json_encode()
+  " call assert_equal('[0,1,2,3]', json_encode(range(4)))
+  call assert_equal('[0, 1, 2, 3]', json_encode(range(4)))
+
   " len()
   call assert_equal(0, len(range(0)))
   call assert_equal(2, len(range(2)))
@@ -2064,6 +2073,7 @@ func Test_range()
 
   " list2str()
   call assert_equal('ABC', list2str(range(65, 67)))
+  call assert_fails('let s = list2str(5)', 'E474:')
 
   " lock()
   let thelist = range(5)
@@ -2194,6 +2204,12 @@ func Test_range()
 
   " uniq()
   call assert_equal([0, 1, 2, 3, 4], uniq(range(5)))
+endfunc
+
+func Test_garbagecollect_now_fails()
+  let v:testing = 0
+  call assert_fails('call test_garbagecollect_now()', 'E1142:')
+  let v:testing = 1
 endfunc
 
 " Test for the eval() function

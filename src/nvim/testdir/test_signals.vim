@@ -16,8 +16,9 @@ endfunc
 " Test signal WINCH (window resize signal)
 func Test_signal_WINCH()
   throw 'skipped: Nvim cannot avoid terminal resize'
-  if has('gui_running') || !HasSignal('WINCH')
-    return
+  CheckNotGui
+  if !HasSignal('WINCH')
+    throw 'Skipped: WINCH signal not supported'
   endif
 
   " We do not actually want to change the size of the terminal.
@@ -128,8 +129,7 @@ func Test_deadly_signal_TERM()
   call assert_equal(['foo'], getline(1, '$'))
 
   let result = readfile('XautoOut')
-  call assert_match('VimLeavePre triggered', result[0])
-  call assert_match('VimLeave triggered', result[1])
+  call assert_equal(["VimLeavePre triggered", "VimLeave triggered"], result)
 
   %bwipe!
   call delete('.Xsig_TERM.swp')

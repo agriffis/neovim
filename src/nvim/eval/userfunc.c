@@ -48,6 +48,8 @@ static char *e_funcexts = N_("E122: Function %s already exists, add ! to replace
 static char *e_funcdict = N_("E717: Dictionary entry already exists");
 static char *e_funcref = N_("E718: Funcref required");
 static char *e_nofunc = N_("E130: Unknown function: %s");
+static char e_no_white_space_allowed_before_str_str[]
+  = N_("E1068: No white space allowed before '%s': %s");
 
 void func_init(void)
 {
@@ -148,6 +150,15 @@ static int get_function_args(char **argp, char_u endchar, garray_T *newargs, int
       } else if (any_default) {
         emsg(_("E989: Non-default argument follows default argument"));
         mustend = true;
+      }
+
+      if (ascii_iswhite(*p) && *skipwhite(p) == ',') {
+        // Be tolerant when skipping
+        if (!skip) {
+          semsg(_(e_no_white_space_allowed_before_str_str), ",", p);
+          goto err_ret;
+        }
+        p = skipwhite(p);
       }
       if (*p == ',') {
         p++;
@@ -1335,10 +1346,10 @@ void free_all_functions(void)
 /// @param[in]   len    length of "name", or -1 for NUL terminated.
 ///
 /// @return true if "name" looks like a builtin function name: starts with a
-/// lower case letter and doesn't contain AUTOLOAD_CHAR.
+/// lower case letter and doesn't contain AUTOLOAD_CHAR or ':'.
 static bool builtin_function(const char *name, int len)
 {
-  if (!ASCII_ISLOWER(name[0])) {
+  if (!ASCII_ISLOWER(name[0]) || name[1] == ':') {
     return false;
   }
 
@@ -2693,6 +2704,13 @@ void ex_delfunction(exarg_T *eap)
     *p = NUL;
   }
 
+  if (isdigit(*name) && fudi.fd_dict == NULL) {
+    if (!eap->skip) {
+      semsg(_(e_invarg2), eap->arg);
+    }
+    xfree(name);
+    return;
+  }
   if (!eap->skip) {
     fp = find_func(name);
   }
