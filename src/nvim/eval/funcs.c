@@ -5872,11 +5872,11 @@ static void f_readdir(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   ga_clear_strings(&ga);
 }
 
-/// "readfile()" function
-static void f_readfile(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
+/// "readfile()" or "readblob()" function
+static void read_file_or_blob(typval_T *argvars, typval_T *rettv, bool always_blob)
 {
   bool binary = false;
-  bool blob = false;
+  bool blob = always_blob;
   FILE *fd;
   char buf[(IOSIZE/256) * 256];    // rounded to avoid odd + 1
   int io_size = sizeof(buf);
@@ -6011,8 +6011,8 @@ static void f_readfile(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
             int adjust_prevlen = 0;
 
             if (dest < buf) {  // -V782
-              adjust_prevlen = (int)(buf - dest);  // -V782
               // adjust_prevlen must be 1 or 2.
+              adjust_prevlen = (int)(buf - dest);  // -V782
               dest = buf;
             }
             if (readlen > p - buf + 1) {
@@ -6053,6 +6053,18 @@ static void f_readfile(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 
   xfree(prev);
   fclose(fd);
+}
+
+/// "readblob()" function
+static void f_readblob(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
+{
+  read_file_or_blob(argvars, rettv, true);
+}
+
+/// "readfile()" function
+static void f_readfile(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
+{
+  read_file_or_blob(argvars, rettv, false);
 }
 
 /// "getreginfo()" function
@@ -9676,6 +9688,10 @@ static void f_win_move_separator(typval_T *argvars, typval_T *rettv, EvalFuncDat
 
   win_T *wp = find_win_by_nr_or_id(&argvars[0]);
   if (wp == NULL || wp->w_floating) {
+    return;
+  }
+  if (!win_valid(wp)) {
+    emsg(_(e_cannot_resize_window_in_another_tab_page));
     return;
   }
 
