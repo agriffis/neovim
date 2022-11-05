@@ -153,7 +153,7 @@ func Test_menu_errors()
   call assert_fails('menu Test.Foo.Bar', 'E327:')
   call assert_fails('cmenu Test.Foo', 'E328:')
   call assert_fails('emenu x Test.Foo', 'E475:')
-  call assert_fails('emenu Test.Foo.Bar', 'E334:')
+  call assert_fails('emenu Test.Foo.Bar', 'E327:')
   call assert_fails('menutranslate Test', 'E474:')
 
   silent! unmenu Foo
@@ -252,6 +252,7 @@ func Test_menu_info()
   nmenu Test.abc  <Nop>
   call assert_equal('<Nop>', menu_info('Test.abc').rhs)
   call assert_fails('call menu_info([])', 'E730:')
+  call assert_fails('call menu_info("", [])', 'E730:')
   nunmenu Test
 
   " Test for defining menus in different modes

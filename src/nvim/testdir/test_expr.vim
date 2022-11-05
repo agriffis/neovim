@@ -65,6 +65,8 @@ func Test_strgetchar()
   call assert_equal(-1, strgetchar('axb', -1))
   call assert_equal(-1, strgetchar('axb', 3))
   call assert_equal(-1, strgetchar('', 0))
+  call assert_fails("let c=strgetchar([], 1)", 'E730:')
+  call assert_fails("let c=strgetchar('axb', [])", 'E745:')
 endfunc
 
 func Test_strcharpart()
@@ -485,49 +487,6 @@ function Test_max_min_errors()
   call assert_fails('call min(v:true)', 'min()')
 endfunc
 
-func Test_substitute_expr()
-  let g:val = 'XXX'
-  call assert_equal('XXX', substitute('yyy', 'y*', '\=g:val', ''))
-  call assert_equal('XXX', substitute('yyy', 'y*', {-> g:val}, ''))
-  call assert_equal("-\u1b \uf2-", substitute("-%1b %f2-", '%\(\x\x\)',
-			   \ '\=nr2char("0x" . submatch(1))', 'g'))
-  call assert_equal("-\u1b \uf2-", substitute("-%1b %f2-", '%\(\x\x\)',
-			   \ {-> nr2char("0x" . submatch(1))}, 'g'))
-
-  call assert_equal('231', substitute('123', '\(.\)\(.\)\(.\)',
-	\ {-> submatch(2) . submatch(3) . submatch(1)}, ''))
-
-  func Recurse()
-    return substitute('yyy', 'y\(.\)y', {-> submatch(1)}, '')
-  endfunc
-  " recursive call works
-  call assert_equal('-y-x-', substitute('xxx', 'x\(.\)x', {-> '-' . Recurse() . '-' . submatch(1) . '-'}, ''))
-endfunc
-
-func Test_invalid_submatch()
-  " This was causing invalid memory access in Vim-7.4.2232 and older
-  call assert_fails("call substitute('x', '.', {-> submatch(10)}, '')", 'E935:')
-endfunc
-
-func Test_substitute_expr_arg()
-  call assert_equal('123456789-123456789=', substitute('123456789',
-	\ '\(.\)\(.\)\(.\)\(.\)\(.\)\(.\)\(.\)\(.\)\(.\)',
-	\ {m -> m[0] . '-' . m[1] . m[2] . m[3] . m[4] . m[5] . m[6] . m[7] . m[8] . m[9] . '='}, ''))
-
-  call assert_equal('123456-123456=789', substitute('123456789',
-	\ '\(.\)\(.\)\(.\)\(a*\)\(n*\)\(.\)\(.\)\(.\)\(x*\)',
-	\ {m -> m[0] . '-' . m[1] . m[2] . m[3] . m[4] . m[5] . m[6] . m[7] . m[8] . m[9] . '='}, ''))
-
-  call assert_equal('123456789-123456789x=', substitute('123456789',
-	\ '\(.\)\(.\)\(.*\)',
-	\ {m -> m[0] . '-' . m[1] . m[2] . m[3] . 'x' . m[4] . m[5] . m[6] . m[7] . m[8] . m[9] . '='}, ''))
-
-  call assert_fails("call substitute('xxx', '.', {m -> string(add(m, 'x'))}, '')", 'E742:')
-  call assert_fails("call substitute('xxx', '.', {m -> string(insert(m, 'x'))}, '')", 'E742:')
-  call assert_fails("call substitute('xxx', '.', {m -> string(extend(m, ['x']))}, '')", 'E742:')
-  call assert_fails("call substitute('xxx', '.', {m -> string(remove(m, 1))}, '')", 'E742:')
-endfunc
-
 func Test_function_with_funcref()
   let s:f = function('type')
   let s:fref = function(s:f)
@@ -569,6 +528,7 @@ func Test_setmatches()
   endif
   eval set->setmatches()
   call assert_equal(exp, getmatches())
+  call assert_fails('let m = setmatches([], [])', 'E745:')
 endfunc
 
 func Test_empty_concatenate()

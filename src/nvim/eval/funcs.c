@@ -365,21 +365,32 @@ static void f_api_info(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 /// "append(lnum, string/list)" function
 static void f_append(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
+  const int did_emsg_before = did_emsg;
   const linenr_T lnum = tv_get_lnum(&argvars[0]);
-
-  set_buffer_lines(curbuf, lnum, true, &argvars[1], rettv);
+  if (did_emsg == did_emsg_before) {
+    set_buffer_lines(curbuf, lnum, true, &argvars[1], rettv);
+  }
 }
 
-/// "appendbufline(buf, lnum, string/list)" function
-static void f_appendbufline(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
+/// Set or append lines to a buffer.
+static void buf_set_append_line(typval_T *argvars, typval_T *rettv, bool append)
 {
+  const int did_emsg_before = did_emsg;
   buf_T *const buf = tv_get_buf(&argvars[0], false);
   if (buf == NULL) {
     rettv->vval.v_number = 1;  // FAIL
   } else {
     const linenr_T lnum = tv_get_lnum_buf(&argvars[1], buf);
-    set_buffer_lines(buf, lnum, true, &argvars[2], rettv);
+    if (did_emsg == did_emsg_before) {
+      set_buffer_lines(buf, lnum, append, &argvars[2], rettv);
+    }
   }
+}
+
+/// "appendbufline(buf, lnum, string/list)" function
+static void f_appendbufline(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
+{
+  buf_set_append_line(argvars, rettv, true);
 }
 
 /// "atan2()" function
@@ -1470,9 +1481,10 @@ static void f_dictwatcherdel(typval_T *argvars, typval_T *rettv, EvalFuncData fp
 /// "deletebufline()" function
 static void f_deletebufline(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
+  const int did_emsg_before = did_emsg;
+  rettv->vval.v_number = 1;   // FAIL by default
   buf_T *const buf = tv_get_buf(&argvars[0], false);
   if (buf == NULL) {
-    rettv->vval.v_number = 1;  // FAIL
     return;
   }
   const bool is_curbuf = buf == curbuf;
@@ -1480,6 +1492,9 @@ static void f_deletebufline(typval_T *argvars, typval_T *rettv, EvalFuncData fpt
 
   linenr_T last;
   const linenr_T first = tv_get_lnum_buf(&argvars[1], buf);
+  if (did_emsg > did_emsg_before) {
+    return;
+  }
   if (argvars[2].v_type != VAR_UNKNOWN) {
     last = tv_get_lnum_buf(&argvars[2], buf);
   } else {
@@ -1488,7 +1503,6 @@ static void f_deletebufline(typval_T *argvars, typval_T *rettv, EvalFuncData fpt
 
   if (buf->b_ml.ml_mfp == NULL || first < 1
       || first > buf->b_ml.ml_line_count || last < first) {
-    rettv->vval.v_number = 1;  // FAIL
     return;
   }
 
@@ -1541,6 +1555,7 @@ static void f_deletebufline(typval_T *argvars, typval_T *rettv, EvalFuncData fpt
     curwin = curwin_save;
     VIsual_active = save_VIsual_active;
   }
+  rettv->vval.v_number = 0;  // OK
 }
 
 /// "did_filetype()" function
@@ -1573,9 +1588,10 @@ static void f_diff_hlID(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
       || changedtick != buf_get_changedtick(curbuf)
       || fnum != curbuf->b_fnum) {
     // New line, buffer, change: need to get the values.
-    int filler_lines = diff_check(curwin, lnum);
-    if (filler_lines < 0) {
-      if (filler_lines == -1) {
+    int linestatus = 0;
+    int filler_lines = diff_check_with_linestatus(curwin, lnum, &linestatus);
+    if (filler_lines < 0 || linestatus < 0) {
+      if (filler_lines == -1 || linestatus == -1) {
         change_start = MAXCOL;
         change_end = -1;
         if (diff_find_change(curwin, lnum, &change_start, &change_end)) {
@@ -2574,9 +2590,12 @@ static void get_buffer_lines(buf_T *buf, linenr_T start, linenr_T end, int retli
 /// "getbufline()" function
 static void f_getbufline(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
+  const int did_emsg_before = did_emsg;
   buf_T *const buf = tv_get_buf_from_arg(&argvars[0]);
-
   const linenr_T lnum = tv_get_lnum_buf(&argvars[1], buf);
+  if (did_emsg > did_emsg_before) {
+    return;
+  }
   const linenr_T end = (argvars[2].v_type == VAR_UNKNOWN
                         ? lnum
                         : tv_get_lnum_buf(&argvars[2], buf));
@@ -7500,16 +7519,7 @@ static void f_serverstop(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 /// "setbufline()" function
 static void f_setbufline(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
-  linenr_T lnum;
-  buf_T *buf;
-
-  buf = tv_get_buf(&argvars[0], false);
-  if (buf == NULL) {
-    rettv->vval.v_number = 1;  // FAIL
-  } else {
-    lnum = tv_get_lnum_buf(&argvars[1], buf);
-    set_buffer_lines(buf, lnum, false, &argvars[2], rettv);
-  }
+  buf_set_append_line(argvars, rettv, false);
 }
 
 /// Set the cursor or mark position.
@@ -7638,8 +7648,11 @@ static void f_setfperm(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 /// "setline()" function
 static void f_setline(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
+  const int did_emsg_before = did_emsg;
   linenr_T lnum = tv_get_lnum(&argvars[0]);
-  set_buffer_lines(curbuf, lnum, false, &argvars[1], rettv);
+  if (did_emsg == did_emsg_before) {
+    set_buffer_lines(curbuf, lnum, false, &argvars[1], rettv);
+  }
 }
 
 /// "setpos()" function

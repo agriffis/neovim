@@ -36,6 +36,8 @@ func Test_taglist()
   call assert_equal('d', cmd[0]['kind'])
   call assert_equal('call cursor(3, 4)', cmd[0]['cmd'])
 
+  call assert_fails("let l=taglist([])", 'E730:')
+
   call delete('Xtags')
   set tags&
   bwipe
@@ -82,13 +84,11 @@ func Test_taglist_ctags_etags()
 endfunc
 
 func Test_tags_too_long()
-  call assert_fails('tag ' . repeat('x', 1020), 'E426')
+  call assert_fails('tag ' . repeat('x', 1020), ['E433', 'E426'])
   tags
 endfunc
 
 func Test_tagfiles()
-  " Nvim: different default for 'tags'.
-  set tags=./tags,tags
   call assert_equal([], tagfiles())
 
   call writefile(["FFoo\tXfoo\t1"], 'Xtags1')

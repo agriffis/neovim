@@ -252,6 +252,7 @@ func Test_blob_func_remove()
   call assert_fails("call remove(b, 3, 2)", 'E979:')
   call assert_fails("call remove(1, 0)", 'E896:')
   call assert_fails("call remove(b, b)", 'E974:')
+  call assert_fails("call remove(b, 1, [])", 'E745:')
   call assert_fails("call remove(v:_null_blob, 1, 2)", 'E979:')
 
   " Translated from v8.2.3284
@@ -300,6 +301,9 @@ func Test_blob_index()
   call assert_equal(3, 0z11110111->index(0x11, 2))
   call assert_equal(2, index(0z11111111, 0x11, -2))
   call assert_equal(3, index(0z11110111, 0x11, -2))
+  call assert_equal(0, index(0z11110111, 0x11, -10))
+  call assert_fails("echo index(0z11110111, 0x11, [])", 'E745:')
+  call assert_equal(-1, index(v:_null_blob, 1))
 
   call assert_fails('call index("asdf", 0)', 'E897:')
 endfunc

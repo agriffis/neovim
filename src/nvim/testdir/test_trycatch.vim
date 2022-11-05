@@ -2000,13 +2000,11 @@ endfunc
 func Test_try_catch_errors()
   call assert_fails('throw |', 'E471:')
   call assert_fails("throw \n ", 'E471:')
-  call assert_fails('catch abc', 'E603:')
+  call assert_fails('catch abc', 'E654:')
   call assert_fails('try | let i = 1| finally | catch | endtry', 'E604:')
   call assert_fails('finally', 'E606:')
   call assert_fails('try | finally | finally | endtry', 'E607:')
-  " v8.2.3486 has been ported, but v8.2.1183 hasn't, so E170 appears here.
-  " call assert_fails('try | for i in range(5) | endif | endtry', 'E580:')
-  call assert_fails('try | for i in range(5) | endif | endtry', 'E170:')
+  call assert_fails('try | for i in range(5) | endif | endtry', 'E580:')
   call assert_fails('try | while v:true | endtry', 'E170:')
   call assert_fails('try | if v:true | endtry', 'E171:')
 endfunc
@@ -2221,6 +2219,23 @@ func Test_user_command_throw_in_function_call()
 
   call delete('XtestThrow')
   unlet g:caught
+endfunc
+
+" Test that after reporting an uncaught exception there is no error for a
+" missing :endif
+func Test_after_exception_no_endif_error()
+  function Throw()
+    throw "Failure"
+  endfunction
+
+  function Foo()
+    if 1
+      call Throw()
+    endif
+  endfunction
+  call assert_fails('call Foo()', ['E605:', 'E605:'])
+  delfunc Throw
+  delfunc Foo
 endfunc
 
 " Test for using throw in a called function with following endtry    {{{1

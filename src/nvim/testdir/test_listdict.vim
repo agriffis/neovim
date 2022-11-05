@@ -341,6 +341,7 @@ func Test_dict_deepcopy()
   let l[1] = l2
   let l3 = deepcopy(l2)
   call assert_true(l3[1] is l3[2])
+  call assert_fails("call deepcopy([1, 2], 2)", 'E474:')
 endfunc
 
 " Locked variables
@@ -420,6 +421,11 @@ func Test_list_locked_var()
       call assert_equal(expected[depth][u][1], ps)
     endfor
   endfor
+  call assert_fails("let x=islocked('a b')", 'E488:')
+  let mylist = [1, 2, 3]
+  call assert_fails("let x = islocked('mylist[1:2]')", 'E786:')
+  let mydict = {'k' : 'v'}
+  call assert_fails("let x = islocked('mydict.a')", 'E716:')
 endfunc
 
 " Unletting locked variables
@@ -674,10 +680,10 @@ func Test_reverse_sort_uniq()
   endif
 
   call assert_fails('call reverse("")', 'E899:')
-  call assert_fails('call uniq([1, 2], {x, y -> []})', 'E882:')
+  call assert_fails('call uniq([1, 2], {x, y -> []})', 'E745:')
   call assert_fails("call sort([1, 2], function('min'), 1)", "E715:")
   call assert_fails("call sort([1, 2], function('invalid_func'))", "E700:")
-  call assert_fails("call sort([1, 2], function('min'))", "E702:")
+  call assert_fails("call sort([1, 2], function('min'))", "E118:")
 endfunc
 
 " reduce a list or a blob
@@ -736,6 +742,8 @@ func Test_str_split()
   call assert_equal(['aa', '', 'bb', 'cc', ''], split('aa,,bb, cc,', ',\s*', 1))
   call assert_equal(['a', 'b', 'c'], split('abc', '\zs'))
   call assert_equal(['', 'a', '', 'b', '', 'c', ''], split('abc', '\zs', 1))
+  call assert_fails("call split('abc', [])", 'E730:')
+  call assert_fails("call split('abc', 'b', [])", 'E745:')
 endfunc
 
 " compare recursively linked list and dict
@@ -975,7 +983,7 @@ func Test_listdict_index()
   call assert_fails('echo d[1:2]', 'E719:')
   call assert_fails("let v = [4, 6][{-> 1}]", 'E729:')
   call assert_fails("let v = range(5)[2:[]]", 'E730:')
-  call assert_fails("let v = range(5)[2:{-> 2}(]", 'E116:')
+  call assert_fails("let v = range(5)[2:{-> 2}(]", ['E15:', 'E116:'])
   call assert_fails("let v = range(5)[2:3", 'E111:')
   call assert_fails("let l = insert([1,2,3], 4, 10)", 'E684:')
   call assert_fails("let l = insert([1,2,3], 4, -10)", 'E684:')

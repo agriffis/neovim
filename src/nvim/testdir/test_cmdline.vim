@@ -89,6 +89,13 @@ func Test_complete_wildmenu()
   call assert_equal('"e Xtestfile3 Xtestfile4', @:)
   cd -
 
+  cnoremap <expr> <F2> wildmenumode()
+  call feedkeys(":cd Xdir\<Tab>\<F2>\<C-B>\"\<CR>", 'tx')
+  call assert_equal('"cd Xdir1/0', @:)
+  call feedkeys(":e Xdir1/\<Tab>\<F2>\<C-B>\"\<CR>", 'tx')
+  call assert_equal('"e Xdir1/Xdir2/1', @:)
+  cunmap <F2>
+
   " cleanup
   %bwipe
   call delete('Xdir1/Xdir2/Xtestfile4')
@@ -1147,7 +1154,7 @@ func Test_cmdline_search_range()
   call assert_equal('B', getline(2))
 
   let @/ = 'apple'
-  call assert_fails('\/print', 'E486:')
+  call assert_fails('\/print', ['E486:.*apple'])
 
   bwipe!
 endfunc
@@ -1263,6 +1270,11 @@ func Test_verbosefile()
   let log = readfile('Xlog')
   call assert_match("foo\nbar", join(log, "\n"))
   call delete('Xlog')
+  call mkdir('Xdir')
+  if !has('win32')  " FIXME: no error on Windows, libuv bug?
+  call assert_fails('set verbosefile=Xdir', ['E484:.*Xdir', 'E474:'])
+  endif
+  call delete('Xdir', 'd')
 endfunc
 
 func Test_verbose_option()
@@ -1513,7 +1525,7 @@ func Test_cmdwin_jump_to_win()
   call assert_fails('call feedkeys("q:\<C-W>\<C-W>\<CR>", "xt")', 'E11:')
   new
   set modified
-  call assert_fails('call feedkeys("q/:qall\<CR>", "xt")', 'E162:')
+  call assert_fails('call feedkeys("q/:qall\<CR>", "xt")', ['E37:', 'E162:'])
   close!
   call feedkeys("q/:close\<CR>", "xt")
   call assert_equal(1, winnr('$'))
@@ -1527,13 +1539,7 @@ endfunc
 
 func Test_cmdwin_tabpage()
   tabedit
-  " v8.2.1919 isn't ported yet, so E492 is thrown after E11 here.
-  " v8.2.1183 also isn't ported yet, so we also can't assert E11 directly.
-  " For now, assert E11 and E492 separately. When v8.2.1183 is ported, the
-  " assert for E492 will fail and this workaround should be removed.
-  " call assert_fails("silent norm q/g	:I\<Esc>", 'E11:')
-  call assert_fails("silent norm q/g	", 'E11:')
-  call assert_fails("silent norm q/g	:I\<Esc>", 'E492:')
+  call assert_fails("silent norm q/g	:I\<Esc>", 'E11:')
   tabclose!
 endfunc
 
