@@ -2061,9 +2061,24 @@ int tv_dict_get_tv(dict_T *d, const char *const key, typval_T *rettv)
 varnumber_T tv_dict_get_number(const dict_T *const d, const char *const key)
   FUNC_ATTR_PURE FUNC_ATTR_WARN_UNUSED_RESULT
 {
+  return tv_dict_get_number_def(d, key, 0);
+}
+
+/// Get a number item from a dictionary.
+///
+/// Returns "def" if the entry doesn't exist.
+///
+/// @param[in]  d  Dictionary to get item from.
+/// @param[in]  key  Key to find in dictionary.
+/// @param[in]  def  Default value.
+///
+/// @return Dictionary item.
+varnumber_T tv_dict_get_number_def(const dict_T *const d, const char *const key, const int def)
+  FUNC_ATTR_PURE FUNC_ATTR_WARN_UNUSED_RESULT
+{
   dictitem_T *const di = tv_dict_find(d, key, -1);
   if (di == NULL) {
-    return 0;
+    return def;
   }
   return tv_get_number(&di->di_tv);
 }
@@ -2191,6 +2206,15 @@ bool tv_dict_get_callback(dict_T *const d, const char *const key, const ptrdiff_
   return res;
 }
 
+/// Check for adding a function to g: or l:.
+/// If the name is wrong give an error message and return true.
+int tv_dict_wrong_func_name(dict_T *d, typval_T *tv, const char *name)
+{
+  return (d == &globvardict || &d->dv_hashtab == get_funccal_local_ht())
+         && tv_is_func(*tv)
+         && var_wrong_func_name(name, true);
+}
+
 //{{{2 dict_add*
 
 /// Add item to dictionary
@@ -2202,6 +2226,9 @@ bool tv_dict_get_callback(dict_T *const d, const char *const key, const ptrdiff_
 int tv_dict_add(dict_T *const d, dictitem_T *const item)
   FUNC_ATTR_NONNULL_ALL
 {
+  if (tv_dict_wrong_func_name(d, &item->di_tv, (const char *)item->di_key)) {
+    return FAIL;
+  }
   return hash_add(&d->dv_hashtab, item->di_key);
 }
 
@@ -2432,17 +2459,9 @@ void tv_dict_extend(dict_T *const d1, dict_T *const d2, const char *const action
 
   TV_DICT_ITER(d2, di2, {
     dictitem_T *const di1 = tv_dict_find(d1, (const char *)di2->di_key, -1);
-    if (d1->dv_scope != VAR_NO_SCOPE) {
-      // Disallow replacing a builtin function in l: and g:.
-      // Check the key to be valid when adding to any scope.
-      if (d1->dv_scope == VAR_DEF_SCOPE
-          && tv_is_func(di2->di_tv)
-          && var_wrong_func_name((const char *)di2->di_key, di1 == NULL)) {
-        break;
-      }
-      if (!valid_varname((const char *)di2->di_key)) {
-        break;
-      }
+    // Check the key to be valid when adding to any scope.
+    if (d1->dv_scope != VAR_NO_SCOPE && !valid_varname((const char *)di2->di_key)) {
+      break;
     }
     if (di1 == NULL) {
       dictitem_T *const new_di = tv_dict_item_copy(di2);
@@ -2460,6 +2479,10 @@ void tv_dict_extend(dict_T *const d1, dict_T *const d2, const char *const action
 
       if (var_check_lock(di1->di_tv.v_lock, arg_errmsg, arg_errmsg_len)
           || var_check_ro(di1->di_flags, arg_errmsg, arg_errmsg_len)) {
+        break;
+      }
+      // Disallow replacing a builtin function.
+      if (tv_dict_wrong_func_name(d1, &di2->di_tv, (const char *)di2->di_key)) {
         break;
       }
 

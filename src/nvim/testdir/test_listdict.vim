@@ -289,6 +289,16 @@ func Test_dict_func()
   call assert_equal('xxx3', Fn('xxx'))
 endfunc
 
+func Test_dict_assign()
+  let d = {}
+  let d.1 = 1
+  let d._ = 2
+  call assert_equal({'1': 1, '_': 2}, d)
+
+  let n = 0
+  call assert_fails('let n.key = 3', 'E1203: Dot can only be used on a dictionary: n.key = 3')
+endfunc
+
 " Function in script-local List or Dict
 func Test_script_local_dict_func()
   let g:dict = {}
@@ -336,12 +346,12 @@ func Test_dict_deepcopy()
   let l = [4, d, 6]
   let d[3] = l
   let dc = deepcopy(d)
-  call assert_fails('call deepcopy(d, 1)', 'E698')
+  call assert_fails('call deepcopy(d, 1)', 'E698:')
   let l2 = [0, l, l, 3]
   let l[1] = l2
   let l3 = deepcopy(l2)
   call assert_true(l3[1] is l3[2])
-  call assert_fails("call deepcopy([1, 2], 2)", 'E474:')
+  call assert_fails("call deepcopy([1, 2], 2)", 'E1023:')
 endfunc
 
 " Locked variables

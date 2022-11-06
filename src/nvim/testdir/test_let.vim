@@ -6,6 +6,10 @@ func Test_let()
   let Test104#numvar = function('tr')
   call assert_equal("function('tr')", string(Test104#numvar))
 
+  let foo#tr = function('tr')
+  call assert_equal("function('tr')", string(foo#tr))
+  unlet foo#tr
+
   let a = 1
   let b = 2
 
@@ -276,20 +280,29 @@ func Test_let_errors()
   let s = "var"
   let var = 1
   call assert_fails('let var += [1,2]', 'E734:')
-  call assert_fails('let {s}.1 = 2', 'E18:')
+  call assert_fails('let {s}.1 = 2', 'E1203:')
   call assert_fails('let a[1] = 5', 'E121:')
   let l = [[1,2]]
   call assert_fails('let l[:][0] = [5]', 'E708:')
   let d = {'k' : 4}
-  call assert_fails('let d.# = 5', 'E713:')
-  call assert_fails('let d.m += 5', 'E734:')
+  call assert_fails('let d.# = 5', 'E488:')
+  call assert_fails('let d.m += 5', 'E716:')
+  call assert_fails('let m = d[{]', 'E15:')
   let l = [1, 2]
   call assert_fails('let l[2] = 0', 'E684:')
   call assert_fails('let l[0:1] = [1, 2, 3]', 'E710:')
   call assert_fails('let l[-2:-3] = [3, 4]', 'E684:')
   call assert_fails('let l[0:4] = [5, 6]', 'E711:')
+  call assert_fails('let l -= 2', 'E734:')
+  call assert_fails('let l += 2', 'E734:')
   call assert_fails('let g:["a;b"] = 10', 'E461:')
   call assert_fails('let g:.min = function("max")', 'E704:')
+  call assert_fails('let g:cos = "" | let g:.cos = {-> 42}', 'E704:')
+  if has('channel')
+    let ch = test_null_channel()
+    call assert_fails('let ch += 1', 'E734:')
+  endif
+  call assert_fails('let name = "a" .. "b",', 'E488: Trailing characters: ,')
 
   " This test works only when the language is English
   if v:lang == "C" || v:lang =~ '^[Ee]n'

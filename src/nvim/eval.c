@@ -66,6 +66,8 @@ static char *e_nowhitespace
 static char *e_write2 = N_("E80: Error while writing: %s");
 static char *e_string_list_or_blob_required = N_("E1098: String, List or Blob required");
 static char e_expression_too_recursive_str[] = N_("E1169: Expression too recursive: %s");
+static char e_dot_can_only_be_used_on_dictionary_str[]
+  = N_("E1203: Dot can only be used on a dictionary: %s");
 
 static char * const namespace_char = "abglstvw";
 
@@ -1313,13 +1315,26 @@ char *get_lval(char *const name, typval_T *const rettv, lval_T *const lp, const 
     return NULL;
   }
 
-  // Loop until no more [idx] or .key is following.
   lp->ll_tv = &v->di_tv;
+
+  if (tv_is_luafunc(lp->ll_tv)) {
+    // For v:lua just return a pointer to the "." after the "v:lua".
+    // If the caller is trans_function_name() it will check for a Lua function name.
+    return p;
+  }
+
+  // Loop until no more [idx] or .key is following.
   typval_T var1;
   var1.v_type = VAR_UNKNOWN;
   typval_T var2;
   var2.v_type = VAR_UNKNOWN;
-  while (*p == '[' || (*p == '.' && lp->ll_tv->v_type == VAR_DICT)) {
+  while (*p == '[' || (*p == '.' && p[1] != '=' && p[1] != '.')) {
+    if (*p == '.' && lp->ll_tv->v_type != VAR_DICT) {
+      if (!quiet) {
+        semsg(_(e_dot_can_only_be_used_on_dictionary_str), name);
+      }
+      return NULL;
+    }
     if (!(lp->ll_tv->v_type == VAR_LIST && lp->ll_tv->vval.v_list != NULL)
         && !(lp->ll_tv->v_type == VAR_DICT && lp->ll_tv->vval.v_dict != NULL)
         && !(lp->ll_tv->v_type == VAR_BLOB && lp->ll_tv->vval.v_blob != NULL)) {
@@ -1757,7 +1772,10 @@ void set_var_lval(lval_T *lp, char *endp, typval_T *rettv, int copy, const bool 
     // Assign to a List or Dictionary item.
     if (lp->ll_newkey != NULL) {
       if (op != NULL && *op != '=') {
-        semsg(_(e_letwrong), op);
+        semsg(_(e_dictkey), lp->ll_newkey);
+        return;
+      }
+      if (tv_dict_wrong_func_name(lp->ll_tv->vval.v_dict, rettv, lp->ll_newkey)) {
         return;
       }
 
@@ -2277,10 +2295,15 @@ int eval0(char *arg, typval_T *rettv, char **nextcmd, int evaluate)
   char *p;
   const int did_emsg_before = did_emsg;
   const int called_emsg_before = called_emsg;
+  bool end_error = false;
 
   p = skipwhite(arg);
   ret = eval1(&p, rettv, evaluate);
-  if (ret == FAIL || !ends_excmd(*p)) {
+
+  if (ret != FAIL) {
+    end_error = !ends_excmd(*p);
+  }
+  if (ret == FAIL || end_error) {
     if (ret != FAIL) {
       tv_clear(rettv);
     }
@@ -2290,7 +2313,11 @@ int eval0(char *arg, typval_T *rettv, char **nextcmd, int evaluate)
     // Also check called_emsg for when using assert_fails().
     if (!aborting() && did_emsg == did_emsg_before
         && called_emsg == called_emsg_before) {
-      semsg(_(e_invexpr2), arg);
+      if (end_error) {
+        semsg(_(e_trailing_arg), p);
+      } else {
+        semsg(_(e_invexpr2), arg);
+      }
     }
     ret = FAIL;
   }
@@ -3418,7 +3445,7 @@ static int eval_index(char **arg, typval_T *rettv, int evaluate, int verbose)
   if (**arg == '.') {
     // dict.name
     key = *arg + 1;
-    for (len = 0; ASCII_ISALNUM(key[len]) || key[len] == '_'; len++) {}
+    for (len = 0; eval_isdictc(key[len]); len++) {}
     if (len == 0) {
       return FAIL;
     }
@@ -6694,7 +6721,8 @@ const char *find_name_end(const char *arg, const char **expr_start, const char *
   for (p = arg; *p != NUL
        && (eval_isnamec(*p)
            || *p == '{'
-           || ((flags & FNE_INCL_BR) && (*p == '[' || *p == '.'))
+           || ((flags & FNE_INCL_BR) && (*p == '['
+                                         || (*p == '.' && eval_isdictc(p[1]))))
            || mb_nest != 0
            || br_nest != 0); MB_PTR_ADV(p)) {
     if (*p == '\'') {
@@ -6807,16 +6835,23 @@ static char *make_expanded_name(const char *in_start, char *expr_start, char *ex
 
 /// @return  true if character "c" can be used in a variable or function name.
 ///          Does not include '{' or '}' for magic braces.
-int eval_isnamec(int c)
+bool eval_isnamec(int c)
 {
   return ASCII_ISALNUM(c) || c == '_' || c == ':' || c == AUTOLOAD_CHAR;
 }
 
 /// @return  true if character "c" can be used as the first character in a
 ///          variable or function name (excluding '{' and '}').
-int eval_isnamec1(int c)
+bool eval_isnamec1(int c)
 {
   return ASCII_ISALPHA(c) || c == '_';
+}
+
+/// @return  true if character "c" can be used as the first character of a
+///          dictionary key.
+bool eval_isdictc(int c)
+{
+  return ASCII_ISALNUM(c) || c == '_';
 }
 
 /// Get typval_T v: variable value.

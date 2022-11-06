@@ -231,10 +231,12 @@ static void ex_let_const(exarg_T *eap, const bool is_const)
           expr++;
         }
       }
-      expr = skipwhite(expr + 2);
+      expr += 2;
     } else {
-      expr = skipwhite(expr + 1);
+      expr += 1;
     }
+
+    expr = skipwhite(expr);
 
     if (eap->skip) {
       emsg_skip++;
@@ -1329,7 +1331,7 @@ void set_var_const(const char *name, const size_t name_len, typval_T *const tv, 
 
     v = xmalloc(sizeof(dictitem_T) + strlen(varname));
     STRCPY(v->di_key, varname);
-    if (tv_dict_add(dict, v) == FAIL) {
+    if (hash_add(ht, v->di_key) == FAIL) {
       xfree(v);
       return;
     }
@@ -1451,9 +1453,10 @@ bool var_wrong_func_name(const char *const name, const bool new_var)
   FUNC_ATTR_NONNULL_ALL FUNC_ATTR_WARN_UNUSED_RESULT
 {
   // Allow for w: b: s: and t:.
+  // Allow autoload variable.
   if (!(vim_strchr("wbst", name[0]) != NULL && name[1] == ':')
-      && !ASCII_ISUPPER((name[0] != NUL && name[1] == ':')
-                        ? name[2] : name[0])) {
+      && !ASCII_ISUPPER((name[0] != NUL && name[1] == ':') ? name[2] : name[0])
+      && vim_strchr(name, '#') == NULL) {
     semsg(_("E704: Funcref variable name must start with a capital: %s"), name);
     return true;
   }
