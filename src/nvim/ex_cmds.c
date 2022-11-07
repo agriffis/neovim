@@ -1772,6 +1772,17 @@ void ex_write(exarg_T *eap)
   }
 }
 
+#ifdef UNIX
+static int check_writable(const char *fname)
+{
+  if (os_nodetype(fname) == NODE_OTHER) {
+    semsg(_("E503: \"%s\" is not a file or writable device"), fname);
+    return FAIL;
+  }
+  return OK;
+}
+#endif
+
 /// write current buffer to file 'eap->arg'
 /// if 'eap->append' is true, append to the file
 ///
@@ -1829,7 +1840,11 @@ int do_write(exarg_T *eap)
   // Writing to the current file is not allowed in readonly mode
   // and a file name is required.
   // "nofile" and "nowrite" buffers cannot be written implicitly either.
-  if (!other && (bt_dontwrite_msg(curbuf) || check_fname() == FAIL
+  if (!other && (bt_dontwrite_msg(curbuf)
+                 || check_fname() == FAIL
+#ifdef UNIX
+                 || check_writable(curbuf->b_ffname) == FAIL
+#endif
                  || check_readonly(&eap->forceit, curbuf))) {
     goto theend;
   }
@@ -1905,6 +1920,13 @@ int do_write(exarg_T *eap)
       // Autocommands may have changed buffer names, esp. when
       // 'autochdir' is set.
       fname = curbuf->b_sfname;
+    }
+
+    if (eap->mkdir_p) {
+      if (os_file_mkdir(fname, 0755) < 0) {
+        retval = FAIL;
+        goto theend;
+      }
     }
 
     name_was_missing = curbuf->b_ffname == NULL;

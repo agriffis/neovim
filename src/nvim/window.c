@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "nvim/api/private/helpers.h"
 #include "nvim/api/vim.h"
@@ -585,6 +586,7 @@ wingotofile:
       cmdmod.cmod_tab = tabpage_index(curtab) + 1;
       nchar = xchar;
       goto wingotofile;
+
     case 't':                       // CTRL-W gt: go to next tab page
       goto_tabpage((int)Prenum);
       break;
@@ -5064,6 +5066,9 @@ static void win_free(win_T *wp, tabpage_T *tp)
       }
     }
   }
+
+  // free the border title text
+  clear_virttext(&wp->w_float_config.title_chunks);
 
   clear_matches(wp);
 

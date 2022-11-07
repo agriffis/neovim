@@ -44,6 +44,8 @@ typedef struct {
 #include "klib/kvec.h"
 // for marktree
 #include "nvim/marktree.h"
+// for float window title
+#include "nvim/extmark_defs.h"
 
 #define GETFILE_SUCCESS(x)    ((x) <= 0)
 #define MODIFIABLE(buf) (buf->b_p_ma)
@@ -673,8 +675,11 @@ struct file_buffer {
   char *b_p_csl;                ///< 'completeslash'
 #endif
   char *b_p_cfu;                ///< 'completefunc'
+  Callback b_cfu_cb;            ///< 'completefunc' callback
   char *b_p_ofu;                ///< 'omnifunc'
+  Callback b_ofu_cb;            ///< 'omnifunc' callback
   char *b_p_tfu;                ///< 'tagfunc'
+  Callback b_tfu_cb;            ///< 'tagfunc' callback
   int b_p_eof;                  ///< 'endoffile'
   int b_p_eol;                  ///< 'endofline'
   int b_p_fixeol;               ///< 'fixendofline'
@@ -746,6 +751,7 @@ struct file_buffer {
   char *b_p_dict;               ///< 'dictionary' local value
   char *b_p_tsr;                ///< 'thesaurus' local value
   char *b_p_tsrfu;              ///< 'thesaurusfunc' local value
+  Callback b_tsrfu_cb;          ///< 'thesaurusfunc' callback
   long b_p_ul;                  ///< 'undolevels' local value
   int b_p_udf;                  ///< 'undofile'
   char *b_p_lw;                 ///< 'lispwords' local value
@@ -1048,6 +1054,12 @@ typedef enum {
   kWinStyleMinimal,  /// Minimal UI: no number column, eob markers, etc
 } WinStyle;
 
+typedef enum {
+  kAlignLeft   = 0,
+  kAlignCenter = 1,
+  kAlignRight  = 2,
+} AlignTextPos;
+
 typedef struct {
   Window window;
   lpos_T bufpos;
@@ -1060,10 +1072,14 @@ typedef struct {
   int zindex;
   WinStyle style;
   bool border;
+  bool title;
   bool shadow;
   schar_T border_chars[8];
   int border_hl_ids[8];
   int border_attr[8];
+  AlignTextPos title_pos;
+  VirtText title_chunks;
+  int title_width;
   bool noautocmd;
 } FloatConfig;
 

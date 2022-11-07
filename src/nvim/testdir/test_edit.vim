@@ -1836,7 +1836,8 @@ endfunc
 " Test for editing a file without read permission
 func Test_edit_file_no_read_perm()
   CheckUnix
-  CheckNotBSD
+  CheckNotRoot
+
   call writefile(['one', 'two'], 'Xfile')
   call setfperm('Xfile', '-w-------')
   new
