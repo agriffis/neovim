@@ -1655,13 +1655,12 @@ static int syn_current_attr(const bool syncing, const bool displaying, bool *con
                 && (spp->sp_type == SPTYPE_MATCH
                     || spp->sp_type == SPTYPE_START)
                 && (current_next_list != NULL
-                           ? in_id_list(NULL, current_next_list,
-                                        &spp->sp_syn, 0)
-                           : (cur_si == NULL
-                              ? !(spp->sp_flags & HL_CONTAINED)
-                              : in_id_list(cur_si,
-                                           cur_si->si_cont_list, &spp->sp_syn,
-                                           spp->sp_flags & HL_CONTAINED)))) {
+                    ? in_id_list(NULL, current_next_list, &spp->sp_syn, 0)
+                    : (cur_si == NULL
+                       ? !(spp->sp_flags & HL_CONTAINED)
+                       : in_id_list(cur_si,
+                                    cur_si->si_cont_list, &spp->sp_syn,
+                                    spp->sp_flags & HL_CONTAINED)))) {
               // If we already tried matching in this line, and
               // there isn't a match before next_match_col, skip
               // this item.
@@ -2788,9 +2787,9 @@ static keyentry_T *match_keyword(char *keyword, hashtab_T *ht, stateitem_T *cur_
       if (current_next_list != 0
           ? in_id_list(NULL, current_next_list, &kp->k_syn, 0)
           : (cur_si == NULL
-            ? !(kp->flags & HL_CONTAINED)
-            : in_id_list(cur_si, cur_si->si_cont_list,
-                         &kp->k_syn, kp->flags & HL_CONTAINED))) {
+             ? !(kp->flags & HL_CONTAINED)
+             : in_id_list(cur_si, cur_si->si_cont_list,
+                          &kp->k_syn, kp->flags & HL_CONTAINED))) {
         return kp;
       }
     }
@@ -3123,22 +3122,20 @@ static void syn_cmd_clear(exarg_T *eap, int syncing)
         if (id == 0) {
           semsg(_("E391: No such syntax cluster: %s"), arg);
           break;
-        } else {
-          // We can't physically delete a cluster without changing
-          // the IDs of other clusters, so we do the next best thing
-          // and make it empty.
-          int scl_id = id - SYNID_CLUSTER;
-
-          XFREE_CLEAR(SYN_CLSTR(curwin->w_s)[scl_id].scl_list);
         }
+        // We can't physically delete a cluster without changing
+        // the IDs of other clusters, so we do the next best thing
+        // and make it empty.
+        int scl_id = id - SYNID_CLUSTER;
+
+        XFREE_CLEAR(SYN_CLSTR(curwin->w_s)[scl_id].scl_list);
       } else {
         id = syn_name2id_len(arg, (size_t)(arg_end - arg));
         if (id == 0) {
           semsg(_(e_nogroup), arg);
           break;
-        } else {
-          syn_clear_one(id, syncing);
         }
+        syn_clear_one(id, syncing);
       }
       arg = skipwhite(arg_end);
     }

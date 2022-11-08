@@ -604,10 +604,9 @@ static const void *tv_ptr(const typval_T *const tvs, int *const idxp)
   if (tvs[idx].v_type == VAR_UNKNOWN) {
     emsg(_(e_printf));
     return NULL;
-  } else {
-    (*idxp)++;
-    return tvs[idx].vval.v_string;
   }
+  (*idxp)++;
+  return tvs[idx].vval.v_string;
 }
 
 /// Get float argument from idxp entry in tvs
@@ -1035,9 +1034,7 @@ int vim_vsnprintf_typval(char *str, size_t str_m, const char *fmt, va_list ap, t
                     : va_arg(ap, long long));  // NOLINT (runtime/int)
             break;
           case 'z':
-            arg = (tvs
-                       ? (ptrdiff_t)tv_nr(tvs, &arg_idx)
-                       : va_arg(ap, ptrdiff_t));
+            arg = (tvs ? (ptrdiff_t)tv_nr(tvs, &arg_idx) : va_arg(ap, ptrdiff_t));
             break;
           }
           if (arg > 0) {
@@ -1049,19 +1046,13 @@ int vim_vsnprintf_typval(char *str, size_t str_m, const char *fmt, va_list ap, t
           // unsigned
           switch (length_modifier) {
           case '\0':
-            uarg = (unsigned int)(tvs
-                                      ? tv_nr(tvs, &arg_idx)
-                                      : va_arg(ap, unsigned int));
+            uarg = (unsigned int)(tvs ? tv_nr(tvs, &arg_idx) : va_arg(ap, unsigned int));
             break;
           case 'h':
-            uarg = (uint16_t)(tvs
-                                  ? tv_nr(tvs, &arg_idx)
-                                  : va_arg(ap, unsigned int));
+            uarg = (uint16_t)(tvs ? tv_nr(tvs, &arg_idx) : va_arg(ap, unsigned int));
             break;
           case 'l':
-            uarg = (tvs
-                        ? (unsigned long)tv_nr(tvs, &arg_idx)
-                        : va_arg(ap, unsigned long));
+            uarg = (tvs ? (unsigned long)tv_nr(tvs, &arg_idx) : va_arg(ap, unsigned long));
             break;
           case '2':
             uarg = (uintmax_t)(unsigned long long)(  // NOLINT (runtime/int)
@@ -1071,9 +1062,7 @@ int vim_vsnprintf_typval(char *str, size_t str_m, const char *fmt, va_list ap, t
                     : va_arg(ap, unsigned long long));  // NOLINT (runtime/int)
             break;
           case 'z':
-            uarg = (tvs
-                        ? (size_t)tv_nr(tvs, &arg_idx)
-                        : va_arg(ap, size_t));
+            uarg = (tvs ? (size_t)tv_nr(tvs, &arg_idx) : va_arg(ap, size_t));
             break;
           }
           arg_sign = (uarg != 0);

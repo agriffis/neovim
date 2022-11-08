@@ -1757,6 +1757,7 @@ nvim_create_user_command({name}, {command}, {*opts})
                    executed. When called from Lua, the command can also be a
                    Lua function. The function is called with a single table
                    argument that contains the following keys:
+                   • name: (string) Command name
                    • args: (string) The args passed to the command, if any
                      |<args>|
                    • fargs: (table) The args split by unescaped whitespace
@@ -3070,7 +3071,7 @@ nvim_open_win({buffer}, {enter}, {*config})                  *nvim_open_win()*
 
                   • title: Title (optional) in window border, String or list.
                     List is [text, highlight] tuples. if is string the default
-                    highlight group is `FloatBorderTitle`.
+                    highlight group is `FloatTitle`.
                   • title_pos: Title position must set with title option.
                     value can be of `left` `center` `right` default is left.
                   • noautocmd: If true then no buffer-related autocommand

@@ -1186,9 +1186,8 @@ static int utf_convert(int a, const convertStruct *const table, size_t n_items)
       && a <= table[start].rangeEnd
       && (a - table[start].rangeStart) % table[start].step == 0) {
     return a + table[start].offset;
-  } else {
-    return a;
   }
+  return a;
 }
 
 // Return the folded-case equivalent of "a", which is a UCS-4 character.  Uses
@@ -1550,7 +1549,7 @@ void show_utf8(void)
       }
       clen = utf_ptr2len((char *)line + i);
     }
-    sprintf((char *)IObuff + rlen, "%02x ",
+    sprintf((char *)IObuff + rlen, "%02x ",  // NOLINT(runtime/printf)
             (line[i] == NL) ? NUL : line[i]);          // NUL is stored as NL
     clen--;
     rlen += (int)strlen(IObuff + rlen);

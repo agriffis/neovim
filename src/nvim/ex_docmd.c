@@ -4231,7 +4231,7 @@ static void ex_autocmd(exarg_T *eap)
     secure = 2;
     eap->errmsg = _(e_curdir);
   } else if (eap->cmdidx == CMD_autocmd) {
-    do_autocmd(eap->arg, eap->forceit);
+    do_autocmd(eap, eap->arg, eap->forceit);
   } else {
     do_augroup(eap->arg, eap->forceit);
   }
@@ -4364,9 +4364,8 @@ char *check_nextcmd(char *p)
 
   if (*s == '|' || *s == '\n') {
     return s + 1;
-  } else {
-    return NULL;
   }
+  return NULL;
 }
 
 /// - if there are more files to edit
@@ -4765,9 +4764,8 @@ static void ex_only(exarg_T *eap)
     for (wp = firstwin; --wnr > 0;) {
       if (wp->w_next == NULL) {
         break;
-      } else {
-        wp = wp->w_next;
       }
+      wp = wp->w_next;
     }
   } else {
     wp = curwin;
