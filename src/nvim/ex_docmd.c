@@ -78,6 +78,7 @@
 #include "nvim/spell.h"
 #include "nvim/spellfile.h"
 #include "nvim/state.h"
+#include "nvim/statusline.h"
 #include "nvim/strings.h"
 #include "nvim/syntax.h"
 #include "nvim/tag.h"
@@ -3223,6 +3224,8 @@ static linenr_T get_address(exarg_T *eap, char **ptr, cmd_addr_T addr_type, int 
   char *cmd = skipwhite(*ptr);
   linenr_T lnum = MAXLNUM;
   do {
+    const int base_char = (uint8_t)(*cmd);
+
     switch (*cmd) {
     case '.':                               // '.' - Cursor position
       cmd++;
@@ -3481,9 +3484,10 @@ static linenr_T get_address(exarg_T *eap, char **ptr, cmd_addr_T addr_type, int 
       } else {
         i = (char_u)(*cmd++);
       }
-      if (!ascii_isdigit(*cmd)) {       // '+' is '+1', but '+0' is not '+1'
+      if (!ascii_isdigit(*cmd)) {       // '+' is '+1'
         n = 1;
       } else {
+        // "number", "+number" or "-number"
         n = getdigits_int32(&cmd, false, MAXLNUM);
         if (n == MAXLNUM) {
           emsg(_(e_line_number_out_of_range));
@@ -3498,10 +3502,16 @@ static linenr_T get_address(exarg_T *eap, char **ptr, cmd_addr_T addr_type, int 
       } else if (addr_type == ADDR_LOADED_BUFFERS || addr_type == ADDR_BUFFERS) {
         lnum = compute_buffer_local_count(addr_type, lnum, (i == '-') ? -1 * n : n);
       } else {
-        // Relative line addressing, need to adjust for folded lines
-        // now, but only do it after the first address.
-        if (addr_type == ADDR_LINES && (i == '-' || i == '+')
-            && address_count >= 2) {
+        // Relative line addressing: need to adjust for closed folds
+        // after the first address.
+        // Subtle difference: "number,+number" and "number,-number"
+        // adjusts to end of closed fold before adding/subtracting,
+        // while "number,.+number" adjusts to end of closed fold after
+        // adding to make "!!" expanded into ".,.+N" work correctly.
+        bool adjust_for_folding = addr_type == ADDR_LINES
+                                  && (i == '-' || i == '+')
+                                  && address_count >= 2;
+        if (adjust_for_folding && (i == '-' || base_char != '.')) {
           (void)hasFolding(lnum, NULL, &lnum);
         }
         if (i == '-') {
@@ -3512,6 +3522,11 @@ static linenr_T get_address(exarg_T *eap, char **ptr, cmd_addr_T addr_type, int 
             goto error;
           }
           lnum += n;
+          // ".+number" rounds up to the end of a closed fold after
+          // adding, so that ":!!sort" sorts one closed fold.
+          if (adjust_for_folding && base_char == '.') {
+            (void)hasFolding(lnum, NULL, &lnum);
+          }
         }
       }
     }
