@@ -30,6 +30,7 @@ local exec_lua = helpers.exec_lua
 local exc_exec = helpers.exc_exec
 local insert = helpers.insert
 local expect_exit = helpers.expect_exit
+local skip = helpers.skip
 
 local pcall_err = helpers.pcall_err
 local format_string = helpers.format_string
@@ -2323,12 +2324,6 @@ describe('API', function()
       meths.set_option('isident', '')
     end)
 
-    local it_maybe_pending = it
-    if helpers.isCI() and os.getenv('CONFIGURATION') == 'MSVC_32' then
-      -- For "works with &opt" (flaky on MSVC_32), but not easy to skip alone.  #10241
-      it_maybe_pending = pending
-    end
-
     local function simplify_east_api_node(line, east_api_node)
       if east_api_node == NIL then
         return nil
@@ -2525,7 +2520,7 @@ describe('API', function()
       end
     end
     require('test.unit.viml.expressions.parser_tests')(
-        it_maybe_pending, _check_parsing, hl, fmtn)
+        it, _check_parsing, hl, fmtn)
   end)
 
   describe('nvim_list_uis', function()
@@ -2729,7 +2724,7 @@ describe('API', function()
       eq({}, meths.get_runtime_file("foobarlang/", true))
     end)
     it('can handle bad patterns', function()
-      if helpers.pending_win32(pending) then return end
+      skip(iswin())
 
       eq("Vim:E220: Missing }.", pcall_err(meths.get_runtime_file, "{", false))
 
