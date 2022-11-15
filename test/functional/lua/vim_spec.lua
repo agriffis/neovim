@@ -168,8 +168,8 @@ describe('lua stdlib', function()
     for i,k in pairs(indicies16) do
       eq(k, exec_lua("return vim.str_byteindex(_G.test_text, ..., true)", i), i)
     end
-    matches(": index out of range$", pcall_err(exec_lua, "return vim.str_byteindex(_G.test_text, ...)", #indicies32 + 1))
-    matches(": index out of range$", pcall_err(exec_lua, "return vim.str_byteindex(_G.test_text, ..., true)", #indicies16 + 1))
+    eq("index out of range", pcall_err(exec_lua, "return vim.str_byteindex(_G.test_text, ...)", #indicies32 + 1))
+    eq("index out of range", pcall_err(exec_lua, "return vim.str_byteindex(_G.test_text, ..., true)", #indicies16 + 1))
     local i32, i16 = 0, 0
     local len = 51
     for k = 0,len do
@@ -184,7 +184,7 @@ describe('lua stdlib', function()
       end
       eq({i32, i16}, exec_lua("return {vim.str_utfindex(_G.test_text, ...)}", k), k)
     end
-    matches(": index out of range$", pcall_err(exec_lua, "return vim.str_utfindex(_G.test_text, ...)", len + 1))
+    eq("index out of range", pcall_err(exec_lua, "return vim.str_utfindex(_G.test_text, ...)", len + 1))
   end)
 
   it("vim.str_utf_start", function()
@@ -417,6 +417,12 @@ describe('lua stdlib', function()
       local t1 = setmetatable({a = 5}, mt)
       local t2 = vim.deepcopy(t1)
       return getmetatable(t2) == mt
+    ]]))
+
+    ok(exec_lua([[
+      local t1 = {a = vim.NIL}
+      local t2 = vim.deepcopy(t1)
+      return t2.a == vim.NIL
     ]]))
 
     matches('Cannot deepcopy object of type thread',
