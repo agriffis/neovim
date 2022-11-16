@@ -1,18 +1,31 @@
 // This is an open source non-commercial project. Dear PVS-Studio, please check
 // it. PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 
+#include <inttypes.h>
+#include <stdbool.h>
+#include <stddef.h>
+
+#include "klib/kvec.h"
+#include "lauxlib.h"
 #include "nvim/api/buffer.h"
+#include "nvim/api/private/defs.h"
 #include "nvim/api/private/helpers.h"
 #include "nvim/assert.h"
 #include "nvim/buffer.h"
+#include "nvim/buffer_defs.h"
 #include "nvim/buffer_updates.h"
 #include "nvim/extmark.h"
+#include "nvim/globals.h"
+#include "nvim/log.h"
 #include "nvim/lua/executor.h"
 #include "nvim/memline.h"
+#include "nvim/memory.h"
 #include "nvim/msgpack_rpc/channel.h"
+#include "nvim/pos.h"
+#include "nvim/types.h"
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS
-# include "buffer_updates.c.generated.h"
+# include "buffer_updates.c.generated.h"  // IWYU pragma: export
 #endif
 
 // Register a channel. Return True if the channel was added, or already added.
@@ -68,7 +81,7 @@ bool buf_updates_register(buf_T *buf, uint64_t channel_id, BufUpdateCallbacks cb
       linedata.size = line_count;
       linedata.items = xcalloc(line_count, sizeof(Object));
 
-      buf_collect_lines(buf, line_count, 1, true, &linedata, NULL, NULL);
+      buf_collect_lines(buf, line_count, 1, 0, true, &linedata, NULL, NULL);
     }
 
     args.items[4] = ARRAY_OBJ(linedata);
@@ -229,7 +242,7 @@ void buf_updates_send_changes(buf_T *buf, linenr_T firstline, int64_t num_added,
       STATIC_ASSERT(SIZE_MAX >= MAXLNUM, "size_t smaller than MAXLNUM");
       linedata.size = (size_t)num_added;
       linedata.items = xcalloc((size_t)num_added, sizeof(Object));
-      buf_collect_lines(buf, (size_t)num_added, firstline, true, &linedata,
+      buf_collect_lines(buf, (size_t)num_added, firstline, 0, true, &linedata,
                         NULL, NULL);
     }
     args.items[4] = ARRAY_OBJ(linedata);

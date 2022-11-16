@@ -5,6 +5,12 @@
 
 # Version should match the tested CMAKE_URL in .github/workflows/ci.yml.
 cmake_minimum_required(VERSION 3.10)
+
+# Can be removed once minimum version is at least 3.15
+if(POLICY CMP0092)
+  cmake_policy(SET CMP0092 NEW)
+endif()
+
 project(nvim C)
 
 if(POLICY CMP0075)
@@ -186,6 +192,20 @@ if(CMAKE_C_FLAGS_RELWITHDEBINFO MATCHES DNDEBUG)
   string(REPLACE "-DNDEBUG" "" CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
 endif()
 
+option(ENABLE_IWYU "Run include-what-you-use with the compiler." OFF)
+if(ENABLE_IWYU)
+  find_program(IWYU_PRG NAMES include-what-you-use iwyu)
+  if(NOT IWYU_PRG)
+    message(FATAL_ERROR "ENABLE_IWYU is ON but include-what-you-use is not found!")
+  endif()
+  set(CMAKE_C_INCLUDE_WHAT_YOU_USE ${IWYU_PRG}
+    -Xiwyu --mapping_file=${PROJECT_SOURCE_DIR}/cmake.config/iwyu/mapping.imp
+    -Xiwyu --mapping_file=${PROJECT_SOURCE_DIR}/cmake.config/iwyu/gcc.libc.imp
+    -Xiwyu --mapping_file=${PROJECT_SOURCE_DIR}/cmake.config/iwyu/gcc.symbols.imp
+    -Xiwyu --no_default_mappings)
+  add_definitions(-DEXITFREE)
+endif()
+
 # gcc 4.0+ sets _FORTIFY_SOURCE=2 automatically.  This currently
 # does not work with Neovim due to some uses of dynamically-sized structures.
 # https://github.com/neovim/neovim/issues/223
@@ -270,7 +290,7 @@ int main(void)
 option(ENABLE_COMPILER_SUGGESTIONS "Enable -Wsuggest compiler warnings" OFF)
 if(MSVC)
   # XXX: /W4 gives too many warnings. #3241
-  add_compile_options(/W3)
+  add_compile_options(-W1 -wd4311)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_DEPRECATE)
   add_definitions(-DMSWIN)
 else()
@@ -364,10 +384,14 @@ option(CI_BUILD "CI, extra flags will be set" OFF)
 
 if(CI_BUILD)
   message(STATUS "CI build enabled")
-  add_compile_options(-Werror)
-  if(DEFINED ENV{BUILD_UCHAR})
-    # Get some test coverage for unsigned char
-    add_compile_options(-funsigned-char)
+  if(MSVC)
+    add_compile_options(-WX)
+  else()
+    add_compile_options(-Werror)
+    if(DEFINED ENV{BUILD_UCHAR})
+      # Get some test coverage for unsigned char
+      add_compile_options(-funsigned-char)
+    endif()
   endif()
 endif()
 

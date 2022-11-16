@@ -3,25 +3,30 @@
 
 // Some of this code was adapted from 'if_py_both.h' from the original
 // vim source
-#include <lauxlib.h>
-#include <limits.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdlib.h>
 
+#include <assert.h>
+#include <lauxlib.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
+#include "klib/kvec.h"
+#include "lua.h"
 #include "nvim/api/buffer.h"
 #include "nvim/api/private/defs.h"
 #include "nvim/api/private/helpers.h"
+#include "nvim/ascii.h"
 #include "nvim/autocmd.h"
 #include "nvim/buffer.h"
+#include "nvim/buffer_defs.h"
 #include "nvim/buffer_updates.h"
 #include "nvim/change.h"
 #include "nvim/cursor.h"
-#include "nvim/decoration.h"
 #include "nvim/drawscreen.h"
 #include "nvim/ex_cmds.h"
-#include "nvim/ex_docmd.h"
 #include "nvim/extmark.h"
+#include "nvim/globals.h"
 #include "nvim/lua/executor.h"
 #include "nvim/mapping.h"
 #include "nvim/mark.h"
@@ -29,9 +34,10 @@
 #include "nvim/memory.h"
 #include "nvim/move.h"
 #include "nvim/ops.h"
+#include "nvim/pos.h"
+#include "nvim/types.h"
 #include "nvim/undo.h"
 #include "nvim/vim.h"
-#include "nvim/window.h"
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "api/buffer.c.generated.h"
@@ -305,7 +311,7 @@ ArrayOf(String) nvim_buf_get_lines(uint64_t channel_id,
 
   init_line_array(lstate, &rv, size);
 
-  if (!buf_collect_lines(buf, size, (linenr_T)start, (channel_id != VIML_INTERNAL_CALL), &rv,
+  if (!buf_collect_lines(buf, size, (linenr_T)start, 0, (channel_id != VIML_INTERNAL_CALL), &rv,
                          lstate, err)) {
     goto end;
   }
@@ -851,9 +857,8 @@ ArrayOf(String) nvim_buf_get_text(uint64_t channel_id, Buffer buffer,
   }
 
   if (size > 2) {
-    Array tmp = ARRAY_DICT_INIT;
-    tmp.items = &rv.items[1];
-    if (!buf_collect_lines(buf, size - 2, (linenr_T)start_row + 1, replace_nl, &tmp, lstate, err)) {
+    if (!buf_collect_lines(buf, size - 2, (linenr_T)start_row + 1, 1, replace_nl, &rv, lstate,
+                           err)) {
       goto end;
     }
   }
@@ -1458,12 +1463,13 @@ static void push_linestr(lua_State *lstate, Array *a, const char *s, size_t len,
 /// @param n Number of lines to collect
 /// @param replace_nl Replace newlines ("\n") with NUL
 /// @param start Line number to start from
+/// @param start_idx First index to push to
 /// @param[out] l If not NULL, Lines are copied here
 /// @param[out] lstate If not NULL, Lines are pushed into a table onto the stack
 /// @param err[out] Error, if any
 /// @return true unless `err` was set
-bool buf_collect_lines(buf_T *buf, size_t n, linenr_T start, bool replace_nl, Array *l,
-                       lua_State *lstate, Error *err)
+bool buf_collect_lines(buf_T *buf, size_t n, linenr_T start, int start_idx, bool replace_nl,
+                       Array *l, lua_State *lstate, Error *err)
 {
   for (size_t i = 0; i < n; i++) {
     linenr_T lnum = start + (linenr_T)i;
@@ -1476,7 +1482,7 @@ bool buf_collect_lines(buf_T *buf, size_t n, linenr_T start, bool replace_nl, Ar
     }
 
     char *bufstr = ml_get_buf(buf, lnum, false);
-    push_linestr(lstate, l, bufstr, strlen(bufstr), (int)i, replace_nl);
+    push_linestr(lstate, l, bufstr, strlen(bufstr), start_idx + (int)i, replace_nl);
   }
 
   return true;

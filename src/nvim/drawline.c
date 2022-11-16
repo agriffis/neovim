@@ -5,40 +5,65 @@
 // This is the middle level, drawscreen.c is the top and grid.c/screen.c the lower level.
 
 #include <assert.h>
-#include <inttypes.h>
+#include <limits.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "nvim/arabic.h"
+#include "nvim/ascii.h"
 #include "nvim/buffer.h"
-#include "nvim/buffer_defs.h"
 #include "nvim/charset.h"
 #include "nvim/cursor.h"
 #include "nvim/cursor_shape.h"
 #include "nvim/decoration.h"
+#include "nvim/decoration_provider.h"
 #include "nvim/diff.h"
 #include "nvim/drawline.h"
+#include "nvim/extmark_defs.h"
 #include "nvim/fold.h"
+#include "nvim/garray.h"
+#include "nvim/globals.h"
 #include "nvim/grid.h"
 #include "nvim/highlight.h"
 #include "nvim/highlight_group.h"
 #include "nvim/indent.h"
+#include "nvim/mark.h"
 #include "nvim/match.h"
+#include "nvim/mbyte.h"
+#include "nvim/memline.h"
+#include "nvim/memory.h"
 #include "nvim/move.h"
 #include "nvim/option.h"
 #include "nvim/plines.h"
+#include "nvim/pos.h"
 #include "nvim/quickfix.h"
-#include "nvim/search.h"
+#include "nvim/screen.h"
 #include "nvim/sign.h"
 #include "nvim/spell.h"
 #include "nvim/state.h"
+#include "nvim/strings.h"
 #include "nvim/syntax.h"
+#include "nvim/terminal.h"
 #include "nvim/types.h"
-#include "nvim/undo.h"
-#include "nvim/window.h"
+#include "nvim/ui.h"
+#include "nvim/vim.h"
 
 #define MB_FILLER_CHAR '<'  // character used when a double-width character
                             // doesn't fit.
+
+/// possible draw states in win_line(), drawn in sequence.
+typedef enum {
+  WL_START = 0,  // nothing done yet
+  WL_CMDLINE,    // cmdline window column
+  WL_FOLD,       // 'foldcolumn'
+  WL_SIGN,       // column for signs
+  WL_NR,         // line number
+  WL_BRI,        // 'breakindent'
+  WL_SBR,        // 'showbreak' or 'diff'
+  WL_LINE,       // text in the line
+} LineDrawState;
 
 /// for line_putchar. Contains the state that needs to be remembered from
 /// putting one character to the next.
@@ -591,16 +616,7 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool nochange, 
   int left_curline_col = 0;
   int right_curline_col = 0;
 
-  // draw_state: items that are drawn in sequence:
-#define WL_START        0               // nothing done yet
-#define WL_CMDLINE      (WL_START + 1)    // cmdline window column
-#define WL_FOLD         (WL_CMDLINE + 1)  // 'foldcolumn'
-#define WL_SIGN         (WL_FOLD + 1)     // column for signs
-#define WL_NR           (WL_SIGN + 1)     // line number
-#define WL_BRI          (WL_NR + 1)       // 'breakindent'
-#define WL_SBR          (WL_BRI + 1)      // 'showbreak' or 'diff'
-#define WL_LINE         (WL_SBR + 1)      // text in the line
-  int draw_state = WL_START;            // what to draw next
+  LineDrawState draw_state = WL_START;  // what to draw next
 
   int syntax_flags    = 0;
   int syntax_seqnr    = 0;
