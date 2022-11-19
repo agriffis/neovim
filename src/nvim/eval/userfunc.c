@@ -297,6 +297,7 @@ int get_lambda_tv(char **arg, typval_T *rettv, bool evaluate)
   e = (char_u *)(*arg);
   *arg = skipwhite(*arg);
   if (**arg != '}') {
+    semsg(_("E451: Expected }: %s"), *arg);
     goto errret;
   }
   (*arg)++;
@@ -1649,6 +1650,11 @@ theend:
   xfree(name);
 
   return ret;
+}
+
+char_u *printable_func_name(ufunc_T *fp)
+{
+  return fp->uf_name_exp != NULL ? fp->uf_name_exp : fp->uf_name;
 }
 
 /// List the head of the function: "name(arg1, arg2)".
