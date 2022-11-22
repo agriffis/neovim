@@ -1,8 +1,6 @@
 // This is an open source non-commercial project. Dear PVS-Studio, please check
 // it. PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 
-// TODO(ZyX-I): move to eval/executor
-
 /// @file ex_eval.c
 ///
 /// Functions for Ex command line for the +eval feature.
@@ -862,7 +860,7 @@ void ex_endif(exarg_T *eap)
 /// Handle ":else" and ":elseif".
 void ex_else(exarg_T *eap)
 {
-  int result;
+  bool result = false;
   cstack_T *const cstack = eap->cstack;
 
   bool skip = CHECK_SKIP;
