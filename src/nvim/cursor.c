@@ -108,14 +108,14 @@ static int coladvance2(pos_T *pos, bool addspaces, bool finetune, colnr_T wcol_a
                  || (VIsual_active && *p_sel != 'o')
                  || ((get_ve_flags() & VE_ONEMORE) && wcol < MAXCOL);
 
-  char_u *line = (char_u *)ml_get_buf(curbuf, pos->lnum, false);
+  char *line = ml_get_buf(curbuf, pos->lnum, false);
 
   if (wcol >= MAXCOL) {
-    idx = (int)STRLEN(line) - 1 + one_more;
+    idx = (int)strlen(line) - 1 + one_more;
     col = wcol;
 
     if ((addspaces || finetune) && !VIsual_active) {
-      curwin->w_curswant = linetabsize(line) + one_more;
+      curwin->w_curswant = linetabsize((char_u *)line) + one_more;
       if (curwin->w_curswant > 0) {
         curwin->w_curswant--;
       }
@@ -129,7 +129,7 @@ static int coladvance2(pos_T *pos, bool addspaces, bool finetune, colnr_T wcol_a
         && curwin->w_width_inner != 0
         && wcol >= (colnr_T)width
         && width > 0) {
-      csize = linetabsize(line);
+      csize = linetabsize((char_u *)line);
       if (csize > 0) {
         csize--;
       }
@@ -145,7 +145,7 @@ static int coladvance2(pos_T *pos, bool addspaces, bool finetune, colnr_T wcol_a
     }
 
     chartabsize_T cts;
-    init_chartabsize_arg(&cts, curwin, pos->lnum, 0, (char *)line, (char *)line);
+    init_chartabsize_arg(&cts, curwin, pos->lnum, 0, line, line);
     while (cts.cts_vcol <= wcol && *cts.cts_ptr != NUL) {
       // Count a tab for what it's worth (if list mode not on)
       csize = win_lbr_chartabsize(&cts, &head);
@@ -153,7 +153,7 @@ static int coladvance2(pos_T *pos, bool addspaces, bool finetune, colnr_T wcol_a
       cts.cts_vcol += csize;
     }
     col = cts.cts_vcol;
-    idx = (int)(cts.cts_ptr - (char *)line);
+    idx = (int)(cts.cts_ptr - line);
     clear_chartabsize_arg(&cts);
 
     // Handle all the special cases.  The virtual_active() check
@@ -188,7 +188,7 @@ static int coladvance2(pos_T *pos, bool addspaces, bool finetune, colnr_T wcol_a
         col = wcol;
       } else {
         // Break a tab
-        int linelen = (int)STRLEN(line);
+        int linelen = (int)strlen(line);
         int correct = wcol - col - csize + 1;             // negative!!
         char_u *newline;
 
@@ -315,8 +315,8 @@ void check_pos(buf_T *buf, pos_T *pos)
   }
 
   if (pos->col > 0) {
-    char_u *line = (char_u *)ml_get_buf(buf, pos->lnum, false);
-    colnr_T len = (colnr_T)STRLEN(line);
+    char *line = ml_get_buf(buf, pos->lnum, false);
+    colnr_T len = (colnr_T)strlen(line);
     if (pos->col > len) {
       pos->col = len;
     }
@@ -456,12 +456,13 @@ bool leftcol_changed(void)
 
   // If the cursor is right or left of the screen, move it to last or first
   // character.
-  if (curwin->w_virtcol > (colnr_T)(lastcol - p_siso)) {
+  long siso = get_sidescrolloff_value(curwin);
+  if (curwin->w_virtcol > (colnr_T)(lastcol - siso)) {
     retval = true;
-    coladvance((colnr_T)(lastcol - p_siso));
-  } else if (curwin->w_virtcol < curwin->w_leftcol + p_siso) {
+    coladvance((colnr_T)(lastcol - siso));
+  } else if (curwin->w_virtcol < curwin->w_leftcol + siso) {
     retval = true;
-    coladvance((colnr_T)(curwin->w_leftcol + p_siso));
+    coladvance((colnr_T)(curwin->w_leftcol + siso));
   }
 
   // If the start of the character under the cursor is not on the screen,
