@@ -361,7 +361,7 @@ static void nfa_regcomp_start(char_u *expr, int re_flags)
   nstate = 0;
   istate = 0;
   // A reasonable estimation for maximum size
-  nstate_max = (STRLEN(expr) + 1) * 25;
+  nstate_max = (strlen((char *)expr) + 1) * 25;
 
   // Some items blow up in size, such as [A-z].  Add more space for that.
   // When it is still not enough realloc_post_list() will be used.
@@ -5418,7 +5418,7 @@ static int match_zref(int subidx, int *bytelen)
     return true;
   }
 
-  len = (int)STRLEN(re_extmatch_in->matches[subidx]);
+  len = (int)strlen((char *)re_extmatch_in->matches[subidx]);
   if (cstrncmp((char *)re_extmatch_in->matches[subidx], (char *)rex.input, &len) == 0) {
     *bytelen = len;
     return true;
@@ -5537,7 +5537,7 @@ static int recursive_regmatch(nfa_state_T *state, nfa_pim_T *pim, nfa_regprog_T 
           rex.line = reg_getline(++rex.lnum);
           rex.input = rex.line;
         } else {
-          rex.input = rex.line + STRLEN(rex.line);
+          rex.input = rex.line + strlen((char *)rex.line);
         }
       }
       if ((int)(rex.input - rex.line) >= state->val) {
@@ -6864,7 +6864,7 @@ static int nfa_regmatch(nfa_regprog_T *prog, nfa_state_T *start, regsubs_T *subm
           pos_T *pos = &fm->mark;
           const colnr_T pos_col = pos->lnum == rex.lnum + rex.reg_firstlnum
                                   && pos->col == MAXCOL
-            ? (colnr_T)STRLEN(reg_getline(pos->lnum - rex.reg_firstlnum))
+            ? (colnr_T)strlen((char *)reg_getline(pos->lnum - rex.reg_firstlnum))
             : pos->col;
 
           result = pos->lnum == rex.lnum + rex.reg_firstlnum
@@ -7385,7 +7385,13 @@ static long nfa_regexec_both(char_u *line, colnr_T startcol, proftime_T *tm, int
     // If match_text is set it contains the full text that must match.
     // Nothing else to try. Doesn't handle combining chars well.
     if (prog->match_text != NULL && !rex.reg_icombine) {
-      return find_match_text(col, prog->regstart, prog->match_text);
+      retval = find_match_text(col, prog->regstart, prog->match_text);
+      if (REG_MULTI) {
+        rex.reg_mmatch->rmm_matchcol = col;
+      } else {
+        rex.reg_match->rm_matchcol = col;
+      }
+      return retval;
     }
   }
 
@@ -7421,10 +7427,18 @@ theend:
           || (end->lnum == start->lnum && end->col < start->col)) {
         rex.reg_mmatch->endpos[0] = rex.reg_mmatch->startpos[0];
       }
+
+      // startpos[0] may be set by "\zs", also return the column where
+      // the whole pattern matched.
+      rex.reg_mmatch->rmm_matchcol = col;
     } else {
       if (rex.reg_match->endp[0] < rex.reg_match->startp[0]) {
         rex.reg_match->endp[0] = rex.reg_match->startp[0];
       }
+
+      // startpos[0] may be set by "\zs", also return the column where
+      // the whole pattern matched.
+      rex.reg_match->rm_matchcol = col;
     }
   }
 
