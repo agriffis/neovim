@@ -2266,7 +2266,7 @@ static int handle_mapping(int *keylenp, const bool *timedout, int *mapdepth)
 
       if (save_m_noremap != REMAP_YES) {
         noremap = save_m_noremap;
-      } else if (STRNCMP(map_str, save_m_keys != NULL ? save_m_keys : (char *)mp->m_keys,
+      } else if (strncmp(map_str, save_m_keys != NULL ? save_m_keys : (char *)mp->m_keys,
                          (size_t)keylen) != 0) {
         noremap = REMAP_YES;
       } else {
@@ -2342,7 +2342,9 @@ void check_end_reg_executing(bool advance)
 static int vgetorpeek(bool advance)
 {
   int c, c1;
-  bool timedout = false;  // waited for more than 1 second for mapping to complete
+  bool timedout = false;  // waited for more than 'timeoutlen'
+                          // for mapping to complete or
+                          // 'ttimeoutlen' for complete key code
   int mapdepth = 0;  // check for recursive mapping
   bool mode_deleted = false;  // set when mode has been deleted
   int new_wcol, new_wrow;

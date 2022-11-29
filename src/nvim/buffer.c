@@ -3735,8 +3735,8 @@ static int chk_modeline(linenr_T lnum, int flags)
   prev = -1;
   for (s = ml_get(lnum); *s != NUL; s++) {
     if (prev == -1 || ascii_isspace(prev)) {
-      if ((prev != -1 && STRNCMP(s, "ex:", (size_t)3) == 0)
-          || STRNCMP(s, "vi:", (size_t)3) == 0) {
+      if ((prev != -1 && strncmp(s, "ex:", (size_t)3) == 0)
+          || strncmp(s, "vi:", (size_t)3) == 0) {
         break;
       }
       // Accept both "vim" and "Vim".
@@ -3752,7 +3752,7 @@ static int chk_modeline(linenr_T lnum, int flags)
 
         if (*e == ':'
             && (s[0] != 'V'
-                || STRNCMP(skipwhite((char *)e + 1), "set", 3) == 0)
+                || strncmp(skipwhite(e + 1), "set", 3) == 0)
             && (s[3] == ':'
                 || (VIM_VERSION_100 >= vers && isdigit(s[3]))
                 || (VIM_VERSION_100 < vers && s[3] == '<')
@@ -3801,8 +3801,8 @@ static int chk_modeline(linenr_T lnum, int flags)
     // "vi:set opt opt opt: foo" -- foo not interpreted
     // "vi:opt opt opt: foo" -- foo interpreted
     // Accept "se" for compatibility with Elvis.
-    if (STRNCMP(s, "set ", (size_t)4) == 0
-        || STRNCMP(s, "se ", (size_t)3) == 0) {
+    if (strncmp(s, "set ", (size_t)4) == 0
+        || strncmp(s, "se ", (size_t)3) == 0) {
       if (*e != ':') {                // no terminating ':'?
         break;
       }
@@ -3959,30 +3959,6 @@ char *buf_spname(buf_T *buf)
     return buf_get_fname(buf);
   }
   return NULL;
-}
-
-/// Find a window for buffer "buf".
-/// If found true is returned and "wp" and "tp" are set to
-/// the window and tabpage.
-/// If not found, false is returned.
-///
-/// @param       buf  buffer to find a window for
-/// @param[out]  wp   stores the found window
-/// @param[out]  tp   stores the found tabpage
-///
-/// @return  true if a window was found for the buffer.
-bool find_win_for_buf(buf_T *buf, win_T **wp, tabpage_T **tp)
-{
-  *wp = NULL;
-  *tp = NULL;
-  FOR_ALL_TAB_WINDOWS(tp2, wp2) {
-    if (wp2->w_buffer == buf) {
-      *tp = tp2;
-      *wp = wp2;
-      return true;
-    }
-  }
-  return false;
 }
 
 static int buf_signcols_inner(buf_T *buf, int maximum)

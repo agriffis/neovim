@@ -27,6 +27,7 @@
 #include "nvim/eval/typval.h"
 #include "nvim/eval/typval_defs.h"
 #include "nvim/eval/vars.h"
+#include "nvim/eval/window.h"
 #include "nvim/ex_cmds.h"
 #include "nvim/ex_cmds2.h"
 #include "nvim/ex_docmd.h"
@@ -543,7 +544,7 @@ wingotofile:
     // Make a copy, if the line was changed it will be freed.
     ptr = xstrnsave(ptr, len);
 
-    find_pattern_in_path((char_u *)ptr, 0, len, true, Prenum == 0,
+    find_pattern_in_path(ptr, 0, len, true, Prenum == 0,
                          type, Prenum1, ACTION_SPLIT, 1, MAXLNUM);
     xfree(ptr);
     curwin->w_set_curswant = true;
@@ -6389,9 +6390,6 @@ void win_new_height(win_T *wp, int height)
   wp->w_height = height;
   wp->w_pos_changed = true;
   win_set_inner_size(wp, true);
-  if (wp->w_status_height) {
-    wp->w_redr_status = true;
-  }
 }
 
 void scroll_to_fraction(win_T *wp, int prev_height)
@@ -6487,7 +6485,6 @@ void scroll_to_fraction(win_T *wp, int prev_height)
   }
 
   redraw_later(wp, UPD_SOME_VALID);
-  wp->w_redr_status = true;
   invalidate_botline_win(wp);
 }
 
@@ -6554,6 +6551,7 @@ void win_set_inner_size(win_T *wp, bool valid_cursor)
   wp->w_width_outer = (wp->w_width_inner + win_border_width(wp));
   wp->w_winrow_off = wp->w_border_adj[0] + wp->w_winbar_height;
   wp->w_wincol_off = wp->w_border_adj[3];
+  wp->w_redr_status = true;
 }
 
 static int win_border_height(win_T *wp)
@@ -6570,10 +6568,8 @@ static int win_border_width(win_T *wp)
 void win_new_width(win_T *wp, int width)
 {
   wp->w_width = width;
-  win_set_inner_size(wp, true);
-
-  wp->w_redr_status = true;
   wp->w_pos_changed = true;
+  win_set_inner_size(wp, true);
 }
 
 void win_comp_scroll(win_T *wp)
@@ -6799,9 +6795,9 @@ char_u *file_name_in_line(char_u *line, int col, int options, long count, char_u
     // Also accept " line 999" with and without the same translation as
     // used in last_set_msg().
     char *p = ptr + len;
-    if (STRNCMP(p, line_english, strlen(line_english)) == 0) {
+    if (strncmp(p, line_english, strlen(line_english)) == 0) {
       p += strlen(line_english);
-    } else if (STRNCMP(p, line_transl, strlen(line_transl)) == 0) {
+    } else if (strncmp(p, line_transl, strlen(line_transl)) == 0) {
       p += strlen(line_transl);
     } else {
       p = skipwhite(p);
@@ -6974,7 +6970,6 @@ int set_winbar_win(win_T *wp, bool make_room, bool valid_cursor)
     }
     wp->w_winbar_height = winbar_height;
     win_set_inner_size(wp, valid_cursor);
-    wp->w_redr_status = wp->w_redr_status || winbar_height;
 
     if (winbar_height == 0) {
       // When removing winbar, deallocate the w_winbar_click_defs array
@@ -7284,114 +7279,6 @@ static win_T *restore_snapshot_rec(frame_T *sn, frame_T *fr)
   return wp;
 }
 
-/// Set "win" to be the curwin and "tp" to be the current tab page.
-/// restore_win() MUST be called to undo, also when FAIL is returned.
-/// No autocommands will be executed until restore_win() is called.
-///
-/// @param no_display  if true the display won't be affected, no redraw is
-///                    triggered, another tabpage access is limited.
-///
-/// @return FAIL if switching to "win" failed.
-int switch_win(switchwin_T *switchwin, win_T *win, tabpage_T *tp, bool no_display)
-{
-  block_autocmds();
-  return switch_win_noblock(switchwin, win, tp, no_display);
-}
-
-// As switch_win() but without blocking autocommands.
-int switch_win_noblock(switchwin_T *switchwin, win_T *win, tabpage_T *tp, bool no_display)
-{
-  CLEAR_POINTER(switchwin);
-  switchwin->sw_curwin = curwin;
-  if (win == curwin) {
-    switchwin->sw_same_win = true;
-  } else {
-    // Disable Visual selection, because redrawing may fail.
-    switchwin->sw_visual_active = VIsual_active;
-    VIsual_active = false;
-  }
-
-  if (tp != NULL) {
-    switchwin->sw_curtab = curtab;
-    if (no_display) {
-      curtab->tp_firstwin = firstwin;
-      curtab->tp_lastwin = lastwin;
-      curtab = tp;
-      firstwin = curtab->tp_firstwin;
-      lastwin = curtab->tp_lastwin;
-    } else {
-      goto_tabpage_tp(tp, false, false);
-    }
-  }
-  if (!win_valid(win)) {
-    return FAIL;
-  }
-  curwin = win;
-  curbuf = curwin->w_buffer;
-  return OK;
-}
-
-// Restore current tabpage and window saved by switch_win(), if still valid.
-// When "no_display" is true the display won't be affected, no redraw is
-// triggered.
-void restore_win(switchwin_T *switchwin, bool no_display)
-{
-  restore_win_noblock(switchwin, no_display);
-  unblock_autocmds();
-}
-
-// As restore_win() but without unblocking autocommands.
-void restore_win_noblock(switchwin_T *switchwin, bool no_display)
-{
-  if (switchwin->sw_curtab != NULL && valid_tabpage(switchwin->sw_curtab)) {
-    if (no_display) {
-      curtab->tp_firstwin = firstwin;
-      curtab->tp_lastwin = lastwin;
-      curtab = switchwin->sw_curtab;
-      firstwin = curtab->tp_firstwin;
-      lastwin = curtab->tp_lastwin;
-    } else {
-      goto_tabpage_tp(switchwin->sw_curtab, false, false);
-    }
-  }
-
-  if (!switchwin->sw_same_win) {
-    VIsual_active = switchwin->sw_visual_active;
-  }
-
-  if (win_valid(switchwin->sw_curwin)) {
-    curwin = switchwin->sw_curwin;
-    curbuf = curwin->w_buffer;
-  }
-}
-
-/// Make "buf" the current buffer.
-///
-/// restore_buffer() MUST be called to undo.
-/// No autocommands will be executed. Use aucmd_prepbuf() if there are any.
-void switch_buffer(bufref_T *save_curbuf, buf_T *buf)
-{
-  block_autocmds();
-  set_bufref(save_curbuf, curbuf);
-  curbuf->b_nwindows--;
-  curbuf = buf;
-  curwin->w_buffer = buf;
-  curbuf->b_nwindows++;
-}
-
-/// Restore the current buffer after using switch_buffer().
-void restore_buffer(bufref_T *save_curbuf)
-{
-  unblock_autocmds();
-  // Check for valid buffer, just in case.
-  if (bufref_valid(save_curbuf)) {
-    curbuf->b_nwindows--;
-    curwin->w_buffer = save_curbuf->br_buf;
-    curbuf = save_curbuf->br_buf;
-    curbuf->b_nwindows++;
-  }
-}
-
 /// Check that "topfrp" and its children are at the right height.
 ///
 /// @param  topfrp  top frame pointer
@@ -7514,43 +7401,6 @@ skip:
   return NULL;    // no error
 }
 
-int win_getid(typval_T *argvars)
-{
-  if (argvars[0].v_type == VAR_UNKNOWN) {
-    return curwin->handle;
-  }
-  int winnr = (int)tv_get_number(&argvars[0]);
-  win_T *wp;
-  if (winnr > 0) {
-    if (argvars[1].v_type == VAR_UNKNOWN) {
-      wp = firstwin;
-    } else {
-      tabpage_T *tp = NULL;
-      int tabnr = (int)tv_get_number(&argvars[1]);
-      FOR_ALL_TABS(tp2) {
-        if (--tabnr == 0) {
-          tp = tp2;
-          break;
-        }
-      }
-      if (tp == NULL) {
-        return -1;
-      }
-      if (tp == curtab) {
-        wp = firstwin;
-      } else {
-        wp = tp->tp_firstwin;
-      }
-    }
-    for (; wp != NULL; wp = wp->w_next) {
-      if (--winnr == 0) {
-        return wp->handle;
-      }
-    }
-  }
-  return 0;
-}
-
 void win_get_tabwin(handle_T id, int *tabnr, int *winnr)
 {
   *tabnr = 0;
@@ -7568,98 +7418,6 @@ void win_get_tabwin(handle_T id, int *tabnr, int *winnr)
     }
     tnum++;
     wnum = 1;
-  }
-}
-
-void win_id2tabwin(typval_T *const argvars, typval_T *const rettv)
-{
-  handle_T id = (handle_T)tv_get_number(&argvars[0]);
-
-  int winnr = 1;
-  int tabnr = 1;
-  win_get_tabwin(id, &tabnr, &winnr);
-
-  list_T *const list = tv_list_alloc_ret(rettv, 2);
-  tv_list_append_number(list, tabnr);
-  tv_list_append_number(list, winnr);
-}
-
-win_T *win_id2wp(int id)
-{
-  return win_id2wp_tp(id, NULL);
-}
-
-// Return the window and tab pointer of window "id".
-win_T *win_id2wp_tp(int id, tabpage_T **tpp)
-{
-  FOR_ALL_TAB_WINDOWS(tp, wp) {
-    if (wp->handle == id) {
-      if (tpp != NULL) {
-        *tpp = tp;
-      }
-      return wp;
-    }
-  }
-
-  return NULL;
-}
-
-int win_id2win(typval_T *argvars)
-{
-  int nr = 1;
-  int id = (int)tv_get_number(&argvars[0]);
-
-  FOR_ALL_WINDOWS_IN_TAB(wp, curtab) {
-    if (wp->handle == id) {
-      return nr;
-    }
-    nr++;
-  }
-  return 0;
-}
-
-void win_findbuf(typval_T *argvars, list_T *list)
-{
-  int bufnr = (int)tv_get_number(&argvars[0]);
-
-  FOR_ALL_TAB_WINDOWS(tp, wp) {
-    if (wp->w_buffer->b_fnum == bufnr) {
-      tv_list_append_number(list, wp->handle);
-    }
-  }
-}
-
-// Get the layout of the given tab page for winlayout().
-void get_framelayout(const frame_T *fr, list_T *l, bool outer)
-{
-  if (fr == NULL) {
-    return;
-  }
-
-  list_T *fr_list;
-  if (outer) {
-    // outermost call from f_winlayout()
-    fr_list = l;
-  } else {
-    fr_list = tv_list_alloc(2);
-    tv_list_append_list(l, fr_list);
-  }
-
-  if (fr->fr_layout == FR_LEAF) {
-    if (fr->fr_win != NULL) {
-      tv_list_append_string(fr_list, "leaf", -1);
-      tv_list_append_number(fr_list, fr->fr_win->handle);
-    }
-  } else {
-    tv_list_append_string(fr_list, fr->fr_layout == FR_ROW ? "row" : "col", -1);
-
-    list_T *const win_list = tv_list_alloc(kListLenUnknown);
-    tv_list_append_list(fr_list, win_list);
-    const frame_T *child = fr->fr_child;
-    while (child != NULL) {
-      get_framelayout(child, win_list, false);
-      child = child->fr_next;
-    }
   }
 }
 

@@ -179,19 +179,28 @@ struct tm *os_localtime(struct tm *result) FUNC_ATTR_NONNULL_ALL
 /// @param result[out] Pointer to a 'char' where the result should be placed
 /// @param result_len length of result buffer
 /// @return human-readable string of current local time
-char *os_ctime_r(const time_t *restrict clock, char *restrict result, size_t result_len)
+char *os_ctime_r(const time_t *restrict clock, char *restrict result, size_t result_len,
+                 bool add_newline)
   FUNC_ATTR_NONNULL_ALL FUNC_ATTR_NONNULL_RET
 {
   struct tm clock_local;
   struct tm *clock_local_ptr = os_localtime_r(clock, &clock_local);
   // MSVC returns NULL for an invalid value of seconds.
   if (clock_local_ptr == NULL) {
-    xstrlcpy(result, _("(Invalid)"), result_len);
+    xstrlcpy(result, _("(Invalid)"), result_len - 1);
   } else {
     // xgettext:no-c-format
-    strftime(result, result_len, _("%a %b %d %H:%M:%S %Y"), clock_local_ptr);
+    if (strftime(result, result_len - 1, _("%a %b %d %H:%M:%S %Y"), clock_local_ptr) == 0) {
+      // Quoting "man strftime":
+      // > If the length of the result string (including the terminating
+      // > null byte) would exceed max bytes, then strftime() returns 0,
+      // > and the contents of the array are undefined.
+      xstrlcpy(result, _("(Invalid)"), result_len - 1);
+    }
   }
-  xstrlcat(result, "\n", result_len);
+  if (add_newline) {
+    xstrlcat(result, "\n", result_len);
+  }
   return result;
 }
 
@@ -200,11 +209,11 @@ char *os_ctime_r(const time_t *restrict clock, char *restrict result, size_t res
 /// @param result[out] Pointer to a 'char' where the result should be placed
 /// @param result_len length of result buffer
 /// @return human-readable string of current local time
-char *os_ctime(char *result, size_t result_len)
+char *os_ctime(char *result, size_t result_len, bool add_newline)
   FUNC_ATTR_NONNULL_ALL FUNC_ATTR_NONNULL_RET
 {
   time_t rawtime = time(NULL);
-  return os_ctime_r(&rawtime, result, result_len);
+  return os_ctime_r(&rawtime, result, result_len, add_newline);
 }
 
 /// Portable version of POSIX strptime()

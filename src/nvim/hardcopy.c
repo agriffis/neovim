@@ -2090,7 +2090,7 @@ int mch_print_init(prt_settings_T *psettings, char_u *jobname, int forceit)
   // encoding other than Unicode.  This is because a Unicode encoding does not
   // uniquely identify a CJK character set to use.
   p_mbenc = NULL;
-  props = enc_canon_props(p_encoding);
+  props = enc_canon_props((char *)p_encoding);
   if (!(props & ENC_8BIT) && ((*p_pmcs != NUL) || !(props & ENC_UNICODE))) {
     p_mbenc_first = NULL;
     int effective_cmap = 0;
@@ -2403,7 +2403,6 @@ bool mch_print_begin(prt_settings_T *psettings)
   struct prt_ps_resource_S res_encoding;
   char buffer[256];
   char *p_encoding;
-  char_u *p;
   struct prt_ps_resource_S res_cidfont;
   struct prt_ps_resource_S res_cmap;
 
@@ -2416,14 +2415,9 @@ bool mch_print_begin(prt_settings_T *psettings)
   prt_dsc_textline("For", buffer);
   prt_dsc_textline("Creator", longVersion);
   // Note: to ensure Clean8bit I don't think we can use LC_TIME
-  char ctime_buf[50];
-  char *p_time = os_ctime(ctime_buf, sizeof(ctime_buf));
-  // Note: os_ctime() adds a \n so we have to remove it :-(
-  p = (char_u *)vim_strchr(p_time, '\n');
-  if (p != NULL) {
-    *p = NUL;
-  }
-  prt_dsc_textline("CreationDate", p_time);
+
+  char ctime_buf[100];  // hopefully enough for every language
+  prt_dsc_textline("CreationDate", os_ctime(ctime_buf, sizeof(ctime_buf), false));
   prt_dsc_textline("DocumentData", "Clean8Bit");
   prt_dsc_textline("Orientation", "Portrait");
   prt_dsc_text(("Pages"), "atend");
@@ -2508,7 +2502,7 @@ bool mch_print_begin(prt_settings_T *psettings)
       int props;
 
       p_encoding = enc_skip(p_enc);
-      props = enc_canon_props((char_u *)p_encoding);
+      props = enc_canon_props(p_encoding);
       if (!(props & ENC_8BIT)
           || !prt_find_resource(p_encoding, &res_encoding)) {
         // 8-bit 'encoding' is not supported
@@ -2547,7 +2541,7 @@ bool mch_print_begin(prt_settings_T *psettings)
   }
 
   prt_conv.vc_type = CONV_NONE;
-  if (!(enc_canon_props((char_u *)p_enc) & enc_canon_props((char_u *)p_encoding) & ENC_8BIT)) {
+  if (!(enc_canon_props(p_enc) & enc_canon_props(p_encoding) & ENC_8BIT)) {
     // Set up encoding conversion if required
     if (convert_setup(&prt_conv, p_enc, p_encoding) == FAIL) {
       semsg(_("E620: Unable to convert to print encoding \"%s\""),

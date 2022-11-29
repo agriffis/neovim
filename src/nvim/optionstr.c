@@ -161,8 +161,8 @@ void didset_string_options(void)
 /// "oldval_l"  the old local value (only non-NULL if global and local value are set)
 /// "oldval_g"  the old global value (only non-NULL if global and local value are set)
 /// "newval"    the new value
-void trigger_optionsset_string(int opt_idx, int opt_flags, char *oldval, char *oldval_l,
-                               char *oldval_g, char *newval)
+void trigger_optionset_string(int opt_idx, int opt_flags, char *oldval, char *oldval_l,
+                              char *oldval_g, char *newval)
 {
   // Don't do this recursively.
   if (oldval != NULL
@@ -448,8 +448,8 @@ char *set_string_option(const int opt_idx, const char *const value, const int op
   // call autocommand after handling side effects
   if (errmsg == NULL) {
     if (!starting) {
-      trigger_optionsset_string(opt_idx, opt_flags, saved_oldval, saved_oldval_l, saved_oldval_g,
-                                saved_newval);
+      trigger_optionset_string(opt_idx, opt_flags, saved_oldval, saved_oldval_l, saved_oldval_g,
+                               saved_newval);
     }
     if (opt->flags & P_UI_OPTION) {
       ui_call_option_set(cstr_as_string(opt->fullname),
@@ -550,7 +550,7 @@ static int check_signcolumn(char *val)
 
   // check for 'auto:<NUMBER>-<NUMBER>'
   if (strlen(val) == 8
-      && !STRNCMP(val, "auto:", 5)
+      && !strncmp(val, "auto:", 5)
       && ascii_isdigit(val[5])
       && val[6] == '-'
       && ascii_isdigit(val[7])) {
@@ -1609,7 +1609,7 @@ char *did_set_string_option(int opt_idx, char **varp, char *oldval, char *errbuf
       char *q = curwin->w_s->b_p_spl;
 
       // Skip the first name if it is "cjk".
-      if (STRNCMP(q, "cjk,", 4) == 0) {
+      if (strncmp(q, "cjk,", 4) == 0) {
         q += 4;
       }
 
@@ -1678,7 +1678,7 @@ static int opt_strings_flags(char *val, char **values, unsigned *flagp, bool lis
       }
 
       size_t len = strlen(values[i]);
-      if (STRNCMP(values[i], val, len) == 0
+      if (strncmp(values[i], val, len) == 0
           && ((list && val[len] == ',') || val[len] == NUL)) {
         val += len + (val[len] == ',');
         assert(i < sizeof(1U) * 8);
