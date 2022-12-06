@@ -320,7 +320,7 @@ EXTERN int garbage_collect_at_exit INIT(= false);
 #define SID_STR         (-10)     // for sourcing a string with no script item
 
 // Script CTX being sourced or was sourced to define the current function.
-EXTERN sctx_T current_sctx INIT(= { 0 COMMA 0 COMMA 0 });
+EXTERN sctx_T current_sctx INIT(= { 0, 0, 0 });
 // ID of the current channel making a client API call
 EXTERN uint64_t current_channel_id INIT(= 0);
 
@@ -422,19 +422,18 @@ EXTERN win_T *prevwin INIT(= NULL);  // previous window
 
 EXTERN win_T *curwin;        // currently active window
 
-/// When executing autocommands for a buffer that is not in any window, a
-/// special window is created to handle the side effects.  When autocommands
-/// nest we may need more than one.  Allow for up to five, if more are needed
-/// something crazy is happening.
-enum { AUCMD_WIN_COUNT = 5, };
-
 typedef struct {
   win_T *auc_win;     ///< Window used in aucmd_prepbuf().  When not NULL the
                       ///< window has been allocated.
   bool auc_win_used;  ///< This auc_win is being used.
 } aucmdwin_T;
 
-EXTERN aucmdwin_T aucmd_win[AUCMD_WIN_COUNT];
+/// When executing autocommands for a buffer that is not in any window, a
+/// special window is created to handle the side effects.  When autocommands
+/// nest we may need more than one.
+EXTERN kvec_t(aucmdwin_T) aucmd_win_vec INIT(= KV_INITIAL_VALUE);
+#define aucmd_win (aucmd_win_vec.items)
+#define AUCMD_WIN_COUNT ((int)aucmd_win_vec.size)
 
 // The window layout is kept in a tree of frames.  topframe points to the top
 // of the tree.
@@ -1024,6 +1023,8 @@ EXTERN char e_highlight_group_name_invalid_char[] INIT(= N_("E5248: Invalid char
 
 EXTERN char e_highlight_group_name_too_long[] INIT(= N_("E1249: Highlight group name too long"));
 
+EXTERN char e_invalid_line_number_nr[] INIT(= N_("E966: Invalid line number: %ld"));
+
 EXTERN char e_undobang_cannot_redo_or_move_branch[]
 INIT(= N_("E5767: Cannot use :undo! to redo or move to a different undo branch"));
 
@@ -1087,6 +1088,10 @@ typedef enum {
 EXTERN char windowsVersion[20] INIT(= { 0 });
 
 EXTERN int exit_need_delay INIT(= 0);
+
+/// While executing a regexp and set to OPTION_MAGIC_ON or OPTION_MAGIC_OFF this
+/// overrules p_magic.  Otherwise set to OPTION_MAGIC_NOT_SET.
+EXTERN optmagic_T magic_overruled INIT(= OPTION_MAGIC_NOT_SET);
 
 /// Skip win_fix_cursor() call for 'splitkeep' when cmdwin is closed.
 EXTERN bool skip_win_fix_cursor INIT(= false);

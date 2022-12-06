@@ -181,13 +181,11 @@ void buffer_ensure_loaded(buf_T *buf)
   if (buf->b_ml.ml_mfp == NULL) {
     aco_save_T aco;
 
-    // Make sure the buffer is in a window.  If not then skip it.
+    // Make sure the buffer is in a window.
     aucmd_prepbuf(&aco, buf);
-    if (curbuf == buf) {
-      swap_exists_action = SEA_NONE;
-      open_buffer(false, NULL, 0);
-      aucmd_restbuf(&aco);
-    }
+    swap_exists_action = SEA_NONE;
+    open_buffer(false, NULL, 0);
+    aucmd_restbuf(&aco);
   }
 }
 
@@ -369,20 +367,17 @@ int open_buffer(int read_stdin, exarg_T *eap, int flags_arg)
     aco_save_T aco;
 
     // Go to the buffer that was opened, make sure it is in a window.
-    // If not then skip it.
     aucmd_prepbuf(&aco, old_curbuf.br_buf);
-    if (curbuf == old_curbuf.br_buf) {
-      do_modelines(0);
-      curbuf->b_flags &= ~(BF_CHECK_RO | BF_NEVERLOADED);
+    do_modelines(0);
+    curbuf->b_flags &= ~(BF_CHECK_RO | BF_NEVERLOADED);
 
-      if ((flags & READ_NOWINENTER) == 0) {
-        apply_autocmds_retval(EVENT_BUFWINENTER, NULL, NULL, false, curbuf,
-                              &retval);
-      }
-
-      // restore curwin/curbuf and a few other things
-      aucmd_restbuf(&aco);
+    if ((flags & READ_NOWINENTER) == 0) {
+      apply_autocmds_retval(EVENT_BUFWINENTER, NULL, NULL, false, curbuf,
+                            &retval);
     }
+
+    // restore curwin/curbuf and a few other things
+    aucmd_restbuf(&aco);
   }
 
   return retval;
@@ -2255,7 +2250,7 @@ int buflist_findpat(const char *pattern, const char *pattern_end, bool unlisted,
         }
 
         regmatch_T regmatch;
-        regmatch.regprog = vim_regcomp(p, p_magic ? RE_MAGIC : 0);
+        regmatch.regprog = vim_regcomp(p, magic_isset() ? RE_MAGIC : 0);
         if (regmatch.regprog == NULL) {
           xfree(pat);
           return -1;
@@ -4177,11 +4172,6 @@ bool buf_contents_changed(buf_T *buf)
   // Set curwin/curbuf to buf and save a few things.
   aco_save_T aco;
   aucmd_prepbuf(&aco, newbuf);
-  if (curbuf != newbuf) {
-    // Failed to find a window for "newbuf".
-    wipe_buffer(newbuf, false);
-    return true;
-  }
 
   if (ml_open(curbuf) == OK
       && readfile(buf->b_ffname, buf->b_fname,

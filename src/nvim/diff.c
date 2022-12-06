@@ -1890,7 +1890,7 @@ static void count_filler_lines_and_topline(int *curlinenum_to, int *linesfiller,
   const diff_T *curdif = thistopdiff;
   int ch_virtual_lines = 0;
   int isfiller = 0;
-  while (virtual_lines_passed) {
+  while (virtual_lines_passed > 0) {
     if (ch_virtual_lines) {
       virtual_lines_passed--;
       ch_virtual_lines--;
@@ -2944,11 +2944,6 @@ void ex_diffgetput(exarg_T *eap)
 
     // Set curwin/curbuf to buf and save a few things.
     aucmd_prepbuf(&aco, curtab->tp_diffbuf[idx_other]);
-    if (curbuf != curtab->tp_diffbuf[idx_other]) {
-      // Could not find a window for this buffer, the rest is likely to
-      // fail.
-      goto theend;
-    }
   }
 
   const int idx_from = eap->cmdidx == CMD_diffget ? idx_other : idx_cur;

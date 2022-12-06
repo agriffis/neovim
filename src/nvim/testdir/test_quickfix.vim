@@ -3298,6 +3298,21 @@ func Test_resize_from_copen()
   endtry
 endfunc
 
+func Test_filetype_autocmd()
+  " this changes the location list while it is in use to fill a buffer
+  lexpr ''
+  lopen
+  augroup FT_loclist
+    au FileType * call setloclist(0, [], 'f')
+  augroup END
+  silent! lolder
+  lexpr ''
+
+  augroup FT_loclist
+    au! FileType
+  augroup END
+endfunc
+
 func Test_vimgrep_with_textlock()
   new
 
@@ -3915,6 +3930,22 @@ func Xgetlist_empty_tests(cchar)
 		\ 'changedtick' : 0, 'filewinid' : 0, 'qfbufnr' : 0,
                 \ 'quickfixtextfunc' : ''}, g:Xgetlist({'nr' : 5, 'all' : 0}))
   endif
+endfunc
+
+func Test_empty_list_quickfixtextfunc()
+  " This was crashing.  Can only reproduce by running it in a separate Vim
+  " instance.
+  let lines =<< trim END
+      func s:Func(o)
+              cgetexpr '0'
+      endfunc
+      cope
+      let &quickfixtextfunc = 's:Func'
+      cgetfile [ex
+  END
+  call writefile(lines, 'Xquickfixtextfunc')
+  call RunVim([], [], '-e -s -S Xquickfixtextfunc -c qa')
+  call delete('Xquickfixtextfunc')
 endfunc
 
 func Test_getqflist()
@@ -5297,6 +5328,29 @@ func Test_lhelpgrep_from_help_window()
   new | only!
 endfunc
 
+" Test for the crash fixed by 7.3.715
+func Test_setloclist_crash()
+  %bw!
+  let g:BufNum = bufnr()
+  augroup QF_Test
+    au!
+    au BufUnload * call setloclist(0, [{'bufnr':g:BufNum, 'lnum':1, 'col':1, 'text': 'tango down'}])
+  augroup END
+
+  try
+    lvimgrep /.*/ *.mak
+  catch /E926:/
+  endtry
+  call assert_equal('tango down', getloclist(0, {'items' : 0}).items[0].text)
+  call assert_equal(1, getloclist(0, {'size' : 0}).size)
+
+  augroup QF_Test
+    au!
+  augroup END
+  unlet g:BufNum
+  %bw!
+endfunc
+
 " Test for adding an invalid entry with the quickfix window open and making
 " sure that the window contents are not changed
 func Test_add_invalid_entry_with_qf_window()
@@ -5789,6 +5843,23 @@ func Test_qftextfunc_callback()
   END
   call CheckLegacyAndVim9Success(lines)
 
+  " Test for using a script-local function name
+  func s:TqfFunc2(info)
+    let g:TqfFunc2Args = [a:info.start_idx, a:info.end_idx]
+    return ''
+  endfunc
+  let g:TqfFunc2Args = []
+  set quickfixtextfunc=s:TqfFunc2
+  cexpr "F10:10:10:L10"
+  cclose
+  call assert_equal([1, 1], g:TqfFunc2Args)
+
+  let &quickfixtextfunc = 's:TqfFunc2'
+  cexpr "F11:11:11:L11"
+  cclose
+  call assert_equal([1, 1], g:TqfFunc2Args)
+  delfunc s:TqfFunc2
+
   " set 'quickfixtextfunc' to a partial with dict. This used to cause a crash.
   func SetQftfFunc()
     let params = {'qftf': function('g:DictQftfFunc')}
@@ -6147,5 +6218,18 @@ func Test_loclist_replace_autocmd()
   %bw!
   call setloclist(0, [], 'f')
 endfunc
+
+func s:QfTf(_)
+endfunc
+
+func Test_setqflist_cb_arg()
+  " This was changing the callback name in the dictionary.
+  let d = #{quickfixtextfunc: 's:QfTf'}
+  call setqflist([], 'a', d)
+  call assert_equal('s:QfTf', d.quickfixtextfunc)
+
+  call setqflist([], 'f')
+endfunc
+
 
 " vim: shiftwidth=2 sts=2 expandtab

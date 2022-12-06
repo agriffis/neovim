@@ -57,7 +57,7 @@
 ///                         Omitted if command cannot take a register.
 ///         - bang: (boolean) Whether command contains a |<bang>| (!) modifier.
 ///         - args: (array) Command arguments.
-///         - addr: (string) Value of |:command-addr|. Uses short name.
+///         - addr: (string) Value of |:command-addr|. Uses short name or "line" for -addr=lines.
 ///         - nargs: (string) Value of |:command-nargs|.
 ///         - nextcmd: (string) Next command if there are multiple commands separated by a |:bar|.
 ///                             Empty if there isn't a next command.
@@ -889,7 +889,7 @@ static void build_cmdline_str(char **cmdlinep, exarg_T *eap, CmdParseInfo *cmdin
 /// {command} is the replacement text or Lua function to execute.
 ///
 /// Example:
-/// <pre>
+/// <pre>vim
 ///    :call nvim_create_user_command('SayHello', 'echo "Hello world!"', {})
 ///    :SayHello
 ///    Hello world!

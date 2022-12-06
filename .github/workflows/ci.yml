@@ -31,18 +31,8 @@ jobs:
 
       - name: Install apt packages
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            autoconf \
-            automake \
-            build-essential \
-            cmake \
-            gettext \
-            libtool-bin \
-            locales \
-            lua-check \
-            ninja-build \
-            pkg-config
+          ./.github/scripts/install_deps_ubuntu.sh
+          sudo apt-get install -y lua-check
 
       - name: Cache uncrustify
         id: cache-uncrustify
@@ -69,12 +59,7 @@ jobs:
           mkdir -p $HOME/.cache
           cp $build_dir/uncrustify ${{ env.CACHE_UNCRUSTIFY }}
 
-      - name: Cache artifacts
-        uses: actions/cache@v3
-        with:
-          path: |
-            ${{ env.CACHE_NVIM_DEPS_DIR }}
-          key: lint-${{ hashFiles('cmake/*', '**/CMakeLists.txt', '!cmake.deps/**CMakeLists.txt') }}-${{ github.base_ref }}
+      - uses: ./.github/actions/cache
 
       - name: Build third-party deps
         run: ./ci/before_script.sh
@@ -141,38 +126,24 @@ jobs:
       - name: Install apt packages
         run: |
           sudo add-apt-repository ppa:neovim-ppa/stable
-          sudo apt-get update
+          ./.github/scripts/install_deps_ubuntu.sh
           sudo apt-get install -y \
-            autoconf \
-            automake \
-            build-essential \
-            cmake \
-            gettext \
             libluajit-5.1-dev \
             libmsgpack-dev \
             libtermkey-dev \
-            libtool-bin \
             libtree-sitter-dev \
             libunibilium-dev \
             libuv1-dev \
             libvterm-dev \
-            locales \
             lua-busted \
             lua-filesystem \
             lua-inspect \
             lua-lpeg \
             lua-luv-dev \
             lua-nvim \
-            luajit \
-            ninja-build \
-            pkg-config
+            luajit
 
-      - name: Cache artifacts
-        uses: actions/cache@v3
-        with:
-          path: |
-            ${{ env.CACHE_NVIM_DEPS_DIR }}
-          key: lint-${{ hashFiles('cmake/*', '**/CMakeLists.txt', '!cmake.deps/**CMakeLists.txt') }}-${{ github.base_ref }}
+      - uses: ./.github/actions/cache
 
       - name: Build third-party deps
         run: ./ci/before_script.sh
@@ -242,9 +213,7 @@ jobs:
 
       - name: Install apt packages
         if: matrix.os == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y autoconf automake build-essential cmake cpanminus gcc-multilib gdb gettext language-pack-tr libtool-bin locales ninja-build pkg-config python3 python3-pip python3-setuptools unzip valgrind xclip
+        run: ./.github/scripts/install_deps_ubuntu.sh
 
       - name: Install minimum required version of cmake
         if: matrix.cmake == 'minimum_required'
@@ -273,12 +242,7 @@ jobs:
       - name: Setup interpreter packages
         run: ./ci/install.sh
 
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ${{ env.CACHE_NVIM_DEPS_DIR }}
-          key: ${{ matrix.runner }}-${{ matrix.flavor }}-${{ matrix.cc }}-${{ hashFiles('cmake/*', 'cmake.deps/**', '**/CMakeLists.txt') }}-${{ github.base_ref }}
+      - uses: ./.github/actions/cache
 
       - name: Build third-party deps
         run: ./ci/before_script.sh
@@ -315,15 +279,13 @@ jobs:
     timeout-minutes: 45
     env:
       DEPS_BUILD_DIR: ${{ github.workspace }}/nvim-deps
+      CACHE_NVIM_DEPS_DIR: ${{ github.workspace }}/nvim-deps
       DEPS_PREFIX: ${{ github.workspace }}/nvim-deps/usr
     name: windows (MSVC_64)
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/cache@v3
-        with:
-          path: ${{ env.DEPS_BUILD_DIR }}
-          key: windows-${{ hashFiles('cmake.deps/**') }}
+      - uses: ./.github/actions/cache
 
       - name: Set env
         run: ./.github/workflows/env.ps1
