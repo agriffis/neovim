@@ -391,6 +391,15 @@ describe('float window', function()
     eq(winids, eval('winids'))
   end)
 
+  it('no crash with bufpos and non-existent window', function()
+    command('new')
+    local closed_win = meths.get_current_win().id
+    command('close')
+    local buf = meths.create_buf(false,false)
+    meths.open_win(buf, true, {relative='win', win=closed_win, width=1, height=1, bufpos={0,0}})
+    assert_alive()
+  end)
+
   it("no segfault when setting minimal style after clearing local 'fillchars' #19510", function()
     local float_opts = {relative = 'editor', row = 1, col = 1, width = 1, height = 1}
     local float_win = meths.open_win(0, true, float_opts)
@@ -727,6 +736,7 @@ describe('float window', function()
         [25] = {blend = 100, background = Screen.colors.Gray0};
         [26] = {blend = 80, background = Screen.colors.Gray0};
         [27] = {background = Screen.colors.LightGray};
+        [28] = {foreground = Screen.colors.DarkBlue, background = Screen.colors.LightGray};
       }
       screen:set_default_attr_ids(attrs)
     end)
@@ -3068,6 +3078,66 @@ describe('float window', function()
         ]]}
       end
 
+      command('set laststatus=0')
+      command('botright vnew')
+      if multigrid then
+        screen:expect{grid=[[
+        ## grid 1
+          [2:----]{5:│}[6:--------------------]|
+          [2:----]{5:│}[6:--------------------]|
+          [2:----]{5:│}[6:--------------------]|
+          [2:----]{5:│}[6:--------------------]|
+          [2:----]{5:│}[6:--------------------]|
+          [2:----]{5:│}[6:--------------------]|
+          [2:----]{5:│}[6:--------------------]|
+          [2:----]{5:│}[6:--------------------]|
+          [2:----]{5:│}[6:--------------------]|
+          [3:-------------------------]|
+        ## grid 2
+          exam|
+          ple |
+          text|
+           tha|
+          t is|
+           wid|
+          er t|
+          han |
+          the |
+        ## grid 3
+                                   |
+        ## grid 5
+          {1:some info!  }|
+        ## grid 6
+          ^                    |
+          {0:~                   }|
+          {0:~                   }|
+          {0:~                   }|
+          {0:~                   }|
+          {0:~                   }|
+          {0:~                   }|
+          {0:~                   }|
+          {0:~                   }|
+        ]], float_pos={
+          [5] = { {
+              id = 1002
+            }, "SW", 2, 8, 0, true }
+        }}
+      else
+        screen:expect{grid=[[
+          exam{5:│}^                    |
+          ple {5:│}{0:~                   }|
+          text{5:│}{0:~                   }|
+           tha{5:│}{0:~                   }|
+          t is{5:│}{0:~                   }|
+           wid{5:│}{0:~                   }|
+          er t{5:│}{0:~                   }|
+          {1:some info!  }{0:             }|
+          the {5:│}{0:~                   }|
+                                   |
+        ]]}
+      end
+      command('close')
+
       meths.win_set_config(win, {relative='win', bufpos={1,32}, anchor='NW', col=-2})
       if multigrid then
         screen:expect{grid=[[
@@ -3156,6 +3226,54 @@ describe('float window', function()
                                    |
                  {1:some info!  }      |
           more text                |
+          {0:~                        }|
+          {0:~                        }|
+          {0:~                        }|
+          {0:~                        }|
+                                   |
+        ]]}
+      end
+
+      command('%fold')
+      if multigrid then
+        screen:expect{grid=[[
+        ## grid 1
+          [2:-------------------------]|
+          [2:-------------------------]|
+          [2:-------------------------]|
+          [2:-------------------------]|
+          [2:-------------------------]|
+          [2:-------------------------]|
+          [2:-------------------------]|
+          [2:-------------------------]|
+          [2:-------------------------]|
+          [3:-------------------------]|
+        ## grid 2
+          {28:^+--  5 lines: just some··}|
+          {0:~                        }|
+          {0:~                        }|
+          {0:~                        }|
+          {0:~                        }|
+          {0:~                        }|
+          {0:~                        }|
+          {0:~                        }|
+          {0:~                        }|
+        ## grid 3
+                                   |
+        ## grid 5
+          {1:some info!  }|
+        ]], float_pos={
+          [5] = { {
+              id = 1002
+            }, "NW", 2, 2, 0, true }
+        }}
+      else
+        screen:expect{grid=[[
+          {28:^+--  5 lines: just some··}|
+          {0:~                        }|
+          {1:some info!  }{0:             }|
+          {0:~                        }|
+          {0:~                        }|
           {0:~                        }|
           {0:~                        }|
           {0:~                        }|
