@@ -4,6 +4,7 @@ local lsp_rpc = require('vim.lsp.rpc')
 local protocol = require('vim.lsp.protocol')
 local util = require('vim.lsp.util')
 local sync = require('vim.lsp.sync')
+local semantic_tokens = require('vim.lsp.semantic_tokens')
 
 local api = vim.api
 local nvim_err_writeln, nvim_buf_get_lines, nvim_command, nvim_buf_get_option, nvim_exec_autocmds =
@@ -25,6 +26,7 @@ local lsp = {
   buf = require('vim.lsp.buf'),
   diagnostic = require('vim.lsp.diagnostic'),
   codelens = require('vim.lsp.codelens'),
+  semantic_tokens = semantic_tokens,
   util = util,
 
   -- Allow raw RPC access.
@@ -56,6 +58,8 @@ lsp._request_name_to_capability = {
   ['textDocument/formatting'] = { 'documentFormattingProvider' },
   ['textDocument/completion'] = { 'completionProvider' },
   ['textDocument/documentHighlight'] = { 'documentHighlightProvider' },
+  ['textDocument/semanticTokens/full'] = { 'semanticTokensProvider' },
+  ['textDocument/semanticTokens/full/delta'] = { 'semanticTokensProvider' },
 }
 
 -- TODO improve handling of scratch buffers with LSP attached.
@@ -1526,6 +1530,11 @@ function lsp.start_client(config)
       -- TODO(ashkan) handle errors.
       pcall(config.on_attach, client, bufnr)
     end
+
+    if vim.tbl_get(client.server_capabilities, 'semanticTokensProvider', 'full') then
+      semantic_tokens.start(bufnr, client.id)
+    end
+
     client.attached_buffers[bufnr] = true
   end
 
@@ -1611,9 +1620,37 @@ function lsp.buf_attach_client(bufnr, client_id)
     all_buffer_active_clients[bufnr] = buffer_client_ids
 
     local uri = vim.uri_from_bufnr(bufnr)
-    local augroup = ('lsp_c_%d_b_%d_did_save'):format(client_id, bufnr)
+    local augroup = ('lsp_c_%d_b_%d_save'):format(client_id, bufnr)
+    local group = api.nvim_create_augroup(augroup, { clear = true })
+    api.nvim_create_autocmd('BufWritePre', {
+      group = group,
+      buffer = bufnr,
+      desc = 'vim.lsp: textDocument/willSave',
+      callback = function(ctx)
+        for_each_buffer_client(ctx.buf, function(client)
+          local params = {
+            textDocument = {
+              uri = uri,
+            },
+            reason = protocol.TextDocumentSaveReason.Manual,
+          }
+          if vim.tbl_get(client.server_capabilities, 'textDocumentSync', 'willSave') then
+            client.notify('textDocument/willSave', params)
+          end
+          if vim.tbl_get(client.server_capabilities, 'textDocumentSync', 'willSaveWaitUntil') then
+            local result, err =
+              client.request_sync('textDocument/willSaveWaitUntil', params, 1000, ctx.buf)
+            if result and result.result then
+              util.apply_text_edits(result.result, ctx.buf, client.offset_encoding)
+            elseif err then
+              log.error(vim.inspect(err))
+            end
+          end
+        end)
+      end,
+    })
     api.nvim_create_autocmd('BufWritePost', {
-      group = api.nvim_create_augroup(augroup, { clear = true }),
+      group = group,
       buffer = bufnr,
       desc = 'vim.lsp: textDocument/didSave handler',
       callback = function(ctx)
