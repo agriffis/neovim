@@ -55,22 +55,22 @@ end
 ---@private
 ---@return string[]
 local function modifiers_from_number(x, modifiers_table)
-  ---@private
-  local function _get_bit(n, k)
-    --TODO(jdrouhard): remove once `bit` module is available for non-LuaJIT
-    if _G.bit then
-      return _G.bit.band(_G.bit.rshift(n, k), 1)
-    else
-      return math.floor((n / math.pow(2, k)) % 2)
-    end
-  end
-
   local modifiers = {}
-  for i = 0, #modifiers_table - 1 do
-    local b = _get_bit(x, i)
-    if b == 1 then
-      modifiers[#modifiers + 1] = modifiers_table[i + 1]
+  local idx = 1
+  while x > 0 do
+    if _G.bit then
+      if _G.bit.band(x, 1) == 1 then
+        modifiers[#modifiers + 1] = modifiers_table[idx]
+      end
+      x = _G.bit.rshift(x, 1)
+    else
+      --TODO(jdrouhard): remove this branch once `bit` module is available for non-LuaJIT (#21222)
+      if x % 2 == 1 then
+        modifiers[#modifiers + 1] = modifiers_table[idx]
+      end
+      x = math.floor(x / 2)
     end
+    idx = idx + 1
   end
 
   return modifiers
@@ -409,7 +409,17 @@ function STHighlighter:on_win(topline, botline)
             strict = false,
           })
 
-          --TODO(jdrouhard): do something with the modifiers
+          -- TODO(bfredl) use single extmark when hl_group supports table
+          if #token.modifiers > 0 then
+            for _, modifier in pairs(token.modifiers) do
+              api.nvim_buf_set_extmark(self.bufnr, state.namespace, token.line, token.start_col, {
+                hl_group = '@' .. modifier,
+                end_col = token.end_col,
+                priority = vim.highlight.priorities.semantic_tokens,
+                strict = false,
+              })
+            end
+          end
 
           token.extmark_added = true
         end
@@ -494,7 +504,7 @@ local M = {}
 --- opt-out of semantic highlighting with a server that supports it, you can
 --- delete the semanticTokensProvider table from the {server_capabilities} of
 --- your client in your |LspAttach| callback or your configuration's
---- `on_attach` callback.
+--- `on_attach` callback:
 --- <pre>lua
 ---   client.server_capabilities.semanticTokensProvider = nil
 --- </pre>

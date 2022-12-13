@@ -69,9 +69,12 @@ describe('semantic token highlighting', function()
         [4] = { bold = true, foreground = Screen.colors.SeaGreen };
         [5] = { foreground = tonumber('0x6a0dad') };
         [6] = { foreground = Screen.colors.Blue1 };
+        [7] = { bold = true, foreground = Screen.colors.DarkCyan };
+        [8] = { bold = true, foreground = Screen.colors.SlateBlue };
       }
       command([[ hi link @namespace Type ]])
       command([[ hi link @function Special ]])
+      command([[ hi @declaration gui=bold ]])
 
       exec_lua(create_server_definition)
       exec_lua([[
@@ -107,9 +110,9 @@ describe('semantic token highlighting', function()
       screen:expect { grid = [[
         #include <iostream>                     |
                                                 |
-        int {3:main}()                              |
+        int {8:main}()                              |
         {                                       |
-            int {2:x};                              |
+            int {7:x};                              |
         #ifdef {5:__cplusplus}                      |
             {4:std}::{2:cout} << {2:x} << "\n";             |
         {6:#else}                                   |
@@ -199,9 +202,9 @@ describe('semantic token highlighting', function()
       screen:expect { grid = [[
         #include <iostream>                     |
                                                 |
-        int {3:main}()                              |
+        int {8:main}()                              |
         {                                       |
-            int {2:x};                              |
+            int {7:x};                              |
         #ifdef {5:__cplusplus}                      |
             {4:std}::{2:cout} << {2:x} << "\n";             |
         {6:#else}                                   |
@@ -228,9 +231,9 @@ describe('semantic token highlighting', function()
       screen:expect { grid = [[
         #include <iostream>                     |
                                                 |
-        int {3:main}()                              |
+        int {8:main}()                              |
         {                                       |
-            int {2:x};                              |
+            int {7:x};                              |
         #ifdef {5:__cplusplus}                      |
             {4:std}::{2:cout} << {2:x} << "\n";             |
         {6:#else}                                   |
@@ -251,9 +254,9 @@ describe('semantic token highlighting', function()
       screen:expect { grid = [[
         #include <iostream>                     |
                                                 |
-        int {3:main}()                              |
+        int {8:main}()                              |
         {                                       |
-            int {2:x};                              |
+            int {7:x};                              |
         #ifdef {5:__cplusplus}                      |
             {4:std}::{2:cout} << {2:x} << "\n";             |
         {6:#else}                                   |
@@ -309,9 +312,9 @@ describe('semantic token highlighting', function()
       screen:expect { grid = [[
         #include <iostream>                     |
                                                 |
-        int {3:main}()                              |
+        int {8:main}()                              |
         {                                       |
-            ^int {3:x}();                            |
+            ^int {8:x}();                            |
         #ifdef {5:__cplusplus}                      |
             {4:std}::{2:cout} << {3:x} << "\n";             |
         {6:#else}                                   |
@@ -459,29 +462,6 @@ describe('semantic token highlighting', function()
         {1:~                                       }|
                                                 |
       ]] }
-
-      exec_lua([[
-        vim.lsp.semantic_tokens.start(bufnr, client_id)
-      ]])
-
-      screen:expect { grid = [[
-        #include <iostream>                     |
-                                                |
-        int main()                              |
-        {                                       |
-            int x;                              |
-        #ifdef __cplusplus                      |
-            std::cout << x << "\n";             |
-        #else                                   |
-            printf("%d\n", x);                  |
-        #endif                                  |
-        }                                       |
-        ^}                                       |
-        {1:~                                       }|
-        {1:~                                       }|
-        {1:~                                       }|
-                                                |
-        ]], unchanged = true }
     end)
 
     it('does not send delta requests if not supported by server', function()
@@ -512,9 +492,9 @@ describe('semantic token highlighting', function()
       screen:expect { grid = [[
         #include <iostream>                     |
                                                 |
-        int {3:main}()                              |
+        int {8:main}()                              |
         {                                       |
-            int {2:x};                              |
+            int {7:x};                              |
         #ifdef {5:__cplusplus}                      |
             {4:std}::{2:cout} << {2:x} << "\n";             |
         {6:#else}                                   |
@@ -536,9 +516,9 @@ describe('semantic token highlighting', function()
       screen:expect { grid = [[
         #include <iostream>                     |
                                                 |
-        int {3:main}()                              |
+        int {8:main}()                              |
         {                                       |
-            ^int {2:x}();                            |
+            ^int {7:x}();                            |
         #ifdef {5:__cplusplus}                      |
             {4:std}::{2:cout} << {2:x} << "\n";             |
         {6:#else}                                   |
