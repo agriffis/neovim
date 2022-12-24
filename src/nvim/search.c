@@ -103,11 +103,12 @@ static int lastc_bytelen = 1;             // >1 for multi-byte char
 
 // copy of spats[], for keeping the search patterns while executing autocmds
 static struct spat saved_spats[2];
+static char *saved_mr_pattern = NULL;
 static int saved_spats_last_idx = 0;
 static bool saved_spats_no_hlsearch = false;
 
-static char_u *mr_pattern = NULL;    // pattern used by search_regcomp()
-static bool mr_pattern_alloced = false;    // mr_pattern was allocated
+// allocated copy of pattern used by search_regcomp()
+static char *mr_pattern = NULL;
 
 // Type used by find_pattern_in_path() to remember which included files have
 // been searched already.
@@ -132,7 +133,8 @@ typedef struct SearchedFile {
 /// @param regmatch  return: pattern and ignore-case flag
 ///
 /// @return          FAIL if failed, OK otherwise.
-int search_regcomp(char_u *pat, int pat_save, int pat_use, int options, regmmatch_T *regmatch)
+int search_regcomp(char_u *pat, char_u **used_pat, int pat_save, int pat_use, int options,
+                   regmmatch_T *regmatch)
 {
   int magic;
   int i;
@@ -163,16 +165,15 @@ int search_regcomp(char_u *pat, int pat_save, int pat_use, int options, regmmatc
     add_to_history(HIST_SEARCH, (char *)pat, true, NUL);
   }
 
-  if (mr_pattern_alloced) {
-    xfree(mr_pattern);
-    mr_pattern_alloced = false;
+  if (used_pat) {
+    *used_pat = pat;
   }
 
+  xfree(mr_pattern);
   if (curwin->w_p_rl && *curwin->w_p_rlc == 's') {
-    mr_pattern = (char_u *)reverse_text((char *)pat);
-    mr_pattern_alloced = true;
+    mr_pattern = reverse_text((char *)pat);
   } else {
-    mr_pattern = pat;
+    mr_pattern = xstrdup((char *)pat);
   }
 
   // Save the currently used pattern in the appropriate place,
@@ -197,8 +198,8 @@ int search_regcomp(char_u *pat, int pat_save, int pat_use, int options, regmmatc
   return OK;
 }
 
-// Get search pattern used by search_regcomp().
-char_u *get_search_pat(void)
+/// Get search pattern used by search_regcomp().
+char *get_search_pat(void)
 {
   return mr_pattern;
 }
@@ -236,6 +237,11 @@ void save_search_patterns(void)
     if (spats[1].pat != NULL) {
       saved_spats[1].pat = xstrdup(spats[1].pat);
     }
+    if (mr_pattern == NULL) {
+      saved_mr_pattern = NULL;
+    } else {
+      saved_mr_pattern = xstrdup(mr_pattern);
+    }
     saved_spats_last_idx = last_idx;
     saved_spats_no_hlsearch = no_hlsearch;
   }
@@ -249,6 +255,8 @@ void restore_search_patterns(void)
     set_vv_searchforward();
     free_spat(&spats[1]);
     spats[1] = saved_spats[1];
+    xfree(mr_pattern);
+    mr_pattern = saved_mr_pattern;
     last_idx = saved_spats_last_idx;
     set_no_hlsearch(saved_spats_no_hlsearch);
   }
@@ -268,11 +276,7 @@ void free_search_patterns(void)
 
   CLEAR_FIELD(spats);
 
-  if (mr_pattern_alloced) {
-    xfree(mr_pattern);
-    mr_pattern_alloced = false;
-    mr_pattern = NULL;
-  }
+  XFREE_CLEAR(mr_pattern);
 }
 
 #endif
@@ -509,7 +513,7 @@ void last_pat_prog(regmmatch_T *regmatch)
     return;
   }
   emsg_off++;           // So it doesn't beep if bad expr
-  (void)search_regcomp((char_u *)"", 0, last_idx, SEARCH_KEEP, regmatch);
+  (void)search_regcomp((char_u *)"", NULL, 0, last_idx, SEARCH_KEEP, regmatch);
   emsg_off--;
 }
 
@@ -567,7 +571,7 @@ int searchit(win_T *win, buf_T *buf, pos_T *pos, pos_T *end_pos, Direction dir, 
     timed_out = &extra_arg->sa_timed_out;
   }
 
-  if (search_regcomp(pat, RE_SEARCH, pat_use,
+  if (search_regcomp(pat, NULL, RE_SEARCH, pat_use,
                      (options & (SEARCH_HIS + SEARCH_KEEP)), &regmatch) == FAIL) {
     if ((options & SEARCH_MSG) && !rc_did_emsg) {
       semsg(_("E383: Invalid search string: %s"), mr_pattern);
@@ -1408,6 +1412,7 @@ end_do_search:
   if ((options & SEARCH_KEEP) || (cmdmod.cmod_flags & CMOD_KEEPPATTERNS)) {
     spats[0].off = old_off;
   }
+  xfree(strcopy);
   xfree(msgbuf);
 
   return retval;
@@ -2523,7 +2528,7 @@ static int is_zero_width(char_u *pattern, int move, pos_T *cur, Direction direct
     pattern = (char_u *)spats[last_idx].pat;
   }
 
-  if (search_regcomp(pattern, RE_SEARCH, RE_SEARCH,
+  if (search_regcomp(pattern, NULL, RE_SEARCH, RE_SEARCH,
                      SEARCH_KEEP, &regmatch) == FAIL) {
     return -1;
   }
