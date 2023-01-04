@@ -3113,8 +3113,6 @@ static void f_has(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     "packages",
     "path_extra",
     "persistent_undo",
-    "postscript",
-    "printer",
     "profile",
     "pythonx",
     "reltime",
@@ -6324,12 +6322,15 @@ static void f_rpcnotify(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     ADD(args, vim_to_object(tv));
   }
 
-  if (!rpc_send_event((uint64_t)argvars[0].vval.v_number,
-                      tv_get_string(&argvars[1]), args)) {
+  bool ok = rpc_send_event((uint64_t)argvars[0].vval.v_number,
+                           tv_get_string(&argvars[1]), args);
+
+  if (!ok) {
     semsg(_(e_invarg2), "Channel doesn't exist");
     return;
   }
 
+  api_free_array(args);
   rettv->vval.v_number = 1;
 }
 
