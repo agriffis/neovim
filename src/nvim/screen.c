@@ -547,8 +547,8 @@ int showmode(void)
           if (curwin->w_p_arab) {
             msg_puts_attr(_(" Arabic"), attr);
           } else if (get_keymap_str(curwin, " (%s)",
-                                    (char *)NameBuff, MAXPATHL)) {
-            msg_puts_attr((char *)NameBuff, attr);
+                                    NameBuff, MAXPATHL)) {
+            msg_puts_attr(NameBuff, attr);
           }
         }
         if ((State & MODE_INSERT) && p_paste) {
@@ -681,11 +681,11 @@ static void recording_mode(int attr)
 void get_trans_bufname(buf_T *buf)
 {
   if (buf_spname(buf) != NULL) {
-    STRLCPY(NameBuff, buf_spname(buf), MAXPATHL);
+    xstrlcpy(NameBuff, buf_spname(buf), MAXPATHL);
   } else {
-    home_replace(buf, buf->b_fname, (char *)NameBuff, MAXPATHL, true);
+    home_replace(buf, buf->b_fname, NameBuff, MAXPATHL, true);
   }
-  trans_characters((char *)NameBuff, MAXPATHL);
+  trans_characters(NameBuff, MAXPATHL);
 }
 
 /// Get the character to use in a separator between vertically split windows.
@@ -779,6 +779,16 @@ int number_width(win_T *wp)
     return wp->w_nrwidth_width;
   }
   wp->w_nrwidth_line_count = lnum;
+
+  // make best estimate for 'statuscolumn'
+  if (*wp->w_p_stc != NUL) {
+    char buf[MAXPATHL];
+    wp->w_nrwidth_width = 0;
+    n = build_statuscol_str(wp, true, false, lnum, 0, 0, NUL, buf, NULL, NULL);
+    n = MAX(n, (wp->w_p_nu || wp->w_p_rnu) * (int)wp->w_p_nuw);
+    wp->w_nrwidth_width = MIN(n, MAX_NUMBERWIDTH);
+    return wp->w_nrwidth_width;
+  }
 
   n = 0;
   do {

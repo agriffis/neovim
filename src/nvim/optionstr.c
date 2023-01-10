@@ -1034,7 +1034,7 @@ char *did_set_string_option(int opt_idx, char **varp, char *oldval, char *errbuf
           if (errbuf != NULL) {
             vim_snprintf(errbuf, errbuflen,
                          _("E526: Missing number after <%s>"),
-                         transchar_byte(*(s - 1)));
+                         transchar_byte((uint8_t)(*(s - 1))));
             errmsg = errbuf;
           } else {
             errmsg = "";
@@ -1177,12 +1177,14 @@ char *did_set_string_option(int opt_idx, char **varp, char *oldval, char *errbuf
       redraw_titles();
     }
   } else if (gvarp == &p_stl || gvarp == &p_wbr || varp == &p_tal
-             || varp == &p_ruf) {
-    // 'statusline', 'winbar', 'tabline' or 'rulerformat'
+             || varp == &p_ruf || varp == &curwin->w_p_stc) {
+    // 'statusline', 'winbar', 'tabline', 'rulerformat' or 'statuscolumn'
     int wid;
 
     if (varp == &p_ruf) {       // reset ru_wid first
       ru_wid = 0;
+    } else if (varp == &curwin->w_p_stc) {
+      curwin->w_nrwidth_line_count = 0;
     }
     s = *varp;
     if (varp == &p_ruf && *s == '%') {
@@ -1197,7 +1199,8 @@ char *did_set_string_option(int opt_idx, char **varp, char *oldval, char *errbuf
         errmsg = check_stl_option(p_ruf);
       }
     } else if (varp == &p_ruf || s[0] != '%' || s[1] != '!') {
-      // check 'statusline', 'winbar' or 'tabline' only if it doesn't start with "%!"
+      // check 'statusline', 'winbar', 'tabline' or 'statuscolumn'
+      // only if it doesn't start with "%!"
       errmsg = check_stl_option(s);
     }
     if (varp == &p_ruf && errmsg == NULL) {

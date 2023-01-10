@@ -279,6 +279,15 @@ int main(int argc, char **argv)
   // argument list "global_alist".
   command_line_scan(&params);
 
+#ifndef MSWIN
+  int tty_fd = params.input_isatty
+    ? STDIN_FILENO
+    : (params.output_isatty
+       ? STDOUT_FILENO
+       : (params.err_isatty ? STDERR_FILENO : -1));
+  pty_process_save_termios(tty_fd);
+#endif
+
   nlua_init(argv, argc, params.lua_arg0);
   TIME_MSG("init lua interpreter");
 
@@ -1327,7 +1336,7 @@ static void command_line_scan(mparm_T *parmp)
         case 's':    // "-s {scriptin}" read from script file
           if (parmp->scriptin != NULL) {
 scripterror:
-            vim_snprintf((char *)IObuff, IOSIZE,
+            vim_snprintf(IObuff, IOSIZE,
                          _("Attempt to open script file again: \"%s %s\"\n"),
                          argv[-1], argv[0]);
             os_errmsg(IObuff);
@@ -1455,14 +1464,6 @@ static void check_and_set_isatty(mparm_T *paramp)
   stdout_isatty
     = paramp->output_isatty = os_isatty(STDOUT_FILENO);
   paramp->err_isatty = os_isatty(STDERR_FILENO);
-#ifndef MSWIN
-  int tty_fd = paramp->input_isatty
-    ? STDIN_FILENO
-    : (paramp->output_isatty
-       ? STDOUT_FILENO
-       : (paramp->err_isatty ? STDERR_FILENO : -1));
-  pty_process_save_termios(tty_fd);
-#endif
   TIME_MSG("window checked");
 }
 
@@ -1513,8 +1514,8 @@ static void handle_quickfix(mparm_T *paramp)
     if (paramp->use_ef != NULL) {
       set_string_option_direct("ef", -1, paramp->use_ef, OPT_FREE, SID_CARG);
     }
-    vim_snprintf((char *)IObuff, IOSIZE, "cfile %s", p_ef);
-    if (qf_init(NULL, (char *)p_ef, p_efm, true, (char *)IObuff, p_menc) < 0) {
+    vim_snprintf(IObuff, IOSIZE, "cfile %s", p_ef);
+    if (qf_init(NULL, (char *)p_ef, p_efm, true, IObuff, p_menc) < 0) {
       msg_putchar('\n');
       os_exit(3);
     }
@@ -1529,8 +1530,8 @@ static void handle_tag(char_u *tagname)
   if (tagname != NULL) {
     swap_exists_did_quit = false;
 
-    vim_snprintf((char *)IObuff, IOSIZE, "ta %s", tagname);
-    do_cmdline_cmd((char *)IObuff);
+    vim_snprintf(IObuff, IOSIZE, "ta %s", tagname);
+    do_cmdline_cmd(IObuff);
     TIME_MSG("jumping to tag");
 
     // If the user doesn't want to edit the file then we quit here.

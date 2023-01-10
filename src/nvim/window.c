@@ -648,7 +648,7 @@ wingotofile:
 
 static void cmd_with_count(char *cmd, char *bufp, size_t bufsize, int64_t Prenum)
 {
-  size_t len = STRLCPY(bufp, cmd, bufsize);
+  size_t len = xstrlcpy(bufp, cmd, bufsize);
 
   if (Prenum > 0 && len < bufsize) {
     vim_snprintf(bufp + len, bufsize - len, "%" PRId64, Prenum);
@@ -4879,7 +4879,7 @@ void fix_current_dir(void)
   // New directory is either the local directory of the window, tab or NULL.
   char *new_dir = curwin->w_localdir ? curwin->w_localdir : curtab->tp_localdir;
   char cwd[MAXPATHL];
-  if (os_dirname((char_u *)cwd, MAXPATHL) != OK) {
+  if (os_dirname(cwd, MAXPATHL) != OK) {
     cwd[0] = NUL;
   }
 
@@ -5093,6 +5093,9 @@ static void win_free(win_T *wp, tabpage_T *tp)
 
   stl_clear_click_defs(wp->w_winbar_click_defs, wp->w_winbar_click_defs_size);
   xfree(wp->w_winbar_click_defs);
+
+  stl_clear_click_defs(wp->w_statuscol_click_defs, wp->w_statuscol_click_defs_size);
+  xfree(wp->w_statuscol_click_defs);
 
   // Remove the window from the b_wininfo lists, it may happen that the
   // freed memory is re-used for another window.

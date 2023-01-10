@@ -1077,7 +1077,8 @@ void unref_extmatch(reg_extmatch_T *em)
 static int reg_prev_class(void)
 {
   if (rex.input > rex.line) {
-    return mb_get_class_tab(rex.input - 1 - utf_head_off((char *)rex.line, (char *)rex.input - 1),
+    return mb_get_class_tab((char *)rex.input - 1 -
+                            utf_head_off((char *)rex.line, (char *)rex.input - 1),
                             rex.reg_buf->b_chartab);
   }
   return -1;
@@ -2140,7 +2141,7 @@ char *reg_submatch(int no)
         // Within one line: take form start to end col.
         len = rsm.sm_mmatch->endpos[no].col - rsm.sm_mmatch->startpos[no].col;
         if (round == 2) {
-          STRLCPY(retval, s, len + 1);
+          xstrlcpy(retval, s, (size_t)len + 1);
         }
         len++;
       } else {

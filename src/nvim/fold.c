@@ -481,7 +481,7 @@ void foldCheckClose(void)
     return;
   }
 
-  // can only be "all" right now
+  // 'foldclose' can only be "all" right now
   checkupdate(curwin);
   if (checkCloseRec(&curwin->w_folds, curwin->w_cursor.lnum,
                     (int)curwin->w_p_fdl)) {
@@ -1615,7 +1615,7 @@ static void foldAddMarker(buf_T *buf, pos_T pos, const char *marker, size_t mark
   STRCPY(newline, line);
   // Append the marker to the end of the line
   if (p == NULL || line_is_comment) {
-    STRLCPY(newline + line_len, marker, markerlen + 1);
+    xstrlcpy(newline + line_len, marker, markerlen + 1);
     added = markerlen;
   } else {
     STRCPY(newline + line_len, cms);

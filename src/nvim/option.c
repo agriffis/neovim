@@ -889,7 +889,7 @@ static int do_set_string(int opt_idx, int opt_flags, char **argp, int nextchar, 
       if (*arg == '\\' && arg[1] != NUL
 #ifdef BACKSLASH_IN_FILENAME
           && !((flags & P_EXPAND)
-               && vim_isfilec(arg[1])
+               && vim_isfilec((uint8_t)arg[1])
                && !ascii_iswhite(arg[1])
                && (arg[1] != '\\'
                    || (s == newval && arg[2] != '\\')))
@@ -1455,7 +1455,7 @@ skip:
     }
 
     if (errmsg != NULL) {
-      STRLCPY(IObuff, _(errmsg), IOSIZE);
+      xstrlcpy(IObuff, _(errmsg), IOSIZE);
       int i = (int)strlen(IObuff) + 2;
       if (i + (arg - startarg) < IOSIZE) {
         // append the argument with the error
@@ -1465,10 +1465,10 @@ skip:
         IObuff[i + (arg - startarg)] = NUL;
       }
       // make sure all characters are printable
-      trans_characters((char *)IObuff, IOSIZE);
+      trans_characters(IObuff, IOSIZE);
 
       no_wait_return++;         // wait_return() done later
-      emsg((char *)IObuff);     // show error highlighted
+      emsg(IObuff);             // show error highlighted
       no_wait_return--;
 
       return FAIL;
@@ -2094,6 +2094,9 @@ static char *set_bool_option(const int opt_idx, char_u *const varp, const int va
     if (curwin->w_p_spell) {
       errmsg = did_set_spelllang(curwin);
     }
+  } else if (((int *)varp == &curwin->w_p_nu || (int *)varp == &curwin->w_p_rnu)
+             && *curwin->w_p_stc != NUL) {  // '(relative)number' + 'statuscolumn'
+    curwin->w_nrwidth_line_count = 0;
   }
 
   if ((int *)varp == &curwin->w_p_arab) {
@@ -2316,7 +2319,7 @@ static char *set_num_option(int opt_idx, char_u *varp, long value, char *errbuf,
   } else if (pp == &curwin->w_p_nuw || pp == &curwin->w_allbuf_opt.wo_nuw) {
     if (value < 1) {
       errmsg = e_positive;
-    } else if (value > 20) {
+    } else if (value > MAX_NUMBERWIDTH) {
       errmsg = e_invarg;
     }
   } else if (pp == &curbuf->b_p_iminsert || pp == &p_iminsert) {
@@ -3159,7 +3162,7 @@ static void showoptions(int all, int opt_flags)
           len = 1;                      // a toggle option fits always
         } else {
           option_value2string(p, opt_flags);
-          len = (int)strlen(p->fullname) + vim_strsize((char *)NameBuff) + 1;
+          len = (int)strlen(p->fullname) + vim_strsize(NameBuff) + 1;
         }
         if ((len <= INC - GAP && run == 1)
             || (len > INC - GAP && run == 2)) {
@@ -3270,7 +3273,7 @@ static void showoneopt(vimoption_T *p, int opt_flags)
     msg_putchar('=');
     // put value string in NameBuff
     option_value2string(p, opt_flags);
-    msg_outtrans((char *)NameBuff);
+    msg_outtrans(NameBuff);
   }
 
   silent_mode = save_silent;
@@ -3629,6 +3632,9 @@ void unset_global_local_option(char *name, void *from)
   case PV_VE:
     clear_string_option(&((win_T *)from)->w_p_ve);
     ((win_T *)from)->w_ve_flags = 0;
+    break;
+  case PV_STC:
+    clear_string_option(&((win_T *)from)->w_p_stc);
     break;
   }
 }
@@ -4014,6 +4020,8 @@ static char_u *get_varp(vimoption_T *p)
     return (char_u *)&(curwin->w_p_winhl);
   case PV_WINBL:
     return (char_u *)&(curwin->w_p_winbl);
+  case PV_STC:
+    return (char_u *)&(curwin->w_p_stc);
   default:
     iemsg(_("E356: get_varp ERROR"));
   }
@@ -4102,6 +4110,7 @@ void copy_winopt(winopt_T *from, winopt_T *to)
   to->wo_scl = copy_option_val(from->wo_scl);
   to->wo_winhl = copy_option_val(from->wo_winhl);
   to->wo_winbl = from->wo_winbl;
+  to->wo_stc = copy_option_val(from->wo_stc);
 
   // Copy the script context so that we know were the value was last set.
   memmove(to->wo_script_ctx, from->wo_script_ctx, sizeof(to->wo_script_ctx));
@@ -4139,6 +4148,7 @@ static void check_winopt(winopt_T *wop)
   check_string_option(&wop->wo_fcs);
   check_string_option(&wop->wo_ve);
   check_string_option(&wop->wo_wbr);
+  check_string_option(&wop->wo_stc);
 }
 
 /// Free the allocated memory inside a winopt_T.
@@ -4165,6 +4175,7 @@ void clear_winopt(winopt_T *wop)
   clear_string_option(&wop->wo_fcs);
   clear_string_option(&wop->wo_ve);
   clear_string_option(&wop->wo_wbr);
+  clear_string_option(&wop->wo_stc);
 }
 
 void didset_window_options(win_T *wp, bool valid_cursor)
@@ -4752,7 +4763,7 @@ int ExpandSettings(expand_T *xp, regmatch_T *regmatch, int *num_file, char ***fi
 
 void ExpandOldSetting(int *num_file, char ***file)
 {
-  char_u *var = NULL;
+  char *var = NULL;
 
   *num_file = 0;
   *file = xmalloc(sizeof(char_u *));
@@ -4765,14 +4776,14 @@ void ExpandOldSetting(int *num_file, char ***file)
   if (expand_option_idx >= 0) {
     // Put string of option value in NameBuff.
     option_value2string(&options[expand_option_idx], expand_option_flags);
-    var = (char_u *)NameBuff;
+    var = NameBuff;
   } else {
-    var = (char_u *)"";
+    var = "";
   }
 
   // A backslash is required before some characters.  This is the reverse of
   // what happens in do_set().
-  char_u *buf = vim_strsave_escaped(var, escape_chars);
+  char_u *buf = vim_strsave_escaped((char_u *)var, escape_chars);
 
 #ifdef BACKSLASH_IN_FILENAME
   // For MS-Windows et al. we don't double backslashes at the start and
@@ -4781,7 +4792,7 @@ void ExpandOldSetting(int *num_file, char ***file)
     if (var[0] == '\\' && var[1] == '\\'
         && expand_option_idx >= 0
         && (options[expand_option_idx].flags & P_EXPAND)
-        && vim_isfilec(var[2])
+        && vim_isfilec((uint8_t)var[2])
         && (var[2] != '\\' || (var == buf && var[4] != '\\'))) {
       STRMOVE(var, var + 1);
     }
@@ -4798,32 +4809,32 @@ void ExpandOldSetting(int *num_file, char ***file)
 /// @param opt_flags  OPT_GLOBAL and/or OPT_LOCAL
 static void option_value2string(vimoption_T *opp, int scope)
 {
-  char_u *varp = (char_u *)get_varp_scope(opp, scope);
+  char *varp = get_varp_scope(opp, scope);
 
   if (opp->flags & P_NUM) {
     long wc = 0;
 
-    if (wc_use_keyname(varp, &wc)) {
-      STRLCPY(NameBuff, get_special_key_name((int)wc, 0), sizeof(NameBuff));
+    if (wc_use_keyname((char_u *)varp, &wc)) {
+      xstrlcpy(NameBuff, (char *)get_special_key_name((int)wc, 0), sizeof(NameBuff));
     } else if (wc != 0) {
-      STRLCPY(NameBuff, transchar((int)wc), sizeof(NameBuff));
+      xstrlcpy(NameBuff, (char *)transchar((int)wc), sizeof(NameBuff));
     } else {
-      snprintf((char *)NameBuff,
+      snprintf(NameBuff,
                sizeof(NameBuff),
                "%" PRId64,
                (int64_t)(*(long *)varp));
     }
   } else {  // P_STRING
-    varp = *(char_u **)(varp);
+    varp = *(char **)(varp);
     if (varp == NULL) {  // Just in case.
       NameBuff[0] = NUL;
     } else if (opp->flags & P_EXPAND) {
-      home_replace(NULL, (char *)varp, (char *)NameBuff, MAXPATHL, false);
+      home_replace(NULL, varp, (char *)NameBuff, MAXPATHL, false);
       // Translate 'pastetoggle' into special key names.
     } else if ((char **)opp->var == &p_pt) {
-      str2specialbuf((const char *)p_pt, (char *)NameBuff, MAXPATHL);
+      str2specialbuf((const char *)p_pt, NameBuff, MAXPATHL);
     } else {
-      STRLCPY(NameBuff, varp, MAXPATHL);
+      xstrlcpy(NameBuff, varp, MAXPATHL);
     }
   }
 }

@@ -359,8 +359,9 @@ int open_buffer(int read_stdin, exarg_T *eap, int flags_arg)
   }
   apply_autocmds_retval(EVENT_BUFENTER, NULL, NULL, false, curbuf, &retval);
 
+  // if (retval != OK) {
   if (retval == FAIL) {
-    return FAIL;
+    return retval;
   }
 
   // The autocommands may have changed the current buffer.  Apply the
@@ -1089,7 +1090,7 @@ char *do_bufdel(int command, char *arg, int addr_count, int start_bnr, int end_b
       } else {
         STRCPY(IObuff, _("E517: No buffers were wiped out"));
       }
-      errormsg = (char *)IObuff;
+      errormsg = IObuff;
     } else if (deleted >= p_report) {
       if (command == DOBUF_UNLOAD) {
         smsg(NGETTEXT("%d buffer unloaded", "%d buffers unloaded", deleted),
@@ -2473,19 +2474,22 @@ static char *fname_match(regmatch_T *rmp, char *name, bool ignore_case)
   char *match = NULL;
   char *p;
 
-  if (name != NULL) {
-    // Ignore case when 'fileignorecase' or the argument is set.
-    rmp->rm_ic = p_fic || ignore_case;
-    if (vim_regexec(rmp, name, (colnr_T)0)) {
+  // extra check for valid arguments
+  if (name == NULL || rmp->regprog == NULL) {
+    return NULL;
+  }
+
+  // Ignore case when 'fileignorecase' or the argument is set.
+  rmp->rm_ic = p_fic || ignore_case;
+  if (vim_regexec(rmp, name, (colnr_T)0)) {
+    match = name;
+  } else if (rmp->regprog != NULL) {
+    // Replace $(HOME) with '~' and try matching again.
+    p = home_replace_save(NULL, name);
+    if (vim_regexec(rmp, p, (colnr_T)0)) {
       match = name;
-    } else if (rmp->regprog != NULL) {
-      // Replace $(HOME) with '~' and try matching again.
-      p = home_replace_save(NULL, name);
-      if (vim_regexec(rmp, p, (colnr_T)0)) {
-        match = name;
-      }
-      xfree(p);
     }
+    xfree(p);
   }
 
   return match;
@@ -2592,17 +2596,18 @@ void buflist_setfpos(buf_T *const buf, win_T *const win, linenr_T lnum, colnr_T 
 static bool wininfo_other_tab_diff(wininfo_T *wip)
   FUNC_ATTR_PURE FUNC_ATTR_WARN_UNUSED_RESULT FUNC_ATTR_NONNULL_ALL
 {
-  if (wip->wi_opt.wo_diff) {
-    FOR_ALL_WINDOWS_IN_TAB(wp, curtab) {
-      // return false when it's a window in the current tab page, thus
-      // the buffer was in diff mode here
-      if (wip->wi_win == wp) {
-        return false;
-      }
-    }
-    return true;
+  if (!wip->wi_opt.wo_diff) {
+    return false;
   }
-  return false;
+
+  FOR_ALL_WINDOWS_IN_TAB(wp, curtab) {
+    // return false when it's a window in the current tab page, thus
+    // the buffer was in diff mode here
+    if (wip->wi_win == wp) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /// Find info for the current window in buffer "buf".
@@ -2625,25 +2630,27 @@ static wininfo_T *find_wininfo(buf_T *buf, bool need_options, bool skip_diff_buf
     }
   }
 
+  if (wip != NULL) {
+    return wip;
+  }
+
   // If no wininfo for curwin, use the first in the list (that doesn't have
   // 'diff' set and is in another tab page).
   // If "need_options" is true skip entries that don't have options set,
   // unless the window is editing "buf", so we can copy from the window
   // itself.
-  if (wip == NULL) {
-    if (skip_diff_buffer) {
-      for (wip = buf->b_wininfo; wip != NULL; wip = wip->wi_next) {
-        if (!wininfo_other_tab_diff(wip)
-            && (!need_options
-                || wip->wi_optset
-                || (wip->wi_win != NULL
-                    && wip->wi_win->w_buffer == buf))) {
-          break;
-        }
+  if (skip_diff_buffer) {
+    for (wip = buf->b_wininfo; wip != NULL; wip = wip->wi_next) {
+      if (!wininfo_other_tab_diff(wip)
+          && (!need_options
+              || wip->wi_optset
+              || (wip->wi_win != NULL
+                  && wip->wi_win->w_buffer == buf))) {
+        break;
       }
-    } else {
-      wip = buf->b_wininfo;
     }
+  } else {
+    wip = buf->b_wininfo;
   }
   return wip;
 }
@@ -2760,9 +2767,9 @@ void buflist_list(exarg_T *eap)
       continue;
     }
     if (buf_spname(buf) != NULL) {
-      STRLCPY(NameBuff, buf_spname(buf), MAXPATHL);
+      xstrlcpy(NameBuff, buf_spname(buf), MAXPATHL);
     } else {
-      home_replace(buf, buf->b_fname, (char *)NameBuff, MAXPATHL, true);
+      home_replace(buf, buf->b_fname, NameBuff, MAXPATHL, true);
     }
 
     if (message_filtered(NameBuff)) {
@@ -2778,7 +2785,7 @@ void buflist_list(exarg_T *eap)
     }
 
     msg_putchar('\n');
-    len = vim_snprintf((char *)IObuff, IOSIZE - 20, "%3d%c%c%c%c%c \"%s\"",
+    len = vim_snprintf(IObuff, IOSIZE - 20, "%3d%c%c%c%c%c \"%s\"",
                        buf->b_fnum,
                        buf->b_p_bl ? ' ' : 'u',
                        buf == curbuf ? '%' : (curwin->w_alt_fnum == buf->b_fnum ? '#' : ' '),
@@ -2792,18 +2799,18 @@ void buflist_list(exarg_T *eap)
     }
 
     // put "line 999" in column 40 or after the file name
-    i = 40 - vim_strsize((char *)IObuff);
+    i = 40 - vim_strsize(IObuff);
     do {
       IObuff[len++] = ' ';
     } while (--i > 0 && len < IOSIZE - 18);
     if (vim_strchr(eap->arg, 't') && buf->b_last_used) {
-      undo_fmt_time((char_u *)IObuff + len, (size_t)(IOSIZE - len), buf->b_last_used);
+      undo_fmt_time(IObuff + len, (size_t)(IOSIZE - len), buf->b_last_used);
     } else {
-      vim_snprintf((char *)IObuff + len, (size_t)(IOSIZE - len), _("line %" PRId64),
+      vim_snprintf(IObuff + len, (size_t)(IOSIZE - len), _("line %" PRId64),
                    buf == curbuf ? (int64_t)curwin->w_cursor.lnum : (int64_t)buflist_findlnum(buf));
     }
 
-    msg_outtrans((char *)IObuff);
+    msg_outtrans(IObuff);
     line_breakcheck();
   }
 
@@ -3110,7 +3117,7 @@ void fileinfo(int fullname, int shorthelp, int dont_truncate)
 
   *p++ = '"';
   if (buf_spname(curbuf) != NULL) {
-    STRLCPY(p, buf_spname(curbuf), IOSIZE - (p - buffer));
+    xstrlcpy(p, buf_spname(curbuf), (size_t)(IOSIZE - (p - buffer)));
   } else {
     if (!fullname && curbuf->b_fname != NULL) {
       name = curbuf->b_fname;
@@ -3236,7 +3243,7 @@ void maketitle(void)
     if (*p_titlestring != NUL) {
       if (stl_syntax & STL_IN_TITLE) {
         build_stl_str_hl(curwin, buf, sizeof(buf), p_titlestring,
-                         "titlestring", 0, 0, maxlen, NULL, NULL);
+                         "titlestring", 0, 0, maxlen, NULL, NULL, NULL);
         title_str = buf;
       } else {
         title_str = p_titlestring;
@@ -3342,7 +3349,7 @@ void maketitle(void)
     if (*p_iconstring != NUL) {
       if (stl_syntax & STL_IN_ICON) {
         build_stl_str_hl(curwin, icon_str, sizeof(buf), p_iconstring,
-                         "iconstring", 0, 0, 0, NULL, NULL);
+                         "iconstring", 0, 0, 0, NULL, NULL, NULL);
       } else {
         icon_str = p_iconstring;
       }
@@ -3436,9 +3443,9 @@ void get_rel_pos(win_T *wp, char *buf, int buflen)
   }
   below = wp->w_buffer->b_ml.ml_line_count - wp->w_botline + 1;
   if (below <= 0) {
-    STRLCPY(buf, (above == 0 ? _("All") : _("Bot")), buflen);
+    xstrlcpy(buf, (above == 0 ? _("All") : _("Bot")), (size_t)buflen);
   } else if (above <= 0) {
-    STRLCPY(buf, _("Top"), buflen);
+    xstrlcpy(buf, _("Top"), (size_t)buflen);
   } else {
     vim_snprintf(buf, (size_t)buflen, "%2d%%", above > 1000000L
                  ? (int)(above / ((above + below) / 100L))

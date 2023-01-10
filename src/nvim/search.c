@@ -2254,7 +2254,7 @@ int check_linecomment(const char *line)
           }
         } else if (!in_str && ((p - line) < 2
                                || (*(p - 1) != '\\' && *(p - 2) != '#'))
-                   && !is_pos_in_string((char_u *)line, (colnr_T)(p - line))) {
+                   && !is_pos_in_string(line, (colnr_T)(p - line))) {
           break;                // found!
         }
         p++;
@@ -2268,7 +2268,7 @@ int check_linecomment(const char *line)
       // because * / / * is an end and start of a C comment.  Only
       // accept the position if it is not inside a string.
       if (p[1] == '/' && (p == line || p[-1] != '*' || p[2] != '*')
-          && !is_pos_in_string((char_u *)line, (colnr_T)(p - line))) {
+          && !is_pos_in_string(line, (colnr_T)(p - line))) {
         break;
       }
       p++;
@@ -3414,10 +3414,10 @@ void f_matchfuzzypos(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 /// Get line "lnum" and copy it into "buf[LSIZE]".
 /// The copy is made because the regexp may make the line invalid when using a
 /// mark.
-static char_u *get_line_and_copy(linenr_T lnum, char_u *buf)
+static char *get_line_and_copy(linenr_T lnum, char *buf)
 {
-  char_u *line = (char_u *)ml_get(lnum);
-  STRLCPY(buf, line, LSIZE);
+  char *line = ml_get(lnum);
+  xstrlcpy(buf, line, LSIZE);
   return buf;
 }
 
@@ -3517,7 +3517,7 @@ void find_pattern_in_path(char *ptr, Direction dir, size_t len, bool whole, bool
   if (lnum > end_lnum) {                // do at least one line
     lnum = end_lnum;
   }
-  line = (char *)get_line_and_copy(lnum, file_line);
+  line = get_line_and_copy(lnum, (char *)file_line);
 
   for (;;) {
     if (incl_regmatch.regprog != NULL
@@ -3678,10 +3678,10 @@ void find_pattern_in_path(char *ptr, Direction dir, size_t len, bool whole, bool
           files[depth].matched = false;
           if (action == ACTION_EXPAND) {
             msg_hist_off = true;                // reset in msg_trunc_attr()
-            vim_snprintf((char *)IObuff, IOSIZE,
+            vim_snprintf(IObuff, IOSIZE,
                          _("Scanning included file: %s"),
                          (char *)new_fname);
-            msg_trunc_attr((char *)IObuff, true, HL_ATTR(HLF_R));
+            msg_trunc_attr(IObuff, true, HL_ATTR(HLF_R));
           } else if (p_verbose >= 5) {
             verbose_enter();
             smsg(_("Searching included file %s"),
@@ -3775,7 +3775,7 @@ search_line:
         char *aux = p = startp;
         if (compl_status_adding()) {
           p += ins_compl_len();
-          if (vim_iswordp((char_u *)p)) {
+          if (vim_iswordp(p)) {
             goto exit_matched;
           }
           p = (char *)find_word_start((char_u *)p);
@@ -3794,7 +3794,7 @@ search_line:
             if (lnum >= end_lnum) {
               goto exit_matched;
             }
-            line = (char *)get_line_and_copy(++lnum, file_line);
+            line = get_line_and_copy(++lnum, (char *)file_line);
           } else if (vim_fgets(line = (char *)file_line,
                                LSIZE, files[depth].fp)) {
             goto exit_matched;
@@ -3984,7 +3984,7 @@ exit_matched:
       if (++lnum > end_lnum) {
         break;
       }
-      line = (char *)get_line_and_copy(lnum, file_line);
+      line = get_line_and_copy(lnum, (char *)file_line);
     }
     already = NULL;
   }
@@ -4056,9 +4056,9 @@ static void show_pat_in_path(char *line, int type, bool did_show, int action, FI
       *(p + 1) = NUL;
     }
     if (action == ACTION_SHOW_ALL) {
-      snprintf((char *)IObuff, IOSIZE, "%3ld: ", count);  // Show match nr.
+      snprintf(IObuff, IOSIZE, "%3ld: ", count);  // Show match nr.
       msg_puts((const char *)IObuff);
-      snprintf((char *)IObuff, IOSIZE, "%4" PRIdLINENR, *lnum);  // Show line nr.
+      snprintf(IObuff, IOSIZE, "%4" PRIdLINENR, *lnum);  // Show line nr.
       // Highlight line numbers.
       msg_puts_attr((const char *)IObuff, HL_ATTR(HLF_N));
       msg_puts(" ");

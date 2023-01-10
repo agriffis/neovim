@@ -484,14 +484,14 @@ static void uc_list(char *name, size_t name_len)
       if (a & (EX_RANGE | EX_COUNT)) {
         if (a & EX_COUNT) {
           // -count=N
-          snprintf((char *)IObuff + len, IOSIZE, "%" PRId64 "c",
+          snprintf(IObuff + len, IOSIZE, "%" PRId64 "c",
                    (int64_t)cmd->uc_def);
           len += (int)strlen(IObuff + len);
         } else if (a & EX_DFLALL) {
           IObuff[len++] = '%';
         } else if (cmd->uc_def >= 0) {
           // -range=N
-          snprintf((char *)IObuff + len, IOSIZE, "%" PRId64 "",
+          snprintf(IObuff + len, IOSIZE, "%" PRId64 "",
                    (int64_t)cmd->uc_def);
           len += (int)strlen(IObuff + len);
         } else {
@@ -529,7 +529,7 @@ static void uc_list(char *name, size_t name_len)
       } while (len < 25 - over);
 
       IObuff[len] = '\0';
-      msg_outtrans((char *)IObuff);
+      msg_outtrans(IObuff);
 
       if (cmd->uc_luaref != LUA_NOREF) {
         char *fn = nlua_funcref_str(cmd->uc_luaref);
@@ -653,7 +653,7 @@ int parse_compl_arg(const char *value, int vallen, int *complp, uint32_t *argt, 
 }
 
 static int uc_scan_attr(char *attr, size_t len, uint32_t *argt, long *def, int *flags, int *complp,
-                        char_u **compl_arg, cmd_addr_T *addr_type_arg)
+                        char **compl_arg, cmd_addr_T *addr_type_arg)
   FUNC_ATTR_NONNULL_ALL
 {
   char *p;
@@ -764,7 +764,7 @@ invalid_count:
         return FAIL;
       }
 
-      if (parse_compl_arg(val, (int)vallen, complp, argt, (char **)compl_arg)
+      if (parse_compl_arg(val, (int)vallen, complp, argt, compl_arg)
           == FAIL) {
         return FAIL;
       }
@@ -941,7 +941,7 @@ void ex_command(exarg_T *eap)
   while (*p == '-') {
     p++;
     end = skiptowhite(p);
-    if (uc_scan_attr(p, (size_t)(end - p), &argt, &def, &flags, &compl, (char_u **)&compl_arg,
+    if (uc_scan_attr(p, (size_t)(end - p), &argt, &def, &flags, &compl, &compl_arg,
                      &addr_type_arg) == FAIL) {
       goto theend;
     }

@@ -155,7 +155,7 @@ void win_redr_status(win_T *wp)
     grid_fill(&default_grid, row, row + 1, len + col,
               this_ru_col + col, fillchar, fillchar, attr);
 
-    if (get_keymap_str(wp, "<%s>", (char *)NameBuff, MAXPATHL)
+    if (get_keymap_str(wp, "<%s>", NameBuff, MAXPATHL)
         && this_ru_col - len > (int)(strlen(NameBuff) + 1)) {
       grid_puts(&default_grid, NameBuff, row,
                 (int)((size_t)this_ru_col - strlen(NameBuff) - 1), attr);
@@ -367,14 +367,15 @@ static void win_redr_custom(win_T *wp, bool draw_winbar, bool draw_ruler)
   // Make a copy, because the statusline may include a function call that
   // might change the option value and free the memory.
   stl = xstrdup(stl);
-  width = build_stl_str_hl(ewp, buf, sizeof(buf), stl, opt_name,
-                           opt_scope, fillchar, maxwidth, &hltab, &tabtab);
+  width = build_stl_str_hl(ewp, buf, sizeof(buf), stl, opt_name, opt_scope,
+                           fillchar, maxwidth, &hltab, &tabtab, NULL);
+
   xfree(stl);
   ewp->w_p_crb = p_crb_save;
 
   // Make all characters printable.
   p = transstr(buf, true);
-  len = (int)STRLCPY(buf, p, sizeof(buf));
+  len = (int)xstrlcpy(buf, p, sizeof(buf));
   len = (size_t)len < sizeof(buf) ? len : (int)sizeof(buf) - 1;
   xfree(p);
 
@@ -666,7 +667,7 @@ static void ui_ext_tabline_update(void)
 
     win_T *cwp = (tp == curtab) ? curwin : tp->tp_curwin;
     get_trans_bufname(cwp->w_buffer);
-    PUT_C(tab_info, "name", STRING_OBJ(arena_string(&arena, cstr_as_string((char *)NameBuff))));
+    PUT_C(tab_info, "name", STRING_OBJ(arena_string(&arena, cstr_as_string(NameBuff))));
 
     ADD_C(tabs, DICTIONARY_OBJ(tab_info));
   }
@@ -687,7 +688,7 @@ static void ui_ext_tabline_update(void)
     PUT_C(buffer_info, "buffer", BUFFER_OBJ(buf->handle));
 
     get_trans_bufname(buf);
-    PUT_C(buffer_info, "name", STRING_OBJ(arena_string(&arena, cstr_as_string((char *)NameBuff))));
+    PUT_C(buffer_info, "name", STRING_OBJ(arena_string(&arena, cstr_as_string(NameBuff))));
 
     ADD_C(buffers, DICTIONARY_OBJ(buffer_info));
   }
@@ -787,7 +788,7 @@ void draw_tabline(void)
 
       if (modified || wincount > 1) {
         if (wincount > 1) {
-          vim_snprintf((char *)NameBuff, MAXPATHL, "%d", wincount);
+          vim_snprintf(NameBuff, MAXPATHL, "%d", wincount);
           len = (int)strlen(NameBuff);
           if (col + len >= Columns - 3) {
             break;
@@ -807,7 +808,7 @@ void draw_tabline(void)
         // Get buffer name in NameBuff[]
         get_trans_bufname(cwp->w_buffer);
         shorten_dir(NameBuff);
-        len = vim_strsize((char *)NameBuff);
+        len = vim_strsize(NameBuff);
         p = (char_u *)NameBuff;
         while (len > room) {
           len -= ptr2cells((char *)p);
@@ -867,6 +868,38 @@ void draw_tabline(void)
   redraw_tabline = false;
 }
 
+/// Build the 'statuscolumn' string for line "lnum".  If "setnum" is true,
+/// update the "lnum" and "relnum" vim-variables for a new line.
+///
+/// @param hlrec  HL attributes (can be NULL)
+/// @param stcp  Status column attributes (can be NULL)
+/// @return  The width of the built status column string for line "lnum"
+int build_statuscol_str(win_T *wp, bool setnum, bool wrap, linenr_T lnum, long relnum, int maxwidth,
+                        int fillchar, char *buf, stl_hlrec_t **hlrec, statuscol_T *stcp)
+{
+  if (setnum) {
+    set_vim_var_nr(VV_LNUM, lnum);
+    set_vim_var_nr(VV_RELNUM, relnum);
+  }
+  set_vim_var_bool(VV_WRAP, wrap);
+
+  StlClickRecord *clickrec;
+  char *stc = xstrdup(wp->w_p_stc);
+  int width = build_stl_str_hl(wp, buf, MAXPATHL, stc, "statuscolumn", OPT_LOCAL,
+                               fillchar, maxwidth, hlrec, &clickrec, stcp);
+  xfree(stc);
+
+  // Allocate and fill click def array if width has changed
+  if (wp->w_status_click_defs_size != (size_t)width) {
+    stl_clear_click_defs(wp->w_statuscol_click_defs, wp->w_statuscol_click_defs_size);
+    wp->w_statuscol_click_defs = stl_alloc_click_defs(wp->w_statuscol_click_defs, width,
+                                                      &wp->w_statuscol_click_defs_size);
+    stl_fill_click_defs(wp->w_statuscol_click_defs, clickrec, buf, width, false);
+  }
+
+  return width;
+}
+
 /// Build a string from the status line items in "fmt".
 /// Return length of string in screen cells.
 ///
@@ -890,11 +923,13 @@ void draw_tabline(void)
 /// @param fillchar  Character to use when filling empty space in the statusline
 /// @param maxwidth  The maximum width to make the statusline
 /// @param hltab  HL attributes (can be NULL)
-/// @param tabtab  Tab clicks definition (can be NULL).
+/// @param tabtab  Tab clicks definition (can be NULL)
+/// @param stcp  Status column attributes (can be NULL)
 ///
 /// @return  The final width of the statusline
 int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, char *opt_name, int opt_scope,
-                     int fillchar, int maxwidth, stl_hlrec_t **hltab, StlClickRecord **tabtab)
+                     int fillchar, int maxwidth, stl_hlrec_t **hltab, StlClickRecord **tabtab,
+                     statuscol_T *stcp)
 {
   static size_t stl_items_len = 20;  // Initial value, grows as needed.
   static stl_item_t *stl_items = NULL;
@@ -1349,17 +1384,17 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, char *opt_n
       // get replaced with the fillchar
       fillable = false;
       if (buf_spname(wp->w_buffer) != NULL) {
-        STRLCPY(NameBuff, buf_spname(wp->w_buffer), MAXPATHL);
+        xstrlcpy(NameBuff, buf_spname(wp->w_buffer), MAXPATHL);
       } else {
         char *t = (opt == STL_FULLPATH) ? wp->w_buffer->b_ffname
                                           : wp->w_buffer->b_fname;
-        home_replace(wp->w_buffer, t, (char *)NameBuff, MAXPATHL, true);
+        home_replace(wp->w_buffer, t, NameBuff, MAXPATHL, true);
       }
-      trans_characters((char *)NameBuff, MAXPATHL);
+      trans_characters(NameBuff, MAXPATHL);
       if (opt != STL_FILENAME) {
-        str = (char *)NameBuff;
+        str = NameBuff;
       } else {
-        str = path_tail((char *)NameBuff);
+        str = path_tail(NameBuff);
       }
       break;
     case STL_VIM_EXPR:     // '{'
@@ -1466,8 +1501,9 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, char *opt_n
     }
 
     case STL_LINE:
-      num = (wp->w_buffer->b_ml.ml_flags & ML_EMPTY)
-            ? 0L : (long)(wp->w_cursor.lnum);
+      // Overload %l with v:lnum for 'statuscolumn'
+      num = strcmp(opt_name, "statuscolumn") == 0 ? get_vim_var_nr(VV_LNUM)
+            : (wp->w_buffer->b_ml.ml_flags & ML_EMPTY) ? 0L : (long)(wp->w_cursor.lnum);
       break;
 
     case STL_NUMLINES:
@@ -1565,9 +1601,14 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, char *opt_n
 
     case STL_ROFLAG:
     case STL_ROFLAG_ALT:
-      itemisflag = true;
-      if (wp->w_buffer->b_p_ro) {
-        str = (opt == STL_ROFLAG_ALT) ? ",RO" : _("[RO]");
+      // Overload %r with v:relnum for 'statuscolumn'
+      if (strcmp(opt_name, "statuscolumn") == 0) {
+        num = get_vim_var_nr(VV_RELNUM);
+      } else {
+        itemisflag = true;
+        if (wp->w_buffer->b_p_ro) {
+          str = (opt == STL_ROFLAG_ALT) ? ",RO" : _("[RO]");
+        }
       }
       break;
 
@@ -1578,6 +1619,33 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, char *opt_n
         str = (opt == STL_HELPFLAG_ALT) ? ",HLP" : _("[Help]");
       }
       break;
+
+    case STL_FOLDCOL:    // 'C' for 'statuscolumn'
+    case STL_SIGNCOL: {  // 's' for 'statuscolumn'
+      if (stcp == NULL) {
+        break;
+      }
+
+      bool fold = opt == STL_FOLDCOL;
+      *buf_tmp = NUL;
+      for (int i = 0; i <= 9; i++) {
+        char *p = fold ? stcp->fold_text : stcp->sign_text[i];
+        if ((!p || !*p) && *buf_tmp == NUL) {
+          break;
+        }
+        stl_items[curitem].type = Highlight;
+        stl_items[curitem].start = out_p + strlen(buf_tmp);
+        stl_items[curitem].minwid = !p || (fold && i) ? 0 : fold ? stcp->fold_attr
+                                                                 : stcp->sign_attr[i];
+        curitem++;
+        if (!p || (fold && i)) {
+          str = buf_tmp;
+          break;
+        }
+        STRCAT(buf_tmp, p);
+      }
+      break;
+    }
 
     case STL_FILETYPE:
       // Copy the filetype if it is not null and the formatted string will fit
@@ -1850,6 +1918,10 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, char *opt_n
   // What follows is post-processing to handle alignment and highlighting.
 
   int width = vim_strsize(out);
+  // Return truncated width for 'statuscolumn'
+  if (stcp != NULL && width > maxwidth) {
+    stcp->truncate = width - maxwidth;
+  }
   if (maxwidth > 0 && width > maxwidth) {
     // Result is too long, must truncate somewhere.
     int item_idx = 0;

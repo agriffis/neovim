@@ -673,7 +673,7 @@ static int qf_get_next_str_line(qfstate_T *state)
   if (len > IOSIZE - 2) {
     state->linebuf = qf_grow_linebuf(state, len);
   } else {
-    state->linebuf = (char *)IObuff;
+    state->linebuf = IObuff;
     state->linelen = len;
   }
   memcpy(state->linebuf, p_str, state->linelen);
@@ -708,12 +708,12 @@ static int qf_get_next_list_line(qfstate_T *state)
   if (len > IOSIZE - 2) {
     state->linebuf = qf_grow_linebuf(state, len);
   } else {
-    state->linebuf = (char *)IObuff;
+    state->linebuf = IObuff;
     state->linelen = len;
   }
 
-  STRLCPY(state->linebuf, TV_LIST_ITEM_TV(p_li)->vval.v_string,
-          state->linelen + 1);
+  xstrlcpy(state->linebuf, TV_LIST_ITEM_TV(p_li)->vval.v_string,
+           state->linelen + 1);
 
   state->p_li = TV_LIST_ITEM_NEXT(state->p_list, p_li);
   return QF_OK;
@@ -733,10 +733,10 @@ static int qf_get_next_buf_line(qfstate_T *state)
   if (len > IOSIZE - 2) {
     state->linebuf = qf_grow_linebuf(state, len);
   } else {
-    state->linebuf = (char *)IObuff;
+    state->linebuf = IObuff;
     state->linelen = len;
   }
-  STRLCPY(state->linebuf, p_buf, state->linelen + 1);
+  xstrlcpy(state->linebuf, p_buf, state->linelen + 1);
 
   return QF_OK;
 }
@@ -746,7 +746,7 @@ static int qf_get_next_file_line(qfstate_T *state)
 {
 retry:
   errno = 0;
-  if (fgets((char *)IObuff, IOSIZE, state->fd) == NULL) {
+  if (fgets(IObuff, IOSIZE, state->fd) == NULL) {
     if (errno == EINTR) {
       goto retry;
     }
@@ -796,7 +796,7 @@ retry:
       // The current line is longer than LINE_MAXLEN, continue reading but
       // discard everything until EOL or EOF is reached.
       errno = 0;
-      if (fgets((char *)IObuff, IOSIZE, state->fd) == NULL) {
+      if (fgets(IObuff, IOSIZE, state->fd) == NULL) {
         if (errno == EINTR) {
           continue;
         }
@@ -810,7 +810,7 @@ retry:
     state->linebuf = state->growbuf;
     state->linelen = growbuflen;
   } else {
-    state->linebuf = (char *)IObuff;
+    state->linebuf = IObuff;
   }
 
   // Convert a line if it contains a non-ASCII character
@@ -818,7 +818,7 @@ retry:
     char *line = string_convert(&state->vc, state->linebuf, &state->linelen);
     if (line != NULL) {
       if (state->linelen < IOSIZE) {
-        STRLCPY(state->linebuf, line, state->linelen + 1);
+        xstrlcpy(state->linebuf, line, state->linelen + 1);
         xfree(line);
       } else {
         xfree(state->growbuf);
@@ -1195,7 +1195,7 @@ static void qf_store_title(qf_list_T *qfl, const char *title)
     char *p = xmallocz(len);
 
     qfl->qf_title = p;
-    STRLCPY(p, title, len + 1);
+    xstrlcpy(p, title, len + 1);
   }
 }
 
@@ -1350,7 +1350,7 @@ static int copy_nonerror_line(const char *linebuf, size_t linelen, qffields_T *f
     fields->errmsglen = linelen + 1;
   }
   // copy whole line to error message
-  STRLCPY(fields->errmsg, linebuf, linelen + 1);
+  xstrlcpy(fields->errmsg, linebuf, linelen + 1);
 
   return QF_OK;
 }
@@ -1368,7 +1368,7 @@ static int qf_parse_fmt_m(regmatch_T *rmp, int midx, qffields_T *fields)
     fields->errmsg = xrealloc(fields->errmsg, len + 1);
     fields->errmsglen = len + 1;
   }
-  STRLCPY(fields->errmsg, rmp->startp[midx], len + 1);
+  xstrlcpy(fields->errmsg, rmp->startp[midx], len + 1);
   return QF_OK;
 }
 
@@ -2803,13 +2803,13 @@ static void qf_jump_print_msg(qf_info_T *qi, int qf_index, qfline_T *qf_ptr, buf
       update_screen();
     }
   }
-  snprintf((char *)IObuff, IOSIZE, _("(%d of %d)%s%s: "), qf_index,
+  snprintf(IObuff, IOSIZE, _("(%d of %d)%s%s: "), qf_index,
            qf_get_curlist(qi)->qf_count,
            qf_ptr->qf_cleared ? _(" (line deleted)") : "",
            qf_types(qf_ptr->qf_type, qf_ptr->qf_nr));
   // Add the message, skipping leading whitespace and newlines.
   int len = (int)strlen(IObuff);
-  qf_fmt_text(skipwhite(qf_ptr->qf_text), (char *)IObuff + len, IOSIZE - len);
+  qf_fmt_text(skipwhite(qf_ptr->qf_text), IObuff + len, IOSIZE - len);
 
   // Output the message.  Overwrite to avoid scrolling when the 'O'
   // flag is present in 'shortmess'; But when not jumping, print the
@@ -2821,7 +2821,7 @@ static void qf_jump_print_msg(qf_info_T *qi, int qf_index, qfline_T *qf_ptr, buf
     msg_scroll = false;
   }
   msg_ext_set_kind("quickfix");
-  msg_attr_keep((char *)IObuff, 0, true, false);
+  msg_attr_keep(IObuff, 0, true, false);
   msg_scroll = (int)i;
 }
 
@@ -3039,7 +3039,7 @@ static void qf_list_entry(qfline_T *qfp, int qf_idx, bool cursel)
 {
   char *fname = NULL;
   if (qfp->qf_module != NULL && *qfp->qf_module != NUL) {
-    vim_snprintf((char *)IObuff, IOSIZE, "%2d %s", qf_idx, qfp->qf_module);
+    vim_snprintf(IObuff, IOSIZE, "%2d %s", qf_idx, qfp->qf_module);
   } else {
     buf_T *buf;
     if (qfp->qf_fnum != 0
@@ -3050,9 +3050,9 @@ static void qf_list_entry(qfline_T *qfp, int qf_idx, bool cursel)
       }
     }
     if (fname == NULL) {
-      snprintf((char *)IObuff, IOSIZE, "%2d", qf_idx);
+      snprintf(IObuff, IOSIZE, "%2d", qf_idx);
     } else {
-      vim_snprintf((char *)IObuff, IOSIZE, "%2d %s", qf_idx, fname);
+      vim_snprintf(IObuff, IOSIZE, "%2d %s", qf_idx, fname);
     }
   }
 
@@ -3077,7 +3077,7 @@ static void qf_list_entry(qfline_T *qfp, int qf_idx, bool cursel)
   }
 
   msg_putchar('\n');
-  msg_outtrans_attr((char *)IObuff, cursel ? HL_ATTR(HLF_QFL) : qfFileAttr);
+  msg_outtrans_attr(IObuff, cursel ? HL_ATTR(HLF_QFL) : qfFileAttr);
 
   if (qfp->qf_lnum != 0) {
     msg_puts_attr(":", qfSepAttr);
@@ -3085,13 +3085,13 @@ static void qf_list_entry(qfline_T *qfp, int qf_idx, bool cursel)
   if (qfp->qf_lnum == 0) {
     IObuff[0] = NUL;
   } else {
-    qf_range_text(qfp, (char *)IObuff, IOSIZE);
+    qf_range_text(qfp, IObuff, IOSIZE);
   }
-  vim_snprintf((char *)IObuff + strlen(IObuff), IOSIZE, "%s", qf_types(qfp->qf_type, qfp->qf_nr));
+  vim_snprintf(IObuff + strlen(IObuff), IOSIZE, "%s", qf_types(qfp->qf_type, qfp->qf_nr));
   msg_puts_attr((const char *)IObuff, qfLineAttr);
   msg_puts_attr(":", qfSepAttr);
   if (qfp->qf_pattern != NULL) {
-    qf_fmt_text(qfp->qf_pattern, (char *)IObuff, IOSIZE);
+    qf_fmt_text(qfp->qf_pattern, IObuff, IOSIZE);
     msg_puts((const char *)IObuff);
     msg_puts_attr(":", qfSepAttr);
   }
@@ -3941,18 +3941,18 @@ static int qf_buf_add_line(qf_list_T *qfl, buf_T *buf, linenr_T lnum, const qfli
   // If the 'quickfixtextfunc' function returned a non-empty custom string
   // for this entry, then use it.
   if (qftf_str != NULL && *qftf_str != NUL) {
-    STRLCPY(IObuff, qftf_str, IOSIZE);
+    xstrlcpy(IObuff, qftf_str, IOSIZE);
   } else {
     buf_T *errbuf;
     int len;
     if (qfp->qf_module != NULL) {
-      STRLCPY(IObuff, qfp->qf_module, IOSIZE);
+      xstrlcpy(IObuff, qfp->qf_module, IOSIZE);
       len = (int)strlen(IObuff);
     } else if (qfp->qf_fnum != 0
                && (errbuf = buflist_findnr(qfp->qf_fnum)) != NULL
                && errbuf->b_fname != NULL) {
       if (qfp->qf_type == 1) {  // :helpgrep
-        STRLCPY(IObuff, path_tail(errbuf->b_fname), IOSIZE);
+        xstrlcpy(IObuff, path_tail(errbuf->b_fname), IOSIZE);
       } else {
         // Shorten the file name if not done already.
         // For optimization, do this only for the first entry in a
@@ -3961,11 +3961,11 @@ static int qf_buf_add_line(qf_list_T *qfl, buf_T *buf, linenr_T lnum, const qfli
             && (errbuf->b_sfname == NULL
                 || path_is_absolute((char_u *)errbuf->b_sfname))) {
           if (*dirname == NUL) {
-            os_dirname((char_u *)dirname, MAXPATHL);
+            os_dirname(dirname, MAXPATHL);
           }
           shorten_buf_fname(errbuf, (char_u *)dirname, false);
         }
-        STRLCPY(IObuff, errbuf->b_fname, IOSIZE);
+        xstrlcpy(IObuff, errbuf->b_fname, IOSIZE);
       }
       len = (int)strlen(IObuff);
     } else {
@@ -3975,14 +3975,14 @@ static int qf_buf_add_line(qf_list_T *qfl, buf_T *buf, linenr_T lnum, const qfli
       IObuff[len++] = '|';
     }
     if (qfp->qf_lnum > 0) {
-      qf_range_text(qfp, (char *)IObuff + len, IOSIZE - len);
+      qf_range_text(qfp, IObuff + len, IOSIZE - len);
       len += (int)strlen(IObuff + len);
 
-      snprintf((char *)IObuff + len, (size_t)(IOSIZE - len), "%s", qf_types(qfp->qf_type,
-                                                                            qfp->qf_nr));
+      snprintf(IObuff + len, (size_t)(IOSIZE - len), "%s", qf_types(qfp->qf_type,
+                                                                    qfp->qf_nr));
       len += (int)strlen(IObuff + len);
     } else if (qfp->qf_pattern != NULL) {
-      qf_fmt_text(qfp->qf_pattern, (char *)IObuff + len, IOSIZE - len);
+      qf_fmt_text(qfp->qf_pattern, IObuff + len, IOSIZE - len);
       len += (int)strlen(IObuff + len);
     }
     if (len < IOSIZE - 2) {
@@ -3994,7 +3994,7 @@ static int qf_buf_add_line(qf_list_T *qfl, buf_T *buf, linenr_T lnum, const qfli
     // For an unrecognized line keep the indent, the compiler may
     // mark a word with ^^^^.
     qf_fmt_text(len > 3 ? skipwhite(qfp->qf_text) : qfp->qf_text,
-                (char *)IObuff + len, IOSIZE - len);
+                IObuff + len, IOSIZE - len);
   }
 
   if (ml_append_buf(buf, lnum, (char_u *)IObuff,
@@ -5370,7 +5370,7 @@ static int vgr_process_files(win_T *wp, qf_info_T *qi, vgr_args_T *cmd_args, boo
 
   // Remember the current directory, because a BufRead autocommand that does
   // ":lcd %:p:h" changes the meaning of short path names.
-  os_dirname((char_u *)dirname_start, MAXPATHL);
+  os_dirname(dirname_start, MAXPATHL);
 
   time_t seconds = (time_t)0;
   for (int fi = 0; fi < cmd_args->fcount && !got_int && cmd_args->tomatch > 0; fi++) {
@@ -5581,7 +5581,7 @@ static void restore_start_dir(char *dirname_start)
 {
   char *dirname_now = xmalloc(MAXPATHL);
 
-  os_dirname((char_u *)dirname_now, MAXPATHL);
+  os_dirname(dirname_now, MAXPATHL);
   if (strcmp(dirname_start, dirname_now) != 0) {
     // If the directory has changed, change it back by building up an
     // appropriate ex command and executing it.
@@ -5675,7 +5675,7 @@ static buf_T *load_dummy_buffer(char *fname, char *dirname_start, char *resultin
   // When autocommands/'autochdir' option changed directory: go back.
   // Let the caller know what the resulting dir was first, in case it is
   // important.
-  os_dirname((char_u *)resulting_dir, MAXPATHL);
+  os_dirname(resulting_dir, MAXPATHL);
   restore_start_dir(dirname_start);
 
   if (!bufref_valid(&newbufref)) {
@@ -6856,8 +6856,8 @@ void ex_cbuffer(exarg_T *eap)
   char *qf_title = qf_cmdtitle(*eap->cmdlinep);
 
   if (buf->b_sfname) {
-    vim_snprintf((char *)IObuff, IOSIZE, "%s (%s)", qf_title, buf->b_sfname);
-    qf_title = (char *)IObuff;
+    vim_snprintf(IObuff, IOSIZE, "%s (%s)", qf_title, buf->b_sfname);
+    qf_title = IObuff;
   }
 
   incr_quickfix_busy();
@@ -7002,7 +7002,7 @@ static void hgr_search_file(qf_list_T *qfl, char *fname, regmatch_T *p_regmatch)
 
   linenr_T lnum = 1;
   while (!vim_fgets(IObuff, IOSIZE, fd) && !got_int) {
-    char *line = (char *)IObuff;
+    char *line = IObuff;
 
     if (vim_regexec(p_regmatch, line, (colnr_T)0)) {
       int l = (int)strlen(line);
@@ -7085,9 +7085,9 @@ static void hgr_search_in_rtp(qf_list_T *qfl, regmatch_T *p_regmatch, const char
   // Go through all directories in 'runtimepath'
   char *p = p_rtp;
   while (*p != NUL && !got_int) {
-    copy_option_part(&p, (char *)NameBuff, MAXPATHL, ",");
+    copy_option_part(&p, NameBuff, MAXPATHL, ",");
 
-    hgr_search_files_in_dir(qfl, (char *)NameBuff, p_regmatch, (char *)lang);
+    hgr_search_files_in_dir(qfl, NameBuff, p_regmatch, (char *)lang);
   }
 }
 

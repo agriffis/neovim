@@ -271,7 +271,7 @@ static bool set_maparg_lhs_rhs(const char *const orig_lhs, const size_t orig_lhs
     return false;
   }
   mapargs->lhs_len = strlen(replaced);
-  STRLCPY(mapargs->lhs, replaced, sizeof(mapargs->lhs));
+  xstrlcpy(mapargs->lhs, replaced, sizeof(mapargs->lhs));
   if (did_simplify) {
     replaced = replace_termcodes(orig_lhs, orig_lhs_len, &bufarg, flags | REPTERM_NO_SIMPLIFY,
                                  NULL, cpo_flags);
@@ -279,7 +279,7 @@ static bool set_maparg_lhs_rhs(const char *const orig_lhs, const size_t orig_lhs
       return false;
     }
     mapargs->alt_lhs_len = strlen(replaced);
-    STRLCPY(mapargs->alt_lhs, replaced, sizeof(mapargs->alt_lhs));
+    xstrlcpy(mapargs->alt_lhs, replaced, sizeof(mapargs->alt_lhs));
   } else {
     mapargs->alt_lhs_len = 0;
   }
@@ -298,7 +298,7 @@ static void set_maparg_rhs(const char *const orig_rhs, const size_t orig_rhs_len
   if (rhs_lua == LUA_NOREF) {
     mapargs->orig_rhs_len = orig_rhs_len;
     mapargs->orig_rhs = xcalloc(mapargs->orig_rhs_len + 1, sizeof(char_u));
-    STRLCPY(mapargs->orig_rhs, orig_rhs, mapargs->orig_rhs_len + 1);
+    xstrlcpy(mapargs->orig_rhs, orig_rhs, mapargs->orig_rhs_len + 1);
     if (STRICMP(orig_rhs, "<nop>") == 0) {  // "<Nop>" means nothing
       mapargs->rhs = xcalloc(1, sizeof(char_u));  // single NUL-char
       mapargs->rhs_len = 0;
@@ -427,11 +427,11 @@ static int str_to_mapargs(const char_u *strargs, bool is_unmap, MapArguments *ma
   if (orig_lhs_len >= 256) {
     return 1;
   }
-  char_u lhs_to_replace[256];
-  STRLCPY(lhs_to_replace, to_parse, orig_lhs_len + 1);
+  char lhs_to_replace[256];
+  xstrlcpy(lhs_to_replace, to_parse, orig_lhs_len + 1);
 
   size_t orig_rhs_len = strlen(rhs_start);
-  if (!set_maparg_lhs_rhs((char *)lhs_to_replace, orig_lhs_len,
+  if (!set_maparg_lhs_rhs(lhs_to_replace, orig_lhs_len,
                           rhs_start, orig_rhs_len, LUA_NOREF,
                           CPO_TO_CPO_FLAGS, mapargs)) {
     return 1;
@@ -464,7 +464,7 @@ static void map_add(buf_T *buf, mapblock_T **map_table, mapblock_T **abbr_table,
 
   mp->m_keys = xstrdup(keys);
   mp->m_str = args->rhs;
-  mp->m_orig_str = (char *)args->orig_rhs;
+  mp->m_orig_str = args->orig_rhs;
   mp->m_luaref = args->rhs_lua;
   if (!simplified) {
     args->rhs = NULL;
@@ -589,13 +589,13 @@ static int buf_do_map(int maptype, MapArguments *args, int mode, bool is_abbrev,
         // vi-compatible way.
         int same = -1;
 
-        const int first = vim_iswordp((char_u *)lhs);
+        const int first = vim_iswordp(lhs);
         int last = first;
         p = (char *)lhs + utfc_ptr2len((char *)lhs);
         n = 1;
         while (p < (char *)lhs + len) {
           n++;                                  // nr of (multi-byte) chars
-          last = vim_iswordp((char_u *)p);                // type of last char
+          last = vim_iswordp(p);                // type of last char
           if (same == -1 && last != first) {
             same = n - 1;                       // count of same char type
           }
@@ -776,7 +776,7 @@ static int buf_do_map(int maptype, MapArguments *args, int mode, bool is_abbrev,
                     XFREE_CLEAR(mp->m_orig_str);
                   }
                   mp->m_str = args->rhs;
-                  mp->m_orig_str = (char *)args->orig_rhs;
+                  mp->m_orig_str = args->orig_rhs;
                   mp->m_luaref = args->rhs_lua;
                   if (!keyround1_simplified) {
                     args->rhs = NULL;
@@ -1419,18 +1419,18 @@ bool check_abbr(int c, char *ptr, int col, int mincol)
   {
     bool vim_abbr;
     char_u *p = mb_prevptr((char_u *)ptr, (char_u *)ptr + col);
-    if (!vim_iswordp(p)) {
+    if (!vim_iswordp((char *)p)) {
       vim_abbr = true;    // Vim added abbr.
     } else {
       vim_abbr = false;   // vi compatible abbr.
       if (p > (char_u *)ptr) {
-        is_id = vim_iswordp(mb_prevptr((char_u *)ptr, p));
+        is_id = vim_iswordp((char *)mb_prevptr((char_u *)ptr, p));
       }
     }
     clen = 1;
     while (p > (char_u *)ptr + mincol) {
       p = mb_prevptr((char_u *)ptr, p);
-      if (ascii_isspace(*p) || (!vim_abbr && is_id != vim_iswordp(p))) {
+      if (ascii_isspace(*p) || (!vim_abbr && is_id != vim_iswordp((char *)p))) {
         p += utfc_ptr2len((char *)p);
         break;
       }

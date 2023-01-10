@@ -71,7 +71,7 @@ FileComparison path_full_compare(char *const s1, char *const s2, const bool chec
   if (expandenv) {
     expand_env(s1, exp1, MAXPATHL);
   } else {
-    STRLCPY(exp1, s1, MAXPATHL);
+    xstrlcpy(exp1, s1, MAXPATHL);
   }
   bool id_ok_1 = os_fileid(exp1, &file_id_1);
   bool id_ok_2 = os_fileid(s2, &file_id_2);
@@ -964,7 +964,7 @@ static void uniquefy_paths(garray_T *gap, char *pattern)
   }
 
   char *curdir = xmalloc(MAXPATHL);
-  os_dirname((char_u *)curdir, MAXPATHL);
+  os_dirname(curdir, MAXPATHL);
   expand_path_option(curdir, &path_ga);
 
   in_curdir = xcalloc((size_t)gap->ga_len, sizeof(char_u *));
@@ -1113,12 +1113,12 @@ const char *gettail_dir(const char *const fname)
 /// Returns the total number of matches.
 ///
 /// @param flags  EW_* flags
-static int expand_in_path(garray_T *const gap, char_u *const pattern, const int flags)
+static int expand_in_path(garray_T *const gap, char *const pattern, const int flags)
 {
   garray_T path_ga;
 
   char_u *const curdir = xmalloc(MAXPATHL);
-  os_dirname(curdir, MAXPATHL);
+  os_dirname((char *)curdir, MAXPATHL);
 
   ga_init(&path_ga, (int)sizeof(char_u *), 1);
   expand_path_option((char *)curdir, &path_ga);
@@ -1127,7 +1127,7 @@ static int expand_in_path(garray_T *const gap, char_u *const pattern, const int 
     return 0;
   }
 
-  char_u *const paths = ga_concat_strings(&path_ga);
+  char *const paths = (char *)ga_concat_strings(&path_ga);
   ga_clear_strings(&path_ga);
 
   int glob_flags = 0;
@@ -1137,7 +1137,7 @@ static int expand_in_path(garray_T *const gap, char_u *const pattern, const int 
   if (flags & EW_ADDSLASH) {
     glob_flags |= WILD_ADD_SLASH;
   }
-  globpath((char *)paths, (char *)pattern, gap, glob_flags);
+  globpath(paths, pattern, gap, glob_flags);
   xfree(paths);
 
   return gap->ga_len;
@@ -1208,7 +1208,7 @@ static bool has_special_wildchar(char_u *p)
 int gen_expand_wildcards(int num_pat, char **pat, int *num_file, char ***file, int flags)
 {
   garray_T ga;
-  char_u *p;
+  char *p;
   static bool recursive = false;
   int add_pat;
   bool did_expand_in_path = false;
@@ -1245,10 +1245,10 @@ int gen_expand_wildcards(int num_pat, char **pat, int *num_file, char ***file, i
 
   for (int i = 0; i < num_pat && !got_int; i++) {
     add_pat = -1;
-    p = (char_u *)pat[i];
+    p = pat[i];
 
-    if (vim_backtick((char *)p)) {
-      add_pat = expand_backtick(&ga, (char *)p, flags);
+    if (vim_backtick(p)) {
+      add_pat = expand_backtick(&ga, p, flags);
       if (add_pat == -1) {
         recursive = false;
         ga_clear_strings(&ga);
@@ -1258,16 +1258,16 @@ int gen_expand_wildcards(int num_pat, char **pat, int *num_file, char ***file, i
       }
     } else {
       // First expand environment variables, "~/" and "~user/".
-      if ((has_env_var(p) && !(flags & EW_NOTENV)) || *p == '~') {
-        p = expand_env_save_opt(p, true);
+      if ((has_env_var((char_u *)p) && !(flags & EW_NOTENV)) || *p == '~') {
+        p = (char *)expand_env_save_opt((char_u *)p, true);
         if (p == NULL) {
-          p = (char_u *)pat[i];
+          p = pat[i];
         } else {
 #ifdef UNIX
           // On Unix, if expand_env() can't expand an environment
           // variable, use the shell to do that.  Discard previously
           // found file names and start all over again.
-          if (has_env_var(p) || *p == '~') {
+          if (has_env_var((char_u *)p) || *p == '~') {
             xfree(p);
             ga_clear_strings(&ga);
             i = os_expand_wildcards(num_pat, pat, num_file, file,
@@ -1284,9 +1284,9 @@ int gen_expand_wildcards(int num_pat, char **pat, int *num_file, char ***file, i
       // there is no match, and EW_NOTFOUND is given, add the pattern.
       // Otherwise: Add the file name if it exists or when EW_NOTFOUND is
       // given.
-      if (path_has_exp_wildcard(p) || (flags & EW_ICASE)) {
+      if (path_has_exp_wildcard((char_u *)p) || (flags & EW_ICASE)) {
         if ((flags & EW_PATH)
-            && !path_is_absolute(p)
+            && !path_is_absolute((char_u *)p)
             && !(p[0] == '.'
                  && (vim_ispathsep(p[1])
                      || (p[1] == '.'
@@ -1298,7 +1298,7 @@ int gen_expand_wildcards(int num_pat, char **pat, int *num_file, char ***file, i
           recursive = true;
           did_expand_in_path = true;
         } else {
-          size_t tmp_add_pat = path_expand(&ga, p, flags);
+          size_t tmp_add_pat = path_expand(&ga, (char_u *)p, flags);
           assert(tmp_add_pat <= INT_MAX);
           add_pat = (int)tmp_add_pat;
         }
@@ -1306,14 +1306,14 @@ int gen_expand_wildcards(int num_pat, char **pat, int *num_file, char ***file, i
     }
 
     if (add_pat == -1 || (add_pat == 0 && (flags & EW_NOTFOUND))) {
-      char_u *t = (char_u *)backslash_halve_save((char *)p);
+      char *t = backslash_halve_save(p);
 
       // When EW_NOTFOUND is used, always add files and dirs.  Makes
       // "vim c:/" work.
       if (flags & EW_NOTFOUND) {
-        addfile(&ga, (char *)t, flags | EW_DIR | EW_FILE);
+        addfile(&ga, t, flags | EW_DIR | EW_FILE);
       } else {
-        addfile(&ga, (char *)t, flags);
+        addfile(&ga, t, flags);
       }
 
       if (t != p) {
@@ -1322,9 +1322,9 @@ int gen_expand_wildcards(int num_pat, char **pat, int *num_file, char ***file, i
     }
 
     if (did_expand_in_path && !GA_EMPTY(&ga) && (flags & EW_PATH)) {
-      uniquefy_paths(&ga, (char *)p);
+      uniquefy_paths(&ga, p);
     }
-    if (p != (char_u *)pat[i]) {
+    if (p != pat[i]) {
       xfree(p);
     }
   }
@@ -1916,12 +1916,12 @@ void path_fix_case(char *name)
     // Only accept names that differ in case and are the same byte
     // length. TODO: accept different length name.
     if (STRICMP(tail, entry) == 0 && strlen(tail) == strlen(entry)) {
-      char_u newname[MAXPATHL + 1];
+      char newname[MAXPATHL + 1];
 
       // Verify the inode is equal.
-      STRLCPY(newname, name, MAXPATHL + 1);
-      STRLCPY(newname + (tail - name), entry,
-              MAXPATHL - (tail - name) + 1);
+      xstrlcpy(newname, name, MAXPATHL + 1);
+      xstrlcpy(newname + (tail - name), entry,
+               (size_t)(MAXPATHL - (tail - name) + 1));
       FileInfo file_info_new;
       if (os_fileinfo_link((char *)newname, &file_info_new)
           && os_fileinfo_id_equal(&file_info, &file_info_new)) {
@@ -2049,7 +2049,7 @@ char_u *path_try_shorten_fname(char_u *full_path)
   char_u *dirname = xmalloc(MAXPATHL);
   char_u *p = full_path;
 
-  if (os_dirname(dirname, MAXPATHL) == OK) {
+  if (os_dirname((char *)dirname, MAXPATHL) == OK) {
     p = (char_u *)path_shorten_fname((char *)full_path, (char *)dirname);
     if (p == NULL || *p == NUL) {
       p = full_path;
@@ -2272,13 +2272,13 @@ int path_full_dir_name(char *directory, char *buffer, size_t len)
   int retval = OK;
 
   if (strlen(directory) == 0) {
-    return os_dirname((char_u *)buffer, len);
+    return os_dirname(buffer, len);
   }
 
   char old_dir[MAXPATHL];
 
   // Get current directory name.
-  if (os_dirname((char_u *)old_dir, MAXPATHL) == FAIL) {
+  if (os_dirname(old_dir, MAXPATHL) == FAIL) {
     return FAIL;
   }
 
@@ -2298,7 +2298,7 @@ int path_full_dir_name(char *directory, char *buffer, size_t len)
       xstrlcpy(buffer, old_dir, len);
       append_path(buffer, directory, len);
     }
-  } else if (os_dirname((char_u *)buffer, len) == FAIL) {
+  } else if (os_dirname(buffer, len) == FAIL) {
     // Do not return immediately since we are in the wrong directory.
     retval = FAIL;
   }
@@ -2421,7 +2421,7 @@ void path_guess_exepath(const char *argv0, char *buf, size_t bufsize)
     xstrlcpy(buf, argv0, bufsize);
   } else if (argv0[0] == '.' || strchr(argv0, PATHSEP)) {
     // Relative to CWD.
-    if (os_dirname((char_u *)buf, MAXPATHL) != OK) {
+    if (os_dirname(buf, MAXPATHL) != OK) {
       buf[0] = NUL;
     }
     xstrlcat(buf, PATHSEPSTR, bufsize);
@@ -2439,11 +2439,11 @@ void path_guess_exepath(const char *argv0, char *buf, size_t bufsize)
       if (dir_len + 1 > sizeof(NameBuff)) {
         continue;
       }
-      STRLCPY(NameBuff, dir, dir_len + 1);
+      xstrlcpy(NameBuff, dir, dir_len + 1);
       xstrlcat(NameBuff, PATHSEPSTR, sizeof(NameBuff));
       xstrlcat(NameBuff, argv0, sizeof(NameBuff));
-      if (os_can_exe((char *)NameBuff, NULL, false)) {
-        xstrlcpy(buf, (char *)NameBuff, bufsize);
+      if (os_can_exe(NameBuff, NULL, false)) {
+        xstrlcpy(buf, NameBuff, bufsize);
         return;
       }
     } while (iter != NULL);
