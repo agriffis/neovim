@@ -74,6 +74,7 @@
 ///      - "editor" The global editor grid
 ///      - "win"    Window given by the `win` field, or current window.
 ///      - "cursor" Cursor position in current window.
+///      - "mouse"  Mouse position
 ///   - win: |window-ID| for relative="win".
 ///   - anchor: Decides which corner of the float to place at (row,col):
 ///      - "NW" northwest (default)
@@ -114,8 +115,9 @@
 ///                    float where the text should not be edited. Disables
 ///                    'number', 'relativenumber', 'cursorline', 'cursorcolumn',
 ///                    'foldcolumn', 'spell' and 'list' options. 'signcolumn'
-///                    is changed to `auto` and 'colorcolumn' is cleared. The
-///                    end-of-buffer region is hidden by setting `eob` flag of
+///                    is changed to `auto` and 'colorcolumn' is cleared.
+///                    'statuscolumn' is changed to empty. The end-of-buffer
+///                     region is hidden by setting `eob` flag of
 ///                    'fillchars' to a space char, and clearing the
 ///                    |hl-EndOfBuffer| region in 'winhighlight'.
 ///   - border: Style of (optional) window border. This can either be a string
@@ -348,6 +350,8 @@ static bool parse_float_relative(String relative, FloatRelative *out)
     *out = kFloatRelativeWindow;
   } else if (striequal(str, "cursor")) {
     *out = kFloatRelativeCursor;
+  } else if (striequal(str, "mouse")) {
+    *out = kFloatRelativeMouse;
   } else {
     return false;
   }

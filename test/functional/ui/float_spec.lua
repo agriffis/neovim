@@ -168,6 +168,29 @@ describe('float window', function()
     eq(7, pos[2])
   end)
 
+  it('opened with correct position relative to the mouse', function()
+    meths.input_mouse('left', 'press', '', 0, 10, 10)
+    local pos = exec_lua([[
+      local bufnr = vim.api.nvim_create_buf(false, true)
+
+      local opts = {
+        width = 10,
+        height = 10,
+        col = 1,
+        row = 2,
+        relative = 'mouse',
+        style = 'minimal'
+      }
+
+      local win_id = vim.api.nvim_open_win(bufnr, false, opts)
+
+      return vim.api.nvim_win_get_position(win_id)
+    ]])
+
+    eq(12, pos[1])
+    eq(11, pos[2])
+  end)
+
   it('opened with correct position relative to the cursor', function()
     local pos = exec_lua([[
       local bufnr = vim.api.nvim_create_buf(false, true)
@@ -1326,6 +1349,54 @@ describe('float window', function()
           {0:~         }{15:                    }{0:          }|
                                                   |
         ]])
+      end
+    end)
+
+    it("would not break 'minimal' style with statuscolumn set", function()
+      command('set number')
+      command('set signcolumn=yes')
+      command('set colorcolumn=1')
+      command('set cursorline')
+      command('set foldcolumn=1')
+      command('set statuscolumn=%l%s%C')
+      command('hi NormalFloat guibg=#333333')
+      feed('ix<cr>y<cr><esc>gg')
+      meths.open_win(0, false, {relative='editor', width=20, height=4, row=4, col=10, style='minimal'})
+      if multigrid then
+        screen:expect{grid=[[
+        ## grid 1
+          [2:----------------------------------------]|
+          [2:----------------------------------------]|
+          [2:----------------------------------------]|
+          [2:----------------------------------------]|
+          [2:----------------------------------------]|
+          [2:----------------------------------------]|
+          [3:----------------------------------------]|
+        ## grid 2
+          {20:1}{19:   }{20:   }{22:^x}{21:                                }|
+          {14:2}{19:   }{14:   }{22:y}                                |
+          {14:3}{19:   }{14:   }{22: }                                |
+          {0:~                                       }|
+          {0:~                                       }|
+          {0:~                                       }|
+        ## grid 3
+                                                  |
+        ## grid 4
+          {15:x                   }|
+          {15:y                   }|
+          {15:                    }|
+          {15:                    }|
+        ]], float_pos={[4] = {{id = 1001}, "NW", 1, 4, 10, true}}}
+      else
+        screen:expect{grid=[[
+          {20:1}{19:   }{20:   }{22:^x}{21:                                }|
+          {14:2}{19:   }{14:   }{22:y}                                |
+          {14:3}{19:   }{14:   }{22: }  {15:x                   }          |
+          {0:~         }{15:y                   }{0:          }|
+          {0:~         }{15:                    }{0:          }|
+          {0:~         }{15:                    }{0:          }|
+                                                  |
+        ]]}
       end
     end)
 
