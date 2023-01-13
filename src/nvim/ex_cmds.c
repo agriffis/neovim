@@ -1025,7 +1025,7 @@ void do_bang(int addr_count, exarg_T *eap, bool forceit, bool do_in, bool do_out
     // If % or # appears in the command, it must have been escaped.
     // Reescape them, so that redoing them does not substitute them by the
     // buffername.
-    char *cmd = (char *)vim_strsave_escaped((char_u *)prevcmd, (char_u *)"%#");
+    char *cmd = vim_strsave_escaped(prevcmd, "%#");
 
     AppendToRedobuffLit(cmd, -1);
     xfree(cmd);
@@ -1382,7 +1382,7 @@ char *make_filter_cmd(char *cmd, char *itmp, char *otmp)
                                   : 0;
 
   if (itmp != NULL) {
-    len += is_pwsh  ? strlen(itmp) + sizeof("& { Get-Content " " | & " " }") - 1
+    len += is_pwsh  ? strlen(itmp) + sizeof("& { Get-Content " " | & " " }") - 1 + 6  // +6: #20530
                     : strlen(itmp) + sizeof(" { " " < " " } ") - 1;
   }
   if (otmp != NULL) {

@@ -908,6 +908,13 @@ stack traceback:
       {1:~                        }|
     ]]}
   end)
+
+  it('does not truncate messages', function()
+    command('write Xtest')
+    screen:expect({messages={
+      {content = { { '"Xtest" [New] 0L, 0B written' } }, kind = "" }
+    }})
+  end)
 end)
 
 describe('ui/builtin messages', function()
@@ -1452,7 +1459,6 @@ describe('ui/ext_messages', function()
     feed(":set mouse=a<cr>")
     meths.input_mouse('left', 'press', '', 0, 12, 10)
     poke_eventloop()
-    meths.input_mouse('left', 'drag', '', 0, 12, 10)
     meths.input_mouse('left', 'drag', '', 0, 11, 10)
     feed("<c-l>")
     feed(":set cmdheight<cr>")
