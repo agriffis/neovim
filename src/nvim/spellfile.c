@@ -575,7 +575,7 @@ static inline int spell_check_magic_string(FILE *const fd)
   FUNC_ATTR_NONNULL_ALL FUNC_ATTR_WARN_UNUSED_RESULT FUNC_ATTR_ALWAYS_INLINE
 {
   char buf[VIMSPELLMAGICL];
-  SPELL_READ_BYTES(buf, VIMSPELLMAGICL, fd,; );
+  SPELL_READ_BYTES(buf, VIMSPELLMAGICL, fd,; );  // NOLINT(whitespace/parens)
   if (memcmp(buf, VIMSPELLMAGIC, VIMSPELLMAGICL) != 0) {
     return SP_FORMERROR;
   }
@@ -1054,7 +1054,7 @@ static int read_region_section(FILE *fd, slang_T *lp, int len)
   if (len > MAXREGIONS * 2) {
     return SP_FORMERROR;
   }
-  SPELL_READ_NONNUL_BYTES((char *)lp->sl_regions, (size_t)len, fd,; );
+  SPELL_READ_NONNUL_BYTES((char *)lp->sl_regions, (size_t)len, fd,; );  // NOLINT(whitespace/parens)
   lp->sl_regions[len] = NUL;
   return 0;
 }
@@ -1121,7 +1121,7 @@ static int read_prefcond_section(FILE *fd, slang_T *lp)
     if (n > 0) {
       char buf[MAXWLEN + 1];
       buf[0] = '^';  // always match at one position only
-      SPELL_READ_NONNUL_BYTES(buf + 1, (size_t)n, fd,; );
+      SPELL_READ_NONNUL_BYTES(buf + 1, (size_t)n, fd,; );  // NOLINT(whitespace/parens)
       buf[n + 1] = NUL;
       lp->sl_prefprog[i] = vim_regcomp(buf, RE_MAGIC | RE_STRING);
     }
@@ -1144,7 +1144,7 @@ static int read_rep_section(FILE *fd, garray_T *gap, int16_t *first)
   ga_grow(gap, cnt);
 
   // <rep> : <repfromlen> <repfrom> <reptolen> <repto>
-  for (; gap->ga_len < cnt; ++gap->ga_len) {
+  for (; gap->ga_len < cnt; gap->ga_len++) {
     int c;
     ftp = &((fromto_T *)gap->ga_data)[gap->ga_len];
     ftp->ft_from = (char *)read_cnt_string(fd, 1, &c);
@@ -1275,7 +1275,7 @@ static int read_sal_section(FILE *fd, slang_T *slang)
 
     // convert the multi-byte strings to wide char strings
     smp->sm_lead_w = mb_str2wide(smp->sm_lead);
-    smp->sm_leadlen = mb_charlen(smp->sm_lead);
+    smp->sm_leadlen = mb_charlen((char *)smp->sm_lead);
     if (smp->sm_oneof == NULL) {
       smp->sm_oneof_w = NULL;
     } else {
@@ -1664,7 +1664,7 @@ static int *mb_str2wide(char_u *s)
 {
   int i = 0;
 
-  int *res = xmalloc(((size_t)mb_charlen(s) + 1) * sizeof(int));
+  int *res = xmalloc(((size_t)mb_charlen((char *)s) + 1) * sizeof(int));
   for (char_u *p = s; *p != NUL;) {
     res[i++] = mb_ptr2char_adv((const char_u **)&p);
   }
@@ -2875,7 +2875,7 @@ static unsigned get_affitem(int flagtype, char_u **pp)
 
   if (flagtype == AFT_NUM) {
     if (!ascii_isdigit(**pp)) {
-      ++*pp;            // always advance, avoid getting stuck
+      (*pp)++;            // always advance, avoid getting stuck
       return 0;
     }
     res = getdigits_int((char **)pp, true, 0);
@@ -3493,7 +3493,7 @@ static int store_aff_word(spellinfo_T *spin, char *word, char_u *afflist, afffil
               p = (char_u *)word;
               if (ae->ae_chop != NULL) {
                 // Skip chop string.
-                i = mb_charlen((char_u *)ae->ae_chop);
+                i = mb_charlen(ae->ae_chop);
                 for (; i > 0; i--) {
                   MB_PTR_ADV(p);
                 }
@@ -3505,7 +3505,7 @@ static int store_aff_word(spellinfo_T *spin, char *word, char_u *afflist, afffil
               if (ae->ae_chop != NULL) {
                 // Remove chop string.
                 p = (char_u *)newword + strlen(newword);
-                i = mb_charlen((char_u *)ae->ae_chop);
+                i = mb_charlen(ae->ae_chop);
                 for (; i > 0; i--) {
                   MB_PTR_BACK(newword, p);
                 }
@@ -5641,7 +5641,7 @@ void spell_add_word(char *word, int len, SpellAddType what, int idx, bool undo)
       // file.  We may need to create the "spell" directory first.  We
       // already checked the runtime directory is writable in
       // init_spellfile().
-      if (!dir_of_file_exists((char_u *)fname)
+      if (!dir_of_file_exists(fname)
           && (p = (char_u *)path_tail_with_sep(fname)) != (char_u *)fname) {
         int c = *p;
 
