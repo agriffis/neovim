@@ -85,7 +85,7 @@ if(ENABLE_IWYU)
   string(APPEND iwyu_flags "-Xiwyu;--mapping_file=${PROJECT_SOURCE_DIR}/cmake.config/iwyu/gcc.symbols.imp")
 
   set_target_properties(nvim PROPERTIES C_INCLUDE_WHAT_YOU_USE "${iwyu_flags}")
-  target_compile_definitions(nvim PRIVATE EXITFREE)
+  target_compile_definitions(main_lib INTERFACE EXITFREE)
 endif()
 
 if(MSVC)
@@ -977,7 +977,9 @@ add_glob_target(
   TARGET lintc-clint
   COMMAND ${PROJECT_SOURCE_DIR}/src/clint.py
   FLAGS --output=${LINT_OUTPUT_FORMAT}
-  FILES ${LINT_NVIM_SOURCES})
+  FILES ${LINT_NVIM_SOURCES}
+  EXCLUDE
+    tui/terminfo_defs.h)
 
 add_custom_target(uncrustify-version
   COMMAND ${CMAKE_COMMAND}
