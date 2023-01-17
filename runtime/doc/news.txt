@@ -159,10 +159,16 @@ The following changes to existing APIs or features add new behavior.
   resulting in a nvim binary which only could be run headless or embedded
   in an external process. As of this version, TUI is always available.
 
+• API calls now show more information about where an exception happened.
+
 ==============================================================================
 REMOVED FEATURES                                                 *news-removed*
 
 The following deprecated functions or APIs were removed.
+
+• It is no longer possible to scroll the whole screen when showing messages
+  longer than 'cmdheight'. |msgsep| is now always enabled even if 'display'
+  doesn't contain the "msgsep" flag.
 
 • `filetype.vim` is removed in favor of |lua-filetype|
   (Note that filetype logic and tests still align with Vim, so additions or

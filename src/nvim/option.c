@@ -36,6 +36,7 @@
 #include "nvim/buffer.h"
 #include "nvim/change.h"
 #include "nvim/charset.h"
+#include "nvim/cmdexpand.h"
 #include "nvim/cursor_shape.h"
 #include "nvim/decoration_provider.h"
 #include "nvim/diff.h"
@@ -81,6 +82,7 @@
 #include "nvim/regexp.h"
 #include "nvim/runtime.h"
 #include "nvim/screen.h"
+#include "nvim/search.h"
 #include "nvim/sign_defs.h"
 #include "nvim/spell.h"
 #include "nvim/spellfile.h"
@@ -674,23 +676,25 @@ void set_helplang_default(const char *lang)
     return;
   }
   int idx = findoption("hlg");
-  if (idx >= 0 && !(options[idx].flags & P_WAS_SET)) {
-    if (options[idx].flags & P_ALLOCED) {
-      free_string_option(p_hlg);
-    }
-    p_hlg = xmemdupz(lang, lang_len);
-    // zh_CN becomes "cn", zh_TW becomes "tw".
-    if (STRNICMP(p_hlg, "zh_", 3) == 0 && strlen(p_hlg) >= 5) {
-      p_hlg[0] = (char)TOLOWER_ASC(p_hlg[3]);
-      p_hlg[1] = (char)TOLOWER_ASC(p_hlg[4]);
-    } else if (strlen(p_hlg) >= 1 && *p_hlg == 'C') {
-      // any C like setting, such as C.UTF-8, becomes "en"
-      p_hlg[0] = 'e';
-      p_hlg[1] = 'n';
-    }
-    p_hlg[2] = NUL;
-    options[idx].flags |= P_ALLOCED;
+  if (idx < 0 || (options[idx].flags & P_WAS_SET)) {
+    return;
   }
+
+  if (options[idx].flags & P_ALLOCED) {
+    free_string_option(p_hlg);
+  }
+  p_hlg = xmemdupz(lang, lang_len);
+  // zh_CN becomes "cn", zh_TW becomes "tw".
+  if (STRNICMP(p_hlg, "zh_", 3) == 0 && strlen(p_hlg) >= 5) {
+    p_hlg[0] = (char)TOLOWER_ASC(p_hlg[3]);
+    p_hlg[1] = (char)TOLOWER_ASC(p_hlg[4]);
+  } else if (strlen(p_hlg) >= 1 && *p_hlg == 'C') {
+    // any C like setting, such as C.UTF-8, becomes "en"
+    p_hlg[0] = 'e';
+    p_hlg[1] = 'n';
+  }
+  p_hlg[2] = NUL;
+  options[idx].flags |= P_ALLOCED;
 }
 
 /// 'title' and 'icon' only default to true if they have not been set or reset
@@ -4696,12 +4700,55 @@ void set_context_in_set_cmd(expand_T *xp, char *arg, int opt_flags)
   }
 }
 
-int ExpandSettings(expand_T *xp, regmatch_T *regmatch, int *num_file, char ***file)
+/// Returns true if "str" either matches "regmatch" or fuzzy matches "pat".
+///
+/// If "test_only" is true and "fuzzy" is false and if "str" matches the regular
+/// expression "regmatch", then returns true.  Otherwise returns false.
+///
+/// If "test_only" is false and "fuzzy" is false and if "str" matches the
+/// regular expression "regmatch", then stores the match in matches[idx] and
+/// returns true.
+///
+/// If "test_only" is true and "fuzzy" is true and if "str" fuzzy matches
+/// "fuzzystr", then returns true. Otherwise returns false.
+///
+/// If "test_only" is false and "fuzzy" is true and if "str" fuzzy matches
+/// "fuzzystr", then stores the match details in fuzmatch[idx] and returns true.
+static bool match_str(char *const str, regmatch_T *const regmatch, char **const matches,
+                      const int idx, const bool test_only, const bool fuzzy,
+                      const char *const fuzzystr, fuzmatch_str_T *const fuzmatch)
+{
+  if (!fuzzy) {
+    if (vim_regexec(regmatch, str, (colnr_T)0)) {
+      if (!test_only) {
+        matches[idx] = xstrdup(str);
+      }
+      return true;
+    }
+  } else {
+    const int score = fuzzy_match_str(str, fuzzystr);
+    if (score != 0) {
+      if (!test_only) {
+        fuzmatch[idx].idx = idx;
+        fuzmatch[idx].str = xstrdup(str);
+        fuzmatch[idx].score = score;
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+int ExpandSettings(expand_T *xp, regmatch_T *regmatch, char *fuzzystr, int *numMatches,
+                   char ***matches, const bool can_fuzzy)
 {
   int num_normal = 0;  // Nr of matching non-term-code settings
   int count = 0;
   static char *(names[]) = { "all" };
   int ic = regmatch->rm_ic;  // remember the ignore-case flag
+
+  fuzmatch_str_T *fuzmatch = NULL;
+  const bool fuzzy = can_fuzzy && cmdline_fuzzy_complete(fuzzystr);
 
   // do this loop twice:
   // loop == 0: count the number of matching options
@@ -4712,11 +4759,12 @@ int ExpandSettings(expand_T *xp, regmatch_T *regmatch, int *num_file, char ***fi
     if (xp->xp_context != EXPAND_BOOL_SETTINGS) {
       for (match = 0; match < (int)ARRAY_SIZE(names);
            match++) {
-        if (vim_regexec(regmatch, names[match], (colnr_T)0)) {
+        if (match_str(names[match], regmatch, *matches,
+                      count, (loop == 0), fuzzy, fuzzystr, fuzmatch)) {
           if (loop == 0) {
             num_normal++;
           } else {
-            (*file)[count++] = xstrdup(names[match]);
+            count++;
           }
         }
       }
@@ -4731,33 +4779,45 @@ int ExpandSettings(expand_T *xp, regmatch_T *regmatch, int *num_file, char ***fi
           && !(options[opt_idx].flags & P_BOOL)) {
         continue;
       }
-      match = false;
-      if (vim_regexec(regmatch, str, (colnr_T)0)
-          || (options[opt_idx].shortname != NULL
-              && vim_regexec(regmatch,
-                             options[opt_idx].shortname,
-                             (colnr_T)0))) {
-        match = true;
-      }
 
-      if (match) {
+      if (match_str(str, regmatch, *matches, count, (loop == 0),
+                    fuzzy, fuzzystr, fuzmatch)) {
         if (loop == 0) {
           num_normal++;
         } else {
-          (*file)[count++] = xstrdup(str);
+          count++;
+        }
+      } else if (!fuzzy && options[opt_idx].shortname != NULL
+                 && vim_regexec(regmatch, options[opt_idx].shortname, (colnr_T)0)) {
+        // Compare against the abbreviated option name (for regular
+        // expression match). Fuzzy matching (previous if) already
+        // matches against both the expanded and abbreviated names.
+        if (loop == 0) {
+          num_normal++;
+        } else {
+          (*matches)[count++] = xstrdup(str);
         }
       }
     }
 
     if (loop == 0) {
       if (num_normal > 0) {
-        *num_file = num_normal;
+        *numMatches = num_normal;
       } else {
         return OK;
       }
-      *file = xmalloc((size_t)(*num_file) * sizeof(char *));
+      if (!fuzzy) {
+        *matches = xmalloc((size_t)(*numMatches) * sizeof(char *));
+      } else {
+        fuzmatch = xmalloc((size_t)(*numMatches) * sizeof(fuzmatch_str_T));
+      }
     }
   }
+
+  if (fuzzy) {
+    fuzzymatches_to_strmatches(fuzmatch, matches, count, false);
+  }
+
   return OK;
 }
 
@@ -5035,10 +5095,11 @@ bool option_was_set(const char *name)
 void reset_option_was_set(const char *name)
 {
   const int idx = findoption(name);
-
-  if (idx >= 0) {
-    options[idx].flags &= ~P_WAS_SET;
+  if (idx < 0) {
+    return;
   }
+
+  options[idx].flags &= ~P_WAS_SET;
 }
 
 /// fill_breakat_flags() -- called when 'breakat' changes value.

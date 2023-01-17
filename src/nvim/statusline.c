@@ -733,6 +733,10 @@ void draw_tabline(void)
     return;
   }
 
+  // Clear tab_page_click_defs: Clicking outside of tabs has no effect.
+  assert(tab_page_click_defs_size >= (size_t)Columns);
+  stl_clear_click_defs(tab_page_click_defs, tab_page_click_defs_size);
+
   // Use the 'tabline' option if it's set.
   if (*p_tal != NUL) {
     win_redr_custom(NULL, false, false);
@@ -876,14 +880,13 @@ void draw_tabline(void)
 /// @param hlrec  HL attributes (can be NULL)
 /// @param stcp  Status column attributes (can be NULL)
 /// @return  The width of the built status column string for line "lnum"
-int build_statuscol_str(win_T *wp, bool setnum, bool wrap, linenr_T lnum, long relnum, int maxwidth,
-                        int fillchar, char *buf, stl_hlrec_t **hlrec, statuscol_T *stcp)
+int build_statuscol_str(win_T *wp, linenr_T lnum, long relnum, int maxwidth, int fillchar,
+                        char *buf, stl_hlrec_t **hlrec, statuscol_T *stcp)
 {
-  if (setnum) {
+  if (relnum >= 0) {
     set_vim_var_nr(VV_LNUM, lnum);
     set_vim_var_nr(VV_RELNUM, relnum);
   }
-  set_vim_var_bool(VV_WRAP, wrap);
 
   StlClickRecord *clickrec;
   char *stc = xstrdup(wp->w_p_stc);
@@ -1324,7 +1327,7 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, char *opt_n
       }
       stl_items[curitem].type = ClickFunc;
       stl_items[curitem].start = out_p;
-      stl_items[curitem].cmd = xmemdupz(t, (size_t)(fmt_p - t));
+      stl_items[curitem].cmd = tabtab ? xmemdupz(t, (size_t)(fmt_p - t)) : NULL;
       stl_items[curitem].minwid = minwid;
       fmt_p++;
       curitem++;
@@ -1506,13 +1509,12 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, char *opt_n
     case STL_LINE:
       // Overload %l with v:lnum for 'statuscolumn'
       if (opt_name != NULL && strcmp(opt_name, "statuscolumn") == 0) {
-        if (wp->w_p_nu) {
+        if (wp->w_p_nu && !get_vim_var_nr(VV_VIRTNUM)) {
           num = get_vim_var_nr(VV_LNUM);
         }
       } else {
         num = (wp->w_buffer->b_ml.ml_flags & ML_EMPTY) ? 0L : (long)(wp->w_cursor.lnum);
       }
-
       break;
 
     case STL_NUMLINES:
@@ -1612,7 +1614,7 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, char *opt_n
     case STL_ROFLAG_ALT:
       // Overload %r with v:relnum for 'statuscolumn'
       if (opt_name != NULL && strcmp(opt_name, "statuscolumn") == 0) {
-        if (wp->w_p_rnu) {
+        if (wp->w_p_rnu && !get_vim_var_nr(VV_VIRTNUM)) {
           num = get_vim_var_nr(VV_RELNUM);
         }
       } else {
