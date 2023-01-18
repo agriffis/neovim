@@ -699,23 +699,23 @@ static int utf_safe_read_char_adv(const char_u **s, size_t *n)
 
 // Get character at **pp and advance *pp to the next character.
 // Note: composing characters are skipped!
-int mb_ptr2char_adv(const char_u **const pp)
+int mb_ptr2char_adv(const char **const pp)
 {
   int c;
 
-  c = utf_ptr2char((char *)(*pp));
-  *pp += utfc_ptr2len((char *)(*pp));
+  c = utf_ptr2char(*pp);
+  *pp += utfc_ptr2len(*pp);
   return c;
 }
 
 // Get character at **pp and advance *pp to the next character.
 // Note: composing characters are returned as separate characters.
-int mb_cptr2char_adv(const char_u **pp)
+int mb_cptr2char_adv(const char **pp)
 {
   int c;
 
-  c = utf_ptr2char((char *)(*pp));
-  *pp += utf_ptr2len((char *)(*pp));
+  c = utf_ptr2char(*pp);
+  *pp += utf_ptr2len(*pp);
   return c;
 }
 
@@ -2232,7 +2232,7 @@ char_u *enc_locale(void)
   const char *p = vim_strchr(s, '.');
   if (p != NULL) {
     if (p > s + 2 && !STRNICMP(p + 1, "EUC", 3)
-        && !isalnum((int)p[4]) && p[4] != '-' && p[-3] == '_') {
+        && !isalnum((uint8_t)p[4]) && p[4] != '-' && p[-3] == '_') {
       // Copy "XY.EUC" to "euc-XY" to buf[10].
       memmove(buf, "euc-", 4);
       buf[4] = (char)(ASCII_ISALNUM(p[-2]) ? TOLOWER_ASC(p[-2]) : 0);
@@ -2793,6 +2793,21 @@ void f_setcellwidths(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 
   xfree(cw_table_save);
   redraw_all_later(UPD_NOT_VALID);
+}
+
+/// "getcellwidths()" function
+void f_getcellwidths(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
+{
+  tv_list_alloc_ret(rettv, (ptrdiff_t)cw_table_size);
+
+  for (size_t i = 0; i < cw_table_size; i++) {
+    list_T *entry = tv_list_alloc(3);
+    tv_list_append_number(entry, (varnumber_T)cw_table[i].first);
+    tv_list_append_number(entry, (varnumber_T)cw_table[i].last);
+    tv_list_append_number(entry, (varnumber_T)cw_table[i].width);
+
+    tv_list_append_list(rettv->vval.v_list, entry);
+  }
 }
 
 void f_charclass(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)

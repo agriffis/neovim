@@ -96,6 +96,7 @@ static const char *command_complete[] = {
   [EXPAND_USER] = "user",
   [EXPAND_USER_VARS] = "var",
   [EXPAND_BREAKPOINT] = "breakpoint",
+  [EXPAND_SCRIPTNAMES] = "scriptnames",
 };
 
 /// List of names of address types.  Must be alphabetical for completion.
@@ -1423,7 +1424,7 @@ static size_t uc_check_code(char *code, size_t len, char *buf, ucmd_T *cmd, exar
     ct_NONE,
   } type = ct_NONE;
 
-  if ((vim_strchr("qQfF", *p) != NULL) && p[1] == '-') {
+  if ((vim_strchr("qQfF", (uint8_t)(*p)) != NULL) && p[1] == '-') {
     quote = (*p == 'q' || *p == 'Q') ? 1 : 2;
     p += 2;
     l -= 2;
@@ -1431,7 +1432,7 @@ static size_t uc_check_code(char *code, size_t len, char *buf, ucmd_T *cmd, exar
 
   l++;
   if (l <= 1) {
-    type = ct_NONE;
+    // type = ct_NONE;
   } else if (STRNICMP(p, "args>", l) == 0) {
     type = ct_ARGS;
   } else if (STRNICMP(p, "bang>", l) == 0) {

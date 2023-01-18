@@ -2255,12 +2255,13 @@ int buflist_findpat(const char *pattern, const char *pattern_end, bool unlisted,
 
         regmatch_T regmatch;
         regmatch.regprog = vim_regcomp(p, magic_isset() ? RE_MAGIC : 0);
-        if (regmatch.regprog == NULL) {
-          xfree(pat);
-          return -1;
-        }
 
         FOR_ALL_BUFFERS_BACKWARDS(buf) {
+          if (regmatch.regprog == NULL) {
+            // invalid pattern, possibly after switching engine
+            xfree(pat);
+            return -1;
+          }
           if (buf->b_p_bl == find_listed
               && (!diffmode || diff_mode_buf(buf))
               && buflist_match(&regmatch, buf, false) != NULL) {
@@ -2372,12 +2373,6 @@ int ExpandBufnames(char *pat, int *num_file, char ***file, int options)
         break;            // there was no anchor, no need to try again
       }
       regmatch.regprog = vim_regcomp(patc + attempt * 11, RE_MAGIC);
-      if (regmatch.regprog == NULL) {
-        if (patc != pat) {
-          xfree(patc);
-        }
-        return FAIL;
-      }
     }
 
     int score = 0;
@@ -2398,6 +2393,13 @@ int ExpandBufnames(char *pat, int *num_file, char ***file, int options)
         }
 
         if (!fuzzy) {
+          if (regmatch.regprog == NULL) {
+            // invalid pattern, possibly after recompiling
+            if (patc != pat) {
+              xfree(patc);
+            }
+            return FAIL;
+          }
           p = buflist_match(&regmatch, buf, p_wic);
         } else {
           p = NULL;
@@ -2413,31 +2415,34 @@ int ExpandBufnames(char *pat, int *num_file, char ***file, int options)
           }
         }
 
-        if (p != NULL) {
-          if (round == 1) {
+        if (p == NULL) {
+          continue;
+        }
+
+        if (round == 1) {
+          count++;
+          continue;
+        }
+
+        if (options & WILD_HOME_REPLACE) {
+          p = home_replace_save(buf, p);
+        } else {
+          p = xstrdup(p);
+        }
+
+        if (!fuzzy) {
+          if (matches != NULL) {
+            matches[count].buf = buf;
+            matches[count].match = p;
             count++;
           } else {
-            if (options & WILD_HOME_REPLACE) {
-              p = home_replace_save(buf, p);
-            } else {
-              p = xstrdup(p);
-            }
-
-            if (!fuzzy) {
-              if (matches != NULL) {
-                matches[count].buf = buf;
-                matches[count].match = p;
-                count++;
-              } else {
-                (*file)[count++] = p;
-              }
-            } else {
-              fuzmatch[count].idx = count;
-              fuzmatch[count].str = p;
-              fuzmatch[count].score = score;
-              count++;
-            }
+            (*file)[count++] = p;
           }
+        } else {
+          fuzmatch[count].idx = count;
+          fuzmatch[count].str = p;
+          fuzmatch[count].score = score;
+          count++;
         }
       }
       if (count == 0) {         // no match found, break here
@@ -2495,6 +2500,7 @@ int ExpandBufnames(char *pat, int *num_file, char ***file, int options)
 }
 
 /// Check for a match on the file name for buffer "buf" with regprog "prog".
+/// Note that rmp->regprog may become NULL when switching regexp engine.
 ///
 /// @param ignore_case  When true, ignore case. Use 'fic' otherwise.
 static char *buflist_match(regmatch_T *rmp, buf_T *buf, bool ignore_case)
@@ -2507,7 +2513,8 @@ static char *buflist_match(regmatch_T *rmp, buf_T *buf, bool ignore_case)
   return match;
 }
 
-/// Try matching the regexp in "prog" with file name "name".
+/// Try matching the regexp in "rmp->regprog" with file name "name".
+/// Note that rmp->regprog may become NULL when switching regexp engine.
 ///
 /// @param ignore_case  When true, ignore case. Use 'fileignorecase' otherwise.
 ///
@@ -3822,7 +3829,7 @@ static int chk_modeline(linenr_T lnum, int flags)
             && (s[0] != 'V'
                 || strncmp(skipwhite(e + 1), "set", 3) == 0)
             && (s[3] == ':'
-                || (VIM_VERSION_100 >= vers && isdigit(s[3]))
+                || (VIM_VERSION_100 >= vers && isdigit((uint8_t)s[3]))
                 || (VIM_VERSION_100 < vers && s[3] == '<')
                 || (VIM_VERSION_100 > vers && s[3] == '>')
                 || (VIM_VERSION_100 == vers && s[3] == '='))) {
