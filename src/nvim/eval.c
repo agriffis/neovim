@@ -1485,9 +1485,9 @@ char *get_lval(char *const name, typval_T *const rettv, lval_T *const lp, const 
         tv_clear(&var1);
         break;
         // existing variable, need to check if it can be changed
-      } else if (!(flags & GLV_READ_ONLY) && var_check_ro(lp->ll_di->di_flags,
-                                                          (const char *)name,
-                                                          (size_t)(p - name))) {
+      } else if (!(flags & GLV_READ_ONLY)
+                 && (var_check_ro(lp->ll_di->di_flags, name, (size_t)(p - name))
+                     || var_check_lock(lp->ll_di->di_flags, name, (size_t)(p - name)))) {
         tv_clear(&var1);
         return NULL;
       }
@@ -1618,7 +1618,7 @@ void set_var_lval(lval_T *lp, char *endp, typval_T *rettv, int copy, const bool 
         semsg(_(e_letwrong), op);
         return;
       }
-      if (var_check_lock(lp->ll_blob->bv_lock, lp->ll_name, TV_CSTRING)) {
+      if (value_check_lock(lp->ll_blob->bv_lock, lp->ll_name, TV_CSTRING)) {
         return;
       }
 
@@ -1681,10 +1681,10 @@ void set_var_lval(lval_T *lp, char *endp, typval_T *rettv, int copy, const bool 
       set_var_const(lp->ll_name, lp->ll_name_len, rettv, copy, is_const);
     }
     *endp = (char)cc;
-  } else if (var_check_lock(lp->ll_newkey == NULL
-                            ? lp->ll_tv->v_lock
-                            : lp->ll_tv->vval.v_dict->dv_lock,
-                            lp->ll_name, TV_CSTRING)) {
+  } else if (value_check_lock(lp->ll_newkey == NULL
+                              ? lp->ll_tv->v_lock
+                              : lp->ll_tv->vval.v_dict->dv_lock,
+                              lp->ll_name, TV_CSTRING)) {
     // Skip
   } else if (lp->ll_range) {
     listitem_T *ll_li = lp->ll_li;
@@ -1698,8 +1698,8 @@ void set_var_lval(lval_T *lp, char *endp, typval_T *rettv, int copy, const bool 
     // Check whether any of the list items is locked
     for (ri = tv_list_first(rettv->vval.v_list);
          ri != NULL && ll_li != NULL;) {
-      if (var_check_lock(TV_LIST_ITEM_TV(ll_li)->v_lock, lp->ll_name,
-                         TV_CSTRING)) {
+      if (value_check_lock(TV_LIST_ITEM_TV(ll_li)->v_lock, lp->ll_name,
+                           TV_CSTRING)) {
         return;
       }
       ri = TV_LIST_ITEM_NEXT(rettv->vval.v_list, ri);
@@ -2887,12 +2887,7 @@ static int eval6(char **arg, typval_T *rettv, int evaluate, int want_string)
 /// @return  OK or FAIL.
 static int eval7(char **arg, typval_T *rettv, int evaluate, int want_string)
 {
-  varnumber_T n;
-  int len;
-  char *s;
-  const char *start_leader, *end_leader;
   int ret = OK;
-  char *alias;
   static int recurse = 0;
 
   // Initialise variable so that tv_clear() can't mistake this for a
@@ -2900,11 +2895,11 @@ static int eval7(char **arg, typval_T *rettv, int evaluate, int want_string)
   rettv->v_type = VAR_UNKNOWN;
 
   // Skip '!', '-' and '+' characters.  They are handled later.
-  start_leader = *arg;
+  const char *start_leader = *arg;
   while (**arg == '!' || **arg == '-' || **arg == '+') {
     *arg = skipwhite(*arg + 1);
   }
-  end_leader = *arg;
+  const char *end_leader = *arg;
 
   // Limit recursion to 1000 levels.  At least at 10000 we run out of stack
   // and crash.  With MSVC the stack is smaller.
@@ -2931,88 +2926,9 @@ static int eval7(char **arg, typval_T *rettv, int evaluate, int want_string)
   case '6':
   case '7':
   case '8':
-  case '9': {
-    char *p = skipdigits(*arg + 1);
-    int get_float = false;
-
-    // We accept a float when the format matches
-    // "[0-9]\+\.[0-9]\+\([eE][+-]\?[0-9]\+\)\?".  This is very
-    // strict to avoid backwards compatibility problems.
-    // Don't look for a float after the "." operator, so that
-    // ":let vers = 1.2.3" doesn't fail.
-    if (!want_string && p[0] == '.' && ascii_isdigit(p[1])) {
-      get_float = true;
-      p = skipdigits(p + 2);
-      if (*p == 'e' || *p == 'E') {
-        p++;
-        if (*p == '-' || *p == '+') {
-          p++;
-        }
-        if (!ascii_isdigit(*p)) {
-          get_float = false;
-        } else {
-          p = skipdigits(p + 1);
-        }
-      }
-      if (ASCII_ISALPHA(*p) || *p == '.') {
-        get_float = false;
-      }
-    }
-    if (get_float) {
-      float_T f;
-
-      *arg += string2float(*arg, &f);
-      if (evaluate) {
-        rettv->v_type = VAR_FLOAT;
-        rettv->vval.v_float = f;
-      }
-    } else if (**arg == '0' && ((*arg)[1] == 'z' || (*arg)[1] == 'Z')) {
-      blob_T *blob = NULL;
-      // Blob constant: 0z0123456789abcdef
-      if (evaluate) {
-        blob = tv_blob_alloc();
-      }
-      char *bp;
-      for (bp = *arg + 2; ascii_isxdigit(bp[0]); bp += 2) {
-        if (!ascii_isxdigit(bp[1])) {
-          if (blob != NULL) {
-            emsg(_("E973: Blob literal should have an even number of hex "
-                   "characters"));
-            ga_clear(&blob->bv_ga);
-            XFREE_CLEAR(blob);
-          }
-          ret = FAIL;
-          break;
-        }
-        if (blob != NULL) {
-          ga_append(&blob->bv_ga, (char)((hex2nr(*bp) << 4) + hex2nr(*(bp + 1))));
-        }
-        if (bp[2] == '.' && ascii_isxdigit(bp[3])) {
-          bp++;
-        }
-      }
-      if (blob != NULL) {
-        tv_blob_set_ret(rettv, blob);
-      }
-      *arg = bp;
-    } else {
-      // decimal, hex or octal number
-      vim_str2nr(*arg, NULL, &len, STR2NR_ALL, &n, NULL, 0, true);
-      if (len == 0) {
-        if (evaluate) {
-          semsg(_(e_invexpr2), *arg);
-        }
-        ret = FAIL;
-        break;
-      }
-      *arg += len;
-      if (evaluate) {
-        rettv->v_type = VAR_NUMBER;
-        rettv->vval.v_number = n;
-      }
-    }
+  case '9':
+    ret = get_number_tv(arg, rettv, evaluate, want_string);
     break;
-  }
 
   // String constant: "string".
   case '"':
@@ -3090,8 +3006,9 @@ static int eval7(char **arg, typval_T *rettv, int evaluate, int want_string)
   if (ret == NOTDONE) {
     // Must be a variable or function name.
     // Can also be a curly-braces kind of name: {expr}.
-    s = *arg;
-    len = get_name_len((const char **)arg, &alias, evaluate, true);
+    char *s = *arg;
+    char *alias;
+    int len = get_name_len((const char **)arg, &alias, evaluate, true);
     if (alias != NULL) {
       s = alias;
     }
@@ -3716,6 +3633,91 @@ int get_option_tv(const char **const arg, typval_T *const rettv, const bool eval
   return ret;
 }
 
+/// Allocate a variable for a number constant.  Also deals with "0z" for blob.
+///
+/// @return  OK or FAIL.
+static int get_number_tv(char **arg, typval_T *rettv, bool evaluate, bool want_string)
+{
+  char *p = skipdigits(*arg + 1);
+  bool get_float = false;
+
+  // We accept a float when the format matches
+  // "[0-9]\+\.[0-9]\+\([eE][+-]\?[0-9]\+\)\?".  This is very
+  // strict to avoid backwards compatibility problems.
+  // Don't look for a float after the "." operator, so that
+  // ":let vers = 1.2.3" doesn't fail.
+  if (!want_string && p[0] == '.' && ascii_isdigit(p[1])) {
+    get_float = true;
+    p = skipdigits(p + 2);
+    if (*p == 'e' || *p == 'E') {
+      p++;
+      if (*p == '-' || *p == '+') {
+        p++;
+      }
+      if (!ascii_isdigit(*p)) {
+        get_float = false;
+      } else {
+        p = skipdigits(p + 1);
+      }
+    }
+    if (ASCII_ISALPHA(*p) || *p == '.') {
+      get_float = false;
+    }
+  }
+  if (get_float) {
+    float_T f;
+    *arg += string2float(*arg, &f);
+    if (evaluate) {
+      rettv->v_type = VAR_FLOAT;
+      rettv->vval.v_float = f;
+    }
+  } else if (**arg == '0' && ((*arg)[1] == 'z' || (*arg)[1] == 'Z')) {
+    // Blob constant: 0z0123456789abcdef
+    blob_T *blob = NULL;
+    if (evaluate) {
+      blob = tv_blob_alloc();
+    }
+    char *bp;
+    for (bp = *arg + 2; ascii_isxdigit(bp[0]); bp += 2) {
+      if (!ascii_isxdigit(bp[1])) {
+        if (blob != NULL) {
+          emsg(_("E973: Blob literal should have an even number of hex characters"));
+          ga_clear(&blob->bv_ga);
+          XFREE_CLEAR(blob);
+        }
+        return FAIL;
+      }
+      if (blob != NULL) {
+        ga_append(&blob->bv_ga, (char)((hex2nr(*bp) << 4) + hex2nr(*(bp + 1))));
+      }
+      if (bp[2] == '.' && ascii_isxdigit(bp[3])) {
+        bp++;
+      }
+    }
+    if (blob != NULL) {
+      tv_blob_set_ret(rettv, blob);
+    }
+    *arg = bp;
+  } else {
+    // decimal, hex or octal number
+    int len;
+    varnumber_T n;
+    vim_str2nr(*arg, NULL, &len, STR2NR_ALL, &n, NULL, 0, true);
+    if (len == 0) {
+      if (evaluate) {
+        semsg(_(e_invexpr2), *arg);
+      }
+      return FAIL;
+    }
+    *arg += len;
+    if (evaluate) {
+      rettv->v_type = VAR_NUMBER;
+      rettv->vval.v_number = n;
+    }
+  }
+  return OK;
+}
+
 /// Allocate a variable for a string constant.
 ///
 /// @return  OK or FAIL.
@@ -3828,7 +3830,7 @@ static int get_string_tv(char **arg, typval_T *rettv, int evaluate)
         if (p[1] != '*') {
           flags |= FSK_SIMPLIFY;
         }
-        extra = trans_special((const char **)&p, strlen(p), (char_u *)name, flags, false, NULL);
+        extra = trans_special((const char **)&p, strlen(p), name, flags, false, NULL);
         if (extra != 0) {
           name += extra;
           if (name >= rettv->vval.v_string + len) {
@@ -3924,7 +3926,7 @@ static void partial_free(partial_T *pt)
   xfree(pt->pt_argv);
   tv_dict_unref(pt->pt_dict);
   if (pt->pt_name != NULL) {
-    func_unref((char_u *)pt->pt_name);
+    func_unref(pt->pt_name);
     xfree(pt->pt_name);
   } else {
     func_ptr_unref(pt->pt_func);
@@ -4490,7 +4492,7 @@ bool set_ref_in_item(typval_T *tv, int copyID, ht_stack_T **ht_stack, list_stack
 
     // A partial does not have a copyID, because it cannot contain itself.
     if (pt != NULL) {
-      abort = set_ref_in_func((char_u *)pt->pt_name, pt->pt_func, copyID);
+      abort = set_ref_in_func(pt->pt_name, pt->pt_func, copyID);
       if (pt->pt_dict != NULL) {
         typval_T dtv;
 
@@ -4507,7 +4509,7 @@ bool set_ref_in_item(typval_T *tv, int copyID, ht_stack_T **ht_stack, list_stack
     break;
   }
   case VAR_FUNC:
-    abort = set_ref_in_func((char_u *)tv->vval.v_string, NULL, copyID);
+    abort = set_ref_in_func(tv->vval.v_string, NULL, copyID);
     break;
   case VAR_UNKNOWN:
   case VAR_BOOL:
@@ -4795,12 +4797,12 @@ void filter_map(typval_T *argvars, typval_T *rettv, int map)
   } else if (argvars[0].v_type == VAR_LIST) {
     if ((l = argvars[0].vval.v_list) == NULL
         || (!map
-            && var_check_lock(tv_list_locked(l), arg_errmsg, TV_TRANSLATE))) {
+            && value_check_lock(tv_list_locked(l), arg_errmsg, TV_TRANSLATE))) {
       return;
     }
   } else if (argvars[0].v_type == VAR_DICT) {
     if ((d = argvars[0].vval.v_dict) == NULL
-        || (!map && var_check_lock(d->dv_lock, arg_errmsg, TV_TRANSLATE))) {
+        || (!map && value_check_lock(d->dv_lock, arg_errmsg, TV_TRANSLATE))) {
       return;
     }
   } else {
@@ -4839,7 +4841,7 @@ void filter_map(typval_T *argvars, typval_T *rettv, int map)
 
           dictitem_T *di = TV_DICT_HI2DI(hi);
           if (map
-              && (var_check_lock(di->di_tv.v_lock, arg_errmsg, TV_TRANSLATE)
+              && (value_check_lock(di->di_tv.v_lock, arg_errmsg, TV_TRANSLATE)
                   || var_check_ro(di->di_flags, arg_errmsg, TV_TRANSLATE))) {
             break;
           }
@@ -4899,8 +4901,8 @@ void filter_map(typval_T *argvars, typval_T *rettv, int map)
       }
       for (listitem_T *li = tv_list_first(l); li != NULL;) {
         if (map
-            && var_check_lock(TV_LIST_ITEM_TV(li)->v_lock, arg_errmsg,
-                              TV_TRANSLATE)) {
+            && value_check_lock(TV_LIST_ITEM_TV(li)->v_lock, arg_errmsg,
+                                TV_TRANSLATE)) {
           break;
         }
         vimvars[VV_KEY].vv_nr = idx;
@@ -5104,7 +5106,7 @@ void common_function(typval_T *argvars, typval_T *rettv, bool is_funcref)
         xfree(name);
       } else {
         pt->pt_name = name;
-        func_ref((char_u *)name);
+        func_ref(name);
       }
 
       rettv->v_type = VAR_PARTIAL;
@@ -5113,7 +5115,7 @@ void common_function(typval_T *argvars, typval_T *rettv, bool is_funcref)
       // result is a VAR_FUNC
       rettv->v_type = VAR_FUNC;
       rettv->vval.v_string = name;
-      func_ref((char_u *)name);
+      func_ref(name);
     }
   }
 theend:
@@ -5529,7 +5531,7 @@ bool callback_from_typval(Callback *const callback, const typval_T *const arg)
       if (callback->data.funcref == NULL) {
         callback->data.funcref = xstrdup(name);
       }
-      func_ref((char_u *)callback->data.funcref);
+      func_ref(callback->data.funcref);
       callback->type = kCallbackFuncref;
     }
   } else if (nlua_is_table_from_lua(arg)) {
@@ -7408,7 +7410,7 @@ void ex_echo(exarg_T *eap)
 /// ":echohl {name}".
 void ex_echohl(exarg_T *eap)
 {
-  echo_attr = syn_name2attr((char_u *)eap->arg);
+  echo_attr = syn_name2attr(eap->arg);
 }
 
 /// ":execute expr1 ..." execute the result of an expression.
@@ -8100,7 +8102,7 @@ char *do_string_sub(char *str, char *pat, char *sub, typval_T *expr, const char 
       // - The text up to where the match is.
       // - The substituted text.
       // - The text after the match.
-      sublen = vim_regsub(&regmatch, (char_u *)sub, expr, (char_u *)tail, 0, REGSUB_MAGIC);
+      sublen = vim_regsub(&regmatch, sub, expr, tail, 0, REGSUB_MAGIC);
       ga_grow(&ga, (int)((end - tail) + sublen -
                          (regmatch.endp[0] - regmatch.startp[0])));
 
@@ -8108,8 +8110,8 @@ char *do_string_sub(char *str, char *pat, char *sub, typval_T *expr, const char 
       int i = (int)(regmatch.startp[0] - tail);
       memmove((char_u *)ga.ga_data + ga.ga_len, tail, (size_t)i);
       // add the substituted text
-      (void)vim_regsub(&regmatch, (char_u *)sub, expr,
-                       (char_u *)ga.ga_data + ga.ga_len + i, sublen,
+      (void)vim_regsub(&regmatch, sub, expr,
+                       (char *)ga.ga_data + ga.ga_len + i, sublen,
                        REGSUB_COPY | REGSUB_MAGIC);
       ga.ga_len += i + sublen - 1;
       tail = regmatch.endp[0];

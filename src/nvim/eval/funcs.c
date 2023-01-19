@@ -244,11 +244,11 @@ int call_internal_func(const char *const fname, const int argcount, typval_T *co
 }
 
 /// Invoke a method for base->method().
-int call_internal_method(const char_u *const fname, const int argcount, typval_T *const argvars,
+int call_internal_method(const char *const fname, const int argcount, typval_T *const argvars,
                          typval_T *const rettv, typval_T *const basetv)
   FUNC_ATTR_NONNULL_ALL
 {
-  const EvalFuncDef *const fdef = find_internal_func((const char *)fname);
+  const EvalFuncDef *const fdef = find_internal_func(fname);
   if (fdef == NULL) {
     return FCERR_UNKNOWN;
   } else if (fdef->base_arg == BASE_NONE) {
@@ -362,15 +362,15 @@ static void f_add(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   rettv->vval.v_number = 1;  // Default: failed.
   if (argvars[0].v_type == VAR_LIST) {
     list_T *const l = argvars[0].vval.v_list;
-    if (!var_check_lock(tv_list_locked(l), N_("add() argument"),
-                        TV_TRANSLATE)) {
+    if (!value_check_lock(tv_list_locked(l), N_("add() argument"),
+                          TV_TRANSLATE)) {
       tv_list_append_tv(l, &argvars[1]);
       tv_copy(&argvars[0], rettv);
     }
   } else if (argvars[0].v_type == VAR_BLOB) {
     blob_T *const b = argvars[0].vval.v_blob;
     if (b != NULL
-        && !var_check_lock(b->bv_lock, N_("add() argument"), TV_TRANSLATE)) {
+        && !value_check_lock(b->bv_lock, N_("add() argument"), TV_TRANSLATE)) {
       bool error = false;
       const varnumber_T n = tv_get_number_chk(&argvars[1], &error);
 
@@ -572,16 +572,16 @@ static void f_call(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     if (argvars[2].v_type != VAR_DICT) {
       emsg(_(e_dictreq));
       if (owned) {
-        func_unref((char_u *)func);
+        func_unref(func);
       }
       return;
     }
     selfdict = argvars[2].vval.v_dict;
   }
 
-  func_call((char_u *)func, &argvars[1], partial, selfdict, rettv);
+  func_call(func, &argvars[1], partial, selfdict, rettv);
   if (owned) {
-    func_unref((char_u *)func);
+    func_unref(func);
   }
 }
 
@@ -1896,9 +1896,9 @@ static void f_flatten(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 
   list_T *list = argvars[0].vval.v_list;
   if (list != NULL
-      && !var_check_lock(tv_list_locked(list),
-                         N_("flatten() argument"),
-                         TV_TRANSLATE)
+      && !value_check_lock(tv_list_locked(list),
+                           N_("flatten() argument"),
+                           TV_TRANSLATE)
       && tv_list_flatten(list, maxdepth) == OK) {
     tv_copy(&argvars[0], rettv);
   }
@@ -1915,7 +1915,7 @@ static void f_extend(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 
     list_T *const l1 = argvars[0].vval.v_list;
     list_T *const l2 = argvars[1].vval.v_list;
-    if (!var_check_lock(tv_list_locked(l1), arg_errmsg, TV_TRANSLATE)) {
+    if (!value_check_lock(tv_list_locked(l1), arg_errmsg, TV_TRANSLATE)) {
       listitem_T *item;
       if (argvars[2].v_type != VAR_UNKNOWN) {
         long before = (long)tv_get_number_chk(&argvars[2], &error);
@@ -1944,13 +1944,13 @@ static void f_extend(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     dict_T *const d1 = argvars[0].vval.v_dict;
     dict_T *const d2 = argvars[1].vval.v_dict;
     if (d1 == NULL) {
-      const bool locked = var_check_lock(VAR_FIXED, arg_errmsg, TV_TRANSLATE);
+      const bool locked = value_check_lock(VAR_FIXED, arg_errmsg, TV_TRANSLATE);
       (void)locked;
       assert(locked == true);
     } else if (d2 == NULL) {
       // Do nothing
       tv_copy(&argvars[0], rettv);
-    } else if (!var_check_lock(d1->dv_lock, arg_errmsg, TV_TRANSLATE)) {
+    } else if (!value_check_lock(d1->dv_lock, arg_errmsg, TV_TRANSLATE)) {
       const char *action = "force";
       // Check the third argument.
       if (argvars[2].v_type != VAR_UNKNOWN) {
@@ -2248,7 +2248,7 @@ static void f_get(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
         rettv->v_type = (*what == 'f' ? VAR_FUNC : VAR_STRING);
         assert(name != NULL);
         if (rettv->v_type == VAR_FUNC) {
-          func_ref((char_u *)name);
+          func_ref((char *)name);
         }
         if (*what == 'n' && pt->pt_name == NULL && pt->pt_func != NULL) {
           // use <SNR> instead of the byte code
@@ -2982,7 +2982,7 @@ static void f_globpath(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   const char *const file = tv_get_string_buf_chk(&argvars[1], buf1);
   if (file != NULL && !error) {
     garray_T ga;
-    ga_init(&ga, (int)sizeof(char_u *), 10);
+    ga_init(&ga, (int)sizeof(char *), 10);
     globpath((char *)tv_get_string(&argvars[0]), (char *)file, &ga, flags);
 
     if (rettv->v_type == VAR_STRING) {
@@ -3556,8 +3556,8 @@ static void f_insert(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     blob_T *const b = argvars[0].vval.v_blob;
 
     if (b == NULL
-        || var_check_lock(b->bv_lock, N_("insert() argument"),
-                          TV_TRANSLATE)) {
+        || value_check_lock(b->bv_lock, N_("insert() argument"),
+                            TV_TRANSLATE)) {
       return;
     }
 
@@ -3592,8 +3592,8 @@ static void f_insert(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     tv_copy(&argvars[0], rettv);
   } else if (argvars[0].v_type != VAR_LIST) {
     semsg(_(e_listblobarg), "insert()");
-  } else if (!var_check_lock(tv_list_locked((l = argvars[0].vval.v_list)),
-                             N_("insert() argument"), TV_TRANSLATE)) {
+  } else if (!value_check_lock(tv_list_locked((l = argvars[0].vval.v_list)),
+                               N_("insert() argument"), TV_TRANSLATE)) {
     long before = 0;
     if (argvars[2].v_type != VAR_UNKNOWN) {
       before = tv_get_number_chk(&argvars[2], &error);
@@ -5985,8 +5985,8 @@ static void f_reverse(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     semsg(_(e_listblobarg), "reverse()");
   } else {
     list_T *const l = argvars[0].vval.v_list;
-    if (!var_check_lock(tv_list_locked(l), N_("reverse() argument"),
-                        TV_TRANSLATE)) {
+    if (!value_check_lock(tv_list_locked(l), N_("reverse() argument"),
+                          TV_TRANSLATE)) {
       tv_list_reverse(l);
       tv_list_set_ret(rettv, l);
     }
@@ -6468,7 +6468,7 @@ static void f_rpcstart(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 
   // Allocate extra memory for the argument vector and the NULL pointer
   int argvl = argsl + 2;
-  char **argv = xmalloc(sizeof(char_u *) * (size_t)argvl);
+  char **argv = xmalloc(sizeof(char *) * (size_t)argvl);
 
   // Copy program name
   argv[0] = xstrdup(argvars[0].vval.v_string);
@@ -6644,7 +6644,7 @@ static void f_searchdecl(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     }
   }
   if (!error && name != NULL) {
-    rettv->vval.v_number = find_decl((char_u *)name, strlen(name), locally,
+    rettv->vval.v_number = find_decl((char *)name, strlen(name), locally,
                                      thisblock, SEARCH_KEEP) == FAIL;
   }
 }
@@ -7069,11 +7069,11 @@ static void f_setcharsearch(typval_T *argvars, typval_T *rettv, EvalFuncData fpt
     return;
   }
 
-  char_u *const csearch = (char_u *)tv_dict_get_string(d, "char", false);
+  char *const csearch = tv_dict_get_string(d, "char", false);
   if (csearch != NULL) {
     int pcc[MAX_MCO];
-    const int c = utfc_ptr2char((char *)csearch, pcc);
-    set_last_csearch(c, (char *)csearch, utfc_ptr2len((char *)csearch));
+    const int c = utfc_ptr2char(csearch, pcc);
+    set_last_csearch(c, csearch, utfc_ptr2len(csearch));
   }
 
   dictitem_T *di = tv_dict_find(d, S_LEN("forward"));
@@ -7612,7 +7612,7 @@ static void f_spellsuggest(typval_T *argvars, typval_T *rettv, EvalFuncData fptr
     maxcount = 25;
   }
 
-  spell_suggest_list(&ga, (char_u *)str, maxcount, need_capital, false);
+  spell_suggest_list(&ga, (char *)str, maxcount, need_capital, false);
 
 f_spellsuggest_return:
   tv_list_alloc_ret(rettv, (ptrdiff_t)ga.ga_len);

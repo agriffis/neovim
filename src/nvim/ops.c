@@ -723,7 +723,7 @@ int get_expr_register(void)
 {
   char *new_line;
 
-  new_line = (char *)getcmdline('=', 0L, 0, true);
+  new_line = getcmdline('=', 0L, 0, true);
   if (new_line == NULL) {
     return NUL;
   }
@@ -1131,7 +1131,7 @@ int do_execreg(int regname, int colon, int addcr, int silent)
     retval = put_in_typebuf(p, true, colon, silent);
     xfree(p);
   } else if (regname == '.') {        // use last inserted text
-    p = (char *)get_last_insert_save();
+    p = get_last_insert_save();
     if (p == NULL) {
       emsg(_(e_noinstext));
       return FAIL;
@@ -1193,18 +1193,20 @@ static void put_reedit_in_typebuf(int silent)
 {
   char_u buf[3];
 
-  if (restart_edit != NUL) {
-    if (restart_edit == 'V') {
-      buf[0] = 'g';
-      buf[1] = 'R';
-      buf[2] = NUL;
-    } else {
-      buf[0] = (char_u)(restart_edit == 'I' ? 'i' : restart_edit);
-      buf[1] = NUL;
-    }
-    if (ins_typebuf((char *)buf, REMAP_NONE, 0, true, silent) == OK) {
-      restart_edit = NUL;
-    }
+  if (restart_edit == NUL) {
+    return;
+  }
+
+  if (restart_edit == 'V') {
+    buf[0] = 'g';
+    buf[1] = 'R';
+    buf[2] = NUL;
+  } else {
+    buf[0] = (char_u)(restart_edit == 'I' ? 'i' : restart_edit);
+    buf[1] = NUL;
+  }
+  if (ins_typebuf((char *)buf, REMAP_NONE, 0, true, silent) == OK) {
+    restart_edit = NUL;
   }
 }
 
@@ -1351,7 +1353,7 @@ bool get_spec_reg(int regname, char **argp, bool *allocated, bool errmsg)
     return true;
 
   case '.':                     // last inserted text
-    *argp = (char *)get_last_insert_save();
+    *argp = get_last_insert_save();
     *allocated = true;
     if (*argp == NULL && errmsg) {
       emsg(_(e_noinstext));
@@ -1363,9 +1365,8 @@ bool get_spec_reg(int regname, char **argp, bool *allocated, bool errmsg)
     if (!errmsg) {
       return false;
     }
-    *argp
-      = (char *)file_name_at_cursor(FNAME_MESS | FNAME_HYP | (regname == Ctrl_P ? FNAME_EXP : 0),
-                                    1L, NULL);
+    *argp = file_name_at_cursor(FNAME_MESS | FNAME_HYP | (regname == Ctrl_P ? FNAME_EXP : 0),
+                                1L, NULL);
     *allocated = true;
     return true;
 
@@ -2575,12 +2576,14 @@ void free_register(yankreg_T *reg)
   FUNC_ATTR_NONNULL_ALL
 {
   set_yreg_additional_data(reg, NULL);
-  if (reg->y_array != NULL) {
-    for (size_t i = reg->y_size; i-- > 0;) {  // from y_size - 1 to 0 included
-      xfree(reg->y_array[i]);
-    }
-    XFREE_CLEAR(reg->y_array);
+  if (reg->y_array == NULL) {
+    return;
   }
+
+  for (size_t i = reg->y_size; i-- > 0;) {  // from y_size - 1 to 0 included
+    xfree(reg->y_array[i]);
+  }
+  XFREE_CLEAR(reg->y_array);
 }
 
 /// Yanks the text between "oap->start" and "oap->end" into a yank register.
@@ -3148,7 +3151,7 @@ void do_put(int regname, yankreg_T *reg, int dir, long count, int flags)
 
   if (y_size == 0 || y_array == NULL) {
     semsg(_("E353: Nothing in register %s"),
-          regname == 0 ? (char_u *)"\"" : transchar(regname));
+          regname == 0 ? "\"" : transchar(regname));
     goto end;
   }
 
@@ -5178,7 +5181,7 @@ static void str_to_reg(yankreg_T *y_ptr, MotionType yank_type, const char *str, 
 
   // Count the number of lines within the string
   if (str_list) {
-    for (char_u **ss = (char_u **)str; *ss != NULL; ss++) {
+    for (char **ss = (char **)str; *ss != NULL; ss++) {
       newlines++;
     }
   } else {
