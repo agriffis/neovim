@@ -7,7 +7,6 @@
 local helpers = require('test.functional.helpers')(after_each)
 local thelpers = require('test.functional.terminal.helpers')
 local Screen = require('test.functional.ui.screen')
-local assert_alive = helpers.assert_alive
 local eq = helpers.eq
 local feed_command = helpers.feed_command
 local feed_data = thelpers.feed_data
@@ -77,7 +76,16 @@ describe('TUI', function()
 
   it('rapid resize #7572 #7628', function()
     -- Need buffer rows to provoke the behavior.
-    feed_data(":edit test/functional/fixtures/bigfile.txt:")
+    feed_data(":edit test/functional/fixtures/bigfile.txt\n")
+    screen:expect([[
+      {1:0}000;<control>;Cc;0;BN;;;;;N;NULL;;;;             |
+      0001;<control>;Cc;0;BN;;;;;N;START OF HEADING;;;; |
+      0002;<control>;Cc;0;BN;;;;;N;START OF TEXT;;;;    |
+      0003;<control>;Cc;0;BN;;;;;N;END OF TEXT;;;;      |
+      {5:test/functional/fixtures/bigfile.txt              }|
+      :edit test/functional/fixtures/bigfile.txt        |
+      {3:-- TERMINAL --}                                    |
+    ]])
     command('call jobresize(b:terminal_job_id, 58, 9)')
     command('call jobresize(b:terminal_job_id, 62, 13)')
     command('call jobresize(b:terminal_job_id, 100, 42)')
@@ -94,7 +102,9 @@ describe('TUI', function()
     command('call jobresize(b:terminal_job_id, 1, 4)')
     screen:try_resize(57, 17)
     command('call jobresize(b:terminal_job_id, 57, 17)')
-    assert_alive()
+    retry(nil, nil, function()
+      eq({true, 57}, {child_session:request('nvim_win_get_width', 0)})
+    end)
   end)
 
   it('accepts resize while pager is active', function()
@@ -2400,9 +2410,7 @@ describe("TUI as a client", function()
     clear()
     local screen = thelpers.screen_setup(0,
       string.format([=[["%s", "-u", "NONE", "-i", "NONE", "--server", "127.0.0.1:2436546", "--remote-ui"]]=],
-                    nvim_prog))
-
-    screen:try_resize(60, 7)
+                    nvim_prog), 60)
 
     screen:expect([[
       Remote ui failed to start: {MATCH:.*}|
