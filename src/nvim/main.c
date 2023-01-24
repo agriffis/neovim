@@ -584,6 +584,7 @@ int main(int argc, char **argv)
   if (use_builtin_ui) {
     os_icon_init();
   }
+  os_title_save();
 #endif
 
   // Adjust default register name for "unnamed" in 'clipboard'. Can only be
@@ -775,6 +776,7 @@ void getout(int exitval)
 #ifdef MSWIN
   // Restore Windows console icon before exiting.
   os_icon_set(NULL, NULL);
+  os_title_reset();
 #endif
 
   os_exit(exitval);
@@ -1721,7 +1723,7 @@ static void edit_buffers(mparm_T *parmp, char *cwd)
 
   // When w_arg_idx is -1 remove the window (see create_windows()).
   if (curwin->w_arg_idx == -1) {
-    win_close(curwin, true, false);
+    win_close(curwin, true);
     advance = false;
   }
 
@@ -1733,7 +1735,7 @@ static void edit_buffers(mparm_T *parmp, char *cwd)
     // When w_arg_idx is -1 remove the window (see create_windows()).
     if (curwin->w_arg_idx == -1) {
       arg_idx++;
-      win_close(curwin, true, false);
+      win_close(curwin, true);
       advance = false;
       continue;
     }
@@ -1780,7 +1782,7 @@ static void edit_buffers(mparm_T *parmp, char *cwd)
           did_emsg = false;             // avoid hit-enter prompt
           getout(1);
         }
-        win_close(curwin, true, false);
+        win_close(curwin, true);
         advance = false;
       }
       if (arg_idx == GARGCOUNT - 1) {

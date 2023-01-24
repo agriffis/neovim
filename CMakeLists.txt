@@ -242,6 +242,17 @@ endif()
 
 message(STATUS "Using Lua interpreter: ${LUA_PRG}")
 
+# Some of the code generation still relies on stable table ordering in order to
+# produce reproducible output - specifically the msgpack'ed data in
+# funcs_metadata.generated.h and ui_events_metadata.generated.h. This should
+# ideally be fixed in the generators, but until then as a workaround you may provide
+# a specific lua implementation that provides the needed stability by setting LUA_GEN_PRG:
+if(NOT LUA_GEN_PRG)
+  set(LUA_GEN_PRG "${LUA_PRG}" CACHE FILEPATH "Path to the lua used for code generation.")
+endif()
+
+message(STATUS "Using Lua interpreter for code generation: ${LUA_GEN_PRG}")
+
 option(COMPILE_LUA "Pre-compile Lua sources into bytecode (for sources that are included in the binary)" ON)
 
 if(COMPILE_LUA AND NOT WIN32)
@@ -331,18 +342,12 @@ install_helper(
   FILES ${CMAKE_SOURCE_DIR}/src/man/nvim.1
   DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 
-option(ENABLE_LIBICONV "enable libiconv" ON)
-if(ENABLE_LIBICONV)
-  find_package(Iconv REQUIRED)
-endif()
-
 #
 # Go down the tree.
 #
 
 add_subdirectory(src/nvim)
 get_directory_property(NVIM_VERSION_CFLAGS DIRECTORY src/nvim DEFINITION NVIM_VERSION_CFLAGS)
-add_subdirectory(test/includes)
 add_subdirectory(cmake.config)
 add_subdirectory(test/functional/fixtures)  # compile test programs
 add_subdirectory(runtime)
@@ -365,7 +370,7 @@ endif()
 if(BUSTED_PRG)
   get_target_property(TEST_INCLUDE_DIRS main_lib INTERFACE_INCLUDE_DIRECTORIES)
 
-  set(UNITTEST_PREREQS nvim-test unittest-headers)
+  set(UNITTEST_PREREQS nvim-test)
   set(FUNCTIONALTEST_PREREQS nvim printenv-test printargs-test shell-test pwsh-test streams-test tty-test ${GENERATED_HELP_TAGS})
   set(BENCHMARK_PREREQS nvim tty-test)
 
