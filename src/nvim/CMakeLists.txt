@@ -62,12 +62,6 @@ else()
   target_link_libraries(main_lib INTERFACE ${LUAJIT_LIBRARIES})
 endif()
 
-# Determine platform's threading library. Set CMAKE_THREAD_PREFER_PTHREAD
-# explicitly to indicate a strong preference for pthread.
-set(CMAKE_THREAD_PREFER_PTHREAD ON)
-find_package(Threads REQUIRED)
-target_link_libraries(main_lib INTERFACE ${CMAKE_THREAD_LIBS_INIT})
-
 option(ENABLE_IWYU "Run include-what-you-use with the compiler." OFF)
 if(ENABLE_IWYU)
   find_program(IWYU_PRG NAMES include-what-you-use iwyu)
@@ -689,8 +683,6 @@ foreach(hfile ${NVIM_GENERATED_FOR_HEADERS})
     message(FATAL_ERROR "File included in both NVIM_GENERATED_FOR_HEADERS and NVIM_GENERATED_FOR_SOURCES")
   endif()
 endforeach()
-
-# Our dependencies come first.
 
 if (CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
   target_link_libraries(main_lib INTERFACE pthread c++abi)
