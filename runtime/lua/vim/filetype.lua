@@ -226,6 +226,7 @@ local extension = {
   hook = function(path, bufnr)
     return M.getlines(bufnr, 1) == '[Trigger]' and 'conf'
   end,
+  nmconnection = 'confini',
   mklx = 'context',
   mkiv = 'context',
   mkii = 'context',
@@ -331,6 +332,7 @@ local extension = {
   am = 'elf',
   exs = 'elixir',
   elm = 'elm',
+  lc = 'elsa',
   elv = 'elvish',
   ent = function(path, bufnr)
     return require('vim.filetype.detect').ent(bufnr)
