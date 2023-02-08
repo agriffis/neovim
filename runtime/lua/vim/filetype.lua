@@ -423,6 +423,7 @@ local extension = {
   fsh = 'fsh',
   fsi = 'fsharp',
   fsx = 'fsharp',
+  fc = 'func',
   fusion = 'fusion',
   gdb = 'gdb',
   gdmo = 'gdmo',
@@ -691,6 +692,7 @@ local extension = {
   isc = 'monk',
   moo = 'moo',
   moon = 'moonscript',
+  move = 'move',
   mp = 'mp',
   mpiv = function(path, bufnr)
     return 'mp', function(b)
