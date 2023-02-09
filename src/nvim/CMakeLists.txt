@@ -135,8 +135,7 @@ if(MINGW)
   target_compile_definitions(main_lib INTERFACE __USE_MINGW_ANSI_STDIO)
 endif()
 if(WIN32)
-  # Windows Vista is the minimum supported version
-  target_compile_definitions(main_lib INTERFACE _WIN32_WINNT=0x0600 MSWIN)
+  target_compile_definitions(main_lib INTERFACE _WIN32_WINNT=0x0602 MSWIN)
 endif()
 
 # OpenBSD's GCC (4.2.1) doesn't have -Wvla
@@ -449,12 +448,12 @@ set(gen_cflags ${gen_cflags} -O2)
 set(NVIM_VERSION_GIT_H ${PROJECT_BINARY_DIR}/cmake.config/auto/versiondef_git.h)
 add_custom_target(update_version_stamp
   COMMAND ${CMAKE_COMMAND}
-    -DNVIM_VERSION_MAJOR=${NVIM_VERSION_MAJOR}
-    -DNVIM_VERSION_MINOR=${NVIM_VERSION_MINOR}
-    -DNVIM_VERSION_PATCH=${NVIM_VERSION_PATCH}
-    -DNVIM_VERSION_PRERELEASE=${NVIM_VERSION_PRERELEASE}
-    -DOUTPUT=${NVIM_VERSION_GIT_H}
-    -DNVIM_SOURCE_DIR=${CMAKE_SOURCE_DIR}
+    -D NVIM_VERSION_MAJOR=${NVIM_VERSION_MAJOR}
+    -D NVIM_VERSION_MINOR=${NVIM_VERSION_MINOR}
+    -D NVIM_VERSION_PATCH=${NVIM_VERSION_PATCH}
+    -D NVIM_VERSION_PRERELEASE=${NVIM_VERSION_PRERELEASE}
+    -D OUTPUT=${NVIM_VERSION_GIT_H}
+    -D NVIM_SOURCE_DIR=${CMAKE_SOURCE_DIR}
     -P ${PROJECT_SOURCE_DIR}/cmake/GenerateVersion.cmake
   BYPRODUCTS ${NVIM_VERSION_GIT_H})
 
@@ -665,9 +664,14 @@ else()
   target_compile_definitions(nvim PRIVATE $<$<CONFIG:Debug>:UNIT_TESTING>)
 endif()
 
-target_sources(nvim PRIVATE ${NVIM_GENERATED_FOR_SOURCES} ${NVIM_GENERATED_FOR_HEADERS}
-  ${NVIM_GENERATED_SOURCES} ${NVIM_SOURCES} ${NVIM_HEADERS}
-  ${EXTERNAL_SOURCES} ${EXTERNAL_HEADERS})
+target_sources(main_lib INTERFACE
+  ${NVIM_GENERATED_FOR_SOURCES}
+  ${NVIM_GENERATED_FOR_HEADERS}
+  ${NVIM_GENERATED_SOURCES}
+  ${NVIM_SOURCES}
+  ${NVIM_HEADERS}
+  ${EXTERNAL_SOURCES}
+  ${EXTERNAL_HEADERS})
 
 set_target_properties(nvim
   PROPERTIES
@@ -706,11 +710,64 @@ if(WIN32)
   add_custom_target(nvim_dll_deps DEPENDS nvim
     COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_BINARY_DIR}/windows_runtime_deps
     COMMAND ${CMAKE_COMMAND}
-      "-DCMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}"
-      -DBINARY="${PROJECT_BINARY_DIR}/bin/nvim${CMAKE_EXECUTABLE_SUFFIX}"
-      -DDST=${PROJECT_BINARY_DIR}/windows_runtime_deps
+      -D CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}
+      -D BINARY="${PROJECT_BINARY_DIR}/bin/nvim${CMAKE_EXECUTABLE_SUFFIX}"
+      -D DST=${PROJECT_BINARY_DIR}/windows_runtime_deps
       -P ${PROJECT_SOURCE_DIR}/cmake/WindowsDllCopy.cmake)
   add_dependencies(nvim_runtime_deps nvim_dll_deps)
+
+  if(USE_BUNDLED_NVIMQT)
+    set(NVIMQT_DEPS
+      # Dependencies for neovim-qt
+      bearer/qgenericbearer.dll
+      iconengines/qsvgicon.dll
+      imageformats/qgif.dll
+      imageformats/qicns.dll
+      imageformats/qico.dll
+      imageformats/qjpeg.dll
+      imageformats/qsvg.dll
+      imageformats/qtga.dll
+      imageformats/qtiff.dll
+      imageformats/qwbmp.dll
+      imageformats/qwebp.dll
+      platforms/qwindows.dll
+      styles/qwindowsvistastyle.dll
+      translations/qt_ar.qm
+      translations/qt_bg.qm
+      translations/qt_ca.qm
+      translations/qt_cs.qm
+      translations/qt_da.qm
+      translations/qt_de.qm
+      translations/qt_en.qm
+      translations/qt_es.qm
+      translations/qt_fi.qm
+      translations/qt_fr.qm
+      translations/qt_gd.qm
+      translations/qt_he.qm
+      translations/qt_hu.qm
+      translations/qt_it.qm
+      translations/qt_ja.qm
+      translations/qt_ko.qm
+      translations/qt_lv.qm
+      translations/qt_pl.qm
+      translations/qt_ru.qm
+      translations/qt_sk.qm
+      translations/qt_uk.qm
+      D3Dcompiler_47.dll
+      libEGL.dll
+      libgcc_s_seh-1.dll
+      libGLESv2.dll
+      libstdc++-6.dll
+      libwinpthread-1.dll
+      nvim-qt.exe
+      opengl32sw.dll
+      Qt5Core.dll
+      Qt5Gui.dll
+      Qt5Network.dll
+      Qt5Svg.dll
+      Qt5Widgets.dll
+      )
+  endif()
 
   # A CMake script is used for copying the files to avoid the
   # "command line is too long" error that occurs when Ninja tries running
@@ -719,67 +776,19 @@ if(WIN32)
   set(EXTERNAL_BLOBS_SCRIPT
     "file(MAKE_DIRECTORY \"${PROJECT_BINARY_DIR}/windows_runtime_deps/platforms\")")
   foreach(DEP_FILE IN ITEMS
-                      curl-ca-bundle.crt
-                      curl.exe
-                      diff.exe
-                      tee.exe
-                      win32yank.exe
-                      xxd.exe
+      curl-ca-bundle.crt
+      curl.exe
+      diff.exe
+      tee.exe
+      win32yank.exe
+      xxd.exe
 
-                      # Dependencies for neovim-qt
-                      bearer/qgenericbearer.dll
-                      iconengines/qsvgicon.dll
-                      imageformats/qgif.dll
-                      imageformats/qicns.dll
-                      imageformats/qico.dll
-                      imageformats/qjpeg.dll
-                      imageformats/qsvg.dll
-                      imageformats/qtga.dll
-                      imageformats/qtiff.dll
-                      imageformats/qwbmp.dll
-                      imageformats/qwebp.dll
-                      platforms/qwindows.dll
-                      styles/qwindowsvistastyle.dll
-                      translations/qt_ar.qm
-                      translations/qt_bg.qm
-                      translations/qt_ca.qm
-                      translations/qt_cs.qm
-                      translations/qt_da.qm
-                      translations/qt_de.qm
-                      translations/qt_en.qm
-                      translations/qt_es.qm
-                      translations/qt_fi.qm
-                      translations/qt_fr.qm
-                      translations/qt_gd.qm
-                      translations/qt_he.qm
-                      translations/qt_hu.qm
-                      translations/qt_it.qm
-                      translations/qt_ja.qm
-                      translations/qt_ko.qm
-                      translations/qt_lv.qm
-                      translations/qt_pl.qm
-                      translations/qt_ru.qm
-                      translations/qt_sk.qm
-                      translations/qt_uk.qm
-                      D3Dcompiler_47.dll
-                      libEGL.dll
-                      libgcc_s_seh-1.dll
-                      libGLESv2.dll
-                      libstdc++-6.dll
-                      libwinpthread-1.dll
-                      nvim-qt.exe
-                      opengl32sw.dll
-                      Qt5Core.dll
-                      Qt5Gui.dll
-                      Qt5Network.dll
-                      Qt5Svg.dll
-                      Qt5Widgets.dll
-
-                      )
-    get_filename_component(DEP_FILE_DIR ${DEP_FILE} DIRECTORY)
-    set(EXTERNAL_BLOBS_SCRIPT "${EXTERNAL_BLOBS_SCRIPT}\n"
-      "file(COPY \"${DEPS_PREFIX}/bin/${DEP_FILE}\"
-         DESTINATION \"${PROJECT_BINARY_DIR}/windows_runtime_deps/${DEP_FILE_DIR}\")")
+      ${NVIMQT_DEPS}
+      )
+  get_filename_component(DEP_FILE_DIR ${DEP_FILE} DIRECTORY)
+  set(EXTERNAL_BLOBS_SCRIPT "${EXTERNAL_BLOBS_SCRIPT}\n"
+    "file(COPY \"${DEPS_PREFIX}/bin/${DEP_FILE}\"
+    DESTINATION \"${PROJECT_BINARY_DIR}/windows_runtime_deps/${DEP_FILE_DIR}\")")
   endforeach()
   file(WRITE ${PROJECT_BINARY_DIR}/external_blobs.cmake ${EXTERNAL_BLOBS_SCRIPT})
   add_custom_target(external_blobs
@@ -805,14 +814,7 @@ install(DIRECTORY ${BINARY_LIB_DIR}
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/nvim/
   USE_SOURCE_PERMISSIONS)
 
-add_library(
-  libnvim
-  STATIC
-  EXCLUDE_FROM_ALL
-  ${NVIM_SOURCES} ${NVIM_GENERATED_SOURCES}
-  ${NVIM_HEADERS} ${NVIM_GENERATED_FOR_SOURCES} ${NVIM_GENERATED_FOR_HEADERS}
-  ${EXTERNAL_SOURCES} ${EXTERNAL_HEADERS}
-)
+add_library(libnvim STATIC EXCLUDE_FROM_ALL)
 if(MSVC)
   set(LIBNVIM_NAME libnvim)
 else()
@@ -855,63 +857,35 @@ elseif(CLANG_TSAN)
   target_link_libraries(nvim PRIVATE -fsanitize=thread)
 endif()
 
-function(get_test_target prefix sfile relative_path_var target_var)
-  get_filename_component(full_d "${sfile}" DIRECTORY)
-  file(RELATIVE_PATH d "${PROJECT_SOURCE_DIR}/src/nvim" "${full_d}")
-  if(d MATCHES "^[.][.]")
-    file(RELATIVE_PATH d "${GENERATED_DIR}" "${full_d}")
-  endif()
-  get_filename_component(r "${sfile}" NAME)
-  if(NOT d MATCHES "^[.]?$")
-    set(r "${d}/${r}")
-  endif()
-  string(REGEX REPLACE "[/.]" "-" suffix "${r}")
-  set(${relative_path_var} ${r} PARENT_SCOPE)
-  if(prefix STREQUAL "")
-    set(${target_var} "${suffix}" PARENT_SCOPE)
-  else()
-    set(${target_var} "${prefix}-${suffix}" PARENT_SCOPE)
-  endif()
-endfunction()
-
+find_program(CLANG_TIDY_PRG clang-tidy)
+set(EXCLUDE_CLANG_TIDY typval_encode.c.h ui_events.in.h)
 if(WIN32)
-  set(NO_SINGLE_CHECK_HEADERS
+  list(APPEND EXCLUDE_CLANG_TIDY
     os/pty_process_unix.h
     os/unix_defs.h)
 else()
-  set(NO_SINGLE_CHECK_HEADERS
+  list(APPEND EXCLUDE_CLANG_TIDY
     os/win_defs.h
     os/pty_process_win.h
     os/pty_conpty_win.h
     os/os_win_console.h)
 endif()
-foreach(hfile ${NVIM_HEADERS})
-  get_test_target(test-includes "${hfile}" relative_path texe)
-
-  if(NOT ${hfile} MATCHES "[.](c|in)[.]h$")
-    set(tsource "${GENERATED_DIR}/${relative_path}.test-include.c")
-    write_file("${tsource}" "#include \"${hfile}\"\nint main(int argc, char **argv) { return 0; }")
-    add_executable(
-      ${texe}
-      EXCLUDE_FROM_ALL
-      ${tsource} ${NVIM_HEADERS} ${NVIM_GENERATED_FOR_HEADERS})
-    target_link_libraries(${texe} PRIVATE main_lib)
-    set_target_properties(${texe} PROPERTIES FOLDER test)
-
-    list(FIND NO_SINGLE_CHECK_HEADERS "${relative_path}" hfile_exclude_idx)
-    if(${hfile_exclude_idx} EQUAL -1)
-      list(APPEND HEADER_CHECK_TARGETS ${texe})
-    endif()
-  endif()
-endforeach()
-add_custom_target(check-single-includes DEPENDS ${HEADER_CHECK_TARGETS})
+add_glob_target(
+  TARGET clang-tidy
+  COMMAND ${CLANG_TIDY_PRG}
+  FILES ${NVIM_SOURCES} ${NVIM_HEADERS}
+  FLAGS --quiet
+  EXCLUDE ${EXCLUDE_CLANG_TIDY})
+add_custom_target(copy_compile_commands
+  COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/compile_commands.json ${PROJECT_SOURCE_DIR}/compile_commands.json)
+add_dependencies(copy_compile_commands nvim)
+add_dependencies(clang-tidy copy_compile_commands)
 
 if(CI_BUILD)
   set(LINT_OUTPUT_FORMAT gh_action)
 else()
   set(LINT_OUTPUT_FORMAT vs7)
 endif()
-
 add_glob_target(
   TARGET lintc-clint
   COMMAND ${PROJECT_SOURCE_DIR}/src/clint.py
