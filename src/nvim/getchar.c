@@ -155,7 +155,6 @@ static char *get_buffcont(buffheader_T *buffer, int dozero)
 {
   size_t count = 0;
   char *p = NULL;
-  char *p2;
 
   // compute the total length of the string
   for (const buffblock_T *bp = buffer->bh_first.b_next;
@@ -165,7 +164,7 @@ static char *get_buffcont(buffheader_T *buffer, int dozero)
 
   if (count || dozero) {
     p = xmalloc(count + 1);
-    p2 = p;
+    char *p2 = p;
     for (const buffblock_T *bp = buffer->bh_first.b_next;
          bp != NULL; bp = bp->b_next) {
       for (const char *str = bp->b_str; *str;) {
@@ -180,7 +179,7 @@ static char *get_buffcont(buffheader_T *buffer, int dozero)
 /// Return the contents of the record buffer as a single string
 /// and clear the record buffer.
 /// K_SPECIAL in the returned string is escaped.
-char_u *get_recorded(void)
+char *get_recorded(void)
 {
   char *p;
   size_t len;
@@ -202,7 +201,7 @@ char_u *get_recorded(void)
     p[len - 1] = NUL;
   }
 
-  return (char_u *)p;
+  return p;
 }
 
 /// Return the contents of the redo buffer as a single string.
@@ -583,7 +582,7 @@ void stuffRedoReadbuff(const char *s)
   add_buff(&readbuf2, s, -1L);
 }
 
-void stuffReadbuffLen(const char *s, long len)
+void stuffReadbuffLen(const char *s, ptrdiff_t len)
 {
   add_buff(&readbuf1, s, len);
 }
@@ -635,7 +634,7 @@ void stuffescaped(const char *arg, bool literally)
       arg++;
     }
     if (arg > start) {
-      stuffReadbuffLen(start, (arg - start));
+      stuffReadbuffLen(start, arg - start);
     }
 
     // stuff a single special character
@@ -979,7 +978,7 @@ int ins_typebuf(char *str, int noremap, int offset, bool nottyped, bool silent)
 int ins_char_typebuf(int c, int modifiers)
 {
   char_u buf[MB_MAXBYTES * 3 + 4];
-  unsigned int len = special_to_buf(c, modifiers, true, buf);
+  unsigned int len = special_to_buf(c, modifiers, true, (char *)buf);
   assert(len < sizeof(buf));
   buf[len] = NUL;
   (void)ins_typebuf((char *)buf, KeyNoremap, 0, !KeyTyped, cmd_silent);
@@ -1020,8 +1019,6 @@ int typebuf_maplen(void)
 // remove "len" characters from typebuf.tb_buf[typebuf.tb_off + offset]
 void del_typebuf(int len, int offset)
 {
-  int i;
-
   if (len == 0) {
     return;             // nothing to do
   }
@@ -1034,7 +1031,7 @@ void del_typebuf(int len, int offset)
     typebuf.tb_off += len;
   } else {
     // Have to move the characters in typebuf.tb_buf[] and typebuf.tb_noremap[]
-    i = typebuf.tb_off + offset;
+    int i = typebuf.tb_off + offset;
     // Leave some extra room at the end to avoid reallocation.
     if (typebuf.tb_off > MAXMAPLEN) {
       memmove(typebuf.tb_buf + MAXMAPLEN,
@@ -1408,10 +1405,8 @@ int merge_modifiers(int c_arg, int *modifiers)
 /// Returns the modifiers in the global "mod_mask".
 int vgetc(void)
 {
-  int c, c2;
-  int n;
+  int c;
   char_u buf[MB_MAXBYTES + 1];
-  int i;
 
   // Do garbage collection when garbagecollect() was called previously and
   // we are now at the toplevel.
@@ -1429,6 +1424,9 @@ int vgetc(void)
     mouse_row = old_mouse_row;
     mouse_col = old_mouse_col;
   } else {
+    int c2;
+    int n;
+    int i;
     // number of characters recorded from the last vgetc() call
     static size_t last_vgetc_recorded_len = 0;
 
@@ -1754,9 +1752,9 @@ static void getchar_common(typval_T *argvars, typval_T *rettv)
       int grid = mouse_grid;
       linenr_T lnum;
       win_T *wp;
-      int winnr = 1;
 
       if (row >= 0 && col >= 0) {
+        int winnr = 1;
         // Find the window at the mouse coordinates and compute the
         // text position.
         win_T *const win = mouse_find_win(&grid, &row, &col);
@@ -1921,9 +1919,7 @@ static int handle_mapping(int *keylenp, const bool *timedout, int *mapdepth)
   int max_mlen = 0;
   int tb_c1;
   int mlen;
-  int nolmaplen;
   int keylen = *keylenp;
-  int i;
   int local_State = get_real_state();
   bool is_plug_map = false;
 
@@ -1956,6 +1952,7 @@ static int handle_mapping(int *keylenp, const bool *timedout, int *mapdepth)
       && State != MODE_ASKMORE
       && State != MODE_CONFIRM
       && !at_ins_compl_key()) {
+    int nolmaplen;
     if (tb_c1 == K_SPECIAL) {
       nolmaplen = 2;
     } else {
@@ -2168,6 +2165,7 @@ static int handle_mapping(int *keylenp, const bool *timedout, int *mapdepth)
 
   // complete match
   if (keylen >= 0 && keylen <= typebuf.tb_len) {
+    int i;
     char *map_str = NULL;
 
     // Write chars to script file(s).
@@ -2199,7 +2197,7 @@ static int handle_mapping(int *keylenp, const bool *timedout, int *mapdepth)
     // mode temporarily.  Append K_SELECT to switch back to Select mode.
     if (VIsual_active && VIsual_select && (mp->m_mode & MODE_VISUAL)) {
       VIsual_select = false;
-      (void)ins_typebuf((char *)K_SELECT_STRING, REMAP_NONE, 0, true, false);
+      (void)ins_typebuf(K_SELECT_STRING, REMAP_NONE, 0, true, false);
     }
 
     // Copy the values from *mp that are used, because evaluating the
@@ -2509,9 +2507,6 @@ static int vgetorpeek(bool advance)
             && (State & MODE_INSERT)
             && (p_timeout || (keylen == KEYLEN_PART_KEY && p_ttimeout))
             && (c = inchar(typebuf.tb_buf + typebuf.tb_off + typebuf.tb_len, 3, 25L)) == 0) {
-          colnr_T col = 0;
-          char_u *ptr;
-
           if (mode_displayed) {
             unshowmode(true);
             mode_deleted = true;
@@ -2522,6 +2517,8 @@ static int vgetorpeek(bool advance)
 
           // move cursor left, if possible
           if (curwin->w_cursor.col != 0) {
+            colnr_T col = 0;
+            char_u *ptr;
             if (curwin->w_wcol > 0) {
               // After auto-indenting and no text is following,
               // we are expecting to truncate the trailing
@@ -2890,13 +2887,13 @@ int inchar(char_u *buf, int maxlen, long wait_time)
     typebuf.tb_change_cnt = 1;
   }
 
-  return fix_input_buffer(buf, len);
+  return fix_input_buffer((char *)buf, len);
 }
 
 // Fix typed characters for use by vgetc() and check_termcode().
 // "buf[]" must have room to triple the number of bytes!
 // Returns the new length.
-int fix_input_buffer(char_u *buf, int len)
+int fix_input_buffer(char *buf, int len)
   FUNC_ATTR_NONNULL_ALL
 {
   if (!using_script()) {
@@ -2908,7 +2905,7 @@ int fix_input_buffer(char_u *buf, int len)
 
   // Reading from script, need to process special bytes
   int i;
-  char_u *p = buf;
+  char_u *p = (char_u *)buf;
 
   // Two characters are special: NUL and K_SPECIAL.
   // Replace       NUL by K_SPECIAL KS_ZERO    KE_FILLER

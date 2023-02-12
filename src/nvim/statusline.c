@@ -1,6 +1,5 @@
 // This is an open source non-commercial project. Dear PVS-Studio, please check
 // it. PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-//
 
 #include <assert.h>
 #include <inttypes.h>
@@ -583,7 +582,7 @@ void win_redr_ruler(win_T *wp, bool always)
       MAXSIZE_TEMP_ARRAY(content, 1);
       MAXSIZE_TEMP_ARRAY(chunk, 2);
       ADD_C(chunk, INTEGER_OBJ(attr));
-      ADD_C(chunk, STRING_OBJ(cstr_as_string((char *)buffer)));
+      ADD_C(chunk, STRING_OBJ(cstr_as_string(buffer)));
       ADD_C(content, ARRAY_OBJ(chunk));
       ui_call_msg_ruler(content);
       did_show_ext_ruler = true;
@@ -1095,7 +1094,7 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, char *opt_n
       continue;
     }
 
-    // STL_SEPARATE: Separation place between left and right aligned items.
+    // STL_SEPARATE: Separation between items, filled with white space.
     if (*fmt_p == STL_SEPARATE) {
       fmt_p++;
       // Ignored when we are inside of a grouping
@@ -1390,7 +1389,7 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, char *opt_n
     NumberBase base = kNumBaseDecimal;
     bool itemisflag = false;
     bool fillable = true;
-    long num = -1;
+    int num = -1;
     char *str = NULL;
     switch (opt) {
     case STL_FILEPATH:
@@ -1520,10 +1519,10 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, char *opt_n
       // Overload %l with v:lnum for 'statuscolumn'
       if (opt_name != NULL && strcmp(opt_name, "statuscolumn") == 0) {
         if (wp->w_p_nu && !get_vim_var_nr(VV_VIRTNUM)) {
-          num = get_vim_var_nr(VV_LNUM);
+          num = (int)get_vim_var_nr(VV_LNUM);
         }
       } else {
-        num = (wp->w_buffer->b_ml.ml_flags & ML_EMPTY) ? 0L : (long)(wp->w_cursor.lnum);
+        num = (wp->w_buffer->b_ml.ml_flags & ML_EMPTY) ? 0L : wp->w_cursor.lnum;
       }
       break;
 
@@ -1544,7 +1543,7 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, char *opt_n
                                    ? 0 : (int)wp->w_cursor.col + 1))) {
         break;
       }
-      num = (long)virtcol;
+      num = virtcol;
       break;
     }
 
@@ -1604,8 +1603,8 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, char *opt_n
       long l = ml_find_line_or_offset(wp->w_buffer, wp->w_cursor.lnum, NULL,
                                       false);
       num = (wp->w_buffer->b_ml.ml_flags & ML_EMPTY) || l < 0 ?
-            0L : l + 1 + ((State & MODE_INSERT) == 0 && empty_line ?
-                          0 : (int)wp->w_cursor.col);
+            0L : (int)l + 1 + ((State & MODE_INSERT) == 0 && empty_line ?
+                               0 : (int)wp->w_cursor.col);
       break;
     }
     case STL_BYTEVAL_X:
@@ -1625,7 +1624,7 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, char *opt_n
       // Overload %r with v:relnum for 'statuscolumn'
       if (opt_name != NULL && strcmp(opt_name, "statuscolumn") == 0) {
         if (wp->w_p_rnu && !get_vim_var_nr(VV_VIRTNUM)) {
-          num = get_vim_var_nr(VV_RELNUM);
+          num = (int)get_vim_var_nr(VV_RELNUM);
         }
       } else {
         itemisflag = true;
@@ -1889,7 +1888,7 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, char *opt_n
 
         // { Reduce the number by base^n
         while (num_chars-- > maxwid) {
-          num /= (long)base;
+          num /= (int)base;
         }
         // }
 
@@ -2067,8 +2066,7 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, char *opt_n
     int num_separators = 0;
     for (int i = 0; i < itemcnt; i++) {
       if (stl_items[i].type == Separate) {
-        // Create an array of the start location for each
-        // separator mark.
+        // Create an array of the start location for each separator mark.
         stl_separator_locations[num_separators] = i;
         num_separators++;
       }
@@ -2080,17 +2078,17 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, char *opt_n
       int final_spaces = (maxwidth - width) -
                          standard_spaces * (num_separators - 1);
 
-      for (int i = 0; i < num_separators; i++) {
-        int dislocation = (i == (num_separators - 1)) ? final_spaces : standard_spaces;
+      for (int l = 0; l < num_separators; l++) {
+        int dislocation = (l == (num_separators - 1)) ? final_spaces : standard_spaces;
         dislocation *= utf_char2len(fillchar);
-        char *start = stl_items[stl_separator_locations[i]].start;
+        char *start = stl_items[stl_separator_locations[l]].start;
         char *seploc = start + dislocation;
         STRMOVE(seploc, start);
         for (char *s = start; s < seploc;) {
           MB_CHAR2BYTES(fillchar, s);
         }
 
-        for (int item_idx = stl_separator_locations[i] + 1;
+        for (int item_idx = stl_separator_locations[l] + 1;
              item_idx < itemcnt;
              item_idx++) {
           stl_items[item_idx].start += dislocation;
