@@ -16,7 +16,16 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  UNCRUSTIFY_VERSION: uncrustify-0.75.0
+  ASAN_OPTIONS: detect_leaks=1:check_initialization_order=1:handle_abort=1:handle_sigill=1:log_path=${{ github.workspace }}/build/log/asan:intercept_tls_get_addr=0
+  BIN_DIR: ${{ github.workspace }}/bin
+  BUILD_DIR: ${{ github.workspace }}/build
+  DEPS_BUILD_DIR: ${{ github.workspace }}/nvim-deps
+  INSTALL_PREFIX: ${{ github.workspace }}/nvim-install
+  LOG_DIR: ${{ github.workspace }}/build/log
+  NVIM_LOG_FILE: ${{ github.workspace }}/build/.nvimlog
+  TSAN_OPTIONS: log_path=${{ github.workspace }}/build/log/tsan
+  UBSAN_OPTIONS: "print_stacktrace=1 log_path=${{ github.workspace }}/build/log/ubsan"
+  VALGRIND_LOG: ${{ github.workspace }}/build/log/valgrind-%p.log
   # TEST_FILE: test/functional/core/startup_spec.lua
   # TEST_FILTER: foo
 
@@ -25,15 +34,15 @@ jobs:
     if: (github.event_name == 'pull_request' && github.base_ref == 'master') || (github.event_name == 'push' && github.ref == 'refs/heads/master')
     runs-on: ubuntu-22.04
     timeout-minutes: 10
+    env:
+      CACHE_UNCRUSTIFY: ${{ github.workspace }}/.cache/uncrustify
+      UNCRUSTIFY_VERSION: uncrustify-0.75.0
     steps:
       - uses: actions/checkout@v3
 
-      - name: Setup common environment variables
-        run: ./.github/workflows/env.sh lint
-
-      - name: Install apt packages
+      - name: Install dependencies
         run: |
-          ./.github/scripts/install_deps_ubuntu.sh
+          cmake -P ./.github/scripts/install_dependencies.cmake
           sudo apt-get install -y lua-check
 
       - name: Cache uncrustify
@@ -58,15 +67,15 @@ jobs:
           build_dir=uncrustify/build
           cmake -S $source_dir -B $build_dir -G Ninja -D CMAKE_BUILD_TYPE=Release
           cmake --build $build_dir
-          mkdir -p $CACHE_DIR
+          mkdir -p .cache
           cp $build_dir/uncrustify ${{ env.CACHE_UNCRUSTIFY }}
 
       - uses: ./.github/actions/cache
 
       - name: Build third-party deps
         run: |
-          cmake -S cmake.deps -B "${DEPS_BUILD_DIR}" -G Ninja ${DEPS_CMAKE_FLAGS}
-          cmake --build "${DEPS_BUILD_DIR}"
+          cmake -S cmake.deps -B $DEPS_BUILD_DIR -G Ninja
+          cmake --build $DEPS_BUILD_DIR
 
       - if: "!cancelled()"
         name: Determine if run should be aborted
@@ -106,8 +115,7 @@ jobs:
 
       - if: success() || failure() && steps.abort_job.outputs.status == 'success'
         name: check uncrustify
-        run: |
-          git diff --color --exit-code
+        run: git diff --color --exit-code
 
   lintc:
     # This job tests two things: it lints the code but also builds neovim using
@@ -121,13 +129,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Setup common environment variables
-        run: ./.github/workflows/env.sh lintc
-
-      - name: Install apt packages
+      - name: Install dependencies
         run: |
           sudo add-apt-repository ppa:neovim-ppa/stable
-          ./.github/scripts/install_deps_ubuntu.sh
+          cmake -P ./.github/scripts/install_dependencies.cmake
           sudo apt-get install -y \
             libluajit-5.1-dev \
             libmsgpack-dev \
@@ -145,14 +150,18 @@ jobs:
             # lua-luv-dev
 
             # Remove comments from packages once we start using these external
-            # dependencies. See env.sh for more context.
+            # dependencies.
 
       - uses: ./.github/actions/cache
 
       - name: Build third-party deps
         run: |
-          cmake -S cmake.deps -B "${DEPS_BUILD_DIR}" -G Ninja ${DEPS_CMAKE_FLAGS}
-          cmake --build "${DEPS_BUILD_DIR}"
+          # Ideally all dependencies should external for this job, but some
+          # dependencies don't have the required version available. We use the
+          # bundled versions for these with the hopes of being able to remove them
+          # later on.
+          cmake -S cmake.deps -B $DEPS_BUILD_DIR -G Ninja -D USE_BUNDLED=OFF -D USE_BUNDLED_LUV=ON -D USE_BUNDLED_LIBVTERM=ON
+          cmake --build $DEPS_BUILD_DIR
 
       - name: Build
         run: |
@@ -180,18 +189,17 @@ jobs:
           - flavor: asan
             cc: clang
             runner: ubuntu-22.04
-            os: linux
+            flags: -D CLANG_ASAN_UBSAN=ON
           - flavor: tsan
             cc: clang
             runner: ubuntu-22.04
-            os: linux
+            flags: -D CLANG_TSAN=ON
           - flavor: uchar
             cc: gcc
             runner: ubuntu-22.04
-            os: linux
+            flags: -D UNSIGNED_CHAR=ON
           - cc: clang
             runner: macos-12
-            os: osx
 
             # functionaltest-lua is our dumping ground for non-mainline configurations.
             # 1. Check that the tests pass with PUC Lua instead of LuaJIT.
@@ -199,50 +207,56 @@ jobs:
           - flavor: functionaltest-lua
             cc: gcc
             runner: ubuntu-22.04
-            os: linux
+            deps_flags: -D USE_BUNDLED_LUAJIT=OFF -D USE_BUNDLED_LUA=ON
+            flags: -D PREFER_LUA=ON
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     env:
       CC: ${{ matrix.cc }}
-      CI_OS_NAME: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
 
-      - name: Setup common environment variables
-        run: ./.github/workflows/env.sh ${{ matrix.flavor }}
+      - name: Set up environment
+        run: |
+          ulimit -c unlimited
+          echo "$BIN_DIR" >> $GITHUB_PATH
 
       - name: Create log dir
-        run: mkdir -p "${LOG_DIR}"
+        run: mkdir -p "$LOG_DIR"
 
-      - name: Install apt packages
-        if: matrix.os == 'linux'
-        run: ./.github/scripts/install_deps_ubuntu.sh
-
-      - name: Install brew packages
-        if: matrix.os == 'osx'
-        run: |
-          brew update --quiet
-          brew install automake cpanminus ninja
+      - name: Install dependencies
+        run: cmake -D TEST_DEPS=ON -P ./.github/scripts/install_dependencies.cmake
 
       - name: Setup interpreter packages
-        run: ./ci/install.sh
+        run: |
+          # Use default CC to avoid compilation problems when installing Python modules.
+          echo "Install neovim module for Python."
+          CC=cc python3 -m pip -q install --user --upgrade pynvim
+
+          echo "Install neovim RubyGem."
+          gem install --no-document --bindir "$BIN_DIR" --user-install --pre neovim
+
+          echo "Install neovim npm package"
+          npm install -g neovim
+          npm link neovim
+
+          if [[ $RUNNER_OS != macOS ]]; then
+            sudo cpanm -n Neovim::Ext || cat "$HOME/.cpanm/build.log"
+            perl -W -e 'use Neovim::Ext; print $Neovim::Ext::VERSION'
+          fi
+
+      - run: echo "DEPS_BUILD_DIR=$HOME/nvim-deps" >> $GITHUB_ENV
 
       - uses: ./.github/actions/cache
 
       - name: Build third-party deps
         run: |
-          if test "${FUNCTIONALTEST}" = "functionaltest-lua" ; then
-            DEPS_CMAKE_FLAGS="${DEPS_CMAKE_FLAGS} -D USE_BUNDLED_LUA=ON"
-          fi
-          cmake -S cmake.deps -B "${DEPS_BUILD_DIR}" -G Ninja ${DEPS_CMAKE_FLAGS}
-          cmake --build "${DEPS_BUILD_DIR}"
+          cmake -S cmake.deps -B $DEPS_BUILD_DIR -G Ninja ${{ matrix.deps_flags }}
+          cmake --build $DEPS_BUILD_DIR
 
       - name: Build
         run: |
-          if test -n "${CLANG_SANITIZER}" ; then
-            CMAKE_FLAGS="${CMAKE_FLAGS} -D CLANG_${CLANG_SANITIZER}=ON"
-          fi
-          cmake -B build -G Ninja ${CMAKE_FLAGS}
+          cmake -B build -G Ninja -D CI_BUILD=ON -D CMAKE_INSTALL_PREFIX:PATH=$INSTALL_PREFIX -D MIN_LOG_LEVEL=3 ${{ matrix.flags }}
           cmake --build build
 
       - if: "!cancelled()"
@@ -251,18 +265,23 @@ jobs:
         run: echo "status=${{ job.status }}" >> $GITHUB_OUTPUT
 
       - if: matrix.flavor != 'tsan' && matrix.flavor != 'functionaltest-lua' && (success() || failure() && steps.abort_job.outputs.status == 'success')
-        name: Unittests
+        name: Unittest
         timeout-minutes: 5
-        run: ./ci/run_tests.sh unittests
+        run: cmake --build build --target unittest
 
-      - if: success() || failure() && steps.abort_job.outputs.status == 'success'
-        name: Functionaltests
+      - if: matrix.flavor != 'functionaltest-lua' && (success() || failure() && steps.abort_job.outputs.status == 'success')
+        name: Functionaltest
         timeout-minutes: 15
-        run: ./ci/run_tests.sh functionaltests
+        run: cmake --build build --target functionaltest
+
+      - if: matrix.flavor == 'functionaltest-lua' && (success() || failure() && steps.abort_job.outputs.status == 'success')
+        name: Functionaltest with PUC Lua
+        timeout-minutes: 15
+        run: cmake --build build --target functionaltest-lua
 
       - if: matrix.flavor != 'tsan' && (success() || failure() && steps.abort_job.outputs.status == 'success')
-        name: Oldtests
-        run: ./ci/run_tests.sh oldtests
+        name: Oldtest
+        run: make oldtest
 
       - if: success() || failure() && steps.abort_job.outputs.status == 'success'
         name: Install
@@ -270,28 +289,82 @@ jobs:
 
       - if: success() || failure() && steps.abort_job.outputs.status == 'success'
         name: Installtests
-        run: ./ci/run_tests.sh installtests
+        run: |
+          "$INSTALL_PREFIX/bin/nvim" --version
+          if ! "$INSTALL_PREFIX/bin/nvim" -u NONE -e -c ':help' -c ':qall'; then
+            echo "Running ':help' in the installed nvim failed."
+            echo "Maybe the helptags have not been generated properly."
+            echo 'Failed running :help'
+            exit 1
+          fi
+
+          # Check that all runtime files were installed
+          for file in $(git -C runtime ls-files '*.vim' '*.ps' '*.dict' '*.py' '*.tutor'); do
+            if ! test -e "$INSTALL_PREFIX/share/nvim/runtime/$file"; then
+              printf "%s%s" 'It appears that %s is not installed.' "$file"
+              exit 1
+            fi
+          done
+
+          # Check that some runtime files are installed and are executables
+          for file in $(git -C runtime ls-files '*.awk' '*.sh' '*.bat'); do
+            if ! test -x "$INSTALL_PREFIX/share/nvim/runtime/$file"; then
+              printf "%s%s" 'It appears that %s is not installed or is not executable.' "$file"
+              exit 1
+            fi
+          done
+
+          # Check that generated syntax file has function names, #5060.
+          genvimsynf=syntax/vim/generated.vim
+          gpat='syn keyword vimFuncName .*eval'
+          if ! grep -q "$gpat" "$INSTALL_PREFIX/share/nvim/runtime/$genvimsynf"; then
+            echo "It appears that $genvimsynf does not contain $gpat."
+            exit 1
+          fi
 
       - if: success() || failure() && steps.abort_job.outputs.status == 'success'
         name: Show logs
         run: cat $(find "$LOG_DIR" -type f)
+
+      - if: success() || failure() && steps.abort_job.outputs.status == 'success'
+        name: Show core dumps
+        run: |
+          # TODO(dundargoc): app should be luajit for unittests
+          app="build/bin/nvim"
+          if test "$RUNNER_OS" = macOS; then
+            cores="$(find /cores/ -type f -print)"
+          else
+            cores="$(find ./ -type f \( -name 'core.*' -o -name core -o -name nvim.core \) -print)"
+          fi
+
+          if test -z "$cores"; then
+            exit 0
+          fi
+          for core in $cores; do
+            if test "$RUNNER_OS" = macOS; then
+              lldb -Q -o "bt all" -f "$app" -c "$core"
+            else
+              gdb -n -batch -ex 'thread apply all bt full' "$app" -c "$core"
+            fi
+          done
+          echo 'Core dumps found'
+          exit 1
 
   old_cmake:
     name: Test oldest supported cmake
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     env:
-      CI_OS_NAME: linux
       CMAKE_URL: 'https://cmake.org/files/v3.10/cmake-3.10.0-Linux-x86_64.sh'
       CMAKE_VERSION: '3.10.0'
     steps:
       - uses: actions/checkout@v3
 
-      - name: Setup common environment variables
-        run: ./.github/workflows/env.sh old_cmake
+      - name: Set up environment
+        run: echo "$BIN_DIR" >> $GITHUB_PATH
 
-      - name: Install apt packages
-        run: ./.github/scripts/install_deps_ubuntu.sh
+      - name: Install dependencies
+        run: cmake -P ./.github/scripts/install_dependencies.cmake
 
       - name: Install minimum required version of cmake
         run: |
@@ -320,16 +393,21 @@ jobs:
   windows:
     runs-on: windows-2019
     timeout-minutes: 45
-    env:
-      DEPS_BUILD_DIR: ${{ github.workspace }}/nvim-deps
-    name: windows (MSVC_64)
+    name: windows
     steps:
       - uses: actions/checkout@v3
 
       - uses: ./.github/actions/cache
 
       - name: Set env
-        run: ./.github/workflows/env.ps1
+        run: |
+          $installationPath = vswhere.exe -latest -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if ($installationPath -and (Test-Path "$installationPath\Common7\Tools\vsdevcmd.bat")) {
+            & "${env:COMSPEC}" /s /c "`"$installationPath\Common7\Tools\vsdevcmd.bat`" -arch=x64 -no_logo && set" | ForEach-Object {
+              $name, $value = $_ -split '=', 2
+              "$name=$value" >> $env:GITHUB_ENV
+            }
+          }
 
       - name: Build deps
         run: |
@@ -371,15 +449,15 @@ jobs:
           "status=${{ job.status }}" >> $env:GITHUB_OUTPUT
 
       - if: success() || failure() && steps.abort_job.outputs.status == 'success'
-        name: Run functionaltests
+        name: Run functionaltest
         timeout-minutes: 15
         run: cmake --build build --target functionaltest
 
       - if: success() || failure() && steps.abort_job.outputs.status == 'success'
-        name: Run oldtests
+        name: Run oldtest
         run: |
           # Add MSYS to path, required for e.g. `find` used in test scripts.
-          # But would break functionaltests, where its `more` would be used then.
+          # But would break functionaltest, where its `more` would be used then.
           $OldPath = $env:PATH
           $env:PATH = "C:\msys64\usr\bin;$env:PATH"
           & "C:\msys64\mingw64\bin\mingw32-make.exe" -C $(Convert-Path src\nvim\testdir) VERBOSE=1
