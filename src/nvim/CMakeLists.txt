@@ -105,30 +105,6 @@ if(HAVE_WIMPLICIT_FALLTHROUGH_FLAG)
   target_compile_options(main_lib INTERFACE -Wimplicit-fallthrough)
 endif()
 
-option(ENABLE_COMPILER_SUGGESTIONS "Enable -Wsuggest compiler warnings" OFF)
-if(ENABLE_COMPILER_SUGGESTIONS)
-  # Clang doesn't have -Wsuggest-attribute so check for each one.
-  check_c_compiler_flag(-Wsuggest-attribute=pure HAVE_WSUGGEST_ATTRIBUTE_PURE)
-  if(HAVE_WSUGGEST_ATTRIBUTE_PURE)
-    target_compile_options(main_lib INTERFACE -Wsuggest-attribute=pure)
-  endif()
-
-  check_c_compiler_flag(-Wsuggest-attribute=const HAVE_WSUGGEST_ATTRIBUTE_CONST)
-  if(HAVE_WSUGGEST_ATTRIBUTE_CONST)
-    target_compile_options(main_lib INTERFACE -Wsuggest-attribute=const)
-  endif()
-
-  check_c_compiler_flag(-Wsuggest-attribute=malloc HAVE_WSUGGEST_ATTRIBUTE_MALLOC)
-  if(HAVE_WSUGGEST_ATTRIBUTE_MALLOC)
-    target_compile_options(main_lib INTERFACE -Wsuggest-attribute=malloc)
-  endif()
-
-  check_c_compiler_flag(-Wsuggest-attribute=cold HAVE_WSUGGEST_ATTRIBUTE_COLD)
-  if(HAVE_WSUGGEST_ATTRIBUTE_COLD)
-    target_compile_options(main_lib INTERFACE -Wsuggest-attribute=cold)
-  endif()
-endif()
-
 if(MINGW)
   # Use POSIX compatible stdio in Mingw
   target_compile_definitions(main_lib INTERFACE __USE_MINGW_ANSI_STDIO)
@@ -412,6 +388,9 @@ else()
 endif()
 
 # Log level (MIN_LOG_LEVEL in log.h)
+if($ENV{CI} MATCHES "true")
+  set(MIN_LOG_LEVEL 3)
+endif()
 if("${MIN_LOG_LEVEL}" MATCHES "^$")
   # Minimize logging for release-type builds.
   target_compile_definitions(main_lib INTERFACE MIN_LOG_LEVEL=$<IF:$<CONFIG:Debug>,1,3>)
