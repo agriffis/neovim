@@ -62,7 +62,7 @@ option(USE_BUNDLED_MSGPACK "Use the bundled msgpack." ${USE_BUNDLED})
 option(USE_BUNDLED_LUAJIT "Use the bundled version of luajit." ${USE_BUNDLED})
 option(USE_BUNDLED_LUAROCKS "Use the bundled version of luarocks." ${USE_BUNDLED})
 option(USE_BUNDLED_LUV "Use the bundled version of luv." ${USE_BUNDLED})
-#XXX(tarruda): Lua is only used for debugging the functional test client, no
+#XXX(tarruda): Lua is only used for debugging the functional test client, don't
 # build it unless explicitly requested
 option(USE_BUNDLED_LUA "Use the bundled version of lua." OFF)
 option(USE_BUNDLED_TS_PARSERS "Use the bundled treesitter parsers." ${USE_BUNDLED})
@@ -274,23 +274,3 @@ if(WIN32)
   GetBinaryDep(TARGET win32yank_X86_64
     INSTALL_COMMAND ${CMAKE_COMMAND} -E copy win32yank.exe ${DEPS_INSTALL_DIR}/bin)
 endif()
-
-# clean-shared-libraries removes ${DEPS_INSTALL_DIR}/lib/nvim/parser/c.dll,
-# resulting in MSVC build failure in CI.
-if (MSVC)
-  set(ALL_DEPS ${THIRD_PARTY_DEPS})
-else()
-  add_custom_target(clean-shared-libraries
-    COMMAND ${CMAKE_COMMAND}
-      -D REMOVE_FILE_GLOB=${DEPS_INSTALL_DIR}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}*${CMAKE_SHARED_LIBRARY_SUFFIX}*
-      -P ${PROJECT_SOURCE_DIR}/cmake/RemoveFiles.cmake
-    DEPENDS ${THIRD_PARTY_DEPS}
-  )
-  set(ALL_DEPS clean-shared-libraries)
-endif()
-
-# TODO(justinmk): does anyone use this target?
-add_custom_target(third-party ALL
-  COMMAND ${CMAKE_COMMAND} -E touch .third-party
-  DEPENDS ${ALL_DEPS}
-)
