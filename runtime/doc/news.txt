@@ -13,7 +13,7 @@ BREAKING CHANGES                                                *news-breaking*
 
 The following changes may require adaptations in user config or plugins.
 
-• Cscope support is now removed (see |cscope| and |nvim-features-removed|):
+• Cscope support is now removed (see |cscope| and |nvim-removed|):
   - Commands removed:
     - `:cscope`
     - `:lcscope`
@@ -34,7 +34,7 @@ The following changes may require adaptations in user config or plugins.
 
   See https://github.com/neovim/neovim/pull/20545 for more information.
 
-• `:hardcopy` is now removed (see |hardcopy| and |nvim-features-removed|):
+• `:hardcopy` is now removed (see |hardcopy| and |nvim-removed|):
   - Commands removed:
     - `:hardcopy`
   - Options removed:
@@ -167,6 +167,7 @@ The following new APIs or features were added.
 • |vim.treesitter.language.add()| as a new replacement for
   `vim.treesitter.language.require_language`.
 
+• `require'bit'` is now always available |lua-bit|
 ==============================================================================
 CHANGED FEATURES                                                 *news-changes*
 
@@ -208,5 +209,7 @@ release.
 • `vim.treesitter.language.require_language()` has been deprecated in favour
   of |vim.treesitter.language.add()|.
 
+• |vim.treesitter.get_node_at_pos()| and |vim.treesitter.get_node_at_cursor()|
+  are both deprecated in favor of |vim.treesitter.get_node()|.
 
  vim:tw=78:ts=8:sw=2:et:ft=help:norl:
