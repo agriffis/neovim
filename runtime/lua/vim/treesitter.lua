@@ -115,6 +115,16 @@ function M.get_parser(bufnr, lang, opts)
   return parsers[bufnr]
 end
 
+---@private
+---@param bufnr (integer|nil) Buffer number
+---@return boolean
+function M._has_parser(bufnr)
+  if bufnr == nil or bufnr == 0 then
+    bufnr = a.nvim_get_current_buf()
+  end
+  return parsers[bufnr] ~= nil
+end
+
 --- Returns a string parser
 ---
 ---@param str string Text to parse
@@ -157,7 +167,7 @@ end
 
 --- Returns the node's range or an unpacked range table
 ---
----@param node_or_range (TSNode|table) Node or table of positions
+---@param node_or_range (TSNode | table) Node or table of positions
 ---
 ---@return integer start_row
 ---@return integer start_col
@@ -218,7 +228,7 @@ end
 ---@param row integer Position row
 ---@param col integer Position column
 ---
----@return table[] List of captures `{ capture = "capture name", metadata = { ... } }`
+---@return table[] List of captures `{ capture = "name", metadata = { ... } }`
 function M.get_captures_at_pos(bufnr, row, col)
   if bufnr == 0 then
     bufnr = a.nvim_get_current_buf()
@@ -339,7 +349,7 @@ end
 ---             - lang string|nil Parser language
 ---             - ignore_injections boolean Ignore injected languages (default true)
 ---
----@return TSNode|nil under the cursor
+---@return TSNode | nil Node at the given position
 ---@deprecated
 function M.get_node_at_pos(bufnr, row, col, opts)
   vim.deprecate('vim.treesitter.get_node_at_pos()', 'vim.treesitter.get_node()', '0.10')
@@ -610,6 +620,16 @@ function M.show_tree(opts)
       end
     end,
   })
+end
+
+--- Returns the fold level for {lnum} in the current buffer. Can be set directly to 'foldexpr':
+--- <pre>lua
+--- vim.wo.foldexpr = 'v:lua.vim.treesitter.foldexpr()'
+--- </pre>
+---@param lnum integer|nil Line number to calculate fold level for
+---@return string
+function M.foldexpr(lnum)
+  return require('vim.treesitter._fold').foldexpr(lnum)
 end
 
 return M
