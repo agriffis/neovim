@@ -179,6 +179,11 @@ The following new APIs or features were added.
 
   Additionally |TSNode:range()| now takes an optional {include_bytes} argument.
 
+• |nvim_list_uis()| reports all |ui-option| fields.
+
+• Vim's `has('gui_running')` is now supported as a way for plugins to check if
+  a GUI (not the |TUI|) is attached to Nvim. |has()|
+
 ==============================================================================
 CHANGED FEATURES                                                 *news-changes*
 
@@ -210,6 +215,8 @@ The following deprecated functions or APIs were removed.
   (Note that filetype logic and tests still align with Vim, so additions or
   changes need to be contributed there first.)
   See https://github.com/neovim/neovim/pull/20674.
+
+- 'hkmap', 'hkmapp' and 'aleph' options were removed. Use 'keymap' option instead.
 
 ==============================================================================
 DEPRECATIONS                                                *news-deprecations*

@@ -55,6 +55,7 @@ assert_report({msg})		Number	report a test failure
 assert_true({actual} [, {msg}])	Number	assert {actual} is true
 atan({expr})			Float	arc tangent of {expr}
 atan2({expr1}, {expr2})		Float	arc tangent of {expr1} / {expr2}
+blob2list({blob})		List	convert {blob} into a list of numbers
 browse({save}, {title}, {initdir}, {default})
 				String	put up a file requester
 browsedir({title}, {initdir})	String	put up a directory requester
@@ -296,7 +297,8 @@ libcallnr({lib}, {func}, {arg})	Number	idem, but return a Number
 line({expr} [, {winid}])	Number	line nr of cursor, last line or mark
 line2byte({lnum})		Number	byte count of line {lnum}
 lispindent({lnum})		Number	Lisp indent for line {lnum}
-list2str({list} [, {utf8}])	String	turn numbers in {list} into a String
+list2blob({list})		Blob	turn {list} of numbers into a Blob
+list2str({list} [, {utf8}])	String	turn {list} of numbers into a String
 localtime()			Number	current time
 log({expr})			Float	natural logarithm (base e) of {expr}
 log10({expr})			Float	logarithm of Float {expr} to base 10
@@ -359,7 +361,8 @@ pyxeval({expr})			any	evaluate |python_x| expression
 rand([{expr}])			Number	get pseudo-random number
 range({expr} [, {max} [, {stride}]])
 				List	items from {expr} to {max}
-readblob({fname})		Blob	read a |Blob| from {fname}
+readblob({fname} [, {offset} [, {size}]])
+				Blob	read a |Blob| from {fname}
 readdir({dir} [, {expr}])	List	file names in {dir} selected by {expr}
 readfile({fname} [, {type} [, {max}]])
 				List	get list of lines from file {fname}
@@ -377,7 +380,8 @@ remove({blob}, {idx} [, {end}])	Number/Blob
 					remove bytes {idx}-{end} from {blob}
 remove({dict}, {key})		any	remove entry {key} from {dict}
 rename({from}, {to})		Number	rename (move) file from {from} to {to}
-repeat({expr}, {count})		String	repeat {expr} {count} times
+repeat({expr}, {count})		List/Blob/String
+					repeat {expr} {count} times
 resolve({filename})		String	get filename a shortcut points to
 reverse({list})			List	reverse {list} in-place
 round({expr})			Float	round off {expr}
@@ -776,6 +780,17 @@ atan2({expr1}, {expr2})					*atan2()*
 		Can also be used as a |method|: >
 			Compute()->atan2(1)
 
+blob2list({blob})					*blob2list()*
+		Return a List containing the number value of each byte in Blob
+		{blob}.  Examples: >
+			blob2list(0z0102.0304)	returns [1, 2, 3, 4]
+			blob2list(0z)		returns []
+<		Returns an empty List on error.  |list2blob()| does the
+		opposite.
+
+		Can also be used as a |method|: >
+			GetBlob()->blob2list()
+<
 							*browse()*
 browse({save}, {title}, {initdir}, {default})
 		Put up a file requester.  This only works when "has("browse")"
@@ -2126,8 +2141,7 @@ extend({expr1}, {expr2} [, {expr3}])			*extend()*
 extendnew({expr1}, {expr2} [, {expr3}])			*extendnew()*
 		Like |extend()| but instead of adding items to {expr1} a new
 		List or Dictionary is created and returned.  {expr1} remains
-		unchanged.  Items can still be changed by {expr2}, if you
-		don't want that use |deepcopy()| first.
+		unchanged.
 
 
 feedkeys({string} [, {mode}])				*feedkeys()*
@@ -3868,6 +3882,7 @@ has({feature})	Returns 1 if {feature} is supported, 0 otherwise.  The
 			clipboard	|clipboard| provider is available.
 			fname_case	Case in file names matters (for Darwin and MS-Windows
 					this is not present).
+                        gui_running	Nvim has a GUI.
 			iconv		Can use |iconv()| for conversion.
 			linux		Linux system.
 			mac		MacOS system.
@@ -4766,6 +4781,19 @@ lispindent({lnum})					*lispindent()*
 
 		Can also be used as a |method|: >
 			GetLnum()->lispindent()
+
+list2blob({list})					*list2blob()*
+		Return a Blob concatenating all the number values in {list}.
+		Examples: >
+			list2blob([1, 2, 3, 4])	returns 0z01020304
+			list2blob([])		returns 0z
+<		Returns an empty Blob on error.  If one of the numbers is
+		negative or more than 255 error *E1239* is given.
+
+		|blob2list()| does the opposite.
+
+		Can also be used as a |method|: >
+			GetList()->list2blob()
 
 list2str({list} [, {utf8}])				*list2str()*
 		Convert each number in {list} to a character string can
@@ -6110,6 +6138,25 @@ pyxeval({expr})						*pyxeval()*
 		Can also be used as a |method|: >
 			GetExpr()->pyxeval()
 <
+rand([{expr}])						*rand()*
+		Return a pseudo-random Number generated with an xoshiro128**
+		algorithm using seed {expr}.  The returned number is 32 bits,
+		also on 64 bits systems, for consistency.
+		{expr} can be initialized by |srand()| and will be updated by
+		rand().  If {expr} is omitted, an internal seed value is used
+		and updated.
+		Returns -1 if {expr} is invalid.
+
+		Examples: >
+			:echo rand()
+			:let seed = srand()
+			:echo rand(seed)
+			:echo rand(seed) % 16  " random number 0 - 15
+<
+		Can also be used as a |method|: >
+			seed->rand()
+<
+
 							*E726* *E727*
 range({expr} [, {max} [, {stride}]])				*range()*
 		Returns a |List| with Numbers:
@@ -6132,29 +6179,29 @@ range({expr} [, {max} [, {stride}]])				*range()*
 		Can also be used as a |method|: >
 			GetExpr()->range()
 <
-rand([{expr}])						*rand()*
-		Return a pseudo-random Number generated with an xoshiro128**
-		algorithm using seed {expr}.  The returned number is 32 bits,
-		also on 64 bits systems, for consistency.
-		{expr} can be initialized by |srand()| and will be updated by
-		rand().  If {expr} is omitted, an internal seed value is used
-		and updated.
-		Returns -1 if {expr} is invalid.
 
-		Examples: >
-			:echo rand()
-			:let seed = srand()
-			:echo rand(seed)
-			:echo rand(seed) % 16  " random number 0 - 15
-<
-		Can also be used as a |method|: >
-			seed->rand()
-<
-
-readblob({fname})					*readblob()*
+readblob({fname} [, {offset} [, {size}]])			*readblob()*
 		Read file {fname} in binary mode and return a |Blob|.
-		When the file can't be opened an error message is given and
+		If {offset} is specified, read the file from the specified
+		offset.  If it is a negative value, it is used as an offset
+		from the end of the file.  E.g., to read the last 12 bytes: >
+			readblob('file.bin', -12)
+<		If {size} is specified, only the specified size will be read.
+		E.g. to read the first 100 bytes of a file: >
+			readblob('file.bin', 0, 100)
+<		If {size} is -1 or omitted, the whole data starting from
+		{offset} will be read.
+		This can be also used to read the data from a character device
+		on Unix when {size} is explicitly set.  Only if the device
+		supports seeking {offset} can be used.  Otherwise it should be
+		zero.  E.g. to read 10 bytes from a serial console: >
+			readblob('/dev/ttyS0', 0, 10)
+<		When the file can't be opened an error message is given and
 		the result is an empty |Blob|.
+		When the offset is beyond the end of the file the result is an
+		empty blob.
+		When trying to read more bytes than are available the result
+		is truncated.
 		Also see |readfile()| and |writefile()|.
 
 
@@ -6374,8 +6421,8 @@ repeat({expr}, {count})					*repeat()*
 		result.  Example: >
 			:let separator = repeat('-', 80)
 <		When {count} is zero or negative the result is empty.
-		When {expr} is a |List| the result is {expr} concatenated
-		{count} times.  Example: >
+		When {expr} is a |List| or a |Blob| the result is {expr}
+		concatenated {count} times.  Example: >
 			:let longlist = repeat(['a', 'b'], 3)
 <		Results in ['a', 'b', 'a', 'b', 'a', 'b'].
 
@@ -8725,6 +8772,8 @@ timer_start({time}, {callback} [, {options}])
 		{time} is the waiting time in milliseconds. This is the
 		minimum time before invoking the callback.  When the system is
 		busy or Vim is not waiting for input the time will be longer.
+		Zero can be used to execute the callback when Vim is back in
+		the main loop.
 
 		{callback} is the function to call.  It can be the name of a
 		function or a |Funcref|.  It is called with one argument, which

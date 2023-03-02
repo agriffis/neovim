@@ -3228,7 +3228,9 @@ static void f_has(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   }
 
   if (!n) {
-    if (STRNICMP(name, "patch", 5) == 0) {
+    if (STRNICMP(name, "gui_running", 11) == 0) {
+      n = ui_gui_attached();
+    } else if (STRNICMP(name, "patch", 5) == 0) {
       if (name[5] == '-'
           && strlen(name) >= 11
           && ascii_isdigit(name[6])
@@ -3743,7 +3745,6 @@ static void f_inputsecret(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 /// "insert()" function
 static void f_insert(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
-  list_T *l;
   bool error = false;
 
   if (argvars[0].v_type == VAR_BLOB) {
@@ -3786,8 +3787,12 @@ static void f_insert(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     tv_copy(&argvars[0], rettv);
   } else if (argvars[0].v_type != VAR_LIST) {
     semsg(_(e_listblobarg), "insert()");
-  } else if (!value_check_lock(tv_list_locked((l = argvars[0].vval.v_list)),
-                               N_("insert() argument"), TV_TRANSLATE)) {
+  } else {
+    list_T *l = argvars[0].vval.v_list;
+    if (value_check_lock(tv_list_locked(l), N_("insert() argument"), TV_TRANSLATE)) {
+      return;
+    }
+
     int64_t before = 0;
     if (argvars[2].v_type != VAR_UNKNOWN) {
       before = tv_get_number_chk(&argvars[2], &error);
@@ -5587,15 +5592,24 @@ static void read_file_or_blob(typval_T *argvars, typval_T *rettv, bool always_bl
   ptrdiff_t prevlen  = 0;               // length of data in prev
   ptrdiff_t prevsize = 0;               // size of prev buffer
   int64_t maxline  = MAXLNUM;
+  off_T offset = 0;
+  off_T size = -1;
 
   if (argvars[1].v_type != VAR_UNKNOWN) {
-    if (strcmp(tv_get_string(&argvars[1]), "b") == 0) {
-      binary = true;
-    } else if (strcmp(tv_get_string(&argvars[1]), "B") == 0) {
-      blob = true;
-    }
-    if (argvars[2].v_type != VAR_UNKNOWN) {
-      maxline = tv_get_number(&argvars[2]);
+    if (always_blob) {
+      offset = (off_T)tv_get_number(&argvars[1]);
+      if (argvars[2].v_type != VAR_UNKNOWN) {
+        size = (off_T)tv_get_number(&argvars[2]);
+      }
+    } else {
+      if (strcmp(tv_get_string(&argvars[1]), "b") == 0) {
+        binary = true;
+      } else if (strcmp(tv_get_string(&argvars[1]), "B") == 0) {
+        blob = true;
+      }
+      if (argvars[2].v_type != VAR_UNKNOWN) {
+        maxline = tv_get_number(&argvars[2]);
+      }
     }
   }
 
@@ -5614,11 +5628,8 @@ static void read_file_or_blob(typval_T *argvars, typval_T *rettv, bool always_bl
 
   if (blob) {
     tv_blob_alloc_ret(rettv);
-    if (!read_blob(fd, rettv->vval.v_blob)) {
+    if (read_blob(fd, rettv, offset, size) == FAIL) {
       semsg(_(e_notread), fname);
-      // An empty blob is returned on error.
-      tv_blob_free(rettv->vval.v_blob);
-      rettv->vval.v_blob = NULL;
     }
     fclose(fd);
     return;
@@ -5964,6 +5975,37 @@ static void f_repeat(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     tv_list_alloc_ret(rettv, (n > 0) * n * tv_list_len(argvars[0].vval.v_list));
     while (n-- > 0) {
       tv_list_extend(rettv->vval.v_list, argvars[0].vval.v_list, NULL);
+    }
+  } else if (argvars[0].v_type == VAR_BLOB) {
+    tv_blob_alloc_ret(rettv);
+    if (argvars[0].vval.v_blob == NULL || n <= 0) {
+      return;
+    }
+
+    const int slen = argvars[0].vval.v_blob->bv_ga.ga_len;
+    const int len = (int)(slen * n);
+    if (len <= 0) {
+      return;
+    }
+
+    ga_grow(&rettv->vval.v_blob->bv_ga, len);
+
+    rettv->vval.v_blob->bv_ga.ga_len = len;
+
+    int i;
+    for (i = 0; i < slen; i++) {
+      if (tv_blob_get(argvars[0].vval.v_blob, i) != 0) {
+        break;
+      }
+    }
+
+    if (i == slen) {
+      // No need to copy since all bytes are already zero
+      return;
+    }
+
+    for (i = 0; i < n; i++) {
+      tv_blob_set_range(rettv->vval.v_blob, i * slen, (i + 1) * slen - 1, argvars);
     }
   } else {
     rettv->v_type = VAR_STRING;
