@@ -22,14 +22,13 @@ list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
 include(CheckCCompilerFlag)
 include(CheckCSourceCompiles)
+include(FindPackageHandleStandardArgs)
 include(InstallHelpers)
-include(LuaHelpers) # Find Lua interpreter
+include(LuaHelpers)
 include(PreventInTreeBuilds)
 include(Util)
 
 set(TOUCHES_DIR ${PROJECT_BINARY_DIR}/touches)
-
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 find_program(CCACHE_PRG ccache)
 if(CCACHE_PRG)
@@ -71,7 +70,7 @@ endif()
 
 list(INSERT CMAKE_PREFIX_PATH 0 ${DEPS_PREFIX})
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if(APPLE)
   # If the macOS deployment target is not set manually (via $MACOSX_DEPLOYMENT_TARGET),
   # fall back to local system version. Needs to be done both here and in cmake.deps.
   if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
@@ -83,7 +82,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   message(STATUS "Using deployment target ${CMAKE_OSX_DEPLOYMENT_TARGET}")
 endif()
 
-if(WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if(WIN32 OR APPLE)
   # Ignore case when comparing filenames on Windows and Mac.
   set(CASE_INSENSITIVE_FILENAME TRUE)
   # Enable fixing case-insensitive filenames for Windows and Mac.
@@ -258,7 +257,7 @@ add_glob_target(
   TARGET lintsh
   COMMAND ${SHELLCHECK_PRG}
   FLAGS -x -a
-  GLOB_DIRS scripts ci
+  GLOB_DIRS scripts
   GLOB_PAT *.sh
   EXCLUDE
     scripts/pvscheck.sh
