@@ -1,8 +1,5 @@
 function(BuildTSParser LANG TS_URL TS_SHA256 TS_CMAKE_FILE)
   set(NAME treesitter-${LANG})
-  if(USE_EXISTING_SRC_DIR)
-    unset(TS_URL)
-  endif()
   ExternalProject_Add(${NAME}
     URL ${TS_URL}
     URL_HASH SHA256=${TS_SHA256}
@@ -20,3 +17,4 @@ BuildTSParser(c ${TREESITTER_C_URL} ${TREESITTER_C_SHA256} TreesitterParserCMake
 BuildTSParser(lua ${TREESITTER_LUA_URL} ${TREESITTER_LUA_SHA256} TreesitterParserCMakeLists.txt)
 BuildTSParser(vim ${TREESITTER_VIM_URL} ${TREESITTER_VIM_SHA256} TreesitterParserCMakeLists.txt)
 BuildTSParser(help ${TREESITTER_HELP_URL} ${TREESITTER_HELP_SHA256} TreesitterParserCMakeLists.txt)
+BuildTSParser(query ${TREESITTER_QUERY_URL} ${TREESITTER_QUERY_SHA256} TreesitterParserCMakeLists.txt)
