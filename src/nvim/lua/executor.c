@@ -165,17 +165,6 @@ static int nlua_pcall(lua_State *lstate, int nargs, int nresults)
   return status;
 }
 
-/// Gets the version of the current Nvim build.
-///
-/// @param  lstate  Lua interpreter state.
-static int nlua_nvim_version(lua_State *const lstate) FUNC_ATTR_NONNULL_ALL
-{
-  Dictionary version = version_dict();
-  nlua_push_Dictionary(lstate, version, true);
-  api_free_dictionary(version);
-  return 1;
-}
-
 static void nlua_luv_error_event(void **argv)
 {
   char *error = (char *)argv[0];
@@ -738,10 +727,6 @@ static bool nlua_state_init(lua_State *const lstate) FUNC_ATTR_NONNULL_ALL
 
   // vim.types, vim.type_idx, vim.val_idx
   nlua_init_types(lstate);
-
-  // neovim version
-  lua_pushcfunction(lstate, &nlua_nvim_version);
-  lua_setfield(lstate, -2, "version");
 
   // schedule
   lua_pushcfunction(lstate, &nlua_schedule);
@@ -1871,6 +1856,12 @@ int nlua_expand_pat(expand_T *xp, char *pat, int *num_results, char ***results)
   // [ vim, vim._expand_pat ]
   lua_getfield(lstate, -1, "_expand_pat");
   luaL_checktype(lstate, -1, LUA_TFUNCTION);
+
+  // ex expansion prepends a ^, but don't worry, it is not a regex
+  if (pat[0] != '^') {
+    return FAIL;
+  }
+  pat++;
 
   // [ vim, vim._expand_pat, buf ]
   lua_pushlstring(lstate, (const char *)pat, strlen(pat));

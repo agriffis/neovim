@@ -45,7 +45,7 @@ The following changes may require adaptations in user config or plugins.
     - `printheader`
     - `printmbcharset`
 
-• libiconv is now a required build dependency.
+• libiconv and intl are now required build dependencies.
 
 • Unsaved changes are now preserved rather than discarded when |channel-stdio|
   is closed.
@@ -54,6 +54,9 @@ The following changes may require adaptations in user config or plugins.
 NEW FEATURES                                                    *news-features*
 
 The following new APIs or features were added.
+
+• Added |vim.version| for parsing and comparing version strings conforming to
+  the semver specification, see |lua-version|.
 
 • A new environment variable named NVIM_APPNAME enables configuring the
   directories where Neovim should find its configuration and state files. See
@@ -87,7 +90,7 @@ The following new APIs or features were added.
   `semanticTokensProvider` from the LSP client's {server_capabilities} in the
   `LspAttach` callback.
 
-  See |lsp-semantic_tokens| for more information.
+  See |lsp-semantic-highlight| for more information.
 
 • |vim.treesitter.inspect_tree()| and |:InspectTree| opens a split window
   showing a text representation of the nodes in a language tree for the current
@@ -188,6 +191,8 @@ The following new APIs or features were added.
   to the LSP client to notify servers of file changes on disk. The feature is
   disabled by default and can be enabled by setting the
   `workspace.didChangeWatchedFiles.dynamicRegistration=true` capability.
+
+• Added an omnifunc implementation for lua, |vim.lua_omnifunc()|
 
 ==============================================================================
 CHANGED FEATURES                                                 *news-changes*

@@ -32,14 +32,11 @@ target_link_libraries(main_lib INTERFACE
   treesitter
   unibilium)
 
-option(ENABLE_LIBINTL "enable libintl" ON)
-if(ENABLE_LIBINTL)
-  # Libintl (not Intl) selects our FindLibintl.cmake script. #8464
-  find_package(Libintl REQUIRED)
-  target_include_directories(main_lib SYSTEM BEFORE INTERFACE ${LIBINTL_INCLUDE_DIR})
-  if (LIBINTL_LIBRARY)
-    target_link_libraries(main_lib INTERFACE ${LIBINTL_LIBRARY})
-  endif()
+# Libintl (not Intl) selects our FindLibintl.cmake script. #8464
+find_package(Libintl REQUIRED)
+target_include_directories(main_lib SYSTEM BEFORE INTERFACE ${LIBINTL_INCLUDE_DIR})
+if (LIBINTL_LIBRARY)
+  target_link_libraries(main_lib INTERFACE ${LIBINTL_LIBRARY})
 endif()
 
 # The unit test lib requires LuaJIT; it will be skipped if LuaJIT is missing.
@@ -626,8 +623,8 @@ if(PREFER_LUA)
   message(STATUS "luajit not used, skipping unit tests")
 else()
   glob_wrapper(UNIT_TEST_FIXTURES ${PROJECT_SOURCE_DIR}/test/unit/fixtures/*.c)
-  target_sources(nvim PRIVATE $<$<CONFIG:Debug>:${UNIT_TEST_FIXTURES}>)
-  target_compile_definitions(nvim PRIVATE $<$<CONFIG:Debug>:UNIT_TESTING>)
+  target_sources(nvim PRIVATE ${UNIT_TEST_FIXTURES})
+  target_compile_definitions(nvim PRIVATE UNIT_TESTING)
 endif()
 
 target_sources(main_lib INTERFACE
