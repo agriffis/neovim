@@ -154,6 +154,8 @@ local all_buffer_active_clients = {}
 local uninitialized_clients = {}
 
 ---@private
+---@param bufnr? integer
+---@param fn fun(client: lsp.Client, client_id: integer, bufnr: integer)
 local function for_each_buffer_client(bufnr, fn, restrict_client_ids)
   validate({
     fn = { fn, 'f' },
@@ -1113,18 +1115,42 @@ function lsp.start_client(config)
   end
 
   ---@private
+  -- Determines whether the given option can be set by `set_defaults`.
+  local function is_empty_or_default(bufnr, option)
+    if vim.bo[bufnr][option] == '' then
+      return true
+    end
+
+    local old_bufnr = vim.fn.bufnr('')
+    local last_set_from = vim.fn.gettext('\n\tLast set from ')
+    local line = vim.fn.gettext(' line ')
+
+    vim.cmd.buffer(bufnr)
+    local scriptname = vim.fn
+      .execute('verbose set ' .. option .. '?')
+      :match(last_set_from .. '(.*)' .. line .. '%d+')
+    vim.cmd.buffer(old_bufnr)
+
+    if not scriptname then
+      return false
+    end
+    local vimruntime = vim.fn.getenv('VIMRUNTIME')
+    return vim.startswith(vim.fn.expand(scriptname), vim.fn.expand(vimruntime))
+  end
+
+  ---@private
   local function set_defaults(client, bufnr)
     local capabilities = client.server_capabilities
-    if capabilities.definitionProvider and vim.bo[bufnr].tagfunc == '' then
+    if capabilities.definitionProvider and is_empty_or_default(bufnr, 'tagfunc') then
       vim.bo[bufnr].tagfunc = 'v:lua.vim.lsp.tagfunc'
     end
-    if capabilities.completionProvider and vim.bo[bufnr].omnifunc == '' then
+    if capabilities.completionProvider and is_empty_or_default(bufnr, 'omnifunc') then
       vim.bo[bufnr].omnifunc = 'v:lua.vim.lsp.omnifunc'
     end
     if
       capabilities.documentRangeFormattingProvider
-      and vim.bo[bufnr].formatprg == ''
-      and vim.bo[bufnr].formatexpr == ''
+      and is_empty_or_default(bufnr, 'formatprg')
+      and is_empty_or_default(bufnr, 'formatexpr')
     then
       vim.bo[bufnr].formatexpr = 'v:lua.vim.lsp.formatexpr()'
     end
@@ -1216,6 +1242,7 @@ function lsp.start_client(config)
     return
   end
 
+  ---@class lsp.Client
   local client = {
     id = client_id,
     name = name,
@@ -1366,7 +1393,7 @@ function lsp.start_client(config)
   --- checks for capabilities and handler availability.
   ---
   ---@param method string LSP method name.
-  ---@param params table LSP request params.
+  ---@param params table|nil LSP request params.
   ---@param handler lsp-handler|nil Response |lsp-handler| for this method.
   ---@param bufnr integer Buffer handle (0 for current).
   ---@return boolean status, integer|nil request_id {status} is a bool indicating
@@ -2063,7 +2090,7 @@ function lsp.buf_request_sync(bufnr, method, params, timeout_ms)
 end
 
 --- Send a notification to a server
----@param bufnr (number|nil) The number of the buffer
+---@param bufnr (integer|nil) The number of the buffer
 ---@param method (string) Name of the request method
 ---@param params (any) Arguments to send to the server
 ---
