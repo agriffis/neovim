@@ -2187,6 +2187,25 @@ theend:
   return retval;
 }
 
+/// Find an already loaded script "name".
+/// If found returns its script ID.  If not found returns -1.
+static int find_script_by_name(char *name)
+{
+  assert(script_items.ga_len >= 0);
+  for (int sid = script_items.ga_len; sid > 0; sid--) {
+    // We used to check inode here, but that doesn't work:
+    // - If a script is edited and written, it may get a different
+    //   inode number, even though to the user it is the same script.
+    // - If a script is deleted and another script is written, with a
+    //   different name, the inode may be re-used.
+    scriptitem_T *si = SCRIPT_ITEM(sid);
+    if (si->sn_name != NULL && path_fnamecmp(si->sn_name, name) == 0) {
+      return sid;
+    }
+  }
+  return -1;
+}
+
 /// Check if fname was sourced before to finds its SID.
 /// If it's new, generate a new SID.
 ///
@@ -2196,28 +2215,19 @@ scriptitem_T *get_current_script_id(char **fnamep, sctx_T *ret_sctx)
 {
   static int last_current_SID_seq = 0;
 
-  sctx_T script_sctx = { .sc_seq = ++last_current_SID_seq,
-                         .sc_lnum = 0,
-                         .sc_sid = 0 };
-  scriptitem_T *si = NULL;
-
-  assert(script_items.ga_len >= 0);
-  for (script_sctx.sc_sid = script_items.ga_len; script_sctx.sc_sid > 0; script_sctx.sc_sid--) {
-    // We used to check inode here, but that doesn't work:
-    // - If a script is edited and written, it may get a different
-    //   inode number, even though to the user it is the same script.
-    // - If a script is deleted and another script is written, with a
-    //   different name, the inode may be re-used.
-    si = SCRIPT_ITEM(script_sctx.sc_sid);
-    if (si->sn_name != NULL && path_fnamecmp(si->sn_name, *fnamep) == 0) {
-      // Found it!
-      break;
-    }
-  }
-  if (script_sctx.sc_sid == 0) {
-    si = new_script_item(*fnamep, &script_sctx.sc_sid);
+  scriptitem_T *si;
+  int sid = find_script_by_name(*fnamep);
+  if (sid > 0) {
+    si = SCRIPT_ITEM(sid);
+  } else {
+    si = new_script_item(*fnamep, &sid);
     *fnamep = xstrdup(si->sn_name);
   }
+
+  sctx_T script_sctx = { .sc_seq = ++last_current_SID_seq,
+                         .sc_lnum = 0,
+                         .sc_sid = sid };
+
   if (ret_sctx != NULL) {
     *ret_sctx = script_sctx;
   }
@@ -2335,6 +2345,29 @@ linenr_T get_sourced_lnum(LineGetter fgetline, void *cookie)
   return fgetline == getsourceline
         ? ((struct source_cookie *)cookie)->sourcing_lnum
         : SOURCING_LNUM;
+}
+
+/// "getscriptinfo()" function
+void f_getscriptinfo(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
+{
+  tv_list_alloc_ret(rettv, script_items.ga_len);
+
+  list_T *l = rettv->vval.v_list;
+
+  for (int i = 1; i <= script_items.ga_len; i++) {
+    scriptitem_T *si = SCRIPT_ITEM(i);
+
+    if (si->sn_name == NULL) {
+      continue;
+    }
+
+    dict_T *d = tv_dict_alloc();
+    tv_list_append_dict(l, d);
+    tv_dict_add_str(d, S_LEN("name"), si->sn_name);
+    tv_dict_add_nr(d, S_LEN("sid"), i);
+    // Vim9 autoload script (:h vim9-autoload), not applicable to Nvim.
+    tv_dict_add_bool(d, S_LEN("autoload"), false);
+  }
 }
 
 /// Get one full line from a sourced file.
