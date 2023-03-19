@@ -1,8 +1,24 @@
+%if 0%{?el8}
+# see https://fedoraproject.org/wiki/Changes/CMake_to_do_out-of-source_builds
+# EPEL 8's %%cmake defaults to in-source build, which neovim does not support
+%undefine __cmake_in_source_build
+%endif
+
 %bcond_with jemalloc
-%ifarch %{arm} %{ix86} x86_64 %{mips} aarch64
-%bcond_without luajit
+%ifarch %{arm} %{ix86} x86_64 %{mips}
+  %bcond_without luajit
 %else
-%bcond_with luajit
+  %ifarch aarch64
+    %if 0%{?el8}
+      # luajit codepath buggy on el8 aarch64
+      # https://bugzilla.redhat.com/show_bug.cgi?id=2065340
+      %bcond_with luajit
+    %else
+      %bcond_without luajit
+    %endif
+  %else
+    %bcond_with luajit
+  %endif
 %endif
 
 %global luv_min_ver 1.42.0
@@ -26,7 +42,7 @@ Name:           {{{git_name name="neovim"}}}
 Version:        {{{git_version}}}
 Release:        {{{git_revision}}}%{?dist}
 
-License:        ASL 2.0
+License:        Apache-2.0 AND Vim
 Summary:        Vim-fork focused on extensibility and agility
 Url:            https://neovim.io
 
@@ -34,8 +50,9 @@ Source0:        {{{git_repo_pack}}}
 Source1:        sysinit.vim
 Source2:        spec-template
 
+Patch0:         neovim-fix-fortify-source.patch
+
 Patch1000:      neovim-lua-bit32.patch
-Patch1001:      neovim-cmake-lua-5.1.patch
 
 BuildRequires:  gcc-c++
 BuildRequires:  cmake
@@ -75,6 +92,8 @@ BuildRequires:  libtree-sitter-devel >= %{tree_sitter_min_ver}
 # tree-sitter didn't do an soname bump. enforce the min version
 # see https://github.com/nvim-treesitter/nvim-treesitter/pull/3055/files
 Requires:       libtree-sitter >= %{tree_sitter_min_ver}
+# Parser generator, only needed for :TSInstallFromGrammar
+Recommends:     tree-sitter-cli
 Suggests:       (python2-neovim if python2)
 Suggests:       (python3-neovim if python3)
 # XSel provides access to the system clipboard
@@ -93,9 +112,11 @@ parts of Vim, without compromise, and more.
 %prep
 {{{git_setup_macro path="$GIT_ROOT"}}}
 
+# avg: doesn't apply to COPR build
+#%patch0 -p1
+
 %if %{without luajit}
 %patch1000 -p1
-%patch1001 -p1
 %endif
 
 %build
@@ -145,6 +166,29 @@ find %{buildroot}%{_datadir} \( -name "*.bat" -o -name "*.awk" \) \
 %changelog
 * {{{git_changelog_date}}} Aron Griffis <aron@scampersand.com> - {{{git_changelog_version}}}
 - Nightly build from git master
+
+* Sun Mar 05 2023 Andreas Schneider <asn@redhat.com> - 0.8.3-2
+- Update License to SPDX expression
+- Update spec template for auto(release|changelog)
+
+* Thu Feb 02 2023 Andreas Schneider <asn@redhat.com> - 0.8.3-1
+- Update to version 0.8.3
+  * https://github.com/neovim/neovim/releases/tag/v0.8.3
+
+* Thu Jan 19 2023 Fedora Release Engineering <releng@fedoraproject.org> - 0.8.2-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_38_Mass_Rebuild
+
+* Fri Dec 30 2022 Andreas Schneider <asn@redhat.com> - 0.8.2-1
+- Update to version 0.8.2
+  * https://github.com/neovim/neovim/releases/tag/v0.8.2
+
+* Mon Nov 14 2022 Andreas Schneider <asn@redhat.com> - 0.8.1-1
+- Update to version 0.8.1
+  * https://github.com/neovim/neovim/releases/tag/v0.8.1
+
+* Fri Sep 30 2022 Andreas Schneider <asn@redhat.com> - 0.8.0-1
+- Update to version 0.8.0
+  * https://github.com/neovim/neovim/releases/tag/v0.8.0
 
 * Wed Sep 21 2022 Andreas Schneider <asn@redhat.com> - 0.7.2-4
 - Build with libvterm 0.3

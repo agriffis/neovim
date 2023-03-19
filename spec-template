@@ -1,6 +1,6 @@
 Name:
 Version:
-Release:        1%{?dist}
+Release:        %{autorelease}
 Summary:
 
 License:
@@ -35,3 +35,4 @@ Requires:
 
 
 %changelog
+%{autochangelog}
