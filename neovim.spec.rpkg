@@ -52,6 +52,9 @@ Source2:        spec-template
 
 Patch0:         neovim-fix-fortify-source.patch
 
+# https://github.com/agriffis/neovim/issues/17
+Patch666:       neovim-restore-libluv-workaround.patch
+
 Patch1000:      neovim-lua-bit32.patch
 
 BuildRequires:  gcc-c++
@@ -114,6 +117,9 @@ parts of Vim, without compromise, and more.
 
 # avg: doesn't apply to COPR build
 #%patch0 -p1
+
+# avg: restore libluv workaround needed on fedora
+%patch666 -p1
 
 %if %{without luajit}
 %patch1000 -p1

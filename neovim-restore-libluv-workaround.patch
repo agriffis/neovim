@@ -1,0 +1,49 @@
+commit da0c66bcddbe4e6ebc72357c9f6c5de75e176744
+Author: dundargoc <gocdundar@gmail.com>
+Date:   Sun Mar 5 17:06:13 2023 +0100
+
+    build: remove workaround for incorrectly packaged libluv
+    
+    This removes a workaround for incorrectly packaged libluv in
+    90e44ecf1144cb32195da00e24d23afb111ea680 as it should not be needed
+    anymore.
+
+diff --git b/cmake/FindLibluv.cmake a/cmake/FindLibluv.cmake
+index 3dfc53602..9a74d5d0e 100644
+--- b/cmake/FindLibluv.cmake
++++ a/cmake/FindLibluv.cmake
+@@ -1,5 +1,14 @@
+ find_path(LIBLUV_INCLUDE_DIR luv/luv.h)
+-find_library(LIBLUV_LIBRARY NAMES luv_a luv libluv_a luv.so)
++
++# Explicitly look for luv.so. #10407
++list(APPEND LIBLUV_NAMES luv_a luv libluv_a luv${CMAKE_SHARED_LIBRARY_SUFFIX})
++
++find_library(LIBLUV_LIBRARY NAMES ${LIBLUV_NAMES})
++
++set(LIBLUV_LIBRARIES ${LIBLUV_LIBRARY})
++set(LIBLUV_INCLUDE_DIRS ${LIBLUV_INCLUDE_DIR})
++
+ find_package_handle_standard_args(Libluv DEFAULT_MSG
+   LIBLUV_LIBRARY LIBLUV_INCLUDE_DIR)
++
+ mark_as_advanced(LIBLUV_INCLUDE_DIR LIBLUV_LIBRARY)
+diff --git b/src/nvim/CMakeLists.txt a/src/nvim/CMakeLists.txt
+index 51e0727cd..61530f5a7 100755
+--- b/src/nvim/CMakeLists.txt
++++ a/src/nvim/CMakeLists.txt
+@@ -14,8 +14,12 @@ else()
+ endif()
+ 
+ find_package(Libluv 1.43.0 REQUIRED)
+-target_include_directories(main_lib SYSTEM BEFORE INTERFACE ${LIBLUV_INCLUDE_DIR})
+-target_link_libraries(main_lib INTERFACE ${LIBLUV_LIBRARY})
++target_include_directories(main_lib SYSTEM BEFORE INTERFACE ${LIBLUV_INCLUDE_DIRS})
++# Use "luv" as imported library, to work around CMake using "-lluv" for
++# "luv.so".  #10407
++add_library(luv UNKNOWN IMPORTED)
++set_target_properties(luv PROPERTIES IMPORTED_LOCATION ${LIBLUV_LIBRARIES})
++target_link_libraries(main_lib INTERFACE luv)
+ 
+ find_package(Iconv REQUIRED)
+ find_package(Libtermkey 0.22 REQUIRED)
