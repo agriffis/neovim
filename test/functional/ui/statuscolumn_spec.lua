@@ -461,7 +461,6 @@ describe('statuscolumn', function()
       vim.api.nvim_buf_set_extmark(0, ns, 7, 0, {
         virt_lines_leftcol = true, virt_lines = {{{"virt", ""}}} })
     ]])
-    feed('lh')  -- force update cursor row
     screen:expect([[
                 4 aaaaa                                    |
                 5 aaaaa                                    |
@@ -555,6 +554,42 @@ describe('statuscolumn', function()
       9  aaaaa                                             |
       10 aaaaa                                             |
       11 aaaaa                                             |
+                                                           |
+    ]])
+  end)
+
+  it("has correct width with custom sign column when (un)placing signs", function()
+    screen:try_resize(screen._width, 6)
+    exec_lua([[
+      vim.cmd.norm('gg')
+      vim.o.signcolumn = 'no'
+      vim.fn.sign_define('sign', { text = 'ss' })
+      _G.StatusCol = function()
+        local s = vim.fn.sign_getplaced(1)[1].signs
+        local sign = ''
+        if #s > 0 then
+          sign = vim.v.lnum == 5 and 'ss' or '  '
+        end
+        return vim.v.lnum .. '%=' .. sign
+      end
+      vim.o.statuscolumn = "%!v:lua.StatusCol()"
+      vim.fn.sign_place(0, '', 'sign', 1, { lnum = 5 })
+    ]])
+    screen:expect([[
+      1   ^aaaaa                                            |
+      2   aaaaa                                            |
+      3   aaaaa                                            |
+      4   aaaaa                                            |
+      5 ssaaaaa                                            |
+                                                           |
+    ]])
+    command('sign unplace 1')
+    screen:expect([[
+      1 ^aaaaa                                              |
+      2 aaaaa                                              |
+      3 aaaaa                                              |
+      4 aaaaa                                              |
+      5 aaaaa                                              |
                                                            |
     ]])
   end)
