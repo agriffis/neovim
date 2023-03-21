@@ -65,8 +65,8 @@ NEW FEATURES                                                    *news-features*
 
 The following new APIs or features were added.
 
-• Added |vim.version| for parsing and comparing version strings conforming to
-  the semver specification, see |lua-version|.
+• Added |lua-version| for parsing and comparing version strings conforming to
+  the semver specification.
 
 • A new environment variable named NVIM_APPNAME enables configuring the
   directories where Neovim should find its configuration and state files. See
@@ -209,6 +209,12 @@ The following new APIs or features were added.
 • Treesitter injection queries now use the format described at
   https://tree-sitter.github.io/tree-sitter/syntax-highlighting#language-injection .
   Support for the previous format will be removed in a future release.
+
+• |nvim_get_option_value()| now has a `filetype` option so it can return the
+  default option for a specific filetype.
+
+• |vim.filetype.get_option()| to get the default option value for a specific
+  filetype. This is a wrapper around |nvim_get_option_value()| with caching.
 
 ==============================================================================
 CHANGED FEATURES                                                 *news-changes*
