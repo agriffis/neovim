@@ -322,8 +322,8 @@ end
 ---
 ---@param command string|table Command(s) to execute.
 ---                            If a string, executes multiple lines of Vim script at once. In this
----                            case, it is an alias to |nvim_exec()|, where `output` is set to
----                            false. Thus it works identical to |:source|.
+---                            case, it is an alias to |nvim_exec2()|, where `opts.output` is set
+---                            to false. Thus it works identical to |:source|.
 ---                            If a table, executes a single command. In this case, it is an alias
 ---                            to |nvim_cmd()| where `opts` is empty.
 ---@see |ex-cmd-index|
@@ -338,7 +338,8 @@ vim.cmd = setmetatable({}, {
     if type(command) == 'table' then
       return vim.api.nvim_cmd(command, {})
     else
-      return vim.api.nvim_exec(command, false)
+      vim.api.nvim_exec2(command, {})
+      return ''
     end
   end,
   __index = function(t, command)
@@ -397,14 +398,17 @@ do
   vim.t = make_dict_accessor('t')
 end
 
---- Get a table of lines with start, end columns for a region marked by two points
+--- Get a table of lines with start, end columns for a region marked by two points.
+--- Input and output positions are (0,0)-indexed and indicate byte positions.
 ---
 ---@param bufnr integer number of buffer
 ---@param pos1 integer[] (line, column) tuple marking beginning of region
 ---@param pos2 integer[] (line, column) tuple marking end of region
 ---@param regtype string type of selection, see |setreg()|
----@param inclusive boolean indicating whether the selection is end-inclusive
----@return table region Table of the form `{linenr = {startcol,endcol}}`
+---@param inclusive boolean indicating whether column of pos2 is inclusive
+---@return table region Table of the form `{linenr = {startcol,endcol}}`.
+---        `endcol` is exclusive, and whole lines are marked with
+---        `{startcol,endcol} = {0,-1}`.
 function vim.region(bufnr, pos1, pos2, regtype, inclusive)
   if not vim.api.nvim_buf_is_loaded(bufnr) then
     vim.fn.bufload(bufnr)

@@ -96,12 +96,12 @@ describe(':source', function()
       let d = s:s]])
 
     command('source')
-    eq('2', meths.exec('echo a', true))
-    eq("{'k': 'v'}", meths.exec('echo b', true))
+    eq('2', exec_capture('echo a'))
+    eq("{'k': 'v'}", exec_capture('echo b'))
 
     -- Script items are created only on script var access
-    eq("1", meths.exec('echo c', true))
-    eq("0zBEEFCAFE", meths.exec('echo d', true))
+    eq("1", exec_capture('echo c'))
+    eq("0zBEEFCAFE", exec_capture('echo d'))
 
     exec('set cpoptions+=C')
     eq('Vim(let):E723: Missing end of Dictionary \'}\': ', exc_exec('source'))
@@ -124,14 +124,14 @@ describe(':source', function()
     -- Source the 2nd line only
     feed('ggjV')
     feed_command(':source')
-    eq('3', meths.exec('echo a', true))
+    eq('3', exec_capture('echo a'))
 
     -- Source from 2nd line to end of file
     feed('ggjVG')
     feed_command(':source')
-    eq('4', meths.exec('echo a', true))
-    eq("{'K': 'V'}", meths.exec('echo b', true))
-    eq("<SNR>1_C()", meths.exec('echo D()', true))
+    eq('4', exec_capture('echo a'))
+    eq("{'K': 'V'}", exec_capture('echo b'))
+    eq("<SNR>1_C()", exec_capture('echo D()'))
 
     -- Source last line only
     feed_command(':$source')
@@ -147,7 +147,7 @@ describe(':source', function()
       let a = 123
     ]]
     command('source')
-    eq('123', meths.exec('echo a', true))
+    eq('123', exec_capture('echo a'))
   end)
 
   it('multiline heredoc command', function()
@@ -157,7 +157,7 @@ describe(':source', function()
       EOF]])
 
     command('source')
-    eq('4', meths.exec('echo luaeval("y")', true))
+    eq('4', exec_capture('echo luaeval("y")'))
   end)
 
   it('can source lua files', function()
