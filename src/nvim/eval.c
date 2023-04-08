@@ -396,11 +396,11 @@ void eval_init(void)
 
     // add to v: scope dict, unless the value is not always available
     if (p->vv_type != VAR_UNKNOWN) {
-      hash_add(&vimvarht, (char *)p->vv_di.di_key);
+      hash_add(&vimvarht, p->vv_di.di_key);
     }
     if (p->vv_flags & VV_COMPAT) {
       // add to compat scope dict
-      hash_add(&compat_hashtab, (char *)p->vv_di.di_key);
+      hash_add(&compat_hashtab, p->vv_di.di_key);
     }
   }
   vimvars[VV_VERSION].vv_nr = VIM_VERSION_100;
@@ -984,7 +984,7 @@ void prepare_vimvar(int idx, typval_T *save_tv)
 {
   *save_tv = vimvars[idx].vv_tv;
   if (vimvars[idx].vv_type == VAR_UNKNOWN) {
-    hash_add(&vimvarht, (char *)vimvars[idx].vv_di.di_key);
+    hash_add(&vimvarht, vimvars[idx].vv_di.di_key);
   }
 }
 
@@ -997,7 +997,7 @@ void restore_vimvar(int idx, typval_T *save_tv)
     return;
   }
 
-  hashitem_T *hi = hash_find(&vimvarht, (char *)vimvars[idx].vv_di.di_key);
+  hashitem_T *hi = hash_find(&vimvarht, vimvars[idx].vv_di.di_key);
   if (HASHITEM_EMPTY(hi)) {
     internal_error("restore_vimvar()");
   } else {
@@ -1145,7 +1145,7 @@ void *call_func_retlist(const char *func, int argc, typval_T *argv)
   typval_T rettv;
 
   // All arguments are passed as strings, no conversion to number.
-  if (call_vim_function((char *)func, argc, argv, &rettv) == FAIL) {
+  if (call_vim_function(func, argc, argv, &rettv) == FAIL) {
     return NULL;
   }
 
@@ -1234,9 +1234,8 @@ char *get_lval(char *const name, typval_T *const rettv, lval_T *const lp, const 
 
   if (skip) {
     // When skipping just find the end of the name.
-    lp->ll_name = (const char *)name;
-    return (char *)find_name_end(name, NULL, NULL,
-                                 FNE_INCL_BR | fne_flags);
+    lp->ll_name = name;
+    return (char *)find_name_end(name, NULL, NULL, FNE_INCL_BR | fne_flags);
   }
 
   // Find the end of the name.
@@ -1269,8 +1268,8 @@ char *get_lval(char *const name, typval_T *const rettv, lval_T *const lp, const 
       lp->ll_name_len = strlen(lp->ll_name);
     }
   } else {
-    lp->ll_name = (const char *)name;
-    lp->ll_name_len = (size_t)((const char *)p - lp->ll_name);
+    lp->ll_name = name;
+    lp->ll_name_len = (size_t)(p - lp->ll_name);
   }
 
   // Without [idx] or .key we are done.
@@ -1417,7 +1416,7 @@ char *get_lval(char *const name, typval_T *const rettv, lval_T *const lp, const 
       }
       lp->ll_list = NULL;
       lp->ll_dict = lp->ll_tv->vval.v_dict;
-      lp->ll_di = tv_dict_find(lp->ll_dict, (const char *)key, len);
+      lp->ll_di = tv_dict_find(lp->ll_dict, key, len);
 
       // When assigning to a scope dictionary check that a function and
       // variable name is valid (only variable name unless it is l: or
@@ -1434,8 +1433,8 @@ char *get_lval(char *const name, typval_T *const rettv, lval_T *const lp, const 
         }
         wrong = ((lp->ll_dict->dv_scope == VAR_DEF_SCOPE
                   && tv_is_func(*rettv)
-                  && var_wrong_func_name((const char *)key, lp->ll_di == NULL))
-                 || !valid_varname((const char *)key));
+                  && var_wrong_func_name(key, lp->ll_di == NULL))
+                 || !valid_varname(key));
         if (len != -1) {
           key[len] = prevval;
         }
@@ -1728,7 +1727,7 @@ void set_var_lval(lval_T *lp, char *endp, typval_T *rettv, int copy, const bool 
       }
 
       // Need to add an item to the Dictionary.
-      di = tv_dict_item_alloc((const char *)lp->ll_newkey);
+      di = tv_dict_item_alloc(lp->ll_newkey);
       if (tv_dict_add(lp->ll_tv->vval.v_dict, di) == FAIL) {
         xfree(di);
         return;
@@ -1764,7 +1763,7 @@ notify:
       } else {
         dictitem_T *di_ = lp->ll_di;
         assert(di_->di_key != NULL);
-        tv_dict_watcher_notify(dict, (char *)di_->di_key, lp->ll_tv, &oldtv);
+        tv_dict_watcher_notify(dict, di_->di_key, lp->ll_tv, &oldtv);
         tv_clear(&oldtv);
       }
     }
@@ -1786,7 +1785,7 @@ void *eval_for_line(const char *arg, bool *errp, char **nextcmdp, int skip)
 
   *errp = true;  // Default: there is an error.
 
-  expr = skip_var_list((char *)arg, &fi->fi_varcount, &fi->fi_semicolon);
+  expr = skip_var_list(arg, &fi->fi_varcount, &fi->fi_semicolon);
   if (expr == NULL) {
     return fi;
   }
@@ -2172,13 +2171,13 @@ static int eval_func(char **const arg, char *const name, const int name_len, typ
   int len = name_len;
 
   if (!evaluate) {
-    check_vars((const char *)s, (size_t)len);
+    check_vars(s, (size_t)len);
   }
 
   // If "s" is the name of a variable of type VAR_FUNC
   // use its contents.
   partial_T *partial;
-  s = deref_func_name((const char *)s, &len, &partial, !evaluate);
+  s = deref_func_name(s, &len, &partial, !evaluate);
 
   // Need to make a copy, in case evaluating the arguments makes
   // the name invalid.
@@ -3000,9 +2999,9 @@ static int eval7(char **arg, typval_T *rettv, int evaluate, int want_string)
       if (**arg == '(') {               // recursive!
         ret = eval_func(arg, s, len, rettv, evaluate, NULL);
       } else if (evaluate) {
-        ret = get_var_tv((const char *)s, len, rettv, NULL, true, false);
+        ret = get_var_tv(s, len, rettv, NULL, true, false);
       } else {
-        check_vars((const char *)s, (size_t)len);
+        check_vars(s, (size_t)len);
         ret = OK;
       }
     }
@@ -3036,7 +3035,7 @@ static int eval7_leader(typval_T *const rettv, const bool numeric_only,
                         const char *const start_leader, const char **const end_leaderp)
   FUNC_ATTR_NONNULL_ALL
 {
-  const char *end_leader = (char *)(*end_leaderp);
+  const char *end_leader = *end_leaderp;
   int ret = OK;
   bool error = false;
   varnumber_T val = 0;
@@ -3199,7 +3198,7 @@ static int eval_method(char **const arg, typval_T *const rettv, const bool evalu
   char *lua_funcname = NULL;
   if (strncmp(name, "v:lua.", 6) == 0) {
     lua_funcname = name + 6;
-    *arg = (char *)skip_luafunc_name((const char *)lua_funcname);
+    *arg = (char *)skip_luafunc_name(lua_funcname);
     *arg = skipwhite(*arg);  // to detect trailing whitespace later
     len = (int)(*arg - lua_funcname);
   } else {
@@ -3264,7 +3263,7 @@ static int eval_index(char **arg, typval_T *rettv, int evaluate, int verbose)
   bool empty2 = false;
   ptrdiff_t len = -1;
   int range = false;
-  char *key = NULL;
+  const char *key = NULL;
 
   switch (rettv->v_type) {
   case VAR_FUNC:
@@ -3513,15 +3512,14 @@ static int eval_index(char **arg, typval_T *rettv, int evaluate, int verbose)
       }
 
       if (len == -1) {
-        key = (char *)tv_get_string_chk(&var1);
+        key = tv_get_string_chk(&var1);
         if (key == NULL) {
           tv_clear(&var1);
           return FAIL;
         }
       }
 
-      dictitem_T *const item = tv_dict_find(rettv->vval.v_dict,
-                                            (const char *)key, len);
+      dictitem_T *const item = tv_dict_find(rettv->vval.v_dict, key, len);
 
       if (item == NULL && verbose) {
         semsg(_(e_dictkey), key);
@@ -4635,14 +4633,14 @@ static int eval_dict(char **arg, typval_T *rettv, int evaluate, bool literal)
       goto failret;
     }
     if (evaluate) {
-      dictitem_T *item = tv_dict_find(d, (const char *)key, -1);
+      dictitem_T *item = tv_dict_find(d, key, -1);
       if (item != NULL) {
         semsg(_("E721: Duplicate key in Dictionary: \"%s\""), key);
         tv_clear(&tvkey);
         tv_clear(&tv);
         goto failret;
       }
-      item = tv_dict_item_alloc((const char *)key);
+      item = tv_dict_item_alloc(key);
       item->di_tv = tv;
       item->di_tv.v_lock = VAR_UNLOCKED;
       if (tv_dict_add(d, item) == FAIL) {
@@ -4755,8 +4753,7 @@ void assert_error(garray_T *gap)
     // Make sure v:errors is a list.
     set_vim_var_list(VV_ERRORS, tv_list_alloc(1));
   }
-  tv_list_append_string(vimvars[VV_ERRORS].vv_list,
-                        (const char *)gap->ga_data, (ptrdiff_t)gap->ga_len);
+  tv_list_append_string(vimvars[VV_ERRORS].vv_list, gap->ga_data, (ptrdiff_t)gap->ga_len);
 }
 
 /// Implementation of map() and filter().
@@ -4831,7 +4828,7 @@ void filter_map(typval_T *argvars, typval_T *rettv, int map)
             break;
           }
 
-          vimvars[VV_KEY].vv_str = xstrdup((char *)di->di_key);
+          vimvars[VV_KEY].vv_str = xstrdup(di->di_key);
           int r = filter_map_one(&di->di_tv, expr, map, &rem);
           tv_clear(&vimvars[VV_KEY].vv_tv);
           if (r == FAIL || did_emsg) {
@@ -4983,14 +4980,12 @@ void common_function(typval_T *argvars, typval_T *rettv, bool is_funcref)
   }
   if (s == NULL || *s == NUL || (use_string && ascii_isdigit(*s))
       || (is_funcref && trans_name == NULL)) {
-    semsg(_(e_invarg2), (use_string
-                         ? tv_get_string(&argvars[0])
-                         : (const char *)s));
+    semsg(_(e_invarg2), (use_string ? tv_get_string(&argvars[0]) : s));
     // Don't check an autoload name for existence here.
   } else if (trans_name != NULL
              && (is_funcref
                  ? find_func(trans_name) == NULL
-                 : !translated_function_exists((const char *)trans_name))) {
+                 : !translated_function_exists(trans_name))) {
     semsg(_("E700: Unknown function: %s"), s);
   } else {
     int dict_idx = 0;
@@ -6338,7 +6333,7 @@ int get_id_len(const char **const arg)
   }
 
   len = (int)(p - *arg);
-  *arg = (const char *)skipwhite(p);
+  *arg = skipwhite(p);
 
   return len;
 }
@@ -6376,7 +6371,7 @@ int get_name_len(const char **const arg, char **alias, bool evaluate, bool verbo
   if (expr_start != NULL) {
     if (!evaluate) {
       len += (int)(p - *arg);
-      *arg = (const char *)skipwhite(p);
+      *arg = skipwhite(p);
       return len;
     }
 
@@ -6387,7 +6382,7 @@ int get_name_len(const char **const arg, char **alias, bool evaluate, bool verbo
       return -1;
     }
     *alias = temp_string;
-    *arg = (const char *)skipwhite(p);
+    *arg = skipwhite(p);
     return (int)strlen(temp_string);
   }
 
@@ -7612,7 +7607,7 @@ const void *var_shada_iter(const void *const iter, const char **const name, typv
   } else {
     hi = (const hashitem_T *)iter;
   }
-  *name = (char *)TV_DICT_HI2DI(hi)->di_key;
+  *name = TV_DICT_HI2DI(hi)->di_key;
   tv_copy(&TV_DICT_HI2DI(hi)->di_tv, rettv);
   while ((size_t)(++hi - hifirst) < hinum) {
     if (!HASHITEM_EMPTY(hi) && (var_flavour(hi->hi_key) & flavour)) {
@@ -7636,10 +7631,10 @@ int store_session_globals(FILE *fd)
   TV_DICT_ITER(&globvardict, this_var, {
     if ((this_var->di_tv.v_type == VAR_NUMBER
          || this_var->di_tv.v_type == VAR_STRING)
-        && var_flavour((char *)this_var->di_key) == VAR_FLAVOUR_SESSION) {
+        && var_flavour(this_var->di_key) == VAR_FLAVOUR_SESSION) {
       // Escape special characters with a backslash.  Turn a LF and
       // CR into \n and \r.
-      char *const p = (char *)vim_strsave_escaped(tv_get_string(&this_var->di_tv), "\\\"\n\r");
+      char *const p = vim_strsave_escaped(tv_get_string(&this_var->di_tv), "\\\"\n\r");
       for (char *t = p; *t != NUL; t++) {
         if (*t == '\n') {
           *t = 'n';
@@ -7658,7 +7653,7 @@ int store_session_globals(FILE *fd)
       }
       xfree(p);
     } else if (this_var->di_tv.v_type == VAR_FLOAT
-               && var_flavour((char *)this_var->di_key) == VAR_FLAVOUR_SESSION) {
+               && var_flavour(this_var->di_key) == VAR_FLAVOUR_SESSION) {
       float_T f = this_var->di_tv.vval.v_float;
       int sign = ' ';
 
@@ -7949,7 +7944,7 @@ repeat:
       // "path/to/this.file.ext" :r:r:r
       //  ^       ^------------- tail
       //  +--------------------- *fnamep
-      if (s > MAX(tail, (char *)(*fnamep))) {
+      if (s > MAX(tail, *fnamep)) {
         *fnamelen = (size_t)(s - *fnamep);
       }
     }
@@ -8165,7 +8160,7 @@ void script_host_eval(char *name, typval_T *argvars, typval_T *rettv)
   }
 
   list_T *args = tv_list_alloc(1);
-  tv_list_append_string(args, (const char *)argvars[0].vval.v_string, -1);
+  tv_list_append_string(args, argvars[0].vval.v_string, -1);
   *rettv = eval_call_provider(name, "eval", args, false);
 }
 

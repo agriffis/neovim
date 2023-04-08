@@ -910,7 +910,7 @@ static int add_pack_dir_to_rtp(char *fname, bool is_pack)
   }
   const char *insp = NULL;
   const char *after_insp = NULL;
-  for (const char *entry = (const char *)p_rtp; *entry != NUL;) {
+  for (const char *entry = p_rtp; *entry != NUL;) {
     const char *cur_entry = entry;
 
     copy_option_part((char **)&entry, buf, MAXPATHL, ",");
@@ -945,7 +945,7 @@ static int add_pack_dir_to_rtp(char *fname, bool is_pack)
 
   if (insp == NULL) {
     // Both "fname" and "after" not found, append at the end.
-    insp = (const char *)p_rtp + strlen(p_rtp);
+    insp = p_rtp + strlen(p_rtp);
   }
 
   // check if rtp/pack/name/start/name/after exists
@@ -966,7 +966,7 @@ static int add_pack_dir_to_rtp(char *fname, bool is_pack)
 
   // We now have 'rtp' parts: {keep}{keep_after}{rest}.
   // Create new_rtp, first: {keep},{fname}
-  size_t keep = (size_t)(insp - (const char *)p_rtp);
+  size_t keep = (size_t)(insp - p_rtp);
   memmove(new_rtp, p_rtp, keep);
   size_t new_rtp_len = keep;
   if (*insp == NUL) {
@@ -979,7 +979,7 @@ static int add_pack_dir_to_rtp(char *fname, bool is_pack)
   }
 
   if (afterlen > 0 && after_insp != NULL) {
-    size_t keep_after = (size_t)(after_insp - (const char *)p_rtp);
+    size_t keep_after = (size_t)(after_insp - p_rtp);
 
     // Add to new_rtp: {keep},{fname}{keep_after},{afterdir}
     memmove(new_rtp + new_rtp_len, p_rtp + keep, keep_after - keep);
@@ -1039,7 +1039,7 @@ static int load_pack_plugin(bool opt, char *fname)
     do_cmdline_cmd("augroup filetypedetect");
     vim_snprintf(pat, len, ftpat, ffname);
     source_all_matches(pat);
-    vim_snprintf((char *)pat, len, "%s/ftdetect/*.lua", ffname);  // NOLINT
+    vim_snprintf(pat, len, "%s/ftdetect/*.lua", ffname);  // NOLINT
     source_all_matches(pat);
     do_cmdline_cmd("augroup END");
   }
@@ -1061,7 +1061,7 @@ static void add_pack_plugin(bool opt, char *fname, void *cookie)
     char *buf = xmalloc(MAXPATHL);
     bool found = false;
 
-    const char *p = (const char *)p_rtp;
+    const char *p = p_rtp;
     while (*p != NUL) {
       copy_option_part((char **)&p, buf, MAXPATHL, ",");
       if (path_fnamecmp(buf, fname) == 0) {
@@ -1784,7 +1784,7 @@ static bool concat_continued_line(garray_T *const ga, const int init_growsize, c
                                   size_t len)
   FUNC_ATTR_NONNULL_ALL
 {
-  const char *const line = skipwhite_len((char *)p, len);
+  const char *const line = skipwhite_len(p, len);
   len -= (size_t)(line - p);
   // Skip lines starting with '\" ', concat lines starting with '\'
   if (len >= 3 && strncmp(line, "\"\\ ", 3) == 0) {
@@ -1832,7 +1832,7 @@ static char *get_str_line(int c, void *cookie, int indent, bool do_concat)
       if (!concat_continued_line(&ga, 400, line, (size_t)(next_eol - line))) {
         break;
       }
-      eol = (char *)next_eol;
+      eol = next_eol;
     }
   }
   ga_append(&ga, NUL);
@@ -1878,7 +1878,7 @@ static int source_using_linegetter(void *cookie, LineGetter fgetline, const char
   if (save_sourcing_name == NULL) {
     sname = (char *)traceback_name;
   } else {
-    snprintf((char *)sourcing_name_buf, sizeof(sourcing_name_buf),
+    snprintf(sourcing_name_buf, sizeof(sourcing_name_buf),
              "%s called at %s:%" PRIdLINENR, traceback_name, save_sourcing_name,
              save_sourcing_lnum);
     sname = sourcing_name_buf;
@@ -1925,12 +1925,10 @@ static void cmd_source_buffer(const exarg_T *const eap)
     .offset = 0,
   };
   if (curbuf->b_fname
-      && path_with_extension((const char *)curbuf->b_fname, "lua")) {
-    nlua_source_using_linegetter(get_str_line, (void *)&cookie,
-                                 ":source (no file)");
+      && path_with_extension(curbuf->b_fname, "lua")) {
+    nlua_source_using_linegetter(get_str_line, (void *)&cookie, ":source (no file)");
   } else {
-    source_using_linegetter((void *)&cookie, get_str_line,
-                            ":source (no file)");
+    source_using_linegetter((void *)&cookie, get_str_line, ":source (no file)");
   }
   ga_clear(&ga);
 }
@@ -2134,12 +2132,12 @@ int do_source(char *fname, int check_other, int is_vimrc, int *ret_sid)
 
   cookie.conv.vc_type = CONV_NONE;              // no conversion
 
-  if (path_with_extension((const char *)fname_exp, "lua")) {
+  if (path_with_extension(fname_exp, "lua")) {
     const sctx_T current_sctx_backup = current_sctx;
     current_sctx.sc_sid = SID_LUA;
     current_sctx.sc_lnum = 0;
     // Source the file as lua
-    nlua_exec_file((const char *)fname_exp);
+    nlua_exec_file(fname_exp);
     current_sctx = current_sctx_backup;
   } else {
     // Read the first line so we can check for a UTF-8 BOM.

@@ -611,7 +611,7 @@ static void add_nr_var(dict_T *dp, dictitem_T *v, char *name, varnumber_T nr)
   STRCPY(v->di_key, name);
 #endif
   v->di_flags = DI_FLAGS_RO | DI_FLAGS_FIX;
-  hash_add(&dp->dv_hashtab, (char *)v->di_key);
+  hash_add(&dp->dv_hashtab, v->di_key);
   v->di_tv.v_type = VAR_NUMBER;
   v->di_tv.v_lock = VAR_FIXED;
   v->di_tv.vval.v_number = nr;
@@ -758,7 +758,7 @@ static void funccal_unref(funccall_T *fc, ufunc_T *fp, bool force)
 /// @return true if the entry was deleted, false if it wasn't found.
 static bool func_remove(ufunc_T *fp)
 {
-  hashitem_T *hi = hash_find(&func_hashtab, (char *)UF2HIKEY(fp));
+  hashitem_T *hi = hash_find(&func_hashtab, UF2HIKEY(fp));
   if (HASHITEM_EMPTY(hi)) {
     return false;
   }
@@ -905,7 +905,7 @@ void call_user_func(ufunc_T *fp, int argcount, typval_T *argvars, typval_T *rett
     STRCPY(name, "self");
 #endif
     v->di_flags = DI_FLAGS_RO | DI_FLAGS_FIX;
-    hash_add(&fc->l_vars.dv_hashtab, (char *)v->di_key);
+    hash_add(&fc->l_vars.dv_hashtab, v->di_key);
     v->di_tv.v_type = VAR_DICT;
     v->di_tv.v_lock = VAR_UNLOCKED;
     v->di_tv.vval.v_dict = selfdict;
@@ -931,7 +931,7 @@ void call_user_func(ufunc_T *fp, int argcount, typval_T *argvars, typval_T *rett
     STRCPY(name, "000");
 #endif
     v->di_flags = DI_FLAGS_RO | DI_FLAGS_FIX;
-    hash_add(&fc->l_avars.dv_hashtab, (char *)v->di_key);
+    hash_add(&fc->l_avars.dv_hashtab, v->di_key);
     v->di_tv.v_type = VAR_LIST;
     v->di_tv.v_lock = VAR_FIXED;
     v->di_tv.vval.v_list = &fc->l_varlist;
@@ -1009,9 +1009,9 @@ void call_user_func(ufunc_T *fp, int argcount, typval_T *argvars, typval_T *rett
       // Named arguments can be accessed without the "a:" prefix in lambda
       // expressions. Add to the l: dict.
       tv_copy(&v->di_tv, &v->di_tv);
-      hash_add(&fc->l_vars.dv_hashtab, (char *)v->di_key);
+      hash_add(&fc->l_vars.dv_hashtab, v->di_key);
     } else {
-      hash_add(&fc->l_avars.dv_hashtab, (char *)v->di_key);
+      hash_add(&fc->l_avars.dv_hashtab, v->di_key);
     }
 
     if (ai >= 0 && ai < MAX_FUNC_ARGS) {
@@ -1575,7 +1575,7 @@ int call_func(const char *funcname, int len, typval_T *rettv, int argcount_in, t
         XFREE_CLEAR(name);
         funcname = "v:lua";
       }
-    } else if (fp != NULL || !builtin_function((const char *)rfname, -1)) {
+    } else if (fp != NULL || !builtin_function(rfname, -1)) {
       // User defined function.
       if (fp == NULL) {
         fp = find_func(rfname);
@@ -1589,8 +1589,7 @@ int call_func(const char *funcname, int len, typval_T *rettv, int argcount_in, t
         fp = find_func(rfname);
       }
       // Try loading a package.
-      if (fp == NULL && script_autoload((const char *)rfname, strlen(rfname),
-                                        true) && !aborting()) {
+      if (fp == NULL && script_autoload(rfname, strlen(rfname), true) && !aborting()) {
         // Loaded a package, search for the function again.
         fp = find_func(rfname);
       }
@@ -1666,7 +1665,7 @@ static void list_func_head(ufunc_T *fp, int indent, bool force)
   }
   msg_puts(force ? "function! " : "function ");
   if (fp->uf_name_exp != NULL) {
-    msg_puts((const char *)fp->uf_name_exp);
+    msg_puts(fp->uf_name_exp);
   } else {
     msg_puts(fp->uf_name);
   }
@@ -1676,7 +1675,7 @@ static void list_func_head(ufunc_T *fp, int indent, bool force)
     if (j) {
       msg_puts(", ");
     }
-    msg_puts((const char *)FUNCARG(fp, j));
+    msg_puts(FUNCARG(fp, j));
     if (j >= fp->uf_args.ga_len - fp->uf_def_args.ga_len) {
       msg_puts(" = ");
       msg_puts(((char **)(fp->uf_def_args.ga_data))
@@ -1771,7 +1770,7 @@ char *trans_function_name(char **pp, bool skip, int flags, funcdict_T *fdp, part
         semsg(_(e_invarg2), start);
       }
     } else {
-      *pp = (char *)find_name_end((char *)start, NULL, NULL, FNE_INCL_BR);
+      *pp = (char *)find_name_end(start, NULL, NULL, FNE_INCL_BR);
     }
     goto theend;
   }
@@ -1828,7 +1827,7 @@ char *trans_function_name(char **pp, bool skip, int flags, funcdict_T *fdp, part
     len = (int)strlen(lv.ll_exp_name);
     name = deref_func_name(lv.ll_exp_name, &len, partial,
                            flags & TFN_NO_AUTOLOAD);
-    if ((const char *)name == lv.ll_exp_name) {
+    if (name == lv.ll_exp_name) {
       name = NULL;
     }
   } else if (!(flags & TFN_NO_DEREF)) {
@@ -1881,8 +1880,7 @@ char *trans_function_name(char **pp, bool skip, int flags, funcdict_T *fdp, part
     lead = 0;  // do nothing
   } else if (lead > 0) {
     lead = 3;
-    if ((lv.ll_exp_name != NULL && eval_fname_sid(lv.ll_exp_name))
-        || eval_fname_sid((const char *)(*pp))) {
+    if ((lv.ll_exp_name != NULL && eval_fname_sid(lv.ll_exp_name)) || eval_fname_sid(*pp)) {
       // It's "s:" or "<SID>".
       if (current_sctx.sc_sid <= 0) {
         emsg(_(e_usingsid));
@@ -2209,7 +2207,7 @@ void ex_function(exarg_T *eap)
 
   if (KeyTyped && ui_has(kUICmdline)) {
     show_block = true;
-    ui_ext_cmdline_block_append(0, (const char *)eap->cmd);
+    ui_ext_cmdline_block_append(0, eap->cmd);
   }
 
   // find extra arguments "range", "dict", "abort" and "closure"
@@ -2308,7 +2306,7 @@ void ex_function(exarg_T *eap)
     }
     if (show_block) {
       assert(indent >= 0);
-      ui_ext_cmdline_block_append((size_t)indent, (const char *)theline);
+      ui_ext_cmdline_block_append((size_t)indent, theline);
     }
 
     // Detect line continuation: SOURCING_LNUM increased more than one.
@@ -2390,7 +2388,7 @@ void ex_function(exarg_T *eap)
         if (*p == '!') {
           p = skipwhite(p + 1);
         }
-        p += eval_fname_script((const char *)p);
+        p += eval_fname_script(p);
         xfree(trans_function_name(&p, true, 0, NULL, NULL));
         if (*skipwhite(p) == '(') {
           if (nesting == MAX_FUNC_NESTING - 1) {
@@ -2501,7 +2499,7 @@ void ex_function(exarg_T *eap)
 
   // If there are no errors, add the function
   if (fudi.fd_dict == NULL) {
-    v = find_var((const char *)name, strlen(name), &ht, false);
+    v = find_var(name, strlen(name), &ht, false);
     if (v != NULL && v->di_tv.v_type == VAR_FUNC) {
       emsg_funcname(N_("E707: Function name conflicts with variable: %s"), name);
       goto erret;
@@ -2548,13 +2546,11 @@ void ex_function(exarg_T *eap)
       goto erret;
     }
     if (fudi.fd_di == NULL) {
-      if (value_check_lock(fudi.fd_dict->dv_lock, (const char *)eap->arg,
-                           TV_CSTRING)) {
+      if (value_check_lock(fudi.fd_dict->dv_lock, eap->arg, TV_CSTRING)) {
         // Can't add a function to a locked dictionary
         goto erret;
       }
-    } else if (value_check_lock(fudi.fd_di->di_tv.v_lock, (const char *)eap->arg,
-                                TV_CSTRING)) {
+    } else if (value_check_lock(fudi.fd_di->di_tv.v_lock, eap->arg, TV_CSTRING)) {
       // Can't change an existing function if it is locked
       goto erret;
     }
@@ -2595,7 +2591,7 @@ void ex_function(exarg_T *eap)
     if (fudi.fd_dict != NULL) {
       if (fudi.fd_di == NULL) {
         // Add new dict entry
-        fudi.fd_di = tv_dict_item_alloc((const char *)fudi.fd_newkey);
+        fudi.fd_di = tv_dict_item_alloc(fudi.fd_newkey);
         if (tv_dict_add(fudi.fd_dict, fudi.fd_di) == FAIL) {
           xfree(fudi.fd_di);
           xfree(fp);
@@ -2616,7 +2612,7 @@ void ex_function(exarg_T *eap)
     set_ufunc_name(fp, name);
     if (overwrite) {
       hi = hash_find(&func_hashtab, name);
-      hi->hi_key = (char *)UF2HIKEY(fp);
+      hi->hi_key = UF2HIKEY(fp);
     } else if (hash_add(&func_hashtab, UF2HIKEY(fp)) == FAIL) {
       xfree(fp);
       goto erret;
@@ -2685,7 +2681,7 @@ int eval_fname_script(const char *const p)
 bool translated_function_exists(const char *name)
 {
   if (builtin_function(name, -1)) {
-    return find_internal_func((char *)name) != NULL;
+    return find_internal_func(name) != NULL;
   }
   return find_func(name) != NULL;
 }

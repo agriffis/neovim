@@ -641,7 +641,7 @@ static size_t do_path_expand(garray_T *gap, const char *path, size_t wildoff, in
   while (*path_end != NUL) {
     // May ignore a wildcard that has a backslash before it; it will
     // be removed by rem_backslash() or file_pat_to_reg_pat() below.
-    if (path_end >= path + wildoff && rem_backslash((char *)path_end)) {
+    if (path_end >= path + wildoff && rem_backslash(path_end)) {
       *p++ = *path_end++;
     } else if (vim_ispathsep_nocolon(*path_end)) {
       if (e != NULL) {
@@ -651,12 +651,12 @@ static size_t do_path_expand(garray_T *gap, const char *path, size_t wildoff, in
     } else if (path_end >= path + wildoff
                && (vim_strchr("*?[{~$", (uint8_t)(*path_end)) != NULL
 #ifndef MSWIN
-                   || (!p_fic && (flags & EW_ICASE) && mb_isalpha(utf_ptr2char((char *)path_end)))
+                   || (!p_fic && (flags & EW_ICASE) && mb_isalpha(utf_ptr2char(path_end)))
 #endif
                    )) {  // NOLINT(whitespace/parens)
       e = p;
     }
-    len = (size_t)(utfc_ptr2len((char *)path_end));
+    len = (size_t)(utfc_ptr2len(path_end));
     memcpy(p, path_end, len);
     p += len;
     path_end += len;
@@ -727,9 +727,9 @@ static size_t do_path_expand(garray_T *gap, const char *path, size_t wildoff, in
   char *dirpath = (*buf == NUL ? "." : buf);
   if (os_file_is_readable(dirpath) && os_scandir(&dir, dirpath)) {
     // Find all matching entries.
-    char *name;
+    const char *name;
     scandir_next_with_dots(NULL);  // initialize
-    while (!got_int && (name = (char *)scandir_next_with_dots(&dir)) != NULL) {
+    while (!got_int && (name = scandir_next_with_dots(&dir)) != NULL) {
       if ((name[0] != '.'
            || starts_with_dot
            || ((flags & EW_DODOT)
@@ -973,7 +973,7 @@ static void uniquefy_paths(garray_T *gap, char *pattern)
   for (int i = 0; i < gap->ga_len && !got_int; i++) {
     char *path = fnames[i];
     int is_in_curdir;
-    char *dir_end = (char *)gettail_dir((const char *)path);
+    const char *dir_end = gettail_dir(path);
     char *pathsep_p;
     char *path_cutoff;
 
@@ -1911,8 +1911,8 @@ void path_fix_case(char *name)
     return;
   }
 
-  char *entry;
-  while ((entry = (char *)os_scandir_next(&dir))) {
+  const char *entry;
+  while ((entry = os_scandir_next(&dir))) {
     // Only accept names that differ in case and are the same byte
     // length. TODO: accept different length name.
     if (STRICMP(tail, entry) == 0 && strlen(tail) == strlen(entry)) {
@@ -2021,7 +2021,7 @@ int pathcmp(const char *p, const char *q, int maxlen)
   // ignore a trailing slash, but not "//" or ":/"
   if (c2 == NUL
       && i > 0
-      && !after_pathsep((char *)s, (char *)s + i)
+      && !after_pathsep(s, s + i)
 #ifdef BACKSLASH_IN_FILENAME
       && (c1 == '/' || c1 == '\\')
 #else
@@ -2354,11 +2354,11 @@ int append_path(char *path, const char *to_append, size_t max_len)
 /// @return FAIL for failure, OK for success.
 static int path_to_absolute(const char *fname, char *buf, size_t len, int force)
 {
-  char *p;
+  const char *p;
   *buf = NUL;
 
   char *relative_directory = xmalloc(len);
-  char *end_of_path = (char *)fname;
+  const char *end_of_path = fname;
 
   // expand it if forced or not an absolute path
   if (force || !path_is_absolute(fname)) {

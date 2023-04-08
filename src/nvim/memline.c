@@ -1351,7 +1351,7 @@ int recover_names(char *fname, int list, int nr, char **fname_out)
           // print the swap file name
           msg_outnum((long)++file_count);
           msg_puts(".    ");
-          msg_puts((const char *)path_tail(files[i]));
+          msg_puts(path_tail(files[i]));
           msg_putchar('\n');
           (void)swapfile_info(files[i]);
         }
@@ -1508,7 +1508,7 @@ static time_t swapfile_info(char *fname)
         if (char_to_long(b0.b0_pid) != 0L) {
           msg_puts(_("\n        process ID: "));
           msg_outnum(char_to_long(b0.b0_pid));
-          if (swapfile_process_running(&b0, (const char *)fname)) {
+          if (swapfile_process_running(&b0, fname)) {
             msg_puts(_(" (STILL RUNNING)"));
             process_still_running = true;
           }
@@ -3988,7 +3988,7 @@ int inc(pos_T *lp)
   if (lp->col != MAXCOL) {
     const char *const p = ml_get_pos(lp);
     if (*p != NUL) {  // still within line, move to next char (may be NUL)
-      const int l = utfc_ptr2len((char *)p);
+      const int l = utfc_ptr2len(p);
 
       lp->col += l;
       return ((p[l] != NUL) ? 0 : 2);

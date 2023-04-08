@@ -422,7 +422,7 @@ static int str_to_mapargs(const char *strargs, bool is_unmap, MapArguments *mapa
 
   // {lhs_end} is a pointer to the "terminating whitespace" after {lhs}.
   // Use that to initialize {rhs_start}.
-  const char *rhs_start = skipwhite((char *)lhs_end);
+  const char *rhs_start = skipwhite(lhs_end);
 
   // Given {lhs} might be larger than MAXMAPLEN before replace_termcodes
   // (e.g. "<Space>" is longer than ' '), so first copy into a buffer.
@@ -449,7 +449,7 @@ static int str_to_mapargs(const char *strargs, bool is_unmap, MapArguments *mapa
 /// @param args  "rhs", "rhs_lua", "orig_rhs", "expr", "silent", "nowait", "replace_keycodes" and
 ///              and "desc" fields are used.
 ///              "rhs", "rhs_lua", "orig_rhs" fields are cleared if "simplified" is false.
-/// @param sid  -1 to use current_sctx
+/// @param sid  0 to use current_sctx
 static void map_add(buf_T *buf, mapblock_T **map_table, mapblock_T **abbr_table, const char *keys,
                     MapArguments *args, int noremap, int mode, bool is_abbr, scid_T sid,
                     linenr_T lnum, bool simplified)
@@ -482,7 +482,7 @@ static void map_add(buf_T *buf, mapblock_T **map_table, mapblock_T **abbr_table,
   mp->m_simplified = simplified;
   mp->m_expr = args->expr;
   mp->m_replace_keycodes = args->replace_keycodes;
-  if (sid >= 0) {
+  if (sid != 0) {
     mp->m_script_ctx.sc_sid = sid;
     mp->m_script_ctx.sc_lnum = lnum;
   } else {
@@ -594,15 +594,15 @@ static int buf_do_map(int maptype, MapArguments *args, int mode, bool is_abbrev,
 
         const int first = vim_iswordp(lhs);
         int last = first;
-        p = (char *)lhs + utfc_ptr2len((char *)lhs);
+        p = lhs + utfc_ptr2len(lhs);
         n = 1;
-        while (p < (char *)lhs + len) {
+        while (p < lhs + len) {
           n++;                                  // nr of (multi-byte) chars
           last = vim_iswordp(p);                // type of last char
           if (same == -1 && last != first) {
             same = n - 1;                       // count of same char type
           }
-          p += utfc_ptr2len((char *)p);
+          p += utfc_ptr2len(p);
         }
         if (last && n > 2 && same >= 0 && same < n - 1) {
           retval = 1;
@@ -733,8 +733,7 @@ static int buf_do_map(int maptype, MapArguments *args, int mode, bool is_abbrev,
                 // we ignore trailing space when matching with
                 // the "lhs", since an abbreviation can't have
                 // trailing space.
-                if (n != len && (!is_abbrev || round || n > len
-                                 || *skipwhite((char *)lhs + n) != NUL)) {
+                if (n != len && (!is_abbrev || round || n > len || *skipwhite(lhs + n) != NUL)) {
                   mpp = &(mp->m_next);
                   continue;
                 }
@@ -857,9 +856,9 @@ static int buf_do_map(int maptype, MapArguments *args, int mode, bool is_abbrev,
     }
 
     // Get here when adding a new entry to the maphash[] list or abbrlist.
-    map_add(buf, map_table, abbr_table, (char *)lhs, args, noremap, mode, is_abbrev,
-            -1,  // sid
-            0,   // lnum
+    map_add(buf, map_table, abbr_table, lhs, args, noremap, mode, is_abbrev,
+            0,  // sid
+            0,  // lnum
             keyround1_simplified);
   }
 
@@ -1501,7 +1500,7 @@ bool check_abbr(int c, char *ptr, int col, int mincol)
       char *q = mp->m_keys;
       int match;
 
-      if (strchr((const char *)mp->m_keys, K_SPECIAL) != NULL) {
+      if (strchr(mp->m_keys, K_SPECIAL) != NULL) {
         // Might have K_SPECIAL escaped mp->m_keys.
         q = xstrdup(mp->m_keys);
         vim_unescape_ks(q);
@@ -1811,8 +1810,7 @@ int makemap(FILE *fd, buf_T *buf)
               did_cpo = true;
             } else {
               const char specials[] = { (char)(uint8_t)K_SPECIAL, NL, NUL };
-              if (strpbrk((const char *)mp->m_str, specials) != NULL
-                  || strpbrk((const char *)mp->m_keys, specials) != NULL) {
+              if (strpbrk(mp->m_str, specials) != NULL || strpbrk(mp->m_keys, specials) != NULL) {
                 did_cpo = true;
               }
             }
@@ -2091,7 +2089,7 @@ static Dictionary mapblock_fill_dict(const mapblock_T *const mp, const char *lhs
     PUT(dict, "desc", STRING_OBJ(cstr_to_string(mp->m_desc)));
   }
   PUT(dict, "lhs", STRING_OBJ(cstr_as_string(lhs)));
-  PUT(dict, "lhsraw", STRING_OBJ(cstr_to_string((const char *)mp->m_keys)));
+  PUT(dict, "lhsraw", STRING_OBJ(cstr_to_string(mp->m_keys)));
   if (lhsrawalt != NULL) {
     // Also add the value for the simplified entry.
     PUT(dict, "lhsrawalt", STRING_OBJ(cstr_to_string(lhsrawalt)));
@@ -2646,10 +2644,10 @@ void modify_keymap(uint64_t channel_id, Buffer buffer, bool is_unmap, String mod
   case 0:
     break;
   case 1:
-    api_set_error(err, kErrorTypeException, (char *)e_invarg, 0);
+    api_set_error(err, kErrorTypeException, e_invarg, 0);
     goto fail_and_free;
   case 2:
-    api_set_error(err, kErrorTypeException, (char *)e_nomap, 0);
+    api_set_error(err, kErrorTypeException, e_nomap, 0);
     goto fail_and_free;
   case 5:
     api_set_error(err, kErrorTypeException,

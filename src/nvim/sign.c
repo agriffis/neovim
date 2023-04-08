@@ -100,7 +100,7 @@ static signgroup_T *sign_group_ref(const char *groupname)
   signgroup_T *group;
 
   hash = hash_hash(groupname);
-  hi = hash_lookup(&sg_table, (char *)groupname, strlen(groupname), hash);
+  hi = hash_lookup(&sg_table, groupname, strlen(groupname), hash);
   if (HASHITEM_EMPTY(hi)) {
     // new group
     group = xmalloc(offsetof(signgroup_T, sg_name) + strlen(groupname) + 1);
@@ -156,7 +156,7 @@ static int sign_group_get_next_signid(buf_T *buf, const char *groupname)
   int found = false;
 
   if (groupname != NULL) {
-    hashitem_T *hi = hash_find(&sg_table, (char *)groupname);
+    hashitem_T *hi = hash_find(&sg_table, groupname);
     if (HASHITEM_EMPTY(hi)) {
       return id;
     }
@@ -174,7 +174,7 @@ static int sign_group_get_next_signid(buf_T *buf, const char *groupname)
     // Check whether this sign is already placed in the buffer
     found = true;
     FOR_ALL_SIGNS_IN_BUF(buf, sign) {
-      if (id == sign->se_id && sign_in_group(sign, (char *)groupname)) {
+      if (id == sign->se_id && sign_in_group(sign, groupname)) {
         found = false;    // sign identifier is in use
         break;
       }
@@ -442,7 +442,7 @@ static linenr_T buf_change_sign_type(buf_T *buf, int markId, const char *group, 
   sign_entry_T *sign;  // a sign in the signlist
 
   FOR_ALL_SIGNS_IN_BUF(buf, sign) {
-    if (sign->se_id == markId && sign_in_group(sign, (char *)group)) {
+    if (sign->se_id == markId && sign_in_group(sign, group)) {
       sign->se_typenr = typenr;
       sign->se_priority = prio;
       sign_sort_by_prio_on_line(buf, sign);
@@ -1085,23 +1085,17 @@ static int sign_place(int *sign_id, const char *sign_group, const char *sign_nam
     return FAIL;
   }
   if (*sign_id == 0) {
-    *sign_id = sign_group_get_next_signid(buf, (char *)sign_group);
+    *sign_id = sign_group_get_next_signid(buf, sign_group);
   }
 
   if (lnum > 0) {
     // ":sign place {id} line={lnum} name={name} file={fname}":
     // place a sign
     bool has_text_or_icon = sp->sn_text != NULL || sp->sn_icon != NULL;
-    buf_addsign(buf,
-                *sign_id,
-                (char *)sign_group,
-                prio,
-                lnum,
-                sp->sn_typenr,
-                has_text_or_icon);
+    buf_addsign(buf, *sign_id, sign_group, prio, lnum, sp->sn_typenr, has_text_or_icon);
   } else {
     // ":sign place {id} file={fname}": change sign type and/or priority
-    lnum = buf_change_sign_type(buf, *sign_id, (char *)sign_group, sp->sn_typenr, prio);
+    lnum = buf_change_sign_type(buf, *sign_id, sign_group, sp->sn_typenr, prio);
   }
   if (lnum > 0) {
     redraw_buf_line_later(buf, lnum, false);
@@ -1585,7 +1579,7 @@ static void sign_getlist(const char *name, list_T *retlist)
   sign_T *sp = first_sign;
 
   if (name != NULL) {
-    sp = sign_find((char *)name, NULL);
+    sp = sign_find(name, NULL);
     if (sp == NULL) {
       return;
     }
@@ -1633,7 +1627,7 @@ static void sign_get_placed_in_buf(buf_T *buf, linenr_T lnum, int sign_id, const
   tv_dict_add_list(d, S_LEN("signs"), l);
 
   FOR_ALL_SIGNS_IN_BUF(buf, sign) {
-    if (!sign_in_group(sign, (char *)sign_group)) {
+    if (!sign_in_group(sign, sign_group)) {
       continue;
     }
     if ((lnum == 0 && sign_id == 0)
@@ -2154,7 +2148,7 @@ static int sign_place_from_dict(typval_T *id_tv, typval_T *group_tv, typval_T *n
 {
   int sign_id = 0;
   char *group = NULL;
-  char *sign_name = NULL;
+  const char *sign_name = NULL;
   buf_T *buf = NULL;
   dictitem_T *di;
   linenr_T lnum = 0;
@@ -2213,7 +2207,7 @@ static int sign_place_from_dict(typval_T *id_tv, typval_T *group_tv, typval_T *n
   if (name_tv == NULL) {
     goto cleanup;
   }
-  sign_name = (char *)tv_get_string_chk(name_tv);
+  sign_name = tv_get_string_chk(name_tv);
   if (sign_name == NULL) {
     goto cleanup;
   }
@@ -2313,7 +2307,7 @@ static void sign_undefine_multiple(list_T *l, list_T *retlist)
   TV_LIST_ITER_CONST(l, li, {
     retval = -1;
     name = (char *)tv_get_string_chk(TV_LIST_ITEM_TV(li));
-    if (name != NULL && (sign_undefine_by_name((char *)name) == OK)) {
+    if (name != NULL && (sign_undefine_by_name(name) == OK)) {
       retval = 0;
     }
     tv_list_append_number(retlist, retval);

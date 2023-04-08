@@ -268,7 +268,7 @@ int open_buffer(int read_stdin, exarg_T *eap, int flags_arg)
     int save_bin = curbuf->b_p_bin;
     int perm;
 
-    perm = os_getperm((const char *)curbuf->b_ffname);
+    perm = os_getperm(curbuf->b_ffname);
     if (perm >= 0 && (0 || S_ISFIFO(perm)
                       || S_ISSOCK(perm)
 # ifdef OPEN_CHR_FILES
@@ -2231,7 +2231,7 @@ int buflist_findpat(const char *pattern, const char *pattern_end, bool unlisted,
     // Repeat this for finding an unlisted buffer if there was no matching
     // listed buffer.
 
-    pat = file_pat_to_reg_pat((char *)pattern, (char *)pattern_end, NULL, false);
+    pat = file_pat_to_reg_pat(pattern, pattern_end, NULL, false);
     if (pat == NULL) {
       return -1;
     }
@@ -3309,8 +3309,7 @@ void maketitle(void)
                                      SPACE_FOR_FNAME + 1);
         buf_p += MIN(size, SPACE_FOR_FNAME);
       } else {
-        buf_p += transstr_buf((const char *)path_tail(curbuf->b_fname),
-                              -1, buf_p, SPACE_FOR_FNAME + 1, true);
+        buf_p += transstr_buf(path_tail(curbuf->b_fname), -1, buf_p, SPACE_FOR_FNAME + 1, true);
       }
 
       switch (bufIsChanged(curbuf)
@@ -3557,7 +3556,7 @@ void fname_expand(buf_T *buf, char **ffname, char **sfname)
 #ifdef MSWIN
   if (!buf->b_p_bin) {
     // If the file name is a shortcut file, use the file it links to.
-    char *rfname = os_resolve_shortcut((const char *)(*ffname));
+    char *rfname = os_resolve_shortcut(*ffname);
     if (rfname != NULL) {
       xfree(*ffname);
       *ffname = rfname;

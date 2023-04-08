@@ -3643,7 +3643,7 @@ static bool syn_list_keywords(const int id, const hashtab_T *const ht, bool did_
             prev_skipempty = (kp->flags & HL_SKIPEMPTY);
           }
         }
-        msg_outtrans((char *)kp->keyword);
+        msg_outtrans(kp->keyword);
       }
     }
   }
@@ -3674,7 +3674,7 @@ static void syn_clear_keyword(int id, hashtab_T *ht)
           if (kp_next == NULL) {
             hash_remove(ht, hi);
           } else {
-            hi->hi_key = (char *)KE2HIKEY(kp_next);
+            hi->hi_key = KE2HIKEY(kp_next);
           }
         } else {
           kp_prev->ke_next = kp_next;
@@ -3749,7 +3749,7 @@ static void add_keyword(char *const name, const int id, const int flags,
   hashtab_T *const ht = (curwin->w_s->b_syn_ic)
       ? &curwin->w_s->b_keywtab_ic
       : &curwin->w_s->b_keywtab;
-  hashitem_T *const hi = hash_lookup(ht, (const char *)kp->keyword,
+  hashitem_T *const hi = hash_lookup(ht, kp->keyword,
                                      strlen(kp->keyword), hash);
 
   // even though it looks like only the kp->keyword member is
@@ -3763,7 +3763,7 @@ static void add_keyword(char *const name, const int id, const int flags,
   } else {
     // keyword already exists, prepend to list
     kp->ke_next = HI2KE(hi);
-    hi->hi_key = (char *)KE2HIKEY(kp);
+    hi->hi_key = KE2HIKEY(kp);
   }
 }
 
@@ -5370,7 +5370,7 @@ void set_context_in_syntax_cmd(expand_T *xp, const char *arg)
   }
 
   // (part of) subcommand already typed
-  const char *p = (const char *)skiptowhite(arg);
+  const char *p = skiptowhite(arg);
   if (*p == NUL) {
     return;
   }
