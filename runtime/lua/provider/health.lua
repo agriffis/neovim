@@ -137,7 +137,7 @@ local function system(cmd, ...)
 
   -- return opts.output
   local _ = ...
-  return vim.fn.system(cmd)
+  return vim.trim(vim.fn.system(cmd))
 end
 
 local function clipboard()
@@ -372,6 +372,13 @@ local function version_info(python)
   return { python_version, nvim_version, pypi_version, version_status }
 end
 
+-- Resolves Python executable path by invoking and checking `sys.executable`.
+local function python_exepath(invocation)
+  return vim.fs.normalize(
+    system(vim.fn.fnameescape(invocation) .. ' -c "import sys; sys.stdout.write(sys.executable)"')
+  )
+end
+
 local function python()
   start('Python 3 provider (optional)')
 
@@ -390,8 +397,8 @@ local function python()
   local pyenv = pyenv_table[1]
   local pyenv_root = pyenv_table[2]
 
-  if vim.g['host_prog_var'] then
-    local message = 'Using: g:' .. host_prog_var .. ' = "' .. vim.g['host_prog_var'] .. '"'
+  if vim.g[host_prog_var] then
+    local message = 'Using: g:' .. host_prog_var .. ' = "' .. vim.g[host_prog_var] .. '"'
     info(message)
   end
 
@@ -404,7 +411,7 @@ local function python()
       'No Python executable found that can `import neovim`. '
         .. 'Using the first available executable for diagnostics.'
     )
-  elseif vim.g['host_prog_var'] then
+  elseif vim.g[host_prog_var] then
     python_exe = pyname
   end
 
@@ -415,7 +422,7 @@ local function python()
       'You may disable this provider (and warning) by adding `let g:loaded_python3_provider = 0` to your init.vim',
     })
   elseif not is_blank(pyname) and is_blank(python_exe) then
-    if not vim.g['host_prog_var'] then
+    if not vim.g[host_prog_var] then
       local message = '`g:'
         .. host_prog_var
         .. '` is not set.  Searching for '
@@ -489,7 +496,7 @@ local function python()
       if not is_blank(pyenv_root) then
         venv_root = pyenv_root
       else
-        venv_root = vim.fs.basename(venv)
+        venv_root = vim.fs.dirname(venv)
       end
 
       if vim.startswith(vim.fn.resolve(python_exe), venv_root .. '/') then
@@ -569,11 +576,341 @@ local function python()
       ok('Latest pynvim is installed.')
     end
   end
+
+  start('Python virtualenv')
+  if not virtual_env then
+    ok('no $VIRTUAL_ENV')
+    return
+  end
+  local errors = {}
+  -- Keep hints as dict keys in order to discard duplicates.
+  local hints = {}
+  -- The virtualenv should contain some Python executables, and those
+  -- executables should be first both on Nvim's $PATH and the $PATH of
+  -- subshells launched from Nvim.
+  local bin_dir = iswin and 'Scripts' or 'bin'
+  local venv_bins = vim.tbl_filter(function(v)
+    -- XXX: Remove irrelevant executables found in bin/.
+    return not v:match('python%-config')
+  end, vim.fn.glob(string.format('%s/%s/python*', virtual_env, bin_dir), true, true))
+  if vim.tbl_count(venv_bins) > 0 then
+    for _, venv_bin in pairs(venv_bins) do
+      venv_bin = vim.fs.normalize(venv_bin)
+      local py_bin_basename = vim.fs.basename(venv_bin)
+      local nvim_py_bin = python_exepath(vim.fn.exepath(py_bin_basename))
+      local subshell_py_bin = python_exepath(py_bin_basename)
+      if venv_bin ~= nvim_py_bin then
+        errors[#errors + 1] = '$PATH yields this '
+          .. py_bin_basename
+          .. ' executable: '
+          .. nvim_py_bin
+        local hint = '$PATH ambiguities arise if the virtualenv is not '
+          .. 'properly activated prior to launching Nvim. Close Nvim, activate the virtualenv, '
+          .. 'check that invoking Python from the command line launches the correct one, '
+          .. 'then relaunch Nvim.'
+        hints[hint] = true
+      end
+      if venv_bin ~= subshell_py_bin then
+        errors[#errors + 1] = '$PATH in subshells yields this '
+          .. py_bin_basename
+          .. ' executable: '
+          .. subshell_py_bin
+        local hint = '$PATH ambiguities in subshells typically are '
+          .. 'caused by your shell config overriding the $PATH previously set by the '
+          .. 'virtualenv. Either prevent them from doing so, or use this workaround: '
+          .. 'https://vi.stackexchange.com/a/34996'
+        hints[hint] = true
+      end
+    end
+  else
+    errors[#errors + 1] = 'no Python executables found in the virtualenv '
+      .. bin_dir
+      .. ' directory.'
+  end
+
+  local msg = '$VIRTUAL_ENV is set to: ' .. virtual_env
+  if vim.tbl_count(errors) > 0 then
+    if vim.tbl_count(venv_bins) > 0 then
+      msg = msg
+        .. '\nAnd its '
+        .. bin_dir
+        .. ' directory contains: '
+        .. vim.fn.join(vim.fn.map(venv_bins, [[fnamemodify(v:val, ':t')]]), ', ')
+    end
+    local conj = '\nBut '
+    for _, err in ipairs(errors) do
+      msg = msg .. conj .. err
+      conj = '\nAnd '
+    end
+    msg = msg .. '\nSo invoking Python may lead to unexpected results.'
+    warn(msg, vim.fn.keys(hints))
+  else
+    info(msg)
+    info(
+      'Python version: '
+        .. system('python -c "import platform, sys; sys.stdout.write(platform.python_version())"')
+    )
+    ok('$VIRTUAL_ENV provides :!python.')
+  end
+end
+
+local function ruby()
+  start('Ruby provider (optional)')
+
+  if disabled_via_loaded_var('ruby') then
+    return
+  end
+
+  if not executable('ruby') or not executable('gem') then
+    warn(
+      '`ruby` and `gem` must be in $PATH.',
+      'Install Ruby and verify that `ruby` and `gem` commands work.'
+    )
+    return
+  end
+  info('Ruby: ' .. system({ 'ruby', '-v' }))
+
+  local ruby_detect_table = vim.fn['provider#ruby#Detect']()
+  local host = ruby_detect_table[1]
+  if is_blank(host) then
+    warn('`neovim-ruby-host` not found.', {
+      'Run `gem install neovim` to ensure the neovim RubyGem is installed.',
+      'Run `gem environment` to ensure the gem bin directory is in $PATH.',
+      'If you are using rvm/rbenv/chruby, try "rehashing".',
+      'See :help g:ruby_host_prog for non-standard gem installations.',
+      'You may disable this provider (and warning) by adding `let g:loaded_ruby_provider = 0` to your init.vim',
+    })
+    return
+  end
+  info('Host: ' .. host)
+
+  local latest_gem_cmd = (iswin and 'cmd /c gem list -ra "^^neovim$"' or 'gem list -ra ^neovim$')
+  local latest_gem = system(vim.fn.split(latest_gem_cmd))
+  if shell_error() or is_blank(latest_gem) then
+    error(
+      'Failed to run: ' .. latest_gem_cmd,
+      { "Make sure you're connected to the internet.", 'Are you behind a firewall or proxy?' }
+    )
+    return
+  end
+  local gem_split = vim.split(latest_gem, [[neovim (\|, \|)$]])
+  latest_gem = gem_split[1] or 'not found'
+
+  local current_gem_cmd = { host, '--version' }
+  local current_gem = system(current_gem_cmd)
+  if shell_error() then
+    error(
+      'Failed to run: ' .. table.concat(current_gem_cmd, ' '),
+      { 'Report this issue with the output of: ', table.concat(current_gem_cmd, ' ') }
+    )
+    return
+  end
+
+  if vim.version.lt(current_gem, latest_gem) then
+    local message = 'Gem "neovim" is out-of-date. Installed: '
+      .. current_gem
+      .. ', latest: '
+      .. latest_gem
+    warn(message, 'Run in shell: gem update neovim')
+  else
+    ok('Latest "neovim" gem is installed: ' .. current_gem)
+  end
+end
+
+local function node()
+  start('Node.js provider (optional)')
+
+  if disabled_via_loaded_var('node') then
+    return
+  end
+
+  if
+    not executable('node')
+    or (not executable('npm') and not executable('yarn') and not executable('pnpm'))
+  then
+    warn(
+      '`node` and `npm` (or `yarn`, `pnpm`) must be in $PATH.',
+      'Install Node.js and verify that `node` and `npm` (or `yarn`, `pnpm`) commands work.'
+    )
+    return
+  end
+
+  -- local node_v = vim.fn.split(system({'node', '-v'}), "\n")[1] or ''
+  local node_v = system({ 'node', '-v' })
+  info('Node.js: ' .. node_v)
+  if shell_error() or vim.version.lt(node_v, '6.0.0') then
+    warn('Nvim node.js host does not support Node ' .. node_v)
+    -- Skip further checks, they are nonsense if nodejs is too old.
+    return
+  end
+  if vim.fn['provider#node#can_inspect']() == 0 then
+    warn(
+      'node.js on this system does not support --inspect-brk so $NVIM_NODE_HOST_DEBUG is ignored.'
+    )
+  end
+
+  local node_detect_table = vim.fn['provider#node#Detect']()
+  local host = node_detect_table[1]
+  if is_blank(host) then
+    warn('Missing "neovim" npm (or yarn, pnpm) package.', {
+      'Run in shell: npm install -g neovim',
+      'Run in shell (if you use yarn): yarn global add neovim',
+      'Run in shell (if you use pnpm): pnpm install -g neovim',
+      'You may disable this provider (and warning) by adding `let g:loaded_node_provider = 0` to your init.vim',
+    })
+    return
+  end
+  info('Nvim node.js host: ' .. host)
+
+  local manager = 'npm'
+  if executable('yarn') then
+    manager = 'yarn'
+  elseif executable('pnpm') then
+    manager = 'pnpm'
+  end
+
+  local latest_npm_cmd = (
+    iswin and 'cmd /c ' .. manager .. ' info neovim --json' or manager .. ' info neovim --json'
+  )
+  local latest_npm = system(vim.fn.split(latest_npm_cmd))
+  if shell_error() or is_blank(latest_npm) then
+    error(
+      'Failed to run: ' .. latest_npm_cmd,
+      { "Make sure you're connected to the internet.", 'Are you behind a firewall or proxy?' }
+    )
+    return
+  end
+
+  local pcall_ok, output = pcall(vim.fn.json_decode, latest_npm)
+  local pkg_data
+  if pcall_ok then
+    pkg_data = output
+  else
+    return 'error: ' .. latest_npm
+  end
+  local latest_npm_subtable = pkg_data['dist-tags'] or {}
+  latest_npm = latest_npm_subtable['latest'] or 'unable to parse'
+
+  local current_npm_cmd = { 'node', host, '--version' }
+  local current_npm = system(current_npm_cmd)
+  if shell_error() then
+    error(
+      'Failed to run: ' .. table.concat(current_npm_cmd, ' '),
+      { 'Report this issue with the output of: ', table.concat(current_npm_cmd, ' ') }
+    )
+    return
+  end
+
+  if latest_npm ~= 'unable to parse' and vim.version.lt(current_npm, latest_npm) then
+    local message = 'Package "neovim" is out-of-date. Installed: '
+      .. current_npm
+      .. ' latest: '
+      .. latest_npm
+    warn(message({
+      'Run in shell: npm install -g neovim',
+      'Run in shell (if you use yarn): yarn global add neovim',
+      'Run in shell (if you use pnpm): pnpm install -g neovim',
+    }))
+  else
+    ok('Latest "neovim" npm/yarn/pnpm package is installed: ' .. current_npm)
+  end
+end
+
+local function perl()
+  start('Perl provider (optional)')
+
+  if disabled_via_loaded_var('perl') then
+    return
+  end
+
+  local perl_detect_table = vim.fn['provider#perl#Detect']()
+  local perl_exec = perl_detect_table[1]
+  local perl_warnings = perl_detect_table[2]
+
+  if is_blank(perl_exec) then
+    if not is_blank(perl_warnings) then
+      warn(perl_warnings, {
+        'See :help provider-perl for more information.',
+        'You may disable this provider (and warning) by adding `let g:loaded_perl_provider = 0` to your init.vim',
+      })
+    else
+      warn('No usable perl executable found')
+    end
+    return
+  end
+
+  info('perl executable: ' .. perl_exec)
+
+  -- we cannot use cpanm that is on the path, as it may not be for the perl
+  -- set with g:perl_host_prog
+  system({ perl_exec, '-W', '-MApp::cpanminus', '-e', '' })
+  if shell_error() then
+    return { perl_exec, '"App::cpanminus" module is not installed' }
+  end
+
+  local latest_cpan_cmd = {
+    perl_exec,
+    '-MApp::cpanminus::fatscript',
+    '-e',
+    'my $app = App::cpanminus::script->new; $app->parse_options ("--info", "-q", "Neovim::Ext"); exit $app->doit',
+  }
+
+  local latest_cpan = system(latest_cpan_cmd)
+  if shell_error() or is_blank(latest_cpan) then
+    error(
+      'Failed to run: ' .. table.concat(latest_cpan_cmd, ' '),
+      { "Make sure you're connected to the internet.", 'Are you behind a firewall or proxy?' }
+    )
+    return
+  elseif latest_cpan[1] == '!' then
+    local cpanm_errs = vim.split(latest_cpan, '!')
+    if cpanm_errs[1]:find("Can't write to ") then
+      local advice = {}
+      for i = 2, #cpanm_errs do
+        advice[#advice + 1] = cpanm_errs[i]
+      end
+
+      warn(cpanm_errs[1], advice)
+      -- Last line is the package info
+      latest_cpan = cpanm_errs[#cpanm_errs]
+    else
+      error('Unknown warning from command: ' .. latest_cpan_cmd, cpanm_errs)
+      return
+    end
+  end
+  latest_cpan = vim.fn.matchstr(latest_cpan, [[\(\.\?\d\)\+]])
+  if is_blank(latest_cpan) then
+    error('Cannot parse version number from cpanm output: ' .. latest_cpan)
+    return
+  end
+
+  local current_cpan_cmd = { perl_exec, '-W', '-MNeovim::Ext', '-e', 'print $Neovim::Ext::VERSION' }
+  local current_cpan = system(current_cpan_cmd)
+  if shell_error then
+    error(
+      'Failed to run: ' .. table.concat(current_cpan_cmd, ' '),
+      { 'Report this issue with the output of: ', table.concat(current_cpan_cmd, ' ') }
+    )
+    return
+  end
+
+  if vim.version.lt(current_cpan, latest_cpan) then
+    local message = 'Module "Neovim::Ext" is out-of-date. Installed: '
+      .. current_cpan
+      .. ', latest: '
+      .. latest_cpan
+    warn(message, 'Run in shell: cpanm -n Neovim::Ext')
+  else
+    ok('Latest "Neovim::Ext" cpan module is installed: ' .. current_cpan)
+  end
 end
 
 function M.check()
   clipboard()
   python()
+  ruby()
+  node()
+  perl()
 end
 
 return M
