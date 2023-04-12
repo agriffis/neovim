@@ -30,7 +30,7 @@ CHANGED FEATURES                                                 *news-changed*
 
 The following changes to existing APIs or features add new behavior.
 
-• ...
+• |vim.region()| can use a string accepted by |getpos()| as position.
 
 ==============================================================================
 REMOVED FEATURES                                                 *news-removed*
@@ -38,6 +38,9 @@ REMOVED FEATURES                                                 *news-removed*
 The following deprecated functions or APIs were removed.
 
 • ...
+
+• Vimball support is removed.
+  - :Vimuntar command removed.
 
 ==============================================================================
 DEPRECATIONS                                                *news-deprecations*
