@@ -453,10 +453,10 @@ func Test_getcompletion()
   let l = getcompletion('blahblah', 'augroup')
   call assert_equal([], l)
 
-  let l = getcompletion('', 'behave')
-  call assert_true(index(l, 'mswin') >= 0)
-  let l = getcompletion('not', 'behave')
-  call assert_equal([], l)
+  " let l = getcompletion('', 'behave')
+  " call assert_true(index(l, 'mswin') >= 0)
+  " let l = getcompletion('not', 'behave')
+  " call assert_equal([], l)
 
   let l = getcompletion('', 'color')
   call assert_true(index(l, 'default') >= 0)
@@ -2770,6 +2770,7 @@ endfunc
 
 " :behave suboptions fuzzy completion
 func Test_fuzzy_completion_behave()
+  throw 'Skipped: Nvim removed :behave'
   set wildoptions&
   call feedkeys(":behave xm\<Tab>\<C-B>\"\<CR>", 'tx')
   call assert_equal('"behave xm', @:)

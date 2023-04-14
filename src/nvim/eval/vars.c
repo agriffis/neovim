@@ -175,25 +175,16 @@ static list_T *heredoc_get(exarg_T *eap, char *cmd)
 /// ":let var ..= expr" assignment command.
 /// ":let [var1, var2] = expr" unpack list.
 /// ":let [name, ..., ; lastname] = expr" unpack list.
-void ex_let(exarg_T *eap)
-{
-  ex_let_const(eap, false);
-}
-
+///
 /// ":cons[t] var = expr1" define constant
 /// ":cons[t] [name1, name2, ...] = expr1" define constants unpacking list
 /// ":cons[t] [name, ..., ; lastname] = expr" define constants unpacking list
-void ex_const(exarg_T *eap)
+void ex_let(exarg_T *eap)
 {
-  ex_let_const(eap, true);
-}
-
-static void ex_let_const(exarg_T *eap, const bool is_const)
-{
+  const bool is_const = eap->cmdidx == CMD_const;
   char *arg = eap->arg;
   char *expr = NULL;
   typval_T rettv;
-  int i;
   int var_count = 0;
   int semicolon = 0;
   char op[2];
@@ -208,8 +199,10 @@ static void ex_let_const(exarg_T *eap, const bool is_const)
     argend--;
   }
   expr = skipwhite(argend);
-  if (*expr != '=' && !((vim_strchr("+-*/%.", (uint8_t)(*expr)) != NULL
-                         && expr[1] == '=') || strncmp(expr, "..=", 3) == 0)) {
+  bool concat = strncmp(expr, "..=", 3) == 0;
+  bool has_assign = *expr == '=' || (vim_strchr("+-*/%.", (uint8_t)(*expr)) != NULL
+                                     && expr[1] == '=');
+  if (!has_assign && !concat) {
     // ":let" without "=": list variables
     if (*arg == '[') {
       emsg(_(e_invarg));
@@ -227,7 +220,10 @@ static void ex_let_const(exarg_T *eap, const bool is_const)
       list_vim_vars(&first);
     }
     eap->nextcmd = check_nextcmd(arg);
-  } else if (expr[0] == '=' && expr[1] == '<' && expr[2] == '<') {
+    return;
+  }
+
+  if (expr[0] == '=' && expr[1] == '<' && expr[2] == '<') {
     // HERE document
     list_T *l = heredoc_get(eap, expr + 3);
     if (l != NULL) {
@@ -239,36 +235,44 @@ static void ex_let_const(exarg_T *eap, const bool is_const)
       }
       tv_clear(&rettv);
     }
+    return;
+  }
+
+  rettv.v_type = VAR_UNKNOWN;
+
+  op[0] = '=';
+  op[1] = NUL;
+  if (*expr != '=') {
+    if (vim_strchr("+-*/%.", (uint8_t)(*expr)) != NULL) {
+      op[0] = *expr;  // +=, -=, *=, /=, %= or .=
+      if (expr[0] == '.' && expr[1] == '.') {  // ..=
+        expr++;
+      }
+    }
+    expr += 2;
   } else {
-    op[0] = '=';
-    op[1] = NUL;
-    if (*expr != '=') {
-      if (vim_strchr("+-*/%.", (uint8_t)(*expr)) != NULL) {
-        op[0] = *expr;  // +=, -=, *=, /=, %= or .=
-        if (expr[0] == '.' && expr[1] == '.') {  // ..=
-          expr++;
-        }
-      }
-      expr += 2;
-    } else {
-      expr += 1;
-    }
+    expr += 1;
+  }
 
-    expr = skipwhite(expr);
+  expr = skipwhite(expr);
 
-    if (eap->skip) {
-      emsg_skip++;
-    }
-    i = eval0(expr, &rettv, &eap->nextcmd, !eap->skip);
-    if (eap->skip) {
-      if (i != FAIL) {
-        tv_clear(&rettv);
-      }
-      emsg_skip--;
-    } else if (i != FAIL) {
-      (void)ex_let_vars(eap->arg, &rettv, false, semicolon, var_count, is_const, op);
-      tv_clear(&rettv);
-    }
+  if (eap->skip) {
+    emsg_skip++;
+  }
+  evalarg_T evalarg = {
+    .eval_flags = eap->skip ? 0 : EVAL_EVALUATE,
+    .eval_cookie = eap->getline == getsourceline ? eap->cookie : NULL,
+  };
+  int eval_res = eval0(expr, &rettv, eap, &evalarg);
+  if (eap->skip) {
+    emsg_skip--;
+  }
+
+  if (!eap->skip && eval_res != FAIL) {
+    (void)ex_let_vars(eap->arg, &rettv, false, semicolon, var_count, is_const, op);
+  }
+  if (eval_res != FAIL) {
+    tv_clear(&rettv);
   }
 }
 
@@ -506,7 +510,7 @@ static const char *list_arg_vars(exarg_T *eap, const char *arg, int *first)
         } else {
           // handle d.key, l[idx], f(expr)
           const char *const arg_subsc = arg;
-          if (handle_subscript(&arg, &tv, true, true) == FAIL) {
+          if (handle_subscript(&arg, &tv, EVAL_EVALUATE, true) == FAIL) {
             error = true;
           } else {
             if (arg == arg_subsc && len == 2 && name[1] == ':') {
@@ -1713,7 +1717,7 @@ bool var_exists(const char *var)
     n = get_var_tv(name, len, &tv, NULL, false, true) == OK;
     if (n) {
       // Handle d.key, l[idx], f(expr).
-      n = handle_subscript(&var, &tv, true, false) == OK;
+      n = handle_subscript(&var, &tv, EVAL_EVALUATE, false) == OK;
       if (n) {
         tv_clear(&tv);
       }
