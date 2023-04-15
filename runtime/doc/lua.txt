@@ -1698,6 +1698,19 @@ is_callable({f})                                           *vim.is_callable()*
     Return: ~
         (boolean) `true` if `f` is callable, else `false`
 
+list_contains({t}, {value})                              *vim.list_contains()*
+    Checks if a list-like table (integer keys without gaps) contains `value`.
+
+    Parameters: ~
+      • {t}      (table) Table to check (must be list-like, not validated)
+      • {value}  any Value to compare
+
+    Return: ~
+        (boolean) `true` if `t` contains `value`
+
+    See also: ~
+      • |vim.tbl_contains()| for checking values in general tables
+
 list_extend({dst}, {src}, {start}, {finish})               *vim.list_extend()*
     Extends a list-like table with the values of another list-like table.
 
@@ -1797,15 +1810,30 @@ tbl_add_reverse_lookup({o})                     *vim.tbl_add_reverse_lookup()*
     Return: ~
         (table) o
 
-tbl_contains({t}, {value})                                *vim.tbl_contains()*
-    Checks if a list-like (vector) table contains `value`.
+tbl_contains({t}, {value}, {opts})                        *vim.tbl_contains()*
+    Checks if a table contains a given value, specified either directly or via
+    a predicate that is checked for each value.
+
+    Example: >lua
+
+      vim.tbl_contains({ 'a', { 'b', 'c' } }, function(v)
+        return vim.deep_equal(v, { 'b', 'c' })
+      end, { predicate = true })
+      -- true
+<
 
     Parameters: ~
       • {t}      (table) Table to check
-      • {value}  any Value to compare
+      • {value}  any Value to compare or predicate function reference
+      • {opts}   (table|nil) Keyword arguments |kwargs|:
+                 • predicate: (boolean) `value` is a function reference to be
+                   checked (default false)
 
     Return: ~
         (boolean) `true` if `t` contains `value`
+
+    See also: ~
+      • |vim.list_contains()| for checking values in list-like tables
 
 tbl_count({t})                                               *vim.tbl_count()*
     Counts the number of non-nil values in table `t`.
@@ -1900,6 +1928,20 @@ tbl_get({o}, {...})                                            *vim.tbl_get()*
     Return: ~
         any Nested value indexed by key (if it exists), else nil
 
+tbl_isarray({t})                                           *vim.tbl_isarray()*
+    Tests if a Lua table can be treated as an array (a table indexed by
+    integers).
+
+    Empty table `{}` is assumed to be an array, unless it was created by
+    |vim.empty_dict()| or returned as a dict-like |API| or Vimscript result,
+    for example from |rpcrequest()| or |vim.fn|.
+
+    Parameters: ~
+      • {t}  (table)
+
+    Return: ~
+        (boolean) `true` if array-like table, else `false`.
+
 tbl_isempty({t})                                           *vim.tbl_isempty()*
     Checks if a table is empty.
 
@@ -1913,17 +1955,18 @@ tbl_isempty({t})                                           *vim.tbl_isempty()*
       • https://github.com/premake/premake-core/blob/master/src/base/table.lua
 
 tbl_islist({t})                                             *vim.tbl_islist()*
-    Tests if a Lua table can be treated as an array.
+    Tests if a Lua table can be treated as a list (a table indexed by
+    consecutive integers starting from 1).
 
-    Empty table `{}` is assumed to be an array, unless it was created by
+    Empty table `{}` is assumed to be an list, unless it was created by
     |vim.empty_dict()| or returned as a dict-like |API| or Vimscript result,
     for example from |rpcrequest()| or |vim.fn|.
 
     Parameters: ~
-      • {t}  (table) Table
+      • {t}  (table)
 
     Return: ~
-        (boolean) `true` if array-like table, else `false`
+        (boolean) `true` if list-like table, else `false`.
 
 tbl_keys({t})                                                 *vim.tbl_keys()*
     Return a list of all keys used in a table. However, the order of the

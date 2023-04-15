@@ -22,6 +22,11 @@ func Test_equal()
   call assert_false([base.method] == [instance.other])
 
   call assert_fails('echo base.method > instance.method')
+  " Nvim doesn't have null functions
+  " call assert_equal(0, test_null_function() == function('min'))
+  " call assert_equal(1, test_null_function() == test_null_function())
+  " Nvim doesn't have test_unknown()
+  " call assert_fails('eval 10 == test_unknown()', 'E685:')
 endfunc
 
 func Test_version()
@@ -37,6 +42,38 @@ func Test_version()
   call assert_false(has('patch-7.4.'))
   call assert_false(has('patch-9.1.0'))
   call assert_false(has('patch-9.9.1'))
+endfunc
+
+func Test_op_trinary()
+  call assert_equal('yes', 1 ? 'yes' : 'no')
+  call assert_equal('no', 0 ? 'yes' : 'no')
+  call assert_equal('no', 'x' ? 'yes' : 'no')
+  call assert_equal('yes', '1x' ? 'yes' : 'no')
+
+  call assert_fails('echo [1] ? "yes" : "no"', 'E745:')
+  call assert_fails('echo {} ? "yes" : "no"', 'E728:')
+endfunc
+
+func Test_op_falsy()
+  call assert_equal(v:true, v:true ?? 456)
+  call assert_equal(123, 123 ?? 456)
+  call assert_equal('yes', 'yes' ?? 456)
+  call assert_equal(0z00, 0z00 ?? 456)
+  call assert_equal([1], [1] ?? 456)
+  call assert_equal(#{one: 1}, #{one: 1} ?? 456)
+  if has('float')
+    call assert_equal(0.1, 0.1 ?? 456)
+  endif
+
+  call assert_equal(456, v:false ?? 456)
+  call assert_equal(456, 0 ?? 456)
+  call assert_equal(456, '' ?? 456)
+  call assert_equal(456, 0z ?? 456)
+  call assert_equal(456, [] ?? 456)
+  call assert_equal(456, {} ?? 456)
+  if has('float')
+    call assert_equal(456, 0.0 ?? 456)
+  endif
 endfunc
 
 func Test_dict()
@@ -102,7 +139,7 @@ func Test_loop_over_null_list()
   endfor
 endfunc
 
-func Test_set_reg_null_list()
+func Test_setreg_null_list()
   call setreg('x', v:_null_list)
 endfunc
 
@@ -678,6 +715,26 @@ func Test_expr_eval_error()
   call assert_fails("let v = 10 + []", 'E745:')
   call assert_fails("let v = 10 / []", 'E745:')
   call assert_fails("let v = -{}", 'E728:')
+endfunc
+
+" Test for float value comparison
+func Test_float_compare()
+  CheckFeature float
+  call assert_true(1.2 == 1.2)
+  call assert_true(1.0 != 1.2)
+  call assert_true(1.2 > 1.0)
+  call assert_true(1.2 >= 1.2)
+  call assert_true(1.0 < 1.2)
+  call assert_true(1.2 <= 1.2)
+  call assert_true(+0.0 == -0.0)
+  " two NaNs (not a number) are not equal
+  call assert_true(sqrt(-4.01) != (0.0 / 0.0))
+  " two inf (infinity) are equal
+  call assert_true((1.0 / 0) == (2.0 / 0))
+  " two -inf (infinity) are equal
+  call assert_true(-(1.0 / 0) == -(2.0 / 0))
+  " +infinity != -infinity
+  call assert_true((1.0 / 0) != -(2.0 / 0))
 endfunc
 
 " vim: shiftwidth=2 sts=2 expandtab

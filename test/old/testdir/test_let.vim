@@ -85,6 +85,24 @@ func Test_let()
   let l:Test_Local_Var = {'k' : 5}
   call assert_match("\nl:Test_Local_Var      {'k': 5}", execute('let l:'))
   call assert_match("v:errors              []", execute('let v:'))
+
+  " Test for assigning multiple list items
+  let l = [1, 2, 3]
+  let [l[0], l[1]] = [10, 20]
+  call assert_equal([10, 20, 3], l)
+
+  " Test for errors in conditional expression
+  call assert_fails('let val = [] ? 1 : 2', 'E745:')
+  call assert_fails('let val = 1 ? 5+ : 6', 'E121:')
+  call assert_fails('let val = 1 ? 0 : 5+', 'E15:')
+  call assert_false(exists('val'))
+
+  " Test for errors in logical operators
+  let @a = 'if [] || 0 | let val = 2 | endif'
+  call assert_fails('exe @a', 'E745:')
+  call assert_fails('call feedkeys(":let val = 0 || []\<cr>", "xt")', 'E745:')
+  call assert_fails('exe "let val = [] && 5"', 'E745:')
+  call assert_fails('exe "let val = 6 && []"', 'E745:')
 endfunc
 
 func s:set_arg1(a) abort
@@ -327,7 +345,7 @@ func Test_let_heredoc_fails()
   endfunc
   END
   call writefile(text, 'XheredocFail')
-  call assert_fails('source XheredocFail', 'E126:')
+  call assert_fails('source XheredocFail', 'E1145:')
   call delete('XheredocFail')
 
   let text =<< trim CodeEnd
@@ -336,7 +354,7 @@ func Test_let_heredoc_fails()
   endfunc
   CodeEnd
   call writefile(text, 'XheredocWrong')
-  call assert_fails('source XheredocWrong', 'E126:')
+  call assert_fails('source XheredocWrong', 'E1145:')
   call delete('XheredocWrong')
 
   let text =<< trim TEXTend

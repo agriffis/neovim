@@ -3806,7 +3806,7 @@ static const char *const str_errors[] = {
   [VAR_DICT]= N_("E731: using Dictionary as a String"),
   [VAR_FLOAT]= e_float_as_string,
   [VAR_BLOB]= N_("E976: using Blob as a String"),
-  [VAR_UNKNOWN]= N_("E908: using an invalid value as a String"),
+  [VAR_UNKNOWN]= e_inval_string,
 };
 
 #undef FUNC_ERROR
@@ -4200,4 +4200,35 @@ const char *tv_get_string_buf(const typval_T *const tv, char *const buf)
   const char *const res = tv_get_string_buf_chk(tv, buf);
 
   return res != NULL ? res : "";
+}
+
+/// Return true when "tv" is not falsy: non-zero, non-empty string, non-empty
+/// list, etc.  Mostly like what JavaScript does, except that empty list and
+/// empty dictionary are false.
+bool tv2bool(const typval_T *const tv)
+{
+  switch (tv->v_type) {
+  case VAR_NUMBER:
+    return tv->vval.v_number != 0;
+  case VAR_FLOAT:
+    return tv->vval.v_float != 0.0;
+  case VAR_PARTIAL:
+    return tv->vval.v_partial != NULL;
+  case VAR_FUNC:
+  case VAR_STRING:
+    return tv->vval.v_string != NULL && *tv->vval.v_string != NUL;
+  case VAR_LIST:
+    return tv->vval.v_list != NULL && tv->vval.v_list->lv_len > 0;
+  case VAR_DICT:
+    return tv->vval.v_dict != NULL && tv->vval.v_dict->dv_hashtab.ht_used > 0;
+  case VAR_BOOL:
+    return tv->vval.v_bool == kBoolVarTrue;
+  case VAR_SPECIAL:
+    return tv->vval.v_special == kSpecialVarNull;
+  case VAR_BLOB:
+    return tv->vval.v_blob != NULL && tv->vval.v_blob->bv_ga.ga_len > 0;
+  case VAR_UNKNOWN:
+    break;
+  }
+  return false;
 }
