@@ -1,10 +1,10 @@
 local M = {}
 
-local start = vim.health.report_start
-local ok = vim.health.report_ok
-local info = vim.health.report_info
-local warn = vim.health.report_warn
-local error = vim.health.report_error
+local start = vim.health.start
+local ok = vim.health.ok
+local info = vim.health.info
+local warn = vim.health.warn
+local error = vim.health.error
 local iswin = vim.loop.os_uname().sysname == 'Windows_NT'
 
 local shell_error_code = 0
@@ -196,7 +196,7 @@ local function check_for_pyenv()
 
   info('pyenv: Path: ' .. pyenv_path)
 
-  local pyenv_root = os.getenv('PYENV_ROOT') and vim.fn.resolve('$PYENV_ROOT') or ''
+  local pyenv_root = os.getenv('PYENV_ROOT') and vim.fn.resolve(os.getenv('PYENV_ROOT')) or ''
 
   if is_blank(pyenv_root) then
     pyenv_root = vim.trim(system({ pyenv_path, 'root' }))

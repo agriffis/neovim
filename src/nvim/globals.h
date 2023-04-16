@@ -986,6 +986,8 @@ EXTERN const char e_maxmempat[] INIT(= N_("E363: pattern uses more memory than '
 EXTERN const char e_emptybuf[] INIT(= N_("E749: empty buffer"));
 EXTERN const char e_nobufnr[] INIT(= N_("E86: Buffer %" PRId64 " does not exist"));
 
+EXTERN const char e_str_not_inside_function[] INIT(= N_("E193: %s not inside a function"));
+
 EXTERN const char e_invalpat[] INIT(= N_("E682: Invalid search pattern or delimiter"));
 EXTERN const char e_bufloaded[] INIT(= N_("E139: File is loaded in another buffer"));
 EXTERN const char e_notset[] INIT(= N_("E764: Option '%s' is not set"));
@@ -1000,6 +1002,7 @@ EXTERN const char e_fnametoolong[] INIT(= N_("E856: Filename too long"));
 EXTERN const char e_float_as_string[] INIT(= N_("E806: using Float as a String"));
 EXTERN const char e_inval_string[] INIT(= N_("E908: using an invalid value as a String"));
 EXTERN const char e_cannot_edit_other_buf[] INIT(= N_("E788: Not allowed to edit another buffer now"));
+EXTERN const char e_not_callable_type_str[] INIT(= N_("E1085: Not a callable type: %s"));
 
 EXTERN const char e_cmdmap_err[] INIT(= N_("E5520: <Cmd> mapping must end with <CR>"));
 EXTERN const char e_cmdmap_repeated[]
@@ -1023,6 +1026,11 @@ EXTERN const char e_highlight_group_name_invalid_char[] INIT(= N_("E5248: Invali
 EXTERN const char e_highlight_group_name_too_long[] INIT(= N_("E1249: Highlight group name too long"));
 
 EXTERN const char e_invalid_line_number_nr[] INIT(= N_("E966: Invalid line number: %ld"));
+
+EXTERN char e_stray_closing_curly_str[]
+INIT(= N_("E1278: Stray '}' without a matching '{': %s"));
+EXTERN char e_missing_close_curly_str[]
+INIT(= N_("E1279: Missing '}': %s"));
 
 EXTERN const char e_undobang_cannot_redo_or_move_branch[]
 INIT(= N_("E5767: Cannot use :undo! to redo or move to a different undo branch"));
