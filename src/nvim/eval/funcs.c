@@ -228,6 +228,31 @@ const EvalFuncDef *find_internal_func(const char *const name)
   return index >= 0 ? &functions[index] : NULL;
 }
 
+/// Check the argument count to use for internal function "fdef".
+/// @return  -1 for failure, 0 if no method base accepted, 1 if method base is
+/// first argument, 2 if method base is second argument, etc.
+int check_internal_func(const EvalFuncDef *const fdef, const int argcount)
+  FUNC_ATTR_NONNULL_ALL
+{
+  int res;
+
+  if (argcount < fdef->min_argc) {
+    res = FCERR_TOOFEW;
+  } else if (argcount > fdef->max_argc) {
+    res = FCERR_TOOMANY;
+  } else {
+    return fdef->base_arg;
+  }
+
+  const char *const name = fdef->name;
+  if (res == FCERR_TOOMANY) {
+    semsg(_(e_toomanyarg), name);
+  } else {
+    semsg(_(e_toofewarg), name);
+  }
+  return -1;
+}
+
 int call_internal_func(const char *const fname, const int argcount, typval_T *const argvars,
                        typval_T *const rettv)
   FUNC_ATTR_NONNULL_ALL
@@ -2121,6 +2146,9 @@ static void findfilendir(typval_T *argvars, typval_T *rettv, int find_what)
   }
 
   if (*fname != NUL && !error) {
+    char *file_to_find = NULL;
+    char *search_ctx = NULL;
+
     do {
       if (rettv->v_type == VAR_STRING || rettv->v_type == VAR_LIST) {
         xfree(fresult);
@@ -2131,13 +2159,17 @@ static void findfilendir(typval_T *argvars, typval_T *rettv, int find_what)
                                          find_what, curbuf->b_ffname,
                                          (find_what == FINDFILE_DIR
                                           ? ""
-                                          : curbuf->b_p_sua));
+                                          : curbuf->b_p_sua),
+                                         &file_to_find, &search_ctx);
       first = false;
 
       if (fresult != NULL && rettv->v_type == VAR_LIST) {
         tv_list_append_string(rettv->vval.v_list, fresult, -1);
       }
     } while ((rettv->v_type == VAR_LIST || --count > 0) && fresult != NULL);
+
+    xfree(file_to_find);
+    vim_findfile_cleanup(search_ctx);
   }
 
   if (rettv->v_type == VAR_STRING) {
