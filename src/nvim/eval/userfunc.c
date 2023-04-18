@@ -536,6 +536,7 @@ int get_func_tv(const char *name, int len, typval_T *rettv, char **arg, evalarg_
                                 : funcexe->fe_partial->pt_argc),
                                argvars, &argcount);
 
+  assert(ret == OK || ret == FAIL);  // suppress clang false positive
   if (ret == OK) {
     int i = 0;
 
@@ -3206,7 +3207,7 @@ static int ex_defer_inner(char *name, char **arg, const partial_T *const partial
 }
 
 /// Return true if currently inside a function call.
-/// Give an error message and return FALSE when not.
+/// Give an error message and return false when not.
 bool can_add_defer(void)
 {
   if (get_current_funccal() == NULL) {

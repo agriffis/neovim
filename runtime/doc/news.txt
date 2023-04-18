@@ -35,7 +35,8 @@ ADDED FEATURES                                                     *news-added*
 
 The following new APIs or features were added.
 
-• ...
+• |vim.iter()| provides a generic iterator interface for tables and Lua
+iterators |luaref-in|.
 
 ==============================================================================
 CHANGED FEATURES                                                 *news-changed*
@@ -47,6 +48,9 @@ The following changes to existing APIs or features add new behavior.
   for checking list-like tables (integer keys without gaps) for literal values.)
 
 • |vim.region()| can use a string accepted by |getpos()| as position.
+
+• vim.diagnostic.config() now accepts a function for the virtual_text.prefix
+  option, which allows for rendering e.g., diagnostic severities differently.
 
 ==============================================================================
 REMOVED FEATURES                                                 *news-removed*
