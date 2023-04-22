@@ -294,9 +294,11 @@ describe('lua stdlib', function()
 
   it('vim.gsplit, vim.split', function()
     local tests = {
+      --                            plain  trimempty
       { 'a,b',             ',',     false, false, { 'a', 'b' } },
       { ':aa::::bb:',      ':',     false, false, { '', 'aa', '', '', '', 'bb', '' } },
       { ':aa::::bb:',      ':',     false, true,  { 'aa', '', '', '', 'bb' } },
+      { 'aa::::bb:',       ':',     false, true,  { 'aa', '', '', '', 'bb' } },
       { ':aa::bb:',        ':',     false, true,  { 'aa', '', 'bb' } },
       { '/a/b:/b/\n',      '[:\n]', false, true,  { '/a/b', '/b/' } },
       { '::ee::ff:',       ':',     false, false, { '', '', 'ee', '', 'ff', '' } },
@@ -315,7 +317,7 @@ describe('lua stdlib', function()
     }
 
     for _, t in ipairs(tests) do
-      eq(t[5], vim.split(t[1], t[2], {plain=t[3], trimempty=t[4]}))
+      eq(t[5], vim.split(t[1], t[2], {plain=t[3], trimempty=t[4]}), t[1])
     end
 
     -- Test old signature
@@ -3413,6 +3415,41 @@ describe('lua stdlib', function()
         { item_2 = 'test' },
         { item_3 = 'test' },
       }, output)
+    end)
+
+    it('handles nil values', function()
+      local t = {1, 2, 3, 4, 5}
+      do
+        local it = vim.iter(t):enumerate():map(function(i, v)
+          if i % 2 == 0 then
+            return nil, v*v
+          end
+          return v, nil
+        end)
+        eq({
+          { [1] = 1 },
+          { [2] = 4 },
+          { [1] = 3 },
+          { [2] = 16 },
+          { [1] = 5 },
+        }, it:totable())
+      end
+
+      do
+        local it = vim.iter(ipairs(t)):map(function(i, v)
+          if i % 2 == 0 then
+            return nil, v*v
+          end
+          return v, nil
+        end)
+        eq({
+          { [1] = 1 },
+          { [2] = 4 },
+          { [1] = 3 },
+          { [2] = 16 },
+          { [1] = 5 },
+        }, it:totable())
+      end
     end)
   end)
 end)
