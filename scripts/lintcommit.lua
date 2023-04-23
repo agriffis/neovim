@@ -1,13 +1,14 @@
 -- Usage:
 --    # verbose
---    nvim -es +"lua require('scripts.lintcommit').main()"
+--    nvim -l scripts/lintcommit.lua main --trace
 --
 --    # silent
---    nvim -es +"lua require('scripts.lintcommit').main({trace=false})"
+--    nvim -l scripts/lintcommit.lua main
 --
 --    # self-test
---    nvim -es +"lua require('scripts.lintcommit')._test()"
+--    nvim -l scripts/lintcommit.lua _test
 
+--- @type table<string,fun(opt: LintcommitOptions)>
 local M = {}
 
 local _trace = false
@@ -17,11 +18,6 @@ local function p(s)
   vim.cmd('set verbose=1')
   vim.api.nvim_echo({{s, ''}}, false, {})
   vim.cmd('set verbose=0')
-end
-
-local function die()
-  p('')
-  vim.cmd("cquit 1")
 end
 
 -- Executes and returns the output of `cmd`, or nil on failure.
@@ -35,7 +31,7 @@ local function run(cmd, or_die)
   if vim.v.shell_error ~= 0 then
     if or_die then
       p(rv)
-      die()
+      os.exit(1)
     end
     return nil
   end
@@ -150,6 +146,7 @@ local function validate_commit(commit_message)
   return nil
 end
 
+--- @param opt? LintcommitOptions
 function M.main(opt)
   _trace = not opt or not not opt.trace
 
@@ -160,10 +157,11 @@ function M.main(opt)
     ancestor = run({'git', 'merge-base', 'upstream/master', branch})
   end
   local commits_str = run({'git', 'rev-list', ancestor..'..'..branch}, true)
+  assert(commits_str)
 
-  local commits = {}
+  local commits = {} --- @type string[]
   for substring in commits_str:gmatch("%S+") do
-     table.insert(commits, substring)
+   table.insert(commits, substring)
   end
 
   local failed = 0
@@ -197,8 +195,9 @@ Invalid commit message: "%s"
         p([[
 See also:
     https://github.com/neovim/neovim/blob/master/CONTRIBUTING.md#commit-messages
+
 ]])
-    die()  -- Exit with error.
+    os.exit(1)
   else
     p('')
   end
@@ -266,9 +265,30 @@ function M._test()
   end
 
   if failed > 0 then
-    die()  -- Exit with error.
+    os.exit(1)
   end
 
 end
 
-return M
+--- @class LintcommitOptions
+--- @field trace? boolean
+local opt = {}
+
+for _, a in ipairs(arg) do
+  if vim.startswith(a, '--') then
+    local nm, val = a:sub(3), true
+    if vim.startswith(a, '--no') then
+      nm, val = a:sub(5), false
+    end
+
+    if nm == 'trace' then
+      opt.trace = val
+    end
+  end
+end
+
+for _, a in ipairs(arg) do
+  if M[a] then
+    M[a](opt)
+  end
+end

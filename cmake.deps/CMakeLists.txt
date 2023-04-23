@@ -164,11 +164,9 @@ set(LUV_SHA256 222b38b6425f0926218e14e7da81481fdde6f9660c1feac25a53e6fb52e886e6)
 set(LUA_COMPAT53_URL https://github.com/keplerproject/lua-compat-5.3/archive/v0.9.tar.gz)
 set(LUA_COMPAT53_SHA256 ad05540d2d96a48725bb79a1def35cf6652a4e2ec26376e2617c8ce2baa6f416)
 
-# Windows only: cat.exe diff.exe tee.exe xxd.exe
+# Windows only: cat.exe tee.exe xxd.exe
 set(CAT_URL https://github.com/neovim/deps/raw/21c5e8bdda33521a6ed497b315e03265a2785cbc/opt/cat.exe)
 set(CAT_SHA256 93b8d307bb15af3968920bdea3beb869a49d166f9164853c58a4e6ffdcae61c6)
-set(DIFF_URL https://github.com/neovim/deps/raw/21c5e8bdda33521a6ed497b315e03265a2785cbc/opt/diff.exe)
-set(DIFF_SHA256 4ceceebc8150422c6d8d9a06c2e9686d5a5d90f1033f60ad92ab81fe810e2a28)
 set(TEE_URL https://github.com/neovim/deps/raw/21c5e8bdda33521a6ed497b315e03265a2785cbc/opt/tee.exe)
 set(TEE_SHA256 950eea4e17fa3a7e89fa2c55374037b5797b3f1a54fea1304634884ab42ec14d)
 set(XXD_URL https://github.com/neovim/deps/raw/21c5e8bdda33521a6ed497b315e03265a2785cbc/opt/xxd.exe)
@@ -196,8 +194,8 @@ set(TREESITTER_VIMDOC_URL https://github.com/neovim/tree-sitter-vimdoc/archive/v
 set(TREESITTER_VIMDOC_SHA256 1ff8f4afd3a9599dd4c3ce87c155660b078c1229704d1a254433e33794b8f274)
 set(TREESITTER_QUERY_URL https://github.com/nvim-treesitter/tree-sitter-query/archive/v0.1.0.tar.gz)
 set(TREESITTER_QUERY_SHA256 e2b806f80e8bf1c4f4e5a96248393fe6622fc1fc6189d6896d269658f67f914c)
-set(TREESITTER_URL https://github.com/tree-sitter/tree-sitter/archive/af92bfc0220eb0f5e18b896b11d8cd979c63f673.tar.gz)
-set(TREESITTER_SHA256 8a083372ed7bfe993e8af0a8c799c60796c922241b44266022c9a6f1fc2f11c1)
+set(TREESITTER_URL https://github.com/tree-sitter/tree-sitter/archive/321a652626c63bfea3ea320083a4b14863b80270.tar.gz)
+set(TREESITTER_SHA256 8f780289d9524a680e548d891c07dab025241fffdea86f8b55921e4024a84757)
 
 if(USE_EXISTING_SRC_DIR)
   get_cmake_property(VARS VARIABLES)
@@ -267,7 +265,6 @@ if(WIN32)
   include(GetBinaryDeps)
 
   GetExecutable(TARGET cat)
-  GetExecutable(TARGET diff)
   GetExecutable(TARGET tee)
   GetExecutable(TARGET xxd)
 

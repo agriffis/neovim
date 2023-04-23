@@ -259,9 +259,7 @@ add_glob_target(
   TOUCH_STRATEGY SINGLE)
 
 add_custom_target(lintcommit
-  COMMAND ${PROJECT_BINARY_DIR}/bin/nvim -u NONE -es -c [[lua require('scripts.lintcommit').main({trace=false})]]
-  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-  VERBATIM)
+  COMMAND $<TARGET_FILE:nvim> -u NONE -l ${PROJECT_SOURCE_DIR}/scripts/lintcommit.lua main)
 add_dependencies(lintcommit nvim)
 
 add_custom_target(lint)
