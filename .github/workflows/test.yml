@@ -199,7 +199,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake -B build -G Ninja -D CMAKE_INSTALL_PREFIX:PATH=$INSTALL_PREFIX ${{ matrix.flags }} -D CI_BUILD=ON
+          cmake --preset ci -D CMAKE_INSTALL_PREFIX:PATH=$INSTALL_PREFIX ${{ matrix.flags }}
           cmake --build build
 
       - if: "!cancelled()"
@@ -295,18 +295,8 @@ jobs:
     name: windows
     steps:
       - uses: actions/checkout@v3
-
       - uses: ./.github/actions/cache
-
-      - name: Set env
-        run: |
-          $installationPath = vswhere.exe -latest -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-          if ($installationPath -and (Test-Path "$installationPath\Common7\Tools\vsdevcmd.bat")) {
-            & "${env:COMSPEC}" /s /c "`"$installationPath\Common7\Tools\vsdevcmd.bat`" -arch=x64 -no_logo && set" | ForEach-Object {
-              $name, $value = $_ -split '=', 2
-              "$name=$value" >> $env:GITHUB_ENV
-            }
-          }
+      - run: .github/scripts/env.ps1
 
       - name: Build deps
         run: |
@@ -315,7 +305,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake -B build -G Ninja -D CMAKE_BUILD_TYPE='RelWithDebInfo' -D CI_BUILD=ON
+          cmake --preset ci -D CMAKE_BUILD_TYPE='RelWithDebInfo'
           cmake --build build
 
       - name: Install test deps
@@ -405,5 +395,5 @@ jobs:
 
       - name: Build
         run: |
-          cmake -B build -G Ninja -D CI_BUILD=ON
+          cmake --preset ci
           cmake --build build
