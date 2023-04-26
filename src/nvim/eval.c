@@ -5357,8 +5357,7 @@ void common_function(typval_T *argvars, typval_T *rettv, bool is_funcref)
         arg_idx = 1;
       }
       if (dict_idx > 0) {
-        if (argvars[dict_idx].v_type != VAR_DICT) {
-          emsg(_("E922: expected a dict"));
+        if (tv_check_for_dict_arg(argvars, dict_idx) == FAIL) {
           xfree(name);
           goto theend;
         }
@@ -6003,7 +6002,7 @@ void add_timer_info_all(typval_T *rettv)
   tv_list_alloc_ret(rettv, map_size(&timers));
   timer_T *timer;
   map_foreach_value(&timers, timer, {
-    if (!timer->stopped) {
+    if (!timer->stopped || timer->refcount > 1) {
       add_timer_info(rettv, timer);
     }
   })
@@ -8726,7 +8725,7 @@ int typval_compare(typval_T *typ1, typval_T *typ2, exprtype_T type, bool ic)
   const bool type_is = type == EXPR_IS || type == EXPR_ISNOT;
 
   if (type_is && typ1->v_type != typ2->v_type) {
-    // For "is" a different type always means false, for "notis"
+    // For "is" a different type always means false, for "isnot"
     // it means true.
     n1 = type == EXPR_ISNOT;
   } else if (typ1->v_type == VAR_BLOB || typ2->v_type == VAR_BLOB) {

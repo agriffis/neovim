@@ -50,6 +50,8 @@ static const char e_number_required_for_argument_nr[]
   = N_("E1210: Number required for argument %d");
 static const char e_list_required_for_argument_nr[]
   = N_("E1211: List required for argument %d");
+static const char e_bool_required_for_argument_nr[]
+  = N_("E1212: Bool required for argument %d");
 static const char e_string_or_list_required_for_argument_nr[]
   = N_("E1222: String or List required for argument %d");
 static const char e_list_or_blob_required_for_argument_nr[]
@@ -60,6 +62,8 @@ static const char e_invalid_value_for_blob_nr[]
   = N_("E1239: Invalid value for blob: %d");
 static const char e_string_or_function_required_for_argument_nr[]
   = N_("E1256: String or function required for argument %d");
+static const char e_non_null_dict_required_for_argument_nr[]
+  = N_("E1297: Non-NULL Dictionary required for argument %d");
 
 bool tv_in_free_unref_items = false;
 
@@ -1232,8 +1236,7 @@ static void do_sort_uniq(typval_T *argvars, typval_T *rettv, bool sort)
 
       if (argvars[2].v_type != VAR_UNKNOWN) {
         // optional third argument: {dict}
-        if (argvars[2].v_type != VAR_DICT) {
-          emsg(_(e_dictreq));
+        if (tv_check_for_dict_arg(argvars, 2) == FAIL) {
           goto theend;
         }
         info.item_compare_selfdict = argvars[2].vval.v_dict;
@@ -2993,10 +2996,10 @@ void f_values(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 /// "has_key()" function
 void f_has_key(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
-  if (argvars[0].v_type != VAR_DICT) {
-    emsg(_(e_dictreq));
+  if (tv_check_for_dict_arg(argvars, 0) == FAIL) {
     return;
   }
+
   if (argvars[0].vval.v_dict == NULL) {
     return;
   }
@@ -3999,6 +4002,14 @@ int tv_check_for_nonempty_string_arg(const typval_T *const args, const int idx)
   return OK;
 }
 
+/// Check for an optional string argument at "idx"
+int tv_check_for_opt_string_arg(const typval_T *const args, const int idx)
+  FUNC_ATTR_NONNULL_ALL FUNC_ATTR_WARN_UNUSED_RESULT FUNC_ATTR_PURE
+{
+  return (args[idx].v_type == VAR_UNKNOWN
+          || tv_check_for_string_arg(args, idx) != FAIL) ? OK : FAIL;
+}
+
 /// Give an error and return FAIL unless "args[idx]" is a number.
 int tv_check_for_number_arg(const typval_T *const args, const int idx)
   FUNC_ATTR_NONNULL_ALL FUNC_ATTR_WARN_UNUSED_RESULT FUNC_ATTR_PURE
@@ -4016,6 +4027,31 @@ int tv_check_for_opt_number_arg(const typval_T *const args, const int idx)
 {
   return (args[idx].v_type == VAR_UNKNOWN
           || tv_check_for_number_arg(args, idx) != FAIL) ? OK : FAIL;
+}
+
+/// Give an error and return FAIL unless "args[idx]" is a bool.
+int tv_check_for_bool_arg(const typval_T *const args, const int idx)
+  FUNC_ATTR_NONNULL_ALL FUNC_ATTR_WARN_UNUSED_RESULT FUNC_ATTR_PURE
+{
+  if (args[idx].v_type != VAR_BOOL
+      && !(args[idx].v_type == VAR_NUMBER
+           && (args[idx].vval.v_number == 0
+               || args[idx].vval.v_number == 1))) {
+    semsg(_(e_bool_required_for_argument_nr), idx + 1);
+    return FAIL;
+  }
+  return OK;
+}
+
+/// Check for an optional bool argument at "idx".
+/// Return FAIL if the type is wrong.
+int tv_check_for_opt_bool_arg(const typval_T *const args, const int idx)
+  FUNC_ATTR_NONNULL_ALL FUNC_ATTR_WARN_UNUSED_RESULT FUNC_ATTR_PURE
+{
+  if (args[idx].v_type == VAR_UNKNOWN) {
+    return OK;
+  }
+  return tv_check_for_bool_arg(args, idx);
 }
 
 /// Give an error and return FAIL unless "args[idx]" is a blob.
@@ -4046,6 +4082,20 @@ int tv_check_for_dict_arg(const typval_T *const args, const int idx)
 {
   if (args[idx].v_type != VAR_DICT) {
     semsg(_(e_dict_required_for_argument_nr), idx + 1);
+    return FAIL;
+  }
+  return OK;
+}
+
+/// Give an error and return FAIL unless "args[idx]" is a non-NULL dict.
+int tv_check_for_nonnull_dict_arg(const typval_T *const args, const int idx)
+  FUNC_ATTR_NONNULL_ALL FUNC_ATTR_WARN_UNUSED_RESULT FUNC_ATTR_PURE
+{
+  if (tv_check_for_dict_arg(args, idx) == FAIL) {
+    return FAIL;
+  }
+  if (args[idx].vval.v_dict == NULL) {
+    semsg(_(e_non_null_dict_required_for_argument_nr), idx + 1);
     return FAIL;
   }
   return OK;
