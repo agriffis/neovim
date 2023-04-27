@@ -2090,7 +2090,7 @@ void op_tilde(oparg_T *oap)
       did_change = swapchars(oap->op_type, &pos,
                              oap->end.col - pos.col + 1);
     } else {
-      for (;;) {
+      while (true) {
         did_change |= swapchars(oap->op_type, &pos,
                                 pos.lnum == oap->end.lnum ? oap->end.col + 1 :
                                 (int)strlen(ml_get_pos(&pos)));
@@ -2944,7 +2944,7 @@ void do_put(int regname, yankreg_T *reg, int dir, long count, int flags)
   long cnt;
   const pos_T orig_start = curbuf->b_op_start;
   const pos_T orig_end = curbuf->b_op_end;
-  unsigned int cur_ve_flags = get_ve_flags();
+  unsigned cur_ve_flags = get_ve_flags();
 
   if (flags & PUT_FIXINDENT) {
     orig_indent = get_indent();
@@ -3056,7 +3056,7 @@ void do_put(int regname, yankreg_T *reg, int dir, long count, int flags)
       // For the = register we need to split the string at NL
       // characters.
       // Loop twice: count the number of lines and save them.
-      for (;;) {
+      while (true) {
         y_size = 0;
         ptr = insert_string;
         while (ptr != NULL) {
@@ -3717,7 +3717,7 @@ end:
 /// there move it left.
 void adjust_cursor_eol(void)
 {
-  unsigned int cur_ve_flags = get_ve_flags();
+  unsigned cur_ve_flags = get_ve_flags();
 
   const bool adj_cursor = (curwin->w_cursor.col > 0
                            && gchar_cursor() == NUL
@@ -4037,7 +4037,7 @@ int do_join(size_t count, int insert_space, int save_undo, int use_formatoptions
   // Don't move anything, just compute the final line length
   // and setup the array of space strings lengths
   for (t = 0; t < (linenr_T)count; t++) {
-    curr_start = ml_get((linenr_T)(curwin->w_cursor.lnum + t));
+    curr_start = ml_get(curwin->w_cursor.lnum + t);
     curr = curr_start;
     if (t == 0 && setmark && (cmdmod.cmod_flags & CMOD_LOCKMARKS) == 0) {
       // Set the '[ mark.
@@ -5555,7 +5555,7 @@ void cursor_pos_info(dict_T *dict)
     // Don't shorten this message, the user asked for it.
     tv_dict_add_nr(dict, S_LEN("words"), word_count);
     tv_dict_add_nr(dict, S_LEN("chars"), char_count);
-    tv_dict_add_nr(dict, S_LEN("bytes"), (varnumber_T)(byte_count + bom_count));
+    tv_dict_add_nr(dict, S_LEN("bytes"), byte_count + bom_count);
 
     STATIC_ASSERT(sizeof("visual") == sizeof("cursor"),
                   "key_len argument in tv_dict_add_nr is wrong");
@@ -6470,7 +6470,7 @@ static yankreg_T *adjust_clipboard_name(int *name, bool quiet, bool writing)
     }
 
     if (cb_flags & CB_UNNAMEDPLUS) {
-      *name = (cb_flags & CB_UNNAMED && writing) ? '"': '+';
+      *name = (cb_flags & CB_UNNAMED && writing) ? '"' : '+';
       target = &y_regs[PLUS_REGISTER];
     } else {
       *name = '*';

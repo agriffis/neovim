@@ -711,8 +711,7 @@ void ins_char_bytes(char *buf, size_t charlen)
   // Copy bytes after the changed character(s).
   char *p = newp + col;
   if (linelen > col + oldlen) {
-    memmove(p + newlen, oldp + col + oldlen,
-            (size_t)(linelen - col - oldlen));
+    memmove(p + newlen, oldp + col + oldlen, linelen - col - oldlen);
   }
 
   // Insert or overwrite the new character.
@@ -951,7 +950,7 @@ int copy_indent(int size, char *src)
 
     // Add tabs required for indent.
     if (!curbuf->b_p_et) {
-      for (;;) {
+      while (true) {
         tab_pad = tabstop_padding(ind_col,
                                   curbuf->b_p_ts,
                                   curbuf->b_p_vts_array);

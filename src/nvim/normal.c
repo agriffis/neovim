@@ -956,10 +956,12 @@ normal_end:
     set_reg_var(get_default_register_name());
   }
 
-  // Reset finish_op, in case it was set
   s->c = finish_op;
-  finish_op = false;
-  may_trigger_modechanged();
+  if (s->oa.op_type == OP_NOP) {
+    // Reset finish_op, in case it was set
+    finish_op = false;
+    may_trigger_modechanged();
+  }
   // Redraw the cursor with another shape, if we were in Operator-pending
   // mode or did a replace command.
   if (s->c || s->ca.cmdchar == 'r'
@@ -1729,9 +1731,9 @@ void prep_redo_num2(int regname, long num1, int cmd1, int cmd2, long num2, int c
   }
 }
 
-/// check for operator active and clear it
+/// Check for operator active and clear it.
 ///
-/// @return  true if operator was active
+/// Beep and return true if an operator was active.
 static bool checkclearop(oparg_T *oap)
 {
   if (oap->op_type == OP_NOP) {
@@ -1743,7 +1745,7 @@ static bool checkclearop(oparg_T *oap)
 
 /// Check for operator or Visual active.  Clear active operator.
 ///
-/// @return  true if operator or Visual was active.
+/// Beep and return true if an operator or Visual was active.
 static bool checkclearopq(oparg_T *oap)
 {
   if (oap->op_type == OP_NOP && !VIsual_active) {
@@ -2340,7 +2342,7 @@ bool find_decl(char *ptr, size_t len, bool locally, bool thisblock, int flags_ar
 
   // Search forward for the identifier, ignore comment lines.
   clearpos(&found_pos);
-  for (;;) {
+  while (true) {
     t = searchit(curwin, curbuf, &curwin->w_cursor, NULL, FORWARD,
                  pat, 1L, searchflags, RE_LAST, NULL);
     if (curwin->w_cursor.lnum >= old_pos.lnum) {
@@ -2690,7 +2692,7 @@ static bool nv_z_get_count(cmdarg_T *cap, int *nchar_arg)
   }
   long n = nchar - '0';
 
-  for (;;) {
+  while (true) {
     no_mapping++;
     allow_keys++;         // no mapping for nchar, but allow key codes
     nchar = plain_vgetc();
@@ -4160,7 +4162,7 @@ static void nv_bracket_block(cmdarg_T *cap, const pos_T *old_pos)
       pos = NULL;
     }
     while (n > 0) {
-      for (;;) {
+      while (true) {
         if ((findc == '{' ? dec_cursor() : inc_cursor()) < 0) {
           // if not found anything, that's an error
           if (pos == NULL) {
@@ -4308,7 +4310,7 @@ static void nv_brackets(cmdarg_T *cap)
       fm = prev_fm;
     }
     MarkMove flags = kMarkContext;
-    flags |= cap->nchar == '\'' ? kMarkBeginLine: 0;
+    flags |= cap->nchar == '\'' ? kMarkBeginLine : 0;
     nv_mark_move_to(cap, flags, fm);
   } else if (cap->nchar >= K_RIGHTRELEASE && cap->nchar <= K_LEFTMOUSE) {
     // [ or ] followed by a middle mouse click: put selected text with

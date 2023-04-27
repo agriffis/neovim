@@ -1448,7 +1448,7 @@ int win_split_ins(int size, int flags, win_T *new_wp, int dir)
     frame_fix_width(oldwin);
     frame_fix_width(wp);
   } else {
-    bool is_stl_global = global_stl_height() > 0;
+    const bool is_stl_global = global_stl_height() > 0;
     // width and column of new window is same as current window
     if (flags & (WSP_TOP | WSP_BOT)) {
       wp->w_wincol = 0;
@@ -1464,6 +1464,7 @@ int win_split_ins(int size, int flags, win_T *new_wp, int dir)
     // "new_size" of the current window goes to the new window, use
     // one row for the status line
     win_new_height(wp, new_size);
+    const int old_status_height = oldwin->w_status_height;
     if (before) {
       wp->w_hsep_height = is_stl_global ? 1 : 0;
     } else {
@@ -1472,14 +1473,18 @@ int win_split_ins(int size, int flags, win_T *new_wp, int dir)
     }
     if (flags & (WSP_TOP | WSP_BOT)) {
       int new_fr_height = curfrp->fr_height - new_size;
-
-      if (!((flags & WSP_BOT) && p_ls == 0) && !is_stl_global) {
-        new_fr_height -= STATUS_HEIGHT;
-      } else if (is_stl_global) {
+      if (is_stl_global) {
         if (flags & WSP_BOT) {
           frame_add_hsep(curfrp);
         } else {
           new_fr_height -= 1;
+        }
+      } else {
+        if (!((flags & WSP_BOT) && p_ls == 0)) {
+          new_fr_height -= STATUS_HEIGHT;
+        }
+        if (flags & WSP_BOT) {
+          frame_add_statusline(curfrp);
         }
       }
       frame_new_height(curfrp, new_fr_height, flags & WSP_TOP, false);
@@ -1489,7 +1494,6 @@ int win_split_ins(int size, int flags, win_T *new_wp, int dir)
 
     if (before) {       // new window above current one
       wp->w_winrow = oldwin->w_winrow;
-
       if (is_stl_global) {
         wp->w_status_height = 0;
         oldwin->w_winrow += wp->w_height + 1;
@@ -1503,14 +1507,11 @@ int win_split_ins(int size, int flags, win_T *new_wp, int dir)
         wp->w_status_height = 0;
       } else {
         wp->w_winrow = oldwin->w_winrow + oldwin->w_height + STATUS_HEIGHT;
-        wp->w_status_height = oldwin->w_status_height;
+        wp->w_status_height = old_status_height;
         if (!(flags & WSP_BOT)) {
           oldwin->w_status_height = STATUS_HEIGHT;
         }
       }
-    }
-    if ((flags & WSP_BOT) && !is_stl_global) {
-      frame_add_statusline(curfrp);
     }
     frame_fix_height(wp);
     frame_fix_height(oldwin);
@@ -2886,7 +2887,7 @@ int win_close(win_T *win, bool free_buf, bool force)
     if (wp->w_p_pvw || bt_quickfix(wp->w_buffer)) {
       // If the cursor goes to the preview or the quickfix window, try
       // finding another window to go to.
-      for (;;) {
+      while (true) {
         if (wp->w_next == NULL) {
           wp = firstwin;
         } else {
@@ -3590,12 +3591,7 @@ static void frame_add_statusline(frame_T *frp)
 {
   if (frp->fr_layout == FR_LEAF) {
     win_T *wp = frp->fr_win;
-    if (wp->w_status_height == 0) {
-      if (wp->w_height - STATUS_HEIGHT >= 0) {           // don't make it negative
-        wp->w_height -= STATUS_HEIGHT;
-      }
-      wp->w_status_height = STATUS_HEIGHT;
-    }
+    wp->w_status_height = STATUS_HEIGHT;
   } else if (frp->fr_layout == FR_ROW) {
     // Handle all the frames in the row.
     FOR_ALL_FRAMES(frp, frp->fr_child) {
@@ -4639,7 +4635,7 @@ win_T *win_vert_neighbor(tabpage_T *tp, win_T *wp, bool up, long count)
     // First go upwards in the tree of frames until we find an upwards or
     // downwards neighbor.
     frame_T *fr = foundfr;
-    for (;;) {
+    while (true) {
       if (fr == tp->tp_topframe) {
         goto end;
       }
@@ -4655,7 +4651,7 @@ win_T *win_vert_neighbor(tabpage_T *tp, win_T *wp, bool up, long count)
     }
 
     // Now go downwards to find the bottom or top frame in it.
-    for (;;) {
+    while (true) {
       if (nfr->fr_layout == FR_LEAF) {
         foundfr = nfr;
         break;
@@ -4715,7 +4711,7 @@ win_T *win_horz_neighbor(tabpage_T *tp, win_T *wp, bool left, long count)
     // First go upwards in the tree of frames until we find a left or
     // right neighbor.
     frame_T *fr = foundfr;
-    for (;;) {
+    while (true) {
       if (fr == tp->tp_topframe) {
         goto end;
       }
@@ -4731,7 +4727,7 @@ win_T *win_horz_neighbor(tabpage_T *tp, win_T *wp, bool left, long count)
     }
 
     // Now go downwards to find the leftmost or rightmost frame in it.
-    for (;;) {
+    while (true) {
       if (nfr->fr_layout == FR_LEAF) {
         foundfr = nfr;
         break;
@@ -5378,7 +5374,7 @@ static dict_T *make_win_info_dict(int width, int height, int topline, int topfil
   d->dv_refcount = 1;
 
   // not actually looping, for breaking out on error
-  while (1) {
+  while (true) {
     typval_T tv = {
       .v_lock = VAR_UNLOCKED,
       .v_type = VAR_NUMBER,
@@ -6759,7 +6755,7 @@ void command_height(void)
 static void frame_add_height(frame_T *frp, int n)
 {
   frame_new_height(frp, frp->fr_height + n, false, false);
-  for (;;) {
+  while (true) {
     frp = frp->fr_parent;
     if (frp == NULL) {
       break;
@@ -7426,7 +7422,7 @@ const char *check_colorcolumn(win_T *wp)
     return NULL;      // buffer was closed
   }
 
-  unsigned int count = 0;
+  unsigned count = 0;
   int color_cols[256];
   for (char *s = wp->w_p_cc; *s != NUL && count < 255;) {
     int col;
@@ -7479,7 +7475,7 @@ skip:
     qsort(color_cols, count, sizeof(int), int_cmp);
 
     int j = 0;
-    for (unsigned int i = 0; i < count; i++) {
+    for (unsigned i = 0; i < count; i++) {
       // skip duplicates
       if (j == 0 || wp->w_p_cc_cols[j - 1] != color_cols[i]) {
         wp->w_p_cc_cols[j++] = color_cols[i];
