@@ -611,4 +611,38 @@ describe('autocmd', function()
       eq(4, #meths.get_autocmds { event = "BufReadCmd", group = "TestingPatterns" })
     end)
   end)
+
+  it('no use-after-free when adding autocommands from a callback', function()
+    exec_lua [[
+      vim.cmd "autocmd! TabNew"
+      vim.g.count = 0
+      vim.api.nvim_create_autocmd('TabNew', {
+        callback = function()
+          vim.g.count = vim.g.count + 1
+          for _ = 1, 100 do
+            vim.cmd "autocmd TabNew * let g:count += 1"
+          end
+          return true
+        end,
+      })
+      vim.cmd "tabnew"
+    ]]
+    eq(1, eval('g:count'))  -- Added autocommands should not be executed
+  end)
+
+  it('no crash when clearing a group inside a callback #23355', function()
+    exec_lua [[
+      vim.cmd "autocmd! TabNew"
+      local group = vim.api.nvim_create_augroup('Test', {})
+      local id
+      id = vim.api.nvim_create_autocmd('TabNew', {
+        group = group,
+        callback = function()
+          vim.api.nvim_del_autocmd(id)
+          vim.api.nvim_create_augroup('Test', { clear = true })
+        end,
+      })
+      vim.cmd "tabnew"
+    ]]
+  end)
 end)
