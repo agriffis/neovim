@@ -1,5 +1,9 @@
 " Helper functions for generating mouse events
 
+let g:Ttymouse_values = ['sgr']
+let g:Ttymouse_dec = []
+let g:Ttymouse_netterm = []
+
 func MouseLeftClick(row, col)
   call nvim_input_mouse('left', 'press', '', 0, a:row - 1, a:col - 1)
   call getchar(1)
@@ -26,6 +30,18 @@ endfunc
 
 func MouseCtrlRightClick(row, col)
   call nvim_input_mouse('right', 'press', 'C', 0, a:row - 1, a:col - 1)
+  call getchar(1)
+  call feedkeys('', 'x!')
+endfunc
+
+func MouseAltLeftClick(row, col)
+  call nvim_input_mouse('left', 'press', 'A', 0, a:row - 1, a:col - 1)
+  call getchar(1)
+  call feedkeys('', 'x!')
+endfunc
+
+func MouseAltRightClick(row, col)
+  call nvim_input_mouse('right', 'press', 'A', 0, a:row - 1, a:col - 1)
   call getchar(1)
   call feedkeys('', 'x!')
 endfunc
@@ -62,6 +78,18 @@ endfunc
 
 func MouseWheelDown(row, col)
   call nvim_input_mouse('wheel', 'down', '', 0, a:row - 1, a:col - 1)
+  call getchar(1)
+  call feedkeys('', 'x!')
+endfunc
+
+func MouseWheelLeft(row, col)
+  call nvim_input_mouse('wheel', 'left', '', 0, a:row - 1, a:col - 1)
+  call getchar(1)
+  call feedkeys('', 'x!')
+endfunc
+
+func MouseWheelRight(row, col)
+  call nvim_input_mouse('wheel', 'right', '', 0, a:row - 1, a:col - 1)
   call getchar(1)
   call feedkeys('', 'x!')
 endfunc
