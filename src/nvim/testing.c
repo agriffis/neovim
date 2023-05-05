@@ -35,11 +35,11 @@
 #endif
 
 static const char e_assert_fails_second_arg[]
-  = N_("E856: assert_fails() second argument must be a string or a list with one or two strings");
+  = N_("E856: \"assert_fails()\" second argument must be a string or a list with one or two strings");
 static const char e_assert_fails_fourth_argument[]
-  = N_("E1115: assert_fails() fourth argument must be a number");
+  = N_("E1115: \"assert_fails()\" fourth argument must be a number");
 static const char e_assert_fails_fifth_argument[]
-  = N_("E1116: assert_fails() fifth argument must be a string");
+  = N_("E1116: \"assert_fails()\" fifth argument must be a string");
 static const char e_calling_test_garbagecollect_now_while_v_testing_is_not_set[]
   = N_("E1142: Calling test_garbagecollect_now() while v:testing is not set");
 
@@ -121,7 +121,7 @@ static void ga_concat_shorten_esc(garray_T *gap, const char *str)
   for (const char *p = str; *p != NUL; p++) {
     int same_len = 1;
     const char *s = p;
-    const int c = mb_ptr2char_adv(&s);
+    const int c = mb_cptr2char_adv(&s);
     const int clen = (int)(s - p);
     while (*s != NUL && c == utf_ptr2char(s)) {
       same_len++;
@@ -500,11 +500,22 @@ void f_assert_exception(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 /// "assert_fails(cmd [, error [, msg]])" function
 void f_assert_fails(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
-  const char *const cmd = tv_get_string_chk(&argvars[0]);
   garray_T ga;
-  int save_trylevel = trylevel;
+  const int save_trylevel = trylevel;
   const int called_emsg_before = called_emsg;
   const char *wrong_arg_msg = NULL;
+
+  if (tv_check_for_string_or_number_arg(argvars, 0) == FAIL
+      || tv_check_for_opt_string_or_list_arg(argvars, 1) == FAIL
+      || (argvars[1].v_type != VAR_UNKNOWN
+          && (argvars[2].v_type != VAR_UNKNOWN
+              && (tv_check_for_opt_number_arg(argvars, 3) == FAIL
+                  || (argvars[3].v_type != VAR_UNKNOWN
+                      && tv_check_for_opt_string_arg(argvars, 4) == FAIL))))) {
+    return;
+  }
+
+  const char *const cmd = tv_get_string_chk(&argvars[0]);
 
   // trylevel must be zero for a ":throw" command to be considered failed
   trylevel = 0;
@@ -682,6 +693,13 @@ static int assert_inrange(typval_T *argvars)
 /// "assert_inrange(lower, upper[, msg])" function
 void f_assert_inrange(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
+  if (tv_check_for_float_or_nr_arg(argvars, 0) == FAIL
+      || tv_check_for_float_or_nr_arg(argvars, 1) == FAIL
+      || tv_check_for_float_or_nr_arg(argvars, 2) == FAIL
+      || tv_check_for_opt_string_arg(argvars, 3) == FAIL) {
+    return;
+  }
+
   rettv->vval.v_number = assert_inrange(argvars);
 }
 

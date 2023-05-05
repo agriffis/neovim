@@ -40,6 +40,10 @@
 # include "eval/typval.c.generated.h"
 #endif
 
+static const char e_variable_nested_too_deep_for_unlock[]
+  = N_("E743: Variable nested too deep for (un)lock");
+static const char e_using_invalid_value_as_string[]
+  = N_("E908: Using an invalid value as a String");
 static const char e_string_required_for_argument_nr[]
   = N_("E1174: String required for argument %d");
 static const char e_non_empty_string_required_for_argument_nr[]
@@ -52,6 +56,8 @@ static const char e_list_required_for_argument_nr[]
   = N_("E1211: List required for argument %d");
 static const char e_bool_required_for_argument_nr[]
   = N_("E1212: Bool required for argument %d");
+static const char e_string_or_number_required_for_argument_nr[]
+  = N_("E1220: String or Number required for argument %d");
 static const char e_string_or_list_required_for_argument_nr[]
   = N_("E1222: String or List required for argument %d");
 static const char e_list_or_blob_required_for_argument_nr[]
@@ -765,10 +771,10 @@ int tv_list_concat(list_T *const l1, list_T *const l2, typval_T *const tv)
   return OK;
 }
 
-static list_T *tv_list_slice(list_T *ol, int n1, int n2)
+static list_T *tv_list_slice(list_T *ol, varnumber_T n1, varnumber_T n2)
 {
   list_T *l = tv_list_alloc(n2 - n1 + 1);
-  listitem_T *item = tv_list_find(ol, n1);
+  listitem_T *item = tv_list_find(ol, (int)n1);
   for (; n1 <= n2; n1++) {
     tv_list_append_tv(l, TV_LIST_ITEM_TV(item));
     item = TV_LIST_ITEM_NEXT(rettv->vval.v_list, item);
@@ -776,22 +782,22 @@ static list_T *tv_list_slice(list_T *ol, int n1, int n2)
   return l;
 }
 
-int tv_list_slice_or_index(list_T *list, bool range, int n1_arg, int n2_arg, typval_T *rettv,
-                           bool verbose)
+int tv_list_slice_or_index(list_T *list, bool range, varnumber_T n1_arg, varnumber_T n2_arg,
+                           bool exclusive, typval_T *rettv, bool verbose)
 {
   int len = tv_list_len(rettv->vval.v_list);
-  int n1 = n1_arg;
-  int n2 = n2_arg;
+  varnumber_T n1 = n1_arg;
+  varnumber_T n2 = n2_arg;
 
   if (n1 < 0) {
     n1 = len + n1;
   }
   if (n1 < 0 || n1 >= len) {
-    // For a range we allow invalid values and return an empty
-    // list.  A list index out of range is an error.
+    // For a range we allow invalid values and return an empty list.
+    // A list index out of range is an error.
     if (!range) {
       if (verbose) {
-        semsg(_(e_listidx), (int64_t)n1);
+        semsg(_(e_list_index_out_of_range_nr), (int64_t)n1);
       }
       return FAIL;
     }
@@ -801,7 +807,10 @@ int tv_list_slice_or_index(list_T *list, bool range, int n1_arg, int n2_arg, typ
     if (n2 < 0) {
       n2 = len + n2;
     } else if (n2 >= len) {
-      n2 = len - 1;
+      n2 = len - (exclusive ? 0 : 1);
+    }
+    if (exclusive) {
+      n2--;
     }
     if (n2 < 0 || n2 + 1 < n1) {
       n2 = -1;
@@ -982,7 +991,7 @@ void tv_list_remove(typval_T *argvars, typval_T *rettv, const char *arg_errmsg)
   if (error) {
     // Type error: do nothing, errmsg already given.
   } else if ((item = tv_list_find(l, (int)idx)) == NULL) {
-    semsg(_(e_listidx), idx);
+    semsg(_(e_list_index_out_of_range_nr), idx);
   } else {
     if (argvars[2].v_type == VAR_UNKNOWN) {
       // Remove one item, return its value.
@@ -996,7 +1005,7 @@ void tv_list_remove(typval_T *argvars, typval_T *rettv, const char *arg_errmsg)
       if (error) {
         // Type error: do nothing.
       } else if ((item2 = tv_list_find(l, (int)end)) == NULL) {
-        semsg(_(e_listidx), end);
+        semsg(_(e_list_index_out_of_range_nr), end);
       } else {
         int cnt = 0;
 
@@ -1570,7 +1579,7 @@ const char *tv_list_find_str(list_T *const l, const int n)
 {
   const listitem_T *const li = tv_list_find(l, n);
   if (li == NULL) {
-    semsg(_(e_listidx), (int64_t)n);
+    semsg(_(e_list_index_out_of_range_nr), (int64_t)n);
     return NULL;
   }
   return tv_get_string(TV_LIST_ITEM_TV(li));
@@ -2773,6 +2782,79 @@ bool tv_blob_equal(const blob_T *const b1, const blob_T *const b2)
   return true;
 }
 
+/// Returns a slice of "blob" from index "n1" to "n2" in "rettv".  The length of
+/// the blob is "len".  Returns an empty blob if the indexes are out of range.
+static int tv_blob_slice(const blob_T *blob, int len, varnumber_T n1, varnumber_T n2,
+                         bool exclusive, typval_T *rettv)
+{
+  // The resulting variable is a sub-blob.  If the indexes
+  // are out of range the result is empty.
+  if (n1 < 0) {
+    n1 = len + n1;
+    if (n1 < 0) {
+      n1 = 0;
+    }
+  }
+  if (n2 < 0) {
+    n2 = len + n2;
+  } else if (n2 >= len) {
+    n2 = len - (exclusive ? 0 : 1);
+  }
+  if (exclusive) {
+    n2--;
+  }
+  if (n1 >= len || n2 < 0 || n1 > n2) {
+    tv_clear(rettv);
+    rettv->v_type = VAR_BLOB;
+    rettv->vval.v_blob = NULL;
+  } else {
+    blob_T *const new_blob = tv_blob_alloc();
+    ga_grow(&new_blob->bv_ga, (int)(n2 - n1 + 1));
+    new_blob->bv_ga.ga_len = (int)(n2 - n1 + 1);
+    for (int i = (int)n1; i <= (int)n2; i++) {
+      tv_blob_set(new_blob, i - (int)n1, tv_blob_get(rettv->vval.v_blob, i));
+    }
+    tv_clear(rettv);
+    tv_blob_set_ret(rettv, new_blob);
+  }
+
+  return OK;
+}
+
+/// Return the byte value in "blob" at index "idx" in "rettv".  If the index is
+/// too big or negative that is an error.  The length of the blob is "len".
+static int tv_blob_index(const blob_T *blob, int len, varnumber_T idx, typval_T *rettv)
+{
+  // The resulting variable is a byte value.
+  // If the index is too big or negative that is an error.
+  if (idx < 0) {
+    idx = len + idx;
+  }
+  if (idx < len && idx >= 0) {
+    const int v = (int)tv_blob_get(rettv->vval.v_blob, (int)idx);
+    tv_clear(rettv);
+    rettv->v_type = VAR_NUMBER;
+    rettv->vval.v_number = v;
+  } else {
+    semsg(_(e_blobidx), idx);
+    return FAIL;
+  }
+
+  return OK;
+}
+
+int tv_blob_slice_or_index(const blob_T *blob, int is_range, varnumber_T n1, varnumber_T n2,
+                           bool exclusive, typval_T *rettv)
+{
+  int len = tv_blob_len(rettv->vval.v_blob);
+
+  if (is_range) {
+    return tv_blob_slice(blob, len, n1, n2, exclusive, rettv);
+  } else {
+    return tv_blob_index(blob, len, n1, rettv);
+  }
+}
+
 /// Check if "n1" is a valid index for a blob with length "bloblen".
 int tv_blob_check_index(int bloblen, varnumber_T n1, bool quiet)
 {
@@ -2800,14 +2882,14 @@ int tv_blob_check_range(int bloblen, varnumber_T n1, varnumber_T n2, bool quiet)
 /// Set bytes "n1" to "n2" (inclusive) in "dest" to the value of "src".
 /// Caller must make sure "src" is a blob.
 /// Returns FAIL if the number of bytes does not match.
-int tv_blob_set_range(blob_T *dest, int n1, int n2, typval_T *src)
+int tv_blob_set_range(blob_T *dest, varnumber_T n1, varnumber_T n2, typval_T *src)
 {
   if (n2 - n1 + 1 != tv_blob_len(src->vval.v_blob)) {
     emsg(_("E972: Blob value does not have the right number of bytes"));
     return FAIL;
   }
 
-  for (int il = n1, ir = 0; il <= n2; il++) {
+  for (int il = (int)n1, ir = 0; il <= (int)n2; il++) {
     tv_blob_set(dest, il, tv_blob_get(src->vval.v_blob, ir++));
   }
   return OK;
@@ -3505,7 +3587,7 @@ void tv_item_lock(typval_T *const tv, const int deep, const bool lock, const boo
   static int recurse = 0;
 
   if (recurse >= DICT_MAXNEST) {
-    emsg(_("E743: variable nested too deep for (un)lock"));
+    emsg(_(e_variable_nested_too_deep_for_unlock));
     return;
   }
   if (deep == 0) {
@@ -3855,16 +3937,16 @@ bool tv_check_num(const typval_T *const tv)
   return false;
 }
 
-#define FUNC_ERROR "E729: using Funcref as a String"
+#define FUNC_ERROR "E729: Using a Funcref as a String"
 
 static const char *const str_errors[] = {
   [VAR_PARTIAL]= N_(FUNC_ERROR),
   [VAR_FUNC]= N_(FUNC_ERROR),
-  [VAR_LIST]= N_("E730: using List as a String"),
-  [VAR_DICT]= N_("E731: using Dictionary as a String"),
-  [VAR_FLOAT]= e_float_as_string,
-  [VAR_BLOB]= N_("E976: using Blob as a String"),
-  [VAR_UNKNOWN]= e_inval_string,
+  [VAR_LIST]= N_("E730: Using a List as a String"),
+  [VAR_DICT]= N_("E731: Using a Dictionary as a String"),
+  [VAR_FLOAT]= e_using_float_as_string,
+  [VAR_BLOB]= N_("E976: Using a Blob as a String"),
+  [VAR_UNKNOWN]= e_using_invalid_value_as_string,
 };
 
 #undef FUNC_ERROR
@@ -4084,6 +4166,17 @@ int tv_check_for_opt_number_arg(const typval_T *const args, const int idx)
           || tv_check_for_number_arg(args, idx) != FAIL) ? OK : FAIL;
 }
 
+/// Give an error and return FAIL unless "args[idx]" is a float or a number.
+int tv_check_for_float_or_nr_arg(const typval_T *const args, const int idx)
+  FUNC_ATTR_NONNULL_ALL FUNC_ATTR_WARN_UNUSED_RESULT FUNC_ATTR_PURE
+{
+  if (args[idx].v_type != VAR_FLOAT && args[idx].v_type != VAR_NUMBER) {
+    semsg(_(e_number_required_for_argument_nr), idx + 1);
+    return FAIL;
+  }
+  return OK;
+}
+
 /// Give an error and return FAIL unless "args[idx]" is a bool.
 int tv_check_for_bool_arg(const typval_T *const args, const int idx)
   FUNC_ATTR_NONNULL_ALL FUNC_ATTR_WARN_UNUSED_RESULT FUNC_ATTR_PURE
@@ -4164,6 +4257,18 @@ int tv_check_for_opt_dict_arg(const typval_T *const args, const int idx)
           || tv_check_for_dict_arg(args, idx) != FAIL) ? OK : FAIL;
 }
 
+/// Give an error and return FAIL unless "args[idx]" is a string or
+/// a number.
+int tv_check_for_string_or_number_arg(const typval_T *const args, const int idx)
+  FUNC_ATTR_NONNULL_ALL FUNC_ATTR_WARN_UNUSED_RESULT FUNC_ATTR_PURE
+{
+  if (args[idx].v_type != VAR_STRING && args[idx].v_type != VAR_NUMBER) {
+    semsg(_(e_string_or_number_required_for_argument_nr), idx + 1);
+    return FAIL;
+  }
+  return OK;
+}
+
 /// Give an error and return FAIL unless "args[idx]" is a string or a list.
 int tv_check_for_string_or_list_arg(const typval_T *const args, const int idx)
   FUNC_ATTR_NONNULL_ALL FUNC_ATTR_WARN_UNUSED_RESULT FUNC_ATTR_PURE
@@ -4173,6 +4278,14 @@ int tv_check_for_string_or_list_arg(const typval_T *const args, const int idx)
     return FAIL;
   }
   return OK;
+}
+
+/// Check for an optional string or list argument at 'idx'
+int tv_check_for_opt_string_or_list_arg(const typval_T *const args, const int idx)
+  FUNC_ATTR_NONNULL_ALL FUNC_ATTR_WARN_UNUSED_RESULT FUNC_ATTR_PURE
+{
+  return (args[idx].v_type == VAR_UNKNOWN
+          || tv_check_for_string_or_list_arg(args, idx) != FAIL) ? OK : FAIL;
 }
 
 /// Give an error and return FAIL unless "args[idx]" is a string
