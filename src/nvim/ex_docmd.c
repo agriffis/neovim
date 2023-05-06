@@ -93,7 +93,7 @@ static const char e_not_an_editor_command[]
   = N_("E492: Not an editor command");
 static const char e_no_autocommand_file_name_to_substitute_for_afile[]
   = N_("E495: No autocommand file name to substitute for \"<afile>\"");
-static const char e_no_autocommand_buffer_name_to_substitute_for_abuf[]
+static const char e_no_autocommand_buffer_number_to_substitute_for_abuf[]
   = N_("E496: No autocommand buffer number to substitute for \"<abuf>\"");
 static const char e_no_autocommand_match_name_to_substitute_for_amatch[]
   = N_("E497: No autocommand match name to substitute for \"<amatch>\"");
@@ -288,7 +288,7 @@ static void msg_verbose_cmd(linenr_T lnum, char *cmd)
 /// Execute a simple command line.  Used for translated commands like "*".
 int do_cmdline_cmd(const char *cmd)
 {
-  return do_cmdline((char *)cmd, NULL, NULL, DOCMD_NOWAIT|DOCMD_KEYTYPED);
+  return do_cmdline((char *)cmd, NULL, NULL, DOCMD_VERBOSE|DOCMD_NOWAIT|DOCMD_KEYTYPED);
 }
 
 /// do_cmdline(): execute one Ex command line
@@ -1862,7 +1862,8 @@ static bool skip_cmd(const exarg_T *eap)
 
 /// Execute one Ex command.
 ///
-/// If 'sourcing' is true, the command will be included in the error message.
+/// If "flags" has DOCMD_VERBOSE, the command will be included in the error
+/// message.
 ///
 /// 1. skip comment lines and leading space
 /// 2. handle command modifiers
@@ -6912,7 +6913,7 @@ char *eval_vars(char *src, const char *srcstart, size_t *usedlen, linenr_T *lnum
 
     case SPEC_ABUF:             // buffer number for autocommand
       if (autocmd_bufnr <= 0) {
-        *errormsg = _(e_no_autocommand_buffer_name_to_substitute_for_abuf);
+        *errormsg = _(e_no_autocommand_buffer_number_to_substitute_for_abuf);
         return NULL;
       }
       snprintf(strbuf, sizeof(strbuf), "%d", autocmd_bufnr);

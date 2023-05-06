@@ -1506,18 +1506,16 @@ char *get_lval(char *const name, typval_T *const rettv, lval_T *const lp, const 
       // g: dictionary). Disallow overwriting a builtin function.
       if (rettv != NULL && lp->ll_dict->dv_scope != 0) {
         char prevval;
-        int wrong;
-
         if (len != -1) {
           prevval = key[len];
           key[len] = NUL;
         } else {
           prevval = 0;  // Avoid compiler warning.
         }
-        wrong = ((lp->ll_dict->dv_scope == VAR_DEF_SCOPE
-                  && tv_is_func(*rettv)
-                  && var_wrong_func_name(key, lp->ll_di == NULL))
-                 || !valid_varname(key));
+        bool wrong = ((lp->ll_dict->dv_scope == VAR_DEF_SCOPE
+                       && tv_is_func(*rettv)
+                       && var_wrong_func_name(key, lp->ll_di == NULL))
+                      || !valid_varname(key));
         if (len != -1) {
           key[len] = prevval;
         }
@@ -2367,7 +2365,17 @@ int eval0(char *arg, typval_T *rettv, exarg_T *eap, evalarg_T *const evalarg)
         semsg(_(e_invexpr2), arg);
       }
     }
-    ret = FAIL;
+
+    if (eap != NULL && p != NULL) {
+      // Some of the expression may not have been consumed.
+      // Only execute a next command if it cannot be a "||" operator.
+      // The next command may be "catch".
+      char *nextcmd = check_nextcmd(p);
+      if (nextcmd != NULL && *nextcmd != '|') {
+        eap->nextcmd = nextcmd;
+      }
+    }
+    return FAIL;
   }
 
   if (eap != NULL) {
