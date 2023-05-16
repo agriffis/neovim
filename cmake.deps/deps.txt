@@ -1,5 +1,5 @@
-LIBUV_URL https://github.com/libuv/libuv/archive/15e81386bf9a285cada688c5faf67b3ed1319dcf.tar.gz
-LIBUV_SHA256 cd97aff8e7073fb128aef7a45e9183264ccaf07945a6cb430053070bd03ff200
+LIBUV_URL https://github.com/libuv/libuv/archive/30fc896cc1b5822e9f1eb462587fe4b368a6215c.tar.gz
+LIBUV_SHA256 045f2b07839e8ba203a40e52d3b799598aff46c9735c07346a9cbad7b2d4dd39
 
 MSGPACK_URL https://github.com/msgpack/msgpack-c/releases/download/c-6.0.0/msgpack-c-6.0.0.tar.gz
 MSGPACK_SHA256 3654f5e2c652dc52e0a993e270bb57d5702b262703f03771c152bba51602aeba
@@ -52,8 +52,8 @@ LIBICONV_SHA256 ccf536620a45458d26ba83887a983b96827001e92a13847b45e4925cc8913178
 
 TREESITTER_C_URL https://github.com/tree-sitter/tree-sitter-c/archive/v0.20.2.tar.gz
 TREESITTER_C_SHA256 af66fde03feb0df4faf03750102a0d265b007e5d957057b6b293c13116a70af2
-TREESITTER_LUA_URL https://github.com/MunifTanjim/tree-sitter-lua/archive/v0.0.14.tar.gz
-TREESITTER_LUA_SHA256 930d0370dc15b66389869355c8e14305b9ba7aafd36edbfdb468c8023395016d
+TREESITTER_LUA_URL https://github.com/MunifTanjim/tree-sitter-lua/archive/v0.0.17.tar.gz
+TREESITTER_LUA_SHA256 8963fd0a185d786c164dfca3824941c7eaec497ce49a3a0bc24bf753f5e0e59c
 TREESITTER_VIM_URL https://github.com/neovim/tree-sitter-vim/archive/v0.3.0.tar.gz
 TREESITTER_VIM_SHA256 403acec3efb7cdb18ff3d68640fc823502a4ffcdfbb71cec3f98aa786c21cbe2
 TREESITTER_VIMDOC_URL https://github.com/neovim/tree-sitter-vimdoc/archive/v2.0.0.tar.gz
