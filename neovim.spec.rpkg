@@ -79,7 +79,7 @@ BuildRequires:  lua5.1-luv-devel >= %{luv_min_ver}
 Requires:       lua5.1-luv >= %{luv_min_ver}
 # /with luajit
 %endif
-BuildRequires:  lua5.1-lpeg
+Requires:       lua5.1-lpeg
 BuildRequires:  lua5.1-mpack
 %if %{with jemalloc}
 BuildRequires:  jemalloc-devel
