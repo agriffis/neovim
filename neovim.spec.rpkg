@@ -21,8 +21,8 @@
   %endif
 %endif
 
-%global luv_min_ver 1.42.0
-%global tree_sitter_min_ver 0.20.3
+%global luv_min_ver 1.43.0
+%global tree_sitter_min_ver 0.20.8
 
 %if %{with luajit}
 %global luajit_version 2.1
@@ -50,10 +50,10 @@ Source0:        {{{git_repo_pack}}}
 Source1:        sysinit.vim
 Source2:        spec-template
 
-Patch0:         neovim-fix-fortify-source.patch
-
-# https://github.com/agriffis/neovim/issues/17
-Patch666:       neovim-restore-libluv-workaround.patch
+# agriffis: these do not apply to COPR
+#Patch0:         https://github.com/neovim/neovim/pull/23246.patch
+#Patch1:         https://github.com/neovim/neovim/pull/23245.patch
+#Patch2:         https://github.com/neovim/neovim/pull/23375.patch
 
 Patch1000:      neovim-lua-bit32.patch
 
@@ -85,13 +85,13 @@ BuildRequires:  lua5.1-mpack
 BuildRequires:  jemalloc-devel
 %endif
 BuildRequires:  msgpack-devel >= 3.1.0
-BuildRequires:  libtermkey-devel
-BuildRequires:  libuv-devel >= 1.42.0
-BuildRequires:  libvterm-devel >= 0.3
+BuildRequires:  pkgconfig(termkey)
+BuildRequires:  pkgconfig(libuv) >= 1.42.0
+BuildRequires:  pkgconfig(vterm) >= 0.3
 # need the build with the fix for the resize buffer issue
 Requires:       libvterm >= 0.3
-BuildRequires:  unibilium-devel
-BuildRequires:  libtree-sitter-devel >= %{tree_sitter_min_ver}
+BuildRequires:  pkgconfig(unibilium)
+BuildRequires:  pkgconfig(tree-sitter) >= %{tree_sitter_min_ver}
 # tree-sitter didn't do an soname bump. enforce the min version
 # see https://github.com/nvim-treesitter/nvim-treesitter/pull/3055/files
 Requires:       libtree-sitter >= %{tree_sitter_min_ver}
@@ -101,6 +101,7 @@ Suggests:       (python2-neovim if python2)
 Suggests:       (python3-neovim if python3)
 # XSel provides access to the system clipboard
 Recommends:     xsel
+Recommends:     wl-clipboard
 
 %description
 Neovim is a refactor - and sometimes redactor - in the tradition of
@@ -114,15 +115,13 @@ parts of Vim, without compromise, and more.
 
 %prep
 {{{git_setup_macro path="$GIT_ROOT"}}}
-
-# avg: doesn't apply to COPR build
-#%patch0 -p1
-
-# avg: restore libluv workaround needed on fedora
-%patch666 -p1
+# agriffis: these don't apply to COPR build
+#%patch -P 0 -p1
+#%patch -P 1 -p1
+#%patch -P 2 -p1
 
 %if %{without luajit}
-%patch1000 -p1
+%patch -P 1000 -p1
 %endif
 
 %build
@@ -133,10 +132,12 @@ USERNAME=koji
        -DPREFER_LUA=%{?with_luajit:OFF}%{!?with_luajit:ON} \
        -DLUA_PRG=%{lua_prg} \
        -DENABLE_JEMALLOC=%{?with_jemalloc:ON}%{!?with_jemalloc:OFF} \
-       -DLIBLUV_INCLUDE_DIR=%{luv_include_dir} \
-       -DLIBLUV_LIBRARY=%{luv_library} \
+       -DLUV_INCLUDE_DIR:PATH=%{luv_include_dir} \
+       -DLUV_LIBRARY:FILEPATH=%{luv_library} \
        -DNVIM_VERSION_MEDIUM="{{{neovim_dev_version}}}"
 
+# HACK: Replace -lluv with the correct path
+sed -i 's#-lluv#%{luv_library}#' %{__cmake_builddir}/src/nvim/CMakeFiles/nvim.dir/link.txt
 %cmake_build
 
 %install
@@ -172,6 +173,23 @@ find %{buildroot}%{_datadir} \( -name "*.bat" -o -name "*.awk" \) \
 %changelog
 * {{{git_changelog_date}}} Aron Griffis <aron@scampersand.com> - {{{git_changelog_version}}}
 - Nightly build from git master
+
+* Tue May 02 2023 Andreas Schneider <asn@redhat.com> - 0.9.0-3
+- Improve semantic token performance
+- related: rhbz#2188229 - Fix applying patches
+
+* Fri Apr 21 2023 Andreas Schneider <asn@redhat.com> - 0.9.0-2
+- resolves: rhbz#2188229 - Fix buffer overflow for user command
+
+* Fri Apr 07 2023 Andreas Schneider <asn@redhat.com> - 0.9.0-1
+- Update to version 0.9.0
+  * For changelog see `:help news`
+
+* Mon Mar 27 2023 Andreas Schneider <asn@redhat.com> - 0.8.3-4
+- resolves: rhbz#2181836 - Fix snprintf buffer overflow with tags
+
+* Sat Mar 25 2023 Andreas Schneider <asn@redhat.com> - 0.8.3-3
+- resolves: rhbz#2165805 - Fix snprintf buffer overflow
 
 * Sun Mar 05 2023 Andreas Schneider <asn@redhat.com> - 0.8.3-2
 - Update License to SPDX expression
