@@ -10,6 +10,7 @@ local expect_events = helpers.expect_events
 local meths = helpers.meths
 local curbufmeths = helpers.curbufmeths
 local command = helpers.command
+local assert_alive = helpers.assert_alive
 
 describe('decorations providers', function()
   local screen
@@ -80,7 +81,7 @@ describe('decorations providers', function()
       local ns2 = api.nvim_create_namespace "ns2"
       api.nvim_set_decoration_provider(ns2, {})
     ]])
-    helpers.assert_alive()
+    assert_alive()
   end)
 
   it('leave a trace', function()
@@ -824,6 +825,26 @@ describe('extmark decorations', function()
       end  -- ?古古古古?古古                                                            |
                                                                                         |
     ]]}
+
+    screen:try_resize(50, 2)
+    command('set nowrap')
+    meths.buf_set_lines(0, 12, 12, true, {'-- ' .. ('…'):rep(57)})
+    feed('G')
+    meths.buf_set_extmark(0, ns, 12, 123, { virt_text={{'!!!!!', 'ErrorMsg'}}, virt_text_pos='overlay', virt_text_hide=true})
+    screen:expect{grid=[[
+      ^-- …………………………………………………………………………………………………………{4:!!!!!}……|
+                                                        |
+    ]]}
+    feed('40zl')
+    screen:expect{grid=[[
+      ^………{4:!!!!!}………………………………                              |
+                                                        |
+    ]]}
+    feed('10zl')
+    screen:expect{grid=[[
+      ^…………………………                                        |
+                                                        |
+    ]]}
   end)
 
   it('can have virtual text of overlay position and styling', function()
@@ -1092,7 +1113,7 @@ describe('extmark decorations', function()
       {1:~                                                 }|
                                                         |
     ]]}
-    helpers.assert_alive()
+    assert_alive()
   end)
 
   it('conceal #19007', function()
@@ -1258,6 +1279,9 @@ describe('decorations: inline virtual text', function()
       [13] = {reverse = true};
       [14] = {foreground = Screen.colors.SlateBlue, background = Screen.colors.LightMagenta};
       [15] = {bold = true, reverse = true};
+      [16] = {foreground = Screen.colors.Red};
+      [17] = {background = Screen.colors.LightGrey, foreground = Screen.colors.DarkBlue};
+      [18] = {background = Screen.colors.LightGrey, foreground = Screen.colors.Red};
     }
 
     ns = meths.create_namespace 'test'
@@ -1970,6 +1994,37 @@ bbbbbbb]])
                                                         |
       ]],
     })
+  end)
+
+  it('does not crash at column 0 when folded in a wide window', function()
+    screen:try_resize(82, 4)
+    command('hi! CursorLine guibg=NONE guifg=Red gui=NONE')
+    command('set cursorline')
+    insert([[
+      aaaaa
+      bbbbb
+      ccccc]])
+    meths.buf_set_extmark(0, ns, 0, 0, { virt_text = {{'foo'}}, virt_text_pos = 'inline' })
+    screen:expect{grid=[[
+      fooaaaaa                                                                          |
+      bbbbb                                                                             |
+      {16:cccc^c                                                                             }|
+                                                                                        |
+    ]]}
+    command('1,2fold')
+    screen:expect{grid=[[
+      {17:+--  2 lines: aaaaa·······························································}|
+      {16:cccc^c                                                                             }|
+      {1:~                                                                                 }|
+                                                                                        |
+    ]]}
+    feed('k')
+    screen:expect{grid=[[
+      {18:^+--  2 lines: aaaaa·······························································}|
+      ccccc                                                                             |
+      {1:~                                                                                 }|
+                                                                                        |
+    ]]}
   end)
 end)
 
