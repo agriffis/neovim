@@ -8,6 +8,7 @@ local exec_lua = helpers.exec_lua
 local exec = helpers.exec
 local expect_events = helpers.expect_events
 local meths = helpers.meths
+local funcs = helpers.funcs
 local curbufmeths = helpers.curbufmeths
 local command = helpers.command
 local assert_alive = helpers.assert_alive
@@ -651,7 +652,7 @@ describe('extmark decorations', function()
       [16] = {blend = 30, background = Screen.colors.Red1, foreground = Screen.colors.Magenta1};
       [17] = {bold = true, foreground = Screen.colors.Brown, background = Screen.colors.LightGrey};
       [18] = {background = Screen.colors.LightGrey};
-      [19] = {foreground = Screen.colors.Cyan4, background = Screen.colors.LightGrey};
+      [19] = {foreground = Screen.colors.DarkCyan, background = Screen.colors.LightGrey};
       [20] = {foreground = tonumber('0x180606'), background = tonumber('0xf13f3f')};
       [21] = {foreground = Screen.colors.Gray0, background = tonumber('0xf13f3f')};
       [22] = {foreground = tonumber('0xb20000'), background = tonumber('0xf13f3f')};
@@ -662,6 +663,9 @@ describe('extmark decorations', function()
       [27] = {background = Screen.colors.Plum1};
       [28] = {underline = true, foreground = Screen.colors.SlateBlue};
       [29] = {foreground = Screen.colors.SlateBlue, background = Screen.colors.LightGray, underline = true};
+      [30] = {foreground = Screen.colors.DarkCyan, background = Screen.colors.LightGray, underline = true};
+      [31] = {underline = true, foreground = Screen.colors.DarkCyan};
+      [32] = {underline = true};
     }
 
     ns = meths.create_namespace 'test'
@@ -833,9 +837,10 @@ describe('extmark decorations', function()
     screen:try_resize(50, 3)
     command('set nowrap')
     meths.buf_set_lines(0, 0, -1, true, {'-- ' .. ('…'):rep(57)})
+    meths.buf_set_extmark(0, ns, 0, 0, { virt_text={{'?????', 'ErrorMsg'}}, virt_text_pos='overlay', virt_text_hide=true})
     meths.buf_set_extmark(0, ns, 0, 123, { virt_text={{'!!!!!', 'ErrorMsg'}}, virt_text_pos='overlay', virt_text_hide=true})
     screen:expect{grid=[[
-      ^-- …………………………………………………………………………………………………………{4:!!!!!}……|
+      {4:^?????}……………………………………………………………………………………………………{4:!!!!!}……|
       {1:~                                                 }|
                                                         |
     ]]}
@@ -845,7 +850,13 @@ describe('extmark decorations', function()
       {1:~                                                 }|
                                                         |
     ]]}
-    feed('10zl')
+    feed('3zl')
+    screen:expect{grid=[[
+      {4:^!!!!!}………………………………                                 |
+      {1:~                                                 }|
+                                                        |
+    ]]}
+    feed('7zl')
     screen:expect{grid=[[
       ^…………………………                                        |
       {1:~                                                 }|
@@ -854,7 +865,7 @@ describe('extmark decorations', function()
 
     command('set wrap smoothscroll')
     screen:expect{grid=[[
-      -- …………………………………………………………………………………………………………{4:!!!!!}……|
+      {4:?????}……………………………………………………………………………………………………{4:!!!!!}……|
       ^…………………………                                        |
                                                         |
     ]]}
@@ -872,7 +883,7 @@ describe('extmark decorations', function()
     ]]}
     feed('<C-Y>')
     screen:expect{grid=[[
-      -- …………………………………………………………………………………………………|
+      {4:?????}……………………………………………………………………………………………|
       ………{4:!!!!!}……………………………^…                    |
                                               |
     ]]}
@@ -1367,7 +1378,56 @@ describe('extmark decorations', function()
     screen:expect_unchanged(true)
   end)
 
-  it('highlights the beginning of a TAB char correctly', function()
+  it('highlight is combined with syntax and sign linehl #20004', function()
+    screen:try_resize(50, 3)
+    insert([[
+      function Func()
+      end]])
+    feed('gg')
+    command('set ft=lua')
+    command('syntax on')
+    meths.buf_set_extmark(0, ns, 0, 0, { end_col = 3, hl_mode = 'combine', hl_group = 'Visual' })
+    command('hi default MyLine gui=underline')
+    command('sign define CurrentLine linehl=MyLine')
+    funcs.sign_place(6, 'Test', 'CurrentLine', '', { lnum = 1 })
+    screen:expect{grid=[[
+      {30:^fun}{31:ction}{32: Func()                                   }|
+      {6:end}                                               |
+                                                        |
+    ]]}
+  end)
+
+  it('highlight works after TAB with sidescroll #14201', function()
+    screen:try_resize(50, 3)
+    command('set nowrap')
+    meths.buf_set_lines(0, 0, -1, true, {'\tword word word word'})
+    meths.buf_set_extmark(0, ns, 0, 1, { end_col = 3, hl_group = 'ErrorMsg' })
+    screen:expect{grid=[[
+             ^ {4:wo}rd word word word                       |
+      {1:~                                                 }|
+                                                        |
+    ]]}
+    feed('7zl')
+    screen:expect{grid=[[
+       {4:^wo}rd word word word                              |
+      {1:~                                                 }|
+                                                        |
+    ]]}
+    feed('zl')
+    screen:expect{grid=[[
+      {4:^wo}rd word word word                               |
+      {1:~                                                 }|
+                                                        |
+    ]]}
+    feed('zl')
+    screen:expect{grid=[[
+      {4:^o}rd word word word                                |
+      {1:~                                                 }|
+                                                        |
+    ]]}
+  end)
+
+  it('highlights the beginning of a TAB char correctly #23734', function()
     screen:try_resize(50, 3)
     meths.buf_set_lines(0, 0, -1, true, {'this is the\ttab'})
     meths.buf_set_extmark(0, ns, 0, 11, { end_col = 15, hl_group = 'ErrorMsg' })
@@ -1386,7 +1446,20 @@ describe('extmark decorations', function()
     ]]}
   end)
 
-  pending('highlight applies to a full Tab in visual block mode #23734', function()
+  it('highlight applies to a full TAB on line with matches #20885', function()
+    screen:try_resize(50, 3)
+    meths.buf_set_lines(0, 0, -1, true, {'\t-- match1', '        -- match2'})
+    funcs.matchadd('Underlined', 'match')
+    meths.buf_set_extmark(0, ns, 0, 0, { end_row = 1, end_col = 0, hl_group = 'Visual' })
+    meths.buf_set_extmark(0, ns, 1, 0, { end_row = 2, end_col = 0, hl_group = 'Visual' })
+    screen:expect{grid=[[
+      {18:       ^ -- }{29:match}{18:1}                                 |
+      {18:        -- }{29:match}{18:2}                                 |
+                                                        |
+    ]]}
+  end)
+
+  pending('highlight applies to a full TAB in visual block mode', function()
     screen:try_resize(50, 8)
     meths.buf_set_lines(0, 0, -1, true, {'asdf', '\tasdf', '\tasdf', '\tasdf', 'asdf'})
     meths.buf_set_extmark(0, ns, 0, 0, {end_row = 5, end_col = 0, hl_group = 'Underlined'})
@@ -2193,7 +2266,7 @@ describe('decorations: virtual lines', function()
     screen:attach()
     screen:set_default_attr_ids {
       [1] = {bold=true, foreground=Screen.colors.Blue};
-      [2] = {foreground = Screen.colors.Cyan4};
+      [2] = {foreground = Screen.colors.DarkCyan};
       [3] = {background = Screen.colors.Yellow1};
       [4] = {bold = true};
       [5] = {background = Screen.colors.Yellow, foreground = Screen.colors.Blue};
@@ -2908,6 +2981,30 @@ if (h->n_buckets < new_n_buckets) { // expand
       {9:  6 }    h->vals_buf = new_vals;                   |
       {9:  7 }  }                                           |
       {9:  8 }}                                             |
+                                                        |
+    ]]}
+  end)
+
+  it('does not show twice if end_row or end_col is specified #18622', function()
+    insert([[
+      aaa
+      bbb
+      ccc
+      ddd]])
+    meths.buf_set_extmark(0, ns, 0, 0, {end_row = 2, virt_lines = {{{'VIRT LINE 1', 'NonText'}}}})
+    meths.buf_set_extmark(0, ns, 3, 0, {end_col = 2, virt_lines = {{{'VIRT LINE 2', 'NonText'}}}})
+    screen:expect{grid=[[
+      aaa                                               |
+      {1:VIRT LINE 1}                                       |
+      bbb                                               |
+      ccc                                               |
+      dd^d                                               |
+      {1:VIRT LINE 2}                                       |
+      {1:~                                                 }|
+      {1:~                                                 }|
+      {1:~                                                 }|
+      {1:~                                                 }|
+      {1:~                                                 }|
                                                         |
     ]]}
   end)
