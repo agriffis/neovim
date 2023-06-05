@@ -451,6 +451,14 @@ function M.apply_text_edits(text_edits, bufnr, offset_encoding)
     }
   end)()
 
+  -- save and restore local marks since they get deleted by nvim_buf_set_lines
+  local marks = {}
+  for _, m in pairs(vim.fn.getmarklist(bufnr or vim.api.nvim_get_current_buf())) do
+    if m.mark:match("^'[a-z]$") then
+      marks[m.mark:sub(2, 2)] = { m.pos[2], m.pos[3] - 1 } -- api-indexed
+    end
+  end
+
   -- Apply text edits.
   local is_cursor_fixed = false
   local has_eol_text_edit = false
@@ -517,6 +525,20 @@ function M.apply_text_edits(text_edits, bufnr, offset_encoding)
   end
 
   local max = api.nvim_buf_line_count(bufnr)
+
+  -- no need to restore marks that still exist
+  for _, m in pairs(vim.fn.getmarklist(bufnr or vim.api.nvim_get_current_buf())) do
+    marks[m.mark:sub(2, 2)] = nil
+  end
+  -- restore marks
+  for mark, pos in pairs(marks) do
+    if pos then
+      -- make sure we don't go out of bounds
+      pos[1] = math.min(pos[1], max)
+      pos[2] = math.min(pos[2], #(get_line(bufnr, pos[1] - 1) or ''))
+      vim.api.nvim_buf_set_mark(bufnr or 0, mark, pos[1], pos[2], {})
+    end
+  end
 
   -- Apply fixed cursor position.
   if is_cursor_fixed then
@@ -694,15 +716,18 @@ function M.text_document_completion_list_to_complete_items(result, prefix)
   local matches = {}
 
   for _, completion_item in ipairs(items) do
-    local info = ' '
+    local info = ''
     local documentation = completion_item.documentation
     if documentation then
       if type(documentation) == 'string' and documentation ~= '' then
         info = documentation
       elseif type(documentation) == 'table' and type(documentation.value) == 'string' then
         info = documentation.value
-        -- else
-        -- TODO(ashkan) Validation handling here?
+      else
+        vim.notify(
+          ('invalid documentation value %s'):format(vim.inspect(documentation)),
+          vim.log.levels.WARN
+        )
       end
     end
 
@@ -712,7 +737,7 @@ function M.text_document_completion_list_to_complete_items(result, prefix)
       abbr = completion_item.label,
       kind = M._get_completion_item_kind_name(completion_item.kind),
       menu = completion_item.detail or '',
-      info = info,
+      info = #info > 0 and info or nil,
       icase = 1,
       dup = 1,
       empty = 1,
