@@ -1344,7 +1344,7 @@ bool scrollup(long line_count, int byfold)
     int width1 = curwin->w_width_inner - curwin_col_off();
     int width2 = width1 + curwin_col_off2();
     unsigned size = 0;
-    linenr_T prev_topline = curwin->w_topline;
+    const colnr_T prev_skipcol = curwin->w_skipcol;
 
     if (do_sms) {
       size = linetabsize(curwin, curwin->w_topline);
@@ -1396,8 +1396,9 @@ bool scrollup(long line_count, int byfold)
       }
     }
 
-    if (curwin->w_topline == prev_topline) {
-      // need to redraw even though w_topline didn't change
+    if (prev_skipcol > 0 || curwin->w_skipcol > 0) {
+      // need to redraw more, because wl_size of the (new) topline may
+      // now be invalid
       redraw_later(curwin, UPD_NOT_VALID);
     }
   } else {
@@ -1825,10 +1826,13 @@ void scroll_cursor_top(int min_scroll, int always)
       }
     }
     check_topfill(curwin, false);
-    // TODO(vim): if the line doesn't fit may optimize w_skipcol
-    if (curwin->w_topline == curwin->w_cursor.lnum
-        && curwin->w_skipcol >= curwin->w_cursor.col) {
-      reset_skipcol(curwin);
+    if (curwin->w_topline == curwin->w_cursor.lnum) {
+      validate_virtcol();
+      if (curwin->w_skipcol >= curwin->w_virtcol) {
+        // TODO(vim): if the line doesn't fit may optimize w_skipcol instead
+        // of making it zero
+        reset_skipcol(curwin);
+      }
     }
     if (curwin->w_topline != old_topline
         || curwin->w_skipcol != old_skipcol
