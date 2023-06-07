@@ -2606,7 +2606,7 @@ void ex_spellrepall(exarg_T *eap)
   }
   const size_t repl_from_len = strlen(repl_from);
   const size_t repl_to_len = strlen(repl_to);
-  int addlen = (int)(repl_to_len - repl_from_len);
+  const int addlen = (int)(repl_to_len - repl_from_len);
 
   const size_t frompatlen = repl_from_len + 7;
   char *frompat = xmalloc(frompatlen);
@@ -3171,17 +3171,15 @@ void ex_spelldump(exarg_T *eap)
   if (no_spell_checking(curwin)) {
     return;
   }
-  char *spl;
-  long dummy;
-  (void)get_option_value("spl", &dummy, &spl, NULL, OPT_LOCAL);
+  OptVal spl = get_option_value("spl", NULL, OPT_LOCAL, NULL);
 
   // Create a new empty buffer in a new window.
   do_cmdline_cmd("new");
 
   // enable spelling locally in the new window
-  set_option_value_give_err("spell", true, "", OPT_LOCAL);
-  set_option_value_give_err("spl",  dummy, spl, OPT_LOCAL);
-  xfree(spl);
+  set_option_value_give_err("spell", BOOLEAN_OPTVAL(true), OPT_LOCAL);
+  set_option_value_give_err("spl", spl, OPT_LOCAL);
+  optval_free(spl);
 
   if (!buf_is_empty(curbuf)) {
     return;
