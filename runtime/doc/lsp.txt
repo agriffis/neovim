@@ -197,10 +197,13 @@ specification. These LSP requests/notifications are defined by default:
     textDocument/formatting
     textDocument/hover
     textDocument/implementation*
+    textDocument/inlayHint
     textDocument/publishDiagnostics
     textDocument/rangeFormatting
     textDocument/references
     textDocument/rename
+    textDocument/semanticTokens/full
+    textDocument/semanticTokens/full/delta
     textDocument/signatureHelp
     textDocument/typeDefinition*
     window/logMessage
@@ -208,6 +211,7 @@ specification. These LSP requests/notifications are defined by default:
     window/showDocument
     window/showMessageRequest
     workspace/applyEdit
+    workspace/inlayHint/refresh
     workspace/symbol
 
 * NOTE: These are sometimes not implemented by servers.
