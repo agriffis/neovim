@@ -1056,55 +1056,55 @@ static int do_unlet_var(lval_T *lp, char *name_end, exarg_T *eap, int deep FUNC_
                                      lp->ll_name_len))) {
     return FAIL;
   } else if (lp->ll_range) {
-    assert(lp->ll_list != NULL);
-    // Delete a range of List items.
-    listitem_T *const first_li = lp->ll_li;
-    listitem_T *last_li = first_li;
-    while (true) {
-      listitem_T *const li = TV_LIST_ITEM_NEXT(lp->ll_list, lp->ll_li);
-      if (value_check_lock(TV_LIST_ITEM_TV(lp->ll_li)->v_lock,
-                           lp->ll_name,
-                           lp->ll_name_len)) {
-        return false;
-      }
-      lp->ll_li = li;
-      lp->ll_n1++;
-      if (lp->ll_li == NULL || (!lp->ll_empty2 && lp->ll_n2 < lp->ll_n1)) {
-        break;
-      }
-      last_li = lp->ll_li;
-    }
-    tv_list_remove_items(lp->ll_list, first_li, last_li);
+    tv_list_unlet_range(lp->ll_list, lp->ll_li, lp->ll_n1, !lp->ll_empty2, lp->ll_n2);
+  } else if (lp->ll_list != NULL) {
+    // unlet a List item.
+    tv_list_item_remove(lp->ll_list, lp->ll_li);
   } else {
-    if (lp->ll_list != NULL) {
-      // unlet a List item.
-      tv_list_item_remove(lp->ll_list, lp->ll_li);
-    } else {
-      // unlet a Dictionary item.
-      dict_T *d = lp->ll_dict;
-      assert(d != NULL);
-      dictitem_T *di = lp->ll_di;
-      bool watched = tv_dict_is_watched(d);
-      char *key = NULL;
-      typval_T oldtv;
+    // unlet a Dictionary item.
+    dict_T *d = lp->ll_dict;
+    assert(d != NULL);
+    dictitem_T *di = lp->ll_di;
+    bool watched = tv_dict_is_watched(d);
+    char *key = NULL;
+    typval_T oldtv;
 
-      if (watched) {
-        tv_copy(&di->di_tv, &oldtv);
-        // need to save key because dictitem_remove will free it
-        key = xstrdup(di->di_key);
-      }
+    if (watched) {
+      tv_copy(&di->di_tv, &oldtv);
+      // need to save key because dictitem_remove will free it
+      key = xstrdup(di->di_key);
+    }
 
-      tv_dict_item_remove(d, di);
+    tv_dict_item_remove(d, di);
 
-      if (watched) {
-        tv_dict_watcher_notify(d, key, NULL, &oldtv);
-        tv_clear(&oldtv);
-        xfree(key);
-      }
+    if (watched) {
+      tv_dict_watcher_notify(d, key, NULL, &oldtv);
+      tv_clear(&oldtv);
+      xfree(key);
     }
   }
 
   return ret;
+}
+
+/// Unlet one item or a range of items from a list.
+/// Return OK or FAIL.
+static void tv_list_unlet_range(list_T *const l, listitem_T *const li_first, const long n1_arg,
+                                const bool has_n2, const long n2)
+{
+  assert(l != NULL);
+  // Delete a range of List items.
+  listitem_T *li_last = li_first;
+  long n1 = n1_arg;
+  while (true) {
+    listitem_T *const li = TV_LIST_ITEM_NEXT(l, li_last);
+    n1++;
+    if (li == NULL || (has_n2 && n2 < n1)) {
+      break;
+    }
+    li_last = li;
+  }
+  tv_list_remove_items(l, li_first, li_last);
 }
 
 /// unlet a variable
