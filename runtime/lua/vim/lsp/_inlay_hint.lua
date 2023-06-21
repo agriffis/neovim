@@ -48,18 +48,6 @@ function M.on_inlayhint(err, result, ctx, _)
   if not (bufstate.client_hint and bufstate.version) then
     bufstate.client_hint = vim.defaulttable()
     bufstate.version = ctx.version
-    api.nvim_buf_attach(bufnr, false, {
-      on_detach = function(_, cb_bufnr)
-        api.nvim_buf_clear_namespace(cb_bufnr, namespace, 0, -1)
-        bufstates[cb_bufnr].version = nil
-        bufstates[cb_bufnr].client_hint = nil
-      end,
-      on_reload = function(_, cb_bufnr)
-        api.nvim_buf_clear_namespace(cb_bufnr, namespace, 0, -1)
-        bufstates[cb_bufnr].version = nil
-        bufstates[cb_bufnr].client_hint = nil
-      end,
-    })
   end
   local hints_by_client = bufstate.client_hint
   local client = vim.lsp.get_client_by_id(client_id)
@@ -219,9 +207,11 @@ end
 ---@private
 function M.disable(bufnr)
   bufnr = resolve_bufnr(bufnr)
-  clear(bufnr)
-  bufstates[bufnr].enabled = nil
-  bufstates[bufnr].timer = nil
+  if bufstates[bufnr] and bufstates[bufnr].enabled then
+    clear(bufnr)
+    bufstates[bufnr].enabled = nil
+    bufstates[bufnr].timer = nil
+  end
 end
 
 --- Toggle inlay hints for a buffer
@@ -262,18 +252,18 @@ api.nvim_set_decoration_provider(namespace, {
               text = text .. part.value
             end
           end
+          local vt = {}
           if hint.paddingLeft then
-            text = ' ' .. text
+            vt[#vt + 1] = { ' ' }
           end
+          vt[#vt + 1] = { text, 'LspInlayHint' }
           if hint.paddingRight then
-            text = text .. ' '
+            vt[#vt + 1] = { ' ' }
           end
           api.nvim_buf_set_extmark(bufnr, namespace, lnum, hint.position.character, {
             virt_text_pos = 'inline',
             ephemeral = false,
-            virt_text = {
-              { text, 'LspInlayHint' },
-            },
+            virt_text = vt,
             hl_mode = 'combine',
           })
         end
