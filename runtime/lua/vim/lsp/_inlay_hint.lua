@@ -8,6 +8,7 @@ local M = {}
 ---@field client_hint table<integer, table<integer, lsp.InlayHint[]>> client_id -> (lnum -> hints)
 ---@field enabled boolean Whether inlay hints are enabled for the buffer
 ---@field timer uv.uv_timer_t? Debounce timer associated with the buffer
+---@field applied table<integer, integer> Last version of hints applied to this line
 
 ---@type table<integer, lsp._inlay_hint.bufstate>
 local bufstates = {}
@@ -143,6 +144,9 @@ end
 ---@private
 local function clear(bufnr)
   bufnr = resolve_bufnr(bufnr)
+  if not bufstates[bufnr] then
+    return
+  end
   reset_timer(bufnr)
   local bufstate = bufstates[bufnr]
   local client_lens = (bufstate or {}).client_hint or {}
@@ -169,7 +173,7 @@ function M.enable(bufnr)
   bufnr = resolve_bufnr(bufnr)
   local bufstate = bufstates[bufnr]
   if not (bufstate and bufstate.enabled) then
-    bufstates[bufnr] = { enabled = true, timer = nil }
+    bufstates[bufnr] = { enabled = true, timer = nil, applied = {} }
     M.refresh({ bufnr = bufnr })
     api.nvim_buf_attach(bufnr, true, {
       on_lines = function(_, cb_bufnr)
@@ -183,7 +187,9 @@ function M.enable(bufnr)
       end,
       on_reload = function(_, cb_bufnr)
         clear(cb_bufnr)
-        bufstates[cb_bufnr] = nil
+        if bufstates[cb_bufnr] and bufstates[cb_bufnr].enabled then
+          bufstates[cb_bufnr] = { enabled = true }
+        end
         M.refresh({ bufnr = cb_bufnr })
       end,
       on_detach = function(_, cb_bufnr)
@@ -238,35 +244,38 @@ api.nvim_set_decoration_provider(namespace, {
       return
     end
     local hints_by_client = bufstate.client_hint
-    api.nvim_buf_clear_namespace(bufnr, namespace, 0, -1)
 
     for lnum = topline, botline do
-      for _, hints_by_lnum in pairs(hints_by_client) do
-        local line_hints = hints_by_lnum[lnum] or {}
-        for _, hint in pairs(line_hints) do
-          local text = ''
-          if type(hint.label) == 'string' then
-            text = hint.label
-          else
-            for _, part in ipairs(hint.label) do
-              text = text .. part.value
+      if bufstate.applied[lnum] ~= bufstate.version then
+        api.nvim_buf_clear_namespace(bufnr, namespace, lnum, lnum + 1)
+        for _, hints_by_lnum in pairs(hints_by_client) do
+          local line_hints = hints_by_lnum[lnum] or {}
+          for _, hint in pairs(line_hints) do
+            local text = ''
+            if type(hint.label) == 'string' then
+              text = hint.label
+            else
+              for _, part in ipairs(hint.label) do
+                text = text .. part.value
+              end
             end
+            local vt = {}
+            if hint.paddingLeft then
+              vt[#vt + 1] = { ' ' }
+            end
+            vt[#vt + 1] = { text, 'LspInlayHint' }
+            if hint.paddingRight then
+              vt[#vt + 1] = { ' ' }
+            end
+            api.nvim_buf_set_extmark(bufnr, namespace, lnum, hint.position.character, {
+              virt_text_pos = 'inline',
+              ephemeral = false,
+              virt_text = vt,
+              hl_mode = 'combine',
+            })
           end
-          local vt = {}
-          if hint.paddingLeft then
-            vt[#vt + 1] = { ' ' }
-          end
-          vt[#vt + 1] = { text, 'LspInlayHint' }
-          if hint.paddingRight then
-            vt[#vt + 1] = { ' ' }
-          end
-          api.nvim_buf_set_extmark(bufnr, namespace, lnum, hint.position.character, {
-            virt_text_pos = 'inline',
-            ephemeral = false,
-            virt_text = vt,
-            hl_mode = 'combine',
-          })
         end
+        bufstate.applied[lnum] = bufstate.version
       end
     end
   end,
