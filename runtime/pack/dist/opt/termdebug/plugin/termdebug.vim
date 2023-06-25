@@ -2,7 +2,7 @@
 "
 " Author: Bram Moolenaar
 " Copyright: Vim license applies, see ":help license"
-" Last Change: 2022 Nov 10
+" Last Change: 2023 Jun 24
 "
 " WORK IN PROGRESS - The basics works stable, more to come
 " Note: In general you need at least GDB 7.12 because this provides the
@@ -87,6 +87,8 @@ func s:Breakpoint2SignNumber(id, subid)
   return s:break_id + a:id * 1000 + a:subid
 endfunction
 
+" Define or adjust the default highlighting, using background "new".
+" When the 'background' option is set then "old" has the old value.
 func s:Highlight(init, old, new)
   let default = a:init ? 'default ' : ''
   if a:new ==# 'light' && a:old !=# 'light'
@@ -96,9 +98,21 @@ func s:Highlight(init, old, new)
   endif
 endfunc
 
-call s:Highlight(1, '', &background)
-hi default debugBreakpoint term=reverse ctermbg=red guibg=red
-hi default debugBreakpointDisabled term=reverse ctermbg=gray guibg=gray
+" Define the default highlighting, using the current 'background' value.
+func s:InitHighlight()
+  call s:Highlight(1, '', &background)
+  hi default debugBreakpoint term=reverse ctermbg=red guibg=red
+  hi default debugBreakpointDisabled term=reverse ctermbg=gray guibg=gray
+endfunc
+
+" Setup an autocommand to redefine the default highlight when the colorscheme
+" is changed.
+func s:InitAutocmd()
+  augroup TermDebug
+    autocmd!
+    autocmd ColorScheme * call s:InitHighlight()
+  augroup END
+endfunc
 
 " Get the command to execute the debugger as a list, defaults to ["gdb"].
 func s:GetCommand()
@@ -626,7 +640,7 @@ func s:GdbOutCallback(job_id, msgs, event)
   for msg in a:msgs
     if msg =~ '^\^error,msg='
       if exists('s:evalexpr')
-            \ && s:DecodeMessage(msg[11:])
+            \ && s:DecodeMessage(msg[11:], v:false)
             \    =~ 'A syntax error in expression, near\|No symbol .* in current context'
         " Silently drop evaluation errors.
         call remove(a:msgs, index)
@@ -634,7 +648,7 @@ func s:GdbOutCallback(job_id, msgs, event)
         continue
       endif
     elseif msg[0] == '~'
-      call add(lines, s:DecodeMessage(msg[1:]))
+      call add(lines, s:DecodeMessage(msg[1:], v:false))
       call remove(a:msgs, index)
       continue
     endif
@@ -656,21 +670,20 @@ func s:GdbOutCallback(job_id, msgs, event)
   call s:CommOutput(a:job_id, a:msgs, a:event)
 endfunc
 
-" Decode a message from gdb.  quotedText starts with a ", return the text up
+" Decode a message from gdb.  "quotedText" starts with a ", return the text up
 " to the next ", unescaping characters:
-" - remove line breaks
-" - change \\t to \t
+" - remove line breaks (unless "literal" is v:true)
+" - change \\t to \t (unless "literal" is v:true)
 " - change \0xhh to \xhh (disabled for now)
 " - change \ooo to octal
 " - change \\ to \
-func s:DecodeMessage(quotedText)
+func s:DecodeMessage(quotedText, literal)
   if a:quotedText[0] != '"'
     echoerr 'DecodeMessage(): missing quote in ' . a:quotedText
     return
   endif
-  return a:quotedText
-        \ ->substitute('^"\|".*\|\\n', '', 'g')
-        \ ->substitute('\\t', "\t", 'g')
+  let msg = a:quotedText
+        \ ->substitute('^"\|".*', '', 'g')
         " multi-byte characters arrive in octal form
         " NULL-values must be kept encoded as those break the string otherwise
         \ ->substitute('\\000', s:NullRepl, 'g')
@@ -682,6 +695,13 @@ func s:DecodeMessage(quotedText)
         " \ ->substitute('\\0x00', s:NullRepl, 'g')
         \ ->substitute('\\\\', '\', 'g')
         \ ->substitute(s:NullRepl, '\\000', 'g')
+  if !a:literal
+          return msg
+        \ ->substitute('\\t', "\t", 'g')
+        \ ->substitute('\\n', '', 'g')
+  else
+          return msg
+  endif
 endfunc
 const s:NullRepl = 'XXXNULLXXX'
 
@@ -690,7 +710,7 @@ func s:GetFullname(msg)
   if a:msg !~ 'fullname'
     return ''
   endif
-  let name = s:DecodeMessage(substitute(a:msg, '.*fullname=', '', ''))
+  let name = s:DecodeMessage(substitute(a:msg, '.*fullname=', '', ''), v:true)
   if has('win32') && name =~ ':\\\\'
     " sometimes the name arrives double-escaped
     let name = substitute(name, '\\\\', '\\', 'g')
@@ -703,11 +723,11 @@ func s:GetAsmAddr(msg)
   if a:msg !~ 'addr='
     return ''
   endif
-  let addr = s:DecodeMessage(substitute(a:msg, '.*addr=', '', ''))
+  let addr = s:DecodeMessage(substitute(a:msg, '.*addr=', '', ''), v:false)
   return addr
 endfunc
 
-function s:EndTermDebug(job_id, exit_code, event)
+func s:EndTermDebug(job_id, exit_code, event)
   let s:running = v:false
   if s:starting
     return
@@ -1663,6 +1683,9 @@ func s:BufUnloaded()
     endfor
   endfor
 endfunc
+
+call s:InitHighlight()
+call s:InitAutocmd()
 
 let &cpo = s:keepcpo
 unlet s:keepcpo

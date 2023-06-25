@@ -1372,6 +1372,7 @@ local filename = {
   ['named.root'] = 'bindzone',
   WORKSPACE = 'bzl',
   ['WORKSPACE.bzlmod'] = 'bzl',
+  BUCK = 'bzl',
   BUILD = 'bzl',
   ['cabal.project'] = 'cabalproject',
   ['cabal.config'] = 'cabalconfig',
@@ -2189,7 +2190,7 @@ local pattern = {
   ['.*/etc/profile'] = function(path, bufnr)
     return require('vim.filetype.detect').sh(path, M.getlines(bufnr))
   end,
-  ['bash%-fc[%-%.]'] = function(path, bufnr)
+  ['bash%-fc[%-%.].*'] = function(path, bufnr)
     return require('vim.filetype.detect').sh(path, M.getlines(bufnr), 'bash')
   end,
   ['%.tcshrc.*'] = function(path, bufnr)
