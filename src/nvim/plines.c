@@ -287,7 +287,7 @@ unsigned win_linetabsize(win_T *wp, linenr_T lnum, char *line, colnr_T len)
 
 /// Return the number of cells line "lnum" of window "wp" will take on the
 /// screen, taking into account the size of a tab and text properties.
-unsigned     linetabsize(win_T *wp, linenr_T lnum)
+unsigned linetabsize(win_T *wp, linenr_T lnum)
 {
   return win_linetabsize(wp, lnum, ml_get_buf(wp->w_buffer, lnum, false), (colnr_T)MAXCOL);
 }
@@ -298,9 +298,8 @@ void win_linetabsize_cts(chartabsize_T *cts, colnr_T len)
        MB_PTR_ADV(cts->cts_ptr)) {
     cts->cts_vcol += win_lbr_chartabsize(cts, NULL);
   }
-  // check for a virtual text on an empty line
-  if (cts->cts_has_virt_text && *cts->cts_ptr == NUL
-      && cts->cts_ptr == cts->cts_line) {
+  // check for a virtual text after the end of the line
+  if (len == MAXCOL && cts->cts_has_virt_text && *cts->cts_ptr == NUL) {
     (void)win_lbr_chartabsize(cts, NULL);
     cts->cts_vcol += cts->cts_cur_text_width_left + cts->cts_cur_text_width_right;
   }
@@ -406,15 +405,15 @@ int win_lbr_chartabsize(chartabsize_T *cts, int *headp)
 
   // First get normal size, without 'linebreak' or virtual text
   int size = win_chartabsize(wp, s, vcol);
+
   if (cts->cts_has_virt_text) {
     int tab_size = size;
-    int charlen = *s == NUL ? 1 : utf_ptr2len(s);
     int col = (int)(s - line);
     while (true) {
       mtkey_t mark = marktree_itr_current(cts->cts_iter);
       if (mark.pos.row != cts->cts_row || mark.pos.col > col) {
         break;
-      } else if (mark.pos.col >= col && mark.pos.col < col + charlen) {
+      } else if (mark.pos.col == col) {
         if (!mt_end(mark)) {
           Decoration decor = get_decor(mark);
           if (decor.virt_text_pos == kVTInline) {
@@ -595,4 +594,53 @@ static int win_nolbr_chartabsize(chartabsize_T *cts, int *headp)
     return 3;
   }
   return n;
+}
+
+int64_t win_get_text_height(win_T *const wp, const linenr_T first, const linenr_T last,
+                            const int64_t start_vcol, const int64_t end_vcol)
+{
+  int width1 = 0;
+  int width2 = 0;
+  if (start_vcol >= 0 || end_vcol >= 0) {
+    width1 = wp->w_width_inner - win_col_off(wp);
+    width2 = width1 + win_col_off2(wp);
+    width1 = MAX(width1, 0);
+    width2 = MAX(width2, 0);
+  }
+
+  int64_t size = 0;
+  int64_t height_nofill = 0;
+  linenr_T lnum = first;
+
+  if (start_vcol >= 0) {
+    linenr_T lnum_next = lnum;
+    const bool folded = hasFoldingWin(wp, lnum, &lnum, &lnum_next, true, NULL);
+    height_nofill = folded ? 1 : plines_win_nofill(wp, lnum, false);
+    size += height_nofill;
+    const int64_t row_off = (start_vcol < width1 || width2 <= 0)
+                            ? 0
+                            : 1 + (start_vcol - width1) / width2;
+    size -= MIN(row_off, height_nofill);
+    lnum = lnum_next + 1;
+  }
+
+  while (lnum <= last) {
+    linenr_T lnum_next = lnum;
+    const bool folded = hasFoldingWin(wp, lnum, &lnum, &lnum_next, true, NULL);
+    height_nofill = folded ? 1 : plines_win_nofill(wp, lnum, false);
+    size += win_get_fill(wp, lnum) + height_nofill;
+    lnum = lnum_next + 1;
+  }
+
+  if (end_vcol >= 0) {
+    size -= height_nofill;
+    const int64_t row_off = end_vcol == 0
+                            ? 0
+                            : (end_vcol <= width1 || width2 <= 0)
+                              ? 1
+                              : 1 + (end_vcol - width1 + width2 - 1) / width2;
+    size += MIN(row_off, height_nofill);
+  }
+
+  return size;
 }
