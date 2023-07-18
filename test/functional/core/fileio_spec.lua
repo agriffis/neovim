@@ -45,6 +45,7 @@ describe('fileio', function()
     os.remove('Xtest-overwrite-forced')
     rmdir('Xtest_startup_swapdir')
     rmdir('Xtest_backupdir')
+    rmdir('Xtest_backupdir with spaces')
   end)
 
   it('fsync() codepaths #8304', function()
@@ -126,6 +127,28 @@ describe('fileio', function()
     local backup_file_name = string.gsub(currentdir()..'/Xtest_startup_file1',
       is_os('win') and '[:/\\]' or '/', '%%') .. '~'
     local foo_contents = trim(read_file('Xtest_backupdir/'..backup_file_name))
+    local foobar_contents = trim(read_file('Xtest_startup_file1'))
+
+    eq('foobar', foobar_contents);
+    eq('foo', foo_contents);
+  end)
+
+  it('backup with full path with spaces', function()
+    skip(is_ci('cirrus'))
+    clear()
+    mkdir('Xtest_backup with spaces')
+    command('set backup')
+    command('set backupdir=Xtest_backupdir\\ with\\ spaces//')
+    command('write Xtest_startup_file1')
+    feed('ifoo<esc>')
+    command('write')
+    feed('Abar<esc>')
+    command('write')
+
+    -- Backup filename = fullpath, separators replaced with "%".
+    local backup_file_name = string.gsub(currentdir()..'/Xtest_startup_file1',
+      is_os('win') and '[:/\\]' or '/', '%%') .. '~'
+    local foo_contents = trim(read_file('Xtest_backupdir with spaces/'..backup_file_name))
     local foobar_contents = trim(read_file('Xtest_startup_file1'))
 
     eq('foobar', foobar_contents);
@@ -265,7 +288,7 @@ describe('tmpdir', function()
 
   before_each(function()
     -- Fake /tmp dir so that we can mess it up.
-    os_tmpdir = vim.loop.fs_mkdtemp(vim.fs.dirname(helpers.tmpname()) .. '/nvim_XXXXXXXXXX')
+    os_tmpdir = vim.uv.fs_mkdtemp(vim.fs.dirname(helpers.tmpname()) .. '/nvim_XXXXXXXXXX')
   end)
 
   after_each(function()
