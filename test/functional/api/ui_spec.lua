@@ -1,8 +1,11 @@
 local helpers = require('test.functional.helpers')(after_each)
 local Screen = require('test.functional.ui.screen')
 local clear = helpers.clear
+local command = helpers.command
 local eq = helpers.eq
 local eval = helpers.eval
+local exec = helpers.exec
+local feed = helpers.feed
 local meths = helpers.meths
 local request = helpers.request
 local pcall_err = helpers.pcall_err
@@ -75,4 +78,46 @@ it('autocmds UIEnter/UILeave', function()
     'UIEnter',
     'UILeave',
   }, eval('g:evs'))
+end)
+
+it('autocmds VimSuspend/VimResume #22041', function()
+  clear()
+  local screen = Screen.new()
+  screen:attach()
+  exec([[
+    let g:ev = []
+    autocmd VimResume  * :call add(g:ev, 'r')
+    autocmd VimSuspend * :call add(g:ev, 's')
+  ]])
+
+  eq(false, screen.suspended)
+  feed('<C-Z>')
+  screen:expect(function() eq(true, screen.suspended) end)
+  eq({ 's' }, eval('g:ev'))
+  screen.suspended = false
+  feed('<Ignore>')
+  eq({ 's', 'r' }, eval('g:ev'))
+
+  command('suspend')
+  screen:expect(function() eq(true, screen.suspended) end)
+  eq({ 's', 'r', 's' }, eval('g:ev'))
+  screen.suspended = false
+  meths.input_mouse('move', '', '', 0, 0, 0)
+  eq({ 's', 'r', 's', 'r' }, eval('g:ev'))
+
+  feed('<C-Z><C-Z><C-Z>')
+  screen:expect(function() eq(true, screen.suspended) end)
+  meths.ui_set_focus(false)
+  eq({ 's', 'r', 's', 'r', 's' }, eval('g:ev'))
+  screen.suspended = false
+  meths.ui_set_focus(true)
+  eq({ 's', 'r', 's', 'r', 's', 'r' }, eval('g:ev'))
+
+  command('suspend | suspend | suspend')
+  screen:expect(function() eq(true, screen.suspended) end)
+  screen:detach()
+  eq({ 's', 'r', 's', 'r', 's', 'r', 's' }, eval('g:ev'))
+  screen.suspended = false
+  screen:attach()
+  eq({ 's', 'r', 's', 'r', 's', 'r', 's', 'r' }, eval('g:ev'))
 end)
