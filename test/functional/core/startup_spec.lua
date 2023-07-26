@@ -9,6 +9,7 @@ local ok = helpers.ok
 local eq = helpers.eq
 local matches = helpers.matches
 local eval = helpers.eval
+local exec = helpers.exec
 local exec_capture = helpers.exec_capture
 local exec_lua = helpers.exec_lua
 local feed = helpers.feed
@@ -458,6 +459,26 @@ describe('startup', function()
                                                                   |
                                                                   |
     ]])
+  end)
+
+  it('-r works without --headless in PTY #23294', function()
+    exec([[
+      func Normalize(data) abort
+        " Windows: remove ^M and term escape sequences
+        return map(a:data, 'substitute(substitute(v:val, "\r", "", "g"), "\x1b\\%(\\]\\d\\+;.\\{-}\x07\\|\\[.\\{-}[\x40-\x7E]\\)", "", "g")')
+      endfunc
+      func OnOutput(id, data, event) dict
+        let g:stdout = Normalize(a:data)
+      endfunc
+      call jobstart([v:progpath, '-u', 'NONE', '-i', 'NONE', '-r'], {
+      \ 'pty': v:true,
+      \ 'stdout_buffered': v:true,
+      \ 'on_stdout': function('OnOutput'),
+      \ })
+    ]])
+    retry(nil, nil, function()
+      eq('Swap files found:', eval('g:stdout[0]'))
+    end)
   end)
 
   it('fixed hang issue with --headless (#11386)', function()
