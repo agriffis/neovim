@@ -798,9 +798,9 @@ M.funcs = {
       If the {buf} is a String, but you want to use it as a buffer
       <If the buffer doesn't exist, or doesn't have a name, an empty
       string is returned. >vim
-      	echo bufname("#")		" alternate buffer name
+      	echo bufname("#")	" alternate buffer name
       	echo bufname(3)		" name of buffer 3
-      	echo bufname("%")		" name of current buffer
+      	echo bufname("%")	" name of current buffer
       	echo bufname("file2")	" name of buffer where "file2" matches.
       <
     ]=],
@@ -1063,10 +1063,10 @@ M.funcs = {
     desc = [=[
       Return Number value of the first char in {string}.
       Examples: >vim
-      	echo char2nr(" ")		" returns 32
-      	echo char2nr("ABC")		" returns 65
-      	echo char2nr("á")		" returns 225
-      	echo char2nr("á"[0])		" returns 195
+      	echo char2nr(" ")	" returns 32
+      	echo char2nr("ABC")	" returns 65
+      	echo char2nr("á")	" returns 225
+      	echo char2nr("á"[0])	" returns 195
       	echo char2nr("\<M-x>")	" returns 128
       <Non-ASCII characters are always treated as UTF-8 characters.
       {utf8} is ignored, it exists only for backwards-compatibility.
@@ -1110,7 +1110,7 @@ M.funcs = {
 
       Example:
       With the cursor on '세' in line 5 with text "여보세요": >vim
-      	echo charcol('.')		" returns 3
+      	echo charcol('.')	" returns 3
       	echo col('.')		" returns 7
 
     ]=],
@@ -1256,9 +1256,9 @@ M.funcs = {
       character position use |charcol()|.
       Note that only marks in the current file can be used.
       Examples: >vim
-      	echo col(".")		" column of cursor
-      	echo col("$")		" length of cursor line plus one
-      	echo col("'t")		" column of mark t
+      	echo col(".")			" column of cursor
+      	echo col("$")			" length of cursor line plus one
+      	echo col("'t")			" column of mark t
       	echo col("'" .. markname)	" column of mark markname
       <The first column is 1.  Returns 0 if {expr} is invalid or when
       the window with ID {winid} is not found.
@@ -1728,7 +1728,7 @@ M.funcs = {
 
     ]=],
     name = 'delete',
-    params = { { 'fname', 'integer' }, { 'flags', 'string' } },
+    params = { { 'fname', 'string' }, { 'flags', 'string' } },
     returns = 'integer',
     signature = 'delete({fname} [, {flags}])',
   },
@@ -2799,7 +2799,7 @@ M.funcs = {
     ]=],
     fast = true,
     name = 'fnamemodify',
-    params = { { 'fname', 'integer' }, { 'mods', 'string' } },
+    params = { { 'fname', 'string' }, { 'mods', 'string' } },
     returns = 'string',
     signature = 'fnamemodify({fname}, {mods})',
   },
@@ -3767,7 +3767,7 @@ M.funcs = {
     ]=],
     fast = true,
     name = 'getfperm',
-    params = { { 'fname', 'integer' } },
+    params = { { 'fname', 'string' } },
     returns = 'string',
     signature = 'getfperm({fname})',
   },
@@ -3785,7 +3785,7 @@ M.funcs = {
     ]=],
     fast = true,
     name = 'getfsize',
-    params = { { 'fname', 'integer' } },
+    params = { { 'fname', 'string' } },
     returns = 'integer',
     signature = 'getfsize({fname})',
   },
@@ -3802,7 +3802,7 @@ M.funcs = {
     ]=],
     fast = true,
     name = 'getftime',
-    params = { { 'fname', 'integer' } },
+    params = { { 'fname', 'string' } },
     returns = 'integer',
     signature = 'getftime({fname})',
   },
@@ -3832,7 +3832,7 @@ M.funcs = {
     ]=],
     fast = true,
     name = 'getftype',
-    params = { { 'fname', 'integer' } },
+    params = { { 'fname', 'string' } },
     returns = "'file'|'dir'|'link'|'bdev'|'cdev'|'socket'|'fifo'|'other'",
     signature = 'getftype({fname})',
   },
@@ -5884,9 +5884,9 @@ M.funcs = {
       that window instead of the current window.
       Returns 0 for invalid values of {expr} and {winid}.
       Examples: >vim
-      	echo line(".")		" line number of the cursor
-      	echo line(".", winid)	" idem, in window "winid"
-      	echo line("'t")		" line number of mark t
+      	echo line(".")			" line number of the cursor
+      	echo line(".", winid)		" idem, in window "winid"
+      	echo line("'t")			" line number of mark t
       	echo line("'" .. marker)	" line number of mark marker
       <
       To jump to the last known position when opening a file see
@@ -7609,11 +7609,11 @@ M.funcs = {
       start this is an error.
       Examples: >vim
       	echo range(4)		" [0, 1, 2, 3]
-      	echo range(2, 4)		" [2, 3, 4]
-      	echo range(2, 9, 3)		" [2, 5, 8]
+      	echo range(2, 4)	" [2, 3, 4]
+      	echo range(2, 9, 3)	" [2, 5, 8]
       	echo range(2, -2, -1)	" [2, 1, 0, -1, -2]
       	echo range(0)		" []
-      	echo range(2, 0)		" error!
+      	echo range(2, 0)	" error!
       <
     ]=],
     name = 'range',
@@ -7649,7 +7649,7 @@ M.funcs = {
       Also see |readfile()| and |writefile()|.
     ]=],
     name = 'readblob',
-    params = { { 'fname', 'integer' }, { 'offset', 'any' }, { 'size', 'any' } },
+    params = { { 'fname', 'string' }, { 'offset', 'any' }, { 'size', 'any' } },
     signature = 'readblob({fname} [, {offset} [, {size}]])',
   },
   readdir = {
@@ -7728,7 +7728,7 @@ M.funcs = {
 
     ]=],
     name = 'readfile',
-    params = { { 'fname', 'integer' }, { 'type', 'any' }, { 'max', 'any' } },
+    params = { { 'fname', 'string' }, { 'type', 'any' }, { 'max', 'any' } },
     signature = 'readfile({fname} [, {type} [, {max}]])',
   },
   reduce = {
@@ -8948,7 +8948,7 @@ M.funcs = {
       To read permissions see |getfperm()|.
     ]=],
     name = 'setfperm',
-    params = { { 'fname', 'integer' }, { 'mode', 'string' } },
+    params = { { 'fname', 'string' }, { 'mode', 'string' } },
     signature = 'setfperm({fname}, {mode})',
   },
   setline = {
@@ -10484,7 +10484,7 @@ M.funcs = {
         echo strftime("%c")		   " Sun Apr 27 11:49:23 1997
         echo strftime("%Y %b %d %X")	   " 1997 Apr 27 11:53:25
         echo strftime("%y%m%d %T")	   " 970427 11:53:55
-        echo strftime("%H:%M")	           " 11:55
+        echo strftime("%H:%M")		   " 11:55
         echo strftime("%c", getftime("file.c"))
       				   " Show mod time of file.c.
 
@@ -10525,8 +10525,8 @@ M.funcs = {
       -1 is returned if the {needle} does not occur in {haystack}.
       See also |strridx()|.
       Examples: >vim
-        echo stridx("An Example", "Example")	     " 3
-        echo stridx("Starting point", "Start")    " 0
+        echo stridx("An Example", "Example")     " 3
+        echo stridx("Starting point", "Start")   " 0
         echo stridx("Starting point", "start")   " -1
       <				*strstr()* *strchr()*
       stridx() works similar to the C function strstr().  When used
@@ -10870,7 +10870,7 @@ M.funcs = {
 
     ]=],
     name = 'swapinfo',
-    params = { { 'fname', 'integer' } },
+    params = { { 'fname', 'string' } },
     signature = 'swapinfo({fname})',
   },
   swapname = {
@@ -12406,7 +12406,7 @@ M.funcs = {
 
     ]=],
     name = 'writefile',
-    params = { { 'object', 'any' }, { 'fname', 'integer' }, { 'flags', 'string' } },
+    params = { { 'object', 'any' }, { 'fname', 'string' }, { 'flags', 'string' } },
     signature = 'writefile({object}, {fname} [, {flags}])',
   },
   xor = {

@@ -572,9 +572,9 @@ function vim.fn.bufloaded(buf) end
 --- If the {buf} is a String, but you want to use it as a buffer
 --- <If the buffer doesn't exist, or doesn't have a name, an empty
 --- string is returned. >vim
----   echo bufname("#")    " alternate buffer name
+---   echo bufname("#")  " alternate buffer name
 ---   echo bufname(3)    " name of buffer 3
----   echo bufname("%")    " name of current buffer
+---   echo bufname("%")  " name of current buffer
 ---   echo bufname("file2")  " name of buffer where "file2" matches.
 --- <
 ---
@@ -778,10 +778,10 @@ function vim.fn.chansend(id, data) end
 
 --- Return Number value of the first char in {string}.
 --- Examples: >vim
----   echo char2nr(" ")    " returns 32
----   echo char2nr("ABC")    " returns 65
----   echo char2nr("á")    " returns 225
----   echo char2nr("á"[0])    " returns 195
+---   echo char2nr(" ")  " returns 32
+---   echo char2nr("ABC")  " returns 65
+---   echo char2nr("á")  " returns 225
+---   echo char2nr("á"[0])  " returns 195
 ---   echo char2nr("\<M-x>")  " returns 128
 --- <Non-ASCII characters are always treated as UTF-8 characters.
 --- {utf8} is ignored, it exists only for backwards-compatibility.
@@ -814,7 +814,7 @@ function vim.fn.charclass(string) end
 ---
 --- Example:
 --- With the cursor on '세' in line 5 with text "여보세요": >vim
----   echo charcol('.')    " returns 3
+---   echo charcol('.')  " returns 3
 ---   echo col('.')    " returns 7
 ---
 --- @param expr any
@@ -929,9 +929,9 @@ function vim.fn.clearmatches(win) end
 --- character position use |charcol()|.
 --- Note that only marks in the current file can be used.
 --- Examples: >vim
----   echo col(".")    " column of cursor
----   echo col("$")    " length of cursor line plus one
----   echo col("'t")    " column of mark t
+---   echo col(".")      " column of cursor
+---   echo col("$")      " length of cursor line plus one
+---   echo col("'t")      " column of mark t
 ---   echo col("'" .. markname)  " column of mark markname
 --- <The first column is 1.  Returns 0 if {expr} is invalid or when
 --- the window with ID {winid} is not found.
@@ -1315,7 +1315,7 @@ function vim.fn.deepcopy(expr, noref) end
 --- operation was successful and -1/true when the deletion failed
 --- or partly failed.
 ---
---- @param fname integer
+--- @param fname string
 --- @param flags? string
 --- @return integer
 function vim.fn.delete(fname, flags) end
@@ -2222,7 +2222,7 @@ function vim.fn.fnameescape(string) end
 --- Note: Environment variables don't work in {fname}, use
 --- |expand()| first then.
 ---
---- @param fname integer
+--- @param fname string
 --- @param mods string
 --- @return string
 function vim.fn.fnamemodify(fname, mods) end
@@ -3029,7 +3029,7 @@ function vim.fn.getfontname(name) end
 ---
 --- For setting permissions use |setfperm()|.
 ---
---- @param fname integer
+--- @param fname string
 --- @return string
 function vim.fn.getfperm(fname) end
 
@@ -3040,7 +3040,7 @@ function vim.fn.getfperm(fname) end
 --- If the size of {fname} is too big to fit in a Number then -2
 --- is returned.
 ---
---- @param fname integer
+--- @param fname string
 --- @return integer
 function vim.fn.getfsize(fname) end
 
@@ -3050,7 +3050,7 @@ function vim.fn.getfsize(fname) end
 --- |localtime()| and |strftime()|.
 --- If the file {fname} can't be found -1 is returned.
 ---
---- @param fname integer
+--- @param fname string
 --- @return integer
 function vim.fn.getftime(fname) end
 
@@ -3073,7 +3073,7 @@ function vim.fn.getftime(fname) end
 --- systems that support it.  On some systems only "dir" and
 --- "file" are returned.
 ---
---- @param fname integer
+--- @param fname string
 --- @return 'file'|'dir'|'link'|'bdev'|'cdev'|'socket'|'fifo'|'other'
 function vim.fn.getftype(fname) end
 
@@ -4809,9 +4809,9 @@ function vim.fn.libcallnr(libname, funcname, argument) end
 --- that window instead of the current window.
 --- Returns 0 for invalid values of {expr} and {winid}.
 --- Examples: >vim
----   echo line(".")    " line number of the cursor
----   echo line(".", winid)  " idem, in window "winid"
----   echo line("'t")    " line number of mark t
+---   echo line(".")      " line number of the cursor
+---   echo line(".", winid)    " idem, in window "winid"
+---   echo line("'t")      " line number of mark t
 ---   echo line("'" .. marker)  " line number of mark marker
 --- <
 --- To jump to the last known position when opening a file see
@@ -6303,11 +6303,11 @@ function vim.fn.rand(expr) end
 --- start this is an error.
 --- Examples: >vim
 ---   echo range(4)    " [0, 1, 2, 3]
----   echo range(2, 4)    " [2, 3, 4]
----   echo range(2, 9, 3)    " [2, 5, 8]
+---   echo range(2, 4)  " [2, 3, 4]
+---   echo range(2, 9, 3)  " [2, 5, 8]
 ---   echo range(2, -2, -1)  " [2, 1, 0, -1, -2]
 ---   echo range(0)    " []
----   echo range(2, 0)    " error!
+---   echo range(2, 0)  " error!
 --- <
 ---
 --- @param expr any
@@ -6339,7 +6339,7 @@ function vim.fn.range(expr, max, stride) end
 --- is truncated.
 --- Also see |readfile()| and |writefile()|.
 ---
---- @param fname integer
+--- @param fname string
 --- @param offset? any
 --- @param size? any
 --- @return any
@@ -6411,7 +6411,7 @@ function vim.fn.readdir(directory, expr) end
 --- the result is an empty list.
 --- Also see |writefile()|.
 ---
---- @param fname integer
+--- @param fname string
 --- @param type? any
 --- @param max? any
 --- @return any
@@ -7441,7 +7441,7 @@ function vim.fn.setenv(name, val) end
 ---
 --- To read permissions see |getfperm()|.
 ---
---- @param fname integer
+--- @param fname string
 --- @param mode string
 --- @return any
 function vim.fn.setfperm(fname, mode) end
@@ -8801,7 +8801,7 @@ function vim.fn.strdisplaywidth(string, col) end
 ---   echo strftime("%c")       " Sun Apr 27 11:49:23 1997
 ---   echo strftime("%Y %b %d %X")     " 1997 Apr 27 11:53:25
 ---   echo strftime("%y%m%d %T")     " 970427 11:53:55
----   echo strftime("%H:%M")             " 11:55
+---   echo strftime("%H:%M")       " 11:55
 ---   echo strftime("%c", getftime("file.c"))
 ---            " Show mod time of file.c.
 ---
@@ -8834,8 +8834,8 @@ function vim.fn.strgetchar(str, index) end
 --- -1 is returned if the {needle} does not occur in {haystack}.
 --- See also |strridx()|.
 --- Examples: >vim
----   echo stridx("An Example", "Example")       " 3
----   echo stridx("Starting point", "Start")    " 0
+---   echo stridx("An Example", "Example")     " 3
+---   echo stridx("Starting point", "Start")   " 0
 ---   echo stridx("Starting point", "start")   " -1
 --- <        *strstr()* *strchr()*
 --- stridx() works similar to the C function strstr().  When used
@@ -9127,7 +9127,7 @@ function vim.fn.swapfilelist() end
 ---   Not a swap file: does not contain correct block ID
 ---   Magic number mismatch: Info in first block is invalid
 ---
---- @param fname integer
+--- @param fname string
 --- @return any
 function vim.fn.swapinfo(fname) end
 
@@ -10391,7 +10391,7 @@ function vim.fn.wordcount() end
 ---   call writefile(fl, "foocopy", "b")
 ---
 --- @param object any
---- @param fname integer
+--- @param fname string
 --- @param flags? string
 --- @return any
 function vim.fn.writefile(object, fname, flags) end
