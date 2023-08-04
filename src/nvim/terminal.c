@@ -577,6 +577,8 @@ static int terminal_execute(VimState *state, int key)
   case K_RIGHTRELEASE:
   case K_MOUSEDOWN:
   case K_MOUSEUP:
+  case K_MOUSELEFT:
+  case K_MOUSERIGHT:
     if (send_mouse_event(s->term, key)) {
       return 0;
     }
@@ -1440,11 +1442,17 @@ static bool send_mouse_event(Terminal *term, int c)
       pressed = true; button = 4; break;
     case K_MOUSEUP:
       pressed = true; button = 5; break;
+    case K_MOUSELEFT:
+      pressed = true; button = 7; break;
+    case K_MOUSERIGHT:
+      pressed = true; button = 6; break;
     default:
       return false;
     }
 
-    mouse_action(term, button, row, col - offset, pressed, 0);
+    VTermModifier mod = VTERM_MOD_NONE;
+    convert_modifiers(c, &mod);
+    mouse_action(term, button, row, col - offset, pressed, mod);
     return false;
   }
 

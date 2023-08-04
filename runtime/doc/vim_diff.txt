@@ -115,13 +115,15 @@ DEFAULT MAPPINGS
 Nvim creates the following default mappings at |startup|. You can disable any
 of these in your config by simply removing the mapping, e.g. ":unmap Y".
 
-- |Y-default|
-- |i_CTRL-U-default|
-- |i_CTRL-W-default|
-- |CTRL-L-default|
-- |&-default|
-- |v_#-default|
-- |v_star-default|
+- Y |Y-default|
+- <C-U> |i_CTRL-U-default|
+- <C-W> |i_CTRL-W-default|
+- <C-L> |CTRL-L-default|
+- & |&-default|
+- # |v_#-default|
+- * |v_star-default|
+- Nvim LSP client defaults |lsp-defaults|
+  - K |K-lsp-default|
 
 DEFAULT AUTOCOMMANDS
 							*default-autocmds*
@@ -464,7 +466,7 @@ Lua interface (|lua.txt|):
 <  whereas Vim emits only "TEST".
 - Lua has direct access to Nvim |API| via `vim.api`.
 - Lua package.path and package.cpath are automatically updated according to
-  'runtimepath': |lua-require|.
+  'runtimepath'. |lua-module-load|
 
 Commands:
   |:doautocmd| does not warn about "No matching autocommands".
@@ -510,6 +512,9 @@ Mappings:
 
 Motion:
   The |jumplist| avoids useless/phantom jumps.
+
+Performance:
+  Folds are not updated during insert-mode.
 
 Syntax highlighting:
   syncolor.vim has been removed. Nvim now sets up default highlighting groups
@@ -731,9 +736,6 @@ Options:
   *'ttyscroll'* *'tsl'*
   *'ttytype'* *'tty'*
   weirdinvert
-
-Performance:
-  Folds are not updated during insert-mode.
 
 Plugins:
 
