@@ -398,7 +398,7 @@ bufload({buf})                                                       *bufload()*
 		refers to an existing file then the file is read.  Otherwise
 		the buffer will be empty.  If the buffer was already loaded
 		then there is no change.  If the buffer is not related to a
-		file the no file is read (e.g., when 'buftype' is "nofile").
+		file then no file is read (e.g., when 'buftype' is "nofile").
 		If there is an existing swap file for the file of the buffer,
 		there will be no dialog, the buffer will be loaded anyway.
 		The {buf} argument is used like with |bufexists()|.
@@ -1856,6 +1856,7 @@ foldtextresult({lnum})                                        *foldtextresult()*
 		{lnum} is used like with |getline()|.  Thus "." is the current
 		line, "'m" mark m, etc.
 		Useful when exporting folded text, e.g., to HTML.
+
 
 fullcommand({name})                                              *fullcommand()*
 		Get the full command name from a short abbreviated command
@@ -7992,6 +7993,13 @@ termopen({cmd} [, {opts}])                                          *termopen()*
 		Terminal environment is initialized as in |jobstart-env|,
 		except $TERM is set to "xterm-256color". Full behavior is
 		described in |terminal|.
+
+test_garbagecollect_now()                            *test_garbagecollect_now()*
+		Like |garbagecollect()|, but executed right away.  This must
+		only be called directly to avoid any structure to exist
+		internally, and |v:testing| must have been set before calling
+		any function.
+
 
 timer_info([{id}])                                                *timer_info()*
 		Return a list with information about timers.

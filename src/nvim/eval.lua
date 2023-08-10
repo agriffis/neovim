@@ -747,7 +747,7 @@ M.funcs = {
       refers to an existing file then the file is read.  Otherwise
       the buffer will be empty.  If the buffer was already loaded
       then there is no change.  If the buffer is not related to a
-      file the no file is read (e.g., when 'buftype' is "nofile").
+      file then no file is read (e.g., when 'buftype' is "nofile").
       If there is an existing swap file for the file of the buffer,
       there will be no dialog, the buffer will be loaded anyway.
       The {buf} argument is used like with |bufexists()|.
@@ -2898,6 +2898,9 @@ M.funcs = {
     signature = 'foldtextresult({lnum})',
   },
   foreground = {
+    args = 0,
+    params = {},
+    signature = '',
     lua = false,
   },
   fullcommand = {
@@ -11326,10 +11329,21 @@ M.funcs = {
     signature = 'termopen({cmd} [, {opts}])',
   },
   test_garbagecollect_now = {
+    args = 0,
+    desc = [=[
+      Like |garbagecollect()|, but executed right away.  This must
+      only be called directly to avoid any structure to exist
+      internally, and |v:testing| must have been set before calling
+      any function.
+    ]=],
+    params = {},
+    signature = 'test_garbagecollect_now()',
     lua = false,
   },
   test_write_list_log = {
     args = 1,
+    params = { { 'fname' } },
+    signature = '',
     lua = false,
   },
   timer_info = {

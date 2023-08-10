@@ -548,6 +548,7 @@ local extension = {
   slnf = 'json',
   json = 'json',
   jsonp = 'json',
+  geojson = 'json',
   webmanifest = 'json',
   ipynb = 'json',
   ['json-patch'] = 'json',
@@ -1011,9 +1012,13 @@ local extension = {
   uit = 'uil',
   uil = 'uil',
   ungram = 'ungrammar',
+  u = 'unison',
+  uu = 'unison',
   url = 'urlshortcut',
   usd = 'usd',
   usda = 'usd',
+  vsh = 'v',
+  vv = 'v',
   sba = 'vb',
   vb = 'vb',
   dsm = 'vb',
@@ -1049,6 +1054,7 @@ local extension = {
   wat = 'wat',
   wdl = 'wdl',
   wm = 'webmacro',
+  wgsl = 'wgsl',
   wbt = 'winbatch',
   wit = 'wit',
   wml = 'wml',
@@ -1090,6 +1096,7 @@ local extension = {
   yxx = 'yacc',
   yml = 'yaml',
   yaml = 'yaml',
+  eyaml = 'yaml',
   yang = 'yang',
   yuck = 'yuck',
   z8a = 'z8a',
@@ -1399,6 +1406,7 @@ local filename = {
   ['/etc/protocols'] = 'protocols',
   INDEX = detect.psf,
   INFO = detect.psf,
+  ['MANIFEST.in'] = 'pymanifest',
   ['.pythonstartup'] = 'python',
   ['.pythonrc'] = 'python',
   SConstruct = 'python',
@@ -2026,9 +2034,9 @@ local function normalize_path(path, as_pattern)
 end
 
 --- @class vim.filetype.add.filetypes
---- @field pattern vim.filetype.mapping
---- @field extension vim.filetype.mapping
---- @field filename vim.filetype.mapping
+--- @field pattern? vim.filetype.mapping
+--- @field extension? vim.filetype.mapping
+--- @field filename? vim.filetype.mapping
 
 --- Add new filetype mappings.
 ---
