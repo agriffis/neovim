@@ -24,18 +24,13 @@
 %global luv_min_ver 1.43.0
 %global tree_sitter_min_ver 0.20.8
 
+%global luv_include_dir %{_includedir}/luv
 %if %{with luajit}
 %global luajit_version 2.1
 %global lua_prg %{_bindir}/luajit
-
-%global luv_include_dir %{_includedir}/luajit-%{luajit_version}
-%global luv_library %{_libdir}/luajit/%{luajit_version}/luv.so
 %else
 %global lua_version 5.1
 %global lua_prg %{_bindir}/lua-5.1
-
-%global luv_include_dir %{_includedir}/lua-%{lua_version}
-%global luv_library %{_libdir}/lua/%{lua_version}/luv.so
 %endif
 
 Name:           {{{git_name name="neovim"}}}
@@ -50,11 +45,6 @@ Source0:        {{{git_repo_pack}}}
 Source1:        sysinit.vim
 Source2:        spec-template
 
-# agriffis: these do not apply to COPR
-#Patch0:         https://github.com/neovim/neovim/pull/23246.patch
-#Patch1:         https://github.com/neovim/neovim/pull/23245.patch
-#Patch2:         https://github.com/neovim/neovim/pull/23375.patch
-
 Patch1000:      neovim-lua-bit32.patch
 
 BuildRequires:  gcc-c++
@@ -64,22 +54,20 @@ BuildRequires:  fdupes
 BuildRequires:  gettext
 BuildRequires:  gperf
 BuildRequires:  gcc
+BuildRequires:  libluv-devel >= %{luv_min_ver}
 %if %{with luajit}
 # luajit implements version 5.1 of the lua language spec, so it needs the
 # compat versions of libs.
 BuildRequires:  luajit-devel
-BuildRequires:  luajit2.1-luv-devel >= %{luv_min_ver}
 Requires:       luajit2.1-luv >= %{luv_min_ver}
 %else
 # lua5.1
 BuildRequires:  compat-lua
 BuildRequires:  compat-lua-devel
 BuildRequires:  lua5.1-bit32
-BuildRequires:  lua5.1-luv-devel >= %{luv_min_ver}
 Requires:       lua5.1-luv >= %{luv_min_ver}
 # /with luajit
 %endif
-BuildRequires:  lua5.1-lpeg
 Requires:       lua5.1-lpeg
 BuildRequires:  lua5.1-mpack
 %if %{with jemalloc}
@@ -116,10 +104,6 @@ parts of Vim, without compromise, and more.
 
 %prep
 {{{git_setup_macro path="$GIT_ROOT"}}}
-# agriffis: these don't apply to COPR build
-#%patch -P 0 -p1
-#%patch -P 1 -p1
-#%patch -P 2 -p1
 
 %if %{without luajit}
 %patch -P 1000 -p1
@@ -133,12 +117,9 @@ USERNAME=koji
        -DPREFER_LUA=%{?with_luajit:OFF}%{!?with_luajit:ON} \
        -DLUA_PRG=%{lua_prg} \
        -DENABLE_JEMALLOC=%{?with_jemalloc:ON}%{!?with_jemalloc:OFF} \
-       -DLUV_INCLUDE_DIR:PATH=%{luv_include_dir} \
-       -DLUV_LIBRARY:FILEPATH=%{luv_library} \
+       -DLIBLUV_INCLUDE_DIR:PATH=%{luv_include_dir} \
        -DNVIM_VERSION_MEDIUM="{{{neovim_dev_version}}}"
 
-# HACK: Replace -lluv with the correct path
-sed -i 's#-lluv#%{luv_library}#' %{__cmake_builddir}/src/nvim/CMakeFiles/nvim.dir/link.txt
 %cmake_build
 
 %install
@@ -174,6 +155,16 @@ find %{buildroot}%{_datadir} \( -name "*.bat" -o -name "*.awk" \) \
 %changelog
 * {{{git_changelog_date}}} Aron Griffis <aron@scampersand.com> - {{{git_changelog_version}}}
 - Nightly build from git master
+
+* Thu Jul 20 2023 Fedora Release Engineering <releng@fedoraproject.org> - 0.9.1-3
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_39_Mass_Rebuild
+
+* Tue Jun 06 2023 Andreas Schneider <asn@redhat.com> - 0.9.1-2
+- Build with new libluv-devel
+
+* Wed May 31 2023 Andreas Schneider <asn@redhat.com> - 0.9.1-1
+- Update to version 0.9.1
+  * For changelog see `:help news`
 
 * Tue May 02 2023 Andreas Schneider <asn@redhat.com> - 0.9.0-3
 - Improve semantic token performance
