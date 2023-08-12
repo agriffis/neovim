@@ -3309,6 +3309,9 @@ function vim.fn.getpos(expr) end
 ---   text  description of the error
 ---   type  type of the error, 'E', '1', etc.
 ---   valid  |TRUE|: recognized error message
+---   user_data
+---     custom data associated with the item, can be
+---     any type.
 ---
 --- When there is no error list or it's empty, an empty list is
 --- returned. Quickfix list entries with a non-existing buffer
@@ -7595,6 +7598,9 @@ function vim.fn.setpos(expr, list) end
 ---     text  description of the error
 ---     type  single-character error type, 'E', 'W', etc.
 ---     valid  recognized error message
+---     user_data
+---     custom data associated with the item, can be
+---     any type.
 ---
 --- The "col", "vcol", "nr", "type" and "text" entries are
 --- optional.  Either "lnum" or "pattern" entry can be used to
@@ -9733,8 +9739,9 @@ function vim.fn.type(expr) end
 --- @return string
 function vim.fn.undofile(name) end
 
---- Return the current state of the undo tree in a dictionary with
---- the following items:
+--- Return the current state of the undo tree for the current
+--- buffer, or for a specific buffer if {buf} is given.  The
+--- result is a dictionary with the following items:
 ---   "seq_last"  The highest undo sequence number used.
 ---   "seq_cur"  The sequence number of the current position in
 ---     the undo tree.  This differs from "seq_last"
@@ -9775,8 +9782,9 @@ function vim.fn.undofile(name) end
 ---     blocks.  Each item may again have an "alt"
 ---     item.
 ---
+--- @param buf? any
 --- @return any
-function vim.fn.undotree() end
+function vim.fn.undotree(buf) end
 
 --- Remove second and succeeding copies of repeated adjacent
 --- {list} items in-place.  Returns {list}.  If you want a list
