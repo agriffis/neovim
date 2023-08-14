@@ -190,6 +190,10 @@ The following changes to existing APIs or features add new behavior.
   supports it, unless |'keywordprg'| was customized before calling
   |vim.lsp.start()|.
 
+• Terminal buffers started with no arguments (and use 'shell') close
+  automatically if the job exited without error, eliminating the (often
+  unwanted) "[Process exited 0]" message.
+
 ==============================================================================
 REMOVED FEATURES                                                 *news-removed*
 
@@ -197,6 +201,8 @@ The following deprecated functions or APIs were removed.
 
 • Vimball support is removed.
   - :Vimuntar command removed.
+
+• Support for legacy treesitter injection queries is removed.
 
 ==============================================================================
 DEPRECATIONS                                                *news-deprecations*

@@ -379,9 +379,7 @@ describe("'scrollback' option", function()
   end)
 
   local function set_fake_shell()
-    -- shell-test.c is a fake shell that prints its arguments and exits.
-    nvim('set_option_value', 'shell', testprg('shell-test'), {})
-    nvim('set_option_value', 'shellcmdflag', 'EXE', {})
+    nvim('set_option_value', 'shell', string.format('"%s" INTERACT', testprg('shell-test')), {})
   end
 
   local function expect_lines(expected, epsilon)

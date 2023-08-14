@@ -442,7 +442,7 @@ describe('treesitter highlighting (C)', function()
 
     exec_lua [[
       local parser = vim.treesitter.get_parser(0, "c", {
-        injections = {c = "(preproc_def (preproc_arg) @c) (preproc_function_def value: (preproc_arg) @c)"}
+        injections = {c = '(preproc_def (preproc_arg) @injection.content (#set! injection.language "c")) (preproc_function_def value: (preproc_arg) @injection.content (#set! injection.language "c"))'}
       })
       local highlighter = vim.treesitter.highlighter
       test_hl = highlighter.new(parser, {queries = {c = hl_query}})
@@ -480,7 +480,7 @@ describe('treesitter highlighting (C)', function()
     ]])
 
     exec_lua [[
-      local injection_query = "(preproc_def (preproc_arg) @c) (preproc_function_def value: (preproc_arg) @c)"
+      local injection_query = '(preproc_def (preproc_arg) @injection.content (#set! injection.language "c")) (preproc_function_def value: (preproc_arg) @injection.content (#set! injection.language "c"))'
       vim.treesitter.query.set("c", "highlights", hl_query)
       vim.treesitter.query.set("c", "injections", injection_query)
 
@@ -580,9 +580,9 @@ describe('treesitter highlighting (C)', function()
     -- expect everything to have Constant highlight
     screen:expect{grid=[[
       {12:int}{8: x = INT_MAX;}                                                 |
-      {8:#define READ_STRING(x, y) (char *)read_string((x), (size_t)(y))}  |
-      {8:#define foo void main() { \}                                      |
-      {8:              return 42;  \}                                      |
+      {8:#define READ_STRING(x, y) (}{12:char}{8: *)read_string((x), (}{12:size_t}{8:)(y))}  |
+      {8:#define foo }{12:void}{8: main() { \}                                      |
+      {8:              }{12:return}{8: 42;  \}                                      |
       {8:            }}                                                    |
       ^                                                                 |
       {1:~                                                                }|
