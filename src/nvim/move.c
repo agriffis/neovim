@@ -69,7 +69,7 @@ int adjust_plines_for_skipcol(win_T *wp, int n)
   if (wp->w_skipcol >= width) {
     off++;
     int skip = wp->w_skipcol - width;
-    width -= win_col_off2(wp);
+    width += win_col_off2(wp);
     while (skip >= width) {
       off++;
       skip -= width;
@@ -443,7 +443,7 @@ static int scrolljump_value(void)
 // current window.
 static bool check_top_offset(void)
 {
-  long so = get_scrolloff_value(curwin);
+  int so = get_scrolloff_value(curwin);
   if (curwin->w_cursor.lnum < curwin->w_topline + so
       || hasAnyFolding(curwin)) {
     lineoff_T loff;
@@ -899,11 +899,9 @@ void curs_columns(win_T *wp, int may_scroll)
     // If Cursor is right of the screen, scroll leftwards
     // If we get closer to the edge than 'sidescrolloff', scroll a little
     // extra
-    long siso = get_sidescrolloff_value(wp);
-    assert(siso <= INT_MAX);
-    int off_left = startcol - wp->w_leftcol - (int)siso;
-    int off_right =
-      endcol - wp->w_leftcol - wp->w_width_inner + (int)siso + 1;
+    int siso = get_sidescrolloff_value(wp);
+    int off_left = startcol - wp->w_leftcol - siso;
+    int off_right = endcol - wp->w_leftcol - wp->w_width_inner + siso + 1;
     if (off_left < 0 || off_right > 0) {
       int diff = (off_left < 0) ? -off_left : off_right;
 
@@ -949,7 +947,7 @@ void curs_columns(win_T *wp, int may_scroll)
   }
 
   int plines = 0;
-  long so = get_scrolloff_value(wp);
+  int so = get_scrolloff_value(wp);
   colnr_T prev_skipcol = wp->w_skipcol;
   if ((wp->w_wrow >= wp->w_height_inner
        || ((prev_skipcol > 0
@@ -978,7 +976,7 @@ void curs_columns(win_T *wp, int may_scroll)
     plines--;
     if (plines > wp->w_wrow + so) {
       assert(so <= INT_MAX);
-      n = wp->w_wrow + (int)so;
+      n = wp->w_wrow + so;
     } else {
       n = plines;
     }
@@ -998,11 +996,15 @@ void curs_columns(win_T *wp, int may_scroll)
       if (n > plines - wp->w_height_inner + 1) {
         n = plines - wp->w_height_inner + 1;
       }
-      wp->w_skipcol = n * width2;
+      if (n > 0) {
+        curwin->w_skipcol = width1 + (n - 1) * width2;
+      } else {
+        curwin->w_skipcol = 0;
+      }
     } else if (extra == 1) {
       // less than 'scrolloff' lines above, decrease skipcol
       assert(so <= INT_MAX);
-      extra = (wp->w_skipcol + (int)so * width2 - wp->w_virtcol + width2 - 1) / width2;
+      extra = (wp->w_skipcol + so * width2 - wp->w_virtcol + width2 - 1) / width2;
       if (extra > 0) {
         if ((colnr_T)(extra * width2) > wp->w_skipcol) {
           extra = wp->w_skipcol / width2;
@@ -1066,7 +1068,6 @@ void textpos2screenpos(win_T *wp, pos_T *pos, int *rowp, int *scolp, int *ccolp,
 {
   colnr_T scol = 0, ccol = 0, ecol = 0;
   int row = 0;
-  int rowoff = 0;
   colnr_T coloff = 0;
   bool visible_row = false;
   bool is_folded = false;
@@ -1074,7 +1075,10 @@ void textpos2screenpos(win_T *wp, pos_T *pos, int *rowp, int *scolp, int *ccolp,
   linenr_T lnum = pos->lnum;
   if (lnum >= wp->w_topline && lnum <= wp->w_botline) {
     is_folded = hasFoldingWin(wp, lnum, &lnum, NULL, true, NULL);
-    row = plines_m_win(wp, wp->w_topline, lnum - 1) + 1;
+    row = plines_m_win(wp, wp->w_topline, lnum - 1, false) + 1;
+    // "row" should be the screen line where line "lnum" begins, which can
+    // be negative if "lnum" is "w_topline" and "w_skipcol" is non-zero.
+    row = adjust_plines_for_skipcol(wp, row);
     // Add filler lines above this buffer line.
     row += lnum == wp->w_topline ? wp->w_topfill : win_get_fill(wp, lnum);
     visible_row = true;
@@ -1100,20 +1104,17 @@ void textpos2screenpos(win_T *wp, pos_T *pos, int *rowp, int *scolp, int *ccolp,
       col += off;
       int width = wp->w_width_inner - off + win_col_off2(wp);
 
-      if (lnum == wp->w_topline) {
-        col -= wp->w_skipcol;
-      }
-
       // long line wrapping, adjust row
       if (wp->w_p_wrap && col >= (colnr_T)wp->w_width_inner && width > 0) {
         // use same formula as what is used in curs_columns()
-        rowoff = visible_row ? ((col - wp->w_width_inner) / width + 1) : 0;
+        int rowoff = visible_row ? ((col - wp->w_width_inner) / width + 1) : 0;
         col -= rowoff * width;
+        row += rowoff;
       }
 
       col -= wp->w_leftcol;
 
-      if (col >= 0 && col < wp->w_width_inner && row + rowoff <= wp->w_height_inner) {
+      if (col >= 0 && col < wp->w_width_inner && row > 0 && row <= wp->w_height_inner) {
         coloff = col - scol + (local ? 0 : wp->w_wincol + wp->w_wincol_off) + 1;
         row += local ? 0 : wp->w_winrow + wp->w_winrow_off;
       } else {
@@ -1122,12 +1123,12 @@ void textpos2screenpos(win_T *wp, pos_T *pos, int *rowp, int *scolp, int *ccolp,
         if (local) {
           coloff = col < 0 ? -1 : wp->w_width_inner + 1;
         } else {
-          row = rowoff = 0;
+          row = 0;
         }
       }
     }
   }
-  *rowp = row + rowoff;
+  *rowp = row;
   *scolp = scol + coloff;
   *ccolp = ccol + coloff;
   *ecolp = ecol + coloff;
@@ -1324,7 +1325,7 @@ bool scrolldown(long line_count, int byfold)
   }
 
   if (curwin->w_cursor.lnum == curwin->w_topline && do_sms) {
-    long so = get_scrolloff_value(curwin);
+    int so = get_scrolloff_value(curwin);
     long scrolloff_cols = so == 0 ? 0 : width1 + (so - 1) * width2;
 
     // make sure the cursor is in the visible text
@@ -1452,7 +1453,7 @@ bool scrollup(linenr_T line_count, int byfold)
     int width1 = curwin->w_width_inner - col_off;
     int width2 = width1 + col_off2;
     int extra2 = col_off - col_off2;
-    long so = get_scrolloff_value(curwin);
+    int so = get_scrolloff_value(curwin);
     long scrolloff_cols = so == 0 ? 0 : width1 + (so - 1) * width2;
     int space_cols = (curwin->w_height_inner - 1) * width2;
 
@@ -1503,7 +1504,7 @@ void adjust_skipcol(void)
     return;  // no text will be displayed
   }
   int width2 = width1 + curwin_col_off2();
-  long so = get_scrolloff_value(curwin);
+  int so = get_scrolloff_value(curwin);
   long scrolloff_cols = so == 0 ? 0 : width1 + (so - 1) * width2;
   bool scrolled = false;
 
@@ -1753,7 +1754,7 @@ void scroll_cursor_top(int min_scroll, int always)
   linenr_T old_topline = curwin->w_topline;
   int old_skipcol = curwin->w_skipcol;
   linenr_T old_topfill = curwin->w_topfill;
-  int off = (int)get_scrolloff_value(curwin);
+  int off = get_scrolloff_value(curwin);
 
   if (mouse_dragging > 0) {
     off = mouse_dragging - 1;
@@ -2003,7 +2004,7 @@ void scroll_cursor_bot(int min_scroll, int set_topbot)
   int fill_below_window = win_get_fill(curwin, curwin->w_botline) - curwin->w_filler_rows;
 
   int extra = 0;
-  long so = get_scrolloff_value(curwin);
+  int so = get_scrolloff_value(curwin);
   while (loff.lnum > 1) {
     // Stop when scrolled nothing or at least "min_scroll", found "extra"
     // context for 'scrolloff' and counted all lines below the window.
@@ -2245,8 +2246,8 @@ void cursor_correct(void)
 {
   // How many lines we would like to have above/below the cursor depends on
   // whether the first/last line of the file is on screen.
-  int above_wanted = (int)get_scrolloff_value(curwin);
-  int below_wanted = (int)get_scrolloff_value(curwin);
+  int above_wanted = get_scrolloff_value(curwin);
+  int below_wanted = get_scrolloff_value(curwin);
   if (mouse_dragging > 0) {
     above_wanted = mouse_dragging - 1;
     below_wanted = mouse_dragging - 1;
@@ -2349,7 +2350,7 @@ int onepage(Direction dir, long count)
   int retval = OK;
   lineoff_T loff;
   linenr_T old_topline = curwin->w_topline;
-  long so = get_scrolloff_value(curwin);
+  int so = get_scrolloff_value(curwin);
 
   if (curbuf->b_ml.ml_line_count == 1) {    // nothing to do
     beep_flush();

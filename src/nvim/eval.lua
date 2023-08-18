@@ -796,6 +796,8 @@ M.funcs = {
       with a listed buffer, that one is returned.  Next unlisted
       buffers are searched for.
       If the {buf} is a String, but you want to use it as a buffer
+      number, force it to be a Number by adding zero to it: >vim
+      	echo bufname("3" + 0)
       <If the buffer doesn't exist, or doesn't have a name, an empty
       string is returned. >vim
       	echo bufname("#")	" alternate buffer name
@@ -2551,8 +2553,8 @@ M.funcs = {
       of the current item.  For a |Dictionary| |v:key| has the key
       of the current item and for a |List| |v:key| has the index of
       the current item.  For a |Blob| |v:key| has the index of the
-      current byte.
-
+      current byte. For a |String| |v:key| has the index of the
+      current character.
       Examples: >vim
       	call filter(mylist, 'v:val !~ "OLD"')
       <Removes the items where "OLD" appears. >vim
@@ -5413,6 +5415,9 @@ M.funcs = {
     base = 1,
     desc = [=[
       Bitwise invert.  The argument is converted to a number.  A
+      List, Dict or Float argument causes an error.  Example: >vim
+      	let bits = invert(bits)
+      <
     ]=],
     name = 'invert',
     params = { { 'expr', 'any' } },
@@ -6068,7 +6073,8 @@ M.funcs = {
       of the current item.  For a |Dictionary| |v:key| has the key
       of the current item and for a |List| |v:key| has the index of
       the current item.  For a |Blob| |v:key| has the index of the
-      current byte.
+      current byte. For a |String| |v:key| has the index of the
+      current character.
       Example: >vim
       	call map(mylist, '"> " .. v:val .. " <"')
       <This puts "> " before and " <" after each item in "mylist".
@@ -7876,9 +7882,9 @@ M.funcs = {
     tags = { 'E998' },
     desc = [=[
       {func} is called for every item in {object}, which can be a
-      |List| or a |Blob|.  {func} is called with two arguments: the
-      result so far and current item.  After processing all items
-      the result is returned.
+      |String|, |List| or a |Blob|.  {func} is called with two
+      arguments: the result so far and current item.  After
+      processing all items the result is returned.
 
       {initial} is the initial result.  When omitted, the first item
       in {object} is used and {func} is first called for the second
@@ -7889,6 +7895,7 @@ M.funcs = {
       	echo reduce([1, 3, 5], { acc, val -> acc + val })
       	echo reduce(['x', 'y'], { acc, val -> acc .. val }, 'a')
       	echo reduce(0z1122, { acc, val -> 2 * acc + val })
+      	echo reduce('xyz', { acc, val -> acc .. ',' .. val })
       <
     ]=],
     name = 'reduce',
@@ -8148,6 +8155,9 @@ M.funcs = {
       {object} can be a |List| or a |Blob|.
       Returns {object}.
       Returns zero if {object} is not a List or a Blob.
+      If you want an object to remain unmodified make a copy first: >vim
+      	let revlist = reverse(copy(mylist))
+      <
     ]=],
     name = 'reverse',
     params = { { 'object', 'any' } },
@@ -10155,15 +10165,16 @@ M.funcs = {
       If you want a list to remain unmodified make a copy first: >vim
       	let sortedlist = sort(copy(mylist))
 
-      <When {func} is omitted, is empty or zero, then sort() uses the
+      <When {how} is omitted or is a string, then sort() uses the
       string representation of each item to sort on.  Numbers sort
       after Strings, |Lists| after Numbers.  For sorting text in the
       current buffer use |:sort|.
 
-      When {func} is given and it is '1' or 'i' then case is
-      ignored.
+      When {how} is given and it is 'i' then case is ignored.
+      For backwards compatibility, the value one can be used to
+      ignore case.  Zero means to not ignore case.
 
-      When {func} is given and it is 'l' then the current collation
+      When {how} is given and it is 'l' then the current collation
       locale is used for ordering. Implementation details: strcoll()
       is used to compare strings. See |:language| check or set the
       collation locale. |v:collate| can also be used to check the
@@ -10180,19 +10191,19 @@ M.funcs = {
       <	['n', 'o', 'O', 'p', 'z', 'ö'] ~
       This does not work properly on Mac.
 
-      When {func} is given and it is 'n' then all items will be
+      When {how} is given and it is 'n' then all items will be
       sorted numerical (Implementation detail: this uses the
       strtod() function to parse numbers, Strings, Lists, Dicts and
       Funcrefs will be considered as being 0).
 
-      When {func} is given and it is 'N' then all items will be
+      When {how} is given and it is 'N' then all items will be
       sorted numerical. This is like 'n' but a string containing
       digits will be used as the number they represent.
 
-      When {func} is given and it is 'f' then all items will be
+      When {how} is given and it is 'f' then all items will be
       sorted numerical. All values must be a Number or a Float.
 
-      When {func} is a |Funcref| or a function name, this function
+      When {how} is a |Funcref| or a function name, this function
       is called to compare items.  The function is invoked with two
       items as argument and must return zero if they are equal, 1 or
       bigger if the first one sorts after the second one, -1 or
@@ -10222,8 +10233,8 @@ M.funcs = {
       <
     ]=],
     name = 'sort',
-    params = { { 'list', 'any' }, { 'func', 'any' }, { 'dict', 'any' } },
-    signature = 'sort({list} [, {func} [, {dict}]])',
+    params = { { 'list', 'any' }, { 'how', 'any' }, { 'dict', 'any' } },
+    signature = 'sort({list} [, {how} [, {dict}]])',
   },
   soundfold = {
     args = 1,
@@ -11882,7 +11893,7 @@ M.funcs = {
     signature = 'values({dict})',
   },
   virtcol = {
-    args = { 1, 2 },
+    args = { 1, 3 },
     base = 1,
     desc = [=[
       The result is a Number, which is the screen column of the file
@@ -11916,9 +11927,12 @@ M.funcs = {
       	    returns the cursor position.  Differs from |'<| in
       	    that it's updated right away.
 
-      If {list} is present and non-zero then virtcol() returns a List
-      with the first and last screen position occupied by the
+      If {list} is present and non-zero then virtcol() returns a
+      List with the first and last screen position occupied by the
       character.
+
+      With the optional {winid} argument the values are obtained for
+      that window instead of the current window.
 
       Note that only marks in the current file can be used.
       Examples: >vim
@@ -11931,15 +11945,15 @@ M.funcs = {
       	" With text "	  there", with 't at 'h':
 
       	echo virtcol("'t")	" returns 6
-      <Techo he first column is 1.  0 is returned for an error.
-      A echo more advanced example that echoes the maximum length of
+      <The first column is 1.  0 or [0, 0] is returned for an error.
+      A more advanced example that echoes the maximum length of
       all lines: >vim
           echo max(map(range(1, line('$')), "virtcol([v:val, '$'])"))
 
     ]=],
     name = 'virtcol',
-    params = { { 'expr', 'any' }, { 'list', 'any' } },
-    signature = 'virtcol({expr} [, {list}])',
+    params = { { 'expr', 'any' }, { 'list', 'any' }, { 'winid', 'integer' } },
+    signature = 'virtcol({expr} [, {list} [, {winid}]])',
   },
   virtcol2col = {
     args = 3,
