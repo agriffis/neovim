@@ -2750,47 +2750,6 @@ static void f_getmarklist(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   get_buf_local_marks(buf, rettv->vval.v_list);
 }
 
-/// "getmousepos()" function
-static void f_getmousepos(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
-{
-  int row = mouse_row;
-  int col = mouse_col;
-  int grid = mouse_grid;
-  varnumber_T winid = 0;
-  varnumber_T winrow = 0;
-  varnumber_T wincol = 0;
-  linenr_T lnum = 0;
-  varnumber_T column = 0;
-
-  tv_dict_alloc_ret(rettv);
-  dict_T *d = rettv->vval.v_dict;
-
-  tv_dict_add_nr(d, S_LEN("screenrow"), (varnumber_T)mouse_row + 1);
-  tv_dict_add_nr(d, S_LEN("screencol"), (varnumber_T)mouse_col + 1);
-
-  win_T *wp = mouse_find_win(&grid, &row, &col);
-  if (wp != NULL) {
-    int height = wp->w_height + wp->w_hsep_height + wp->w_status_height;
-    // The height is adjusted by 1 when there is a bottom border. This is not
-    // necessary for a top border since `row` starts at -1 in that case.
-    if (row < height + wp->w_border_adj[2]) {
-      winid = wp->handle;
-      winrow = row + 1 + wp->w_winrow_off;  // Adjust by 1 for top border
-      wincol = col + 1 + wp->w_wincol_off;  // Adjust by 1 for left border
-      if (row >= 0 && row < wp->w_height && col >= 0 && col < wp->w_width) {
-        (void)mouse_comp_pos(wp, &row, &col, &lnum);
-        col = vcol2col(wp, lnum, col);
-        column = col + 1;
-      }
-    }
-  }
-  tv_dict_add_nr(d, S_LEN("winid"), winid);
-  tv_dict_add_nr(d, S_LEN("winrow"), winrow);
-  tv_dict_add_nr(d, S_LEN("wincol"), wincol);
-  tv_dict_add_nr(d, S_LEN("line"), (varnumber_T)lnum);
-  tv_dict_add_nr(d, S_LEN("column"), column);
-}
-
 /// "getpid()" function
 static void f_getpid(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
@@ -4923,6 +4882,50 @@ static void f_mode(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 
   rettv->vval.v_string = xstrdup(buf);
   rettv->v_type = VAR_STRING;
+}
+
+static void may_add_state_char(garray_T *gap, const char *include, uint8_t c)
+{
+  if (include == NULL || vim_strchr(include, c) != NULL) {
+    ga_append(gap, c);
+  }
+}
+
+/// "state()" function
+static void f_state(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
+{
+  garray_T ga;
+  ga_init(&ga, 1, 20);
+  const char *include = NULL;
+
+  if (argvars[0].v_type != VAR_UNKNOWN) {
+    include = tv_get_string(&argvars[0]);
+  }
+
+  if (!(stuff_empty() && typebuf.tb_len == 0 && !using_script())) {
+    may_add_state_char(&ga, include, 'm');
+  }
+  if (op_pending()) {
+    may_add_state_char(&ga, include, 'o');
+  }
+  if (autocmd_busy) {
+    may_add_state_char(&ga, include, 'x');
+  }
+  if (ins_compl_active()) {
+    may_add_state_char(&ga, include, 'a');
+  }
+  if (!get_was_safe_state()) {
+    may_add_state_char(&ga, include, 'S');
+  }
+  for (int i = 0; i < get_callback_depth() && i < 3; i++) {
+    may_add_state_char(&ga, include, 'c');
+  }
+  if (msg_scrolled > 0) {
+    may_add_state_char(&ga, include, 's');
+  }
+
+  rettv->v_type = VAR_STRING;
+  rettv->vval.v_string = ga.ga_data;
 }
 
 /// "msgpackdump()" function
