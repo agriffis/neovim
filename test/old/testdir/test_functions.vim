@@ -2009,6 +2009,32 @@ func Test_setbufvar_options()
   bwipe!
 endfunc
 
+func Test_setbufvar_keep_window_title()
+  CheckRunVimInTerminal
+  if !has('title') || empty(&t_ts)
+    throw "Skipped: can't get/set title"
+  endif
+
+  let lines =<< trim END
+      set title
+      edit Xa.txt
+      let g:buf = bufadd('Xb.txt')
+      inoremap <F2> <C-R>=setbufvar(g:buf, '&autoindent', 1) ?? ''<CR>
+  END
+  call writefile(lines, 'Xsetbufvar')
+  let buf = RunVimInTerminal('-S Xsetbufvar', {})
+  call WaitForAssert({-> assert_match('Xa.txt', term_gettitle(buf))}, 1000)
+
+  call term_sendkeys(buf, "i\<F2>")
+  call TermWait(buf)
+  call term_sendkeys(buf, "\<Esc>")
+  call TermWait(buf)
+  call assert_match('Xa.txt', term_gettitle(buf))
+
+  call StopVimInTerminal(buf)
+  call delete('Xsetbufvar')
+endfunc
+
 func Test_redo_in_nested_functions()
   nnoremap g. :set opfunc=Operator<CR>g@
   function Operator( type, ... )
@@ -2568,6 +2594,8 @@ endfunc
 func Test_state()
   CheckRunVimInTerminal
 
+  let getstate = ":echo 'state: ' .. g:state .. '; mode: ' .. g:mode\<CR>"
+
   let lines =<< trim END
 	call setline(1, ['one', 'two', 'three'])
 	map ;; gg
@@ -2587,28 +2615,27 @@ func Test_state()
 
   " Using a timer callback
   call term_sendkeys(buf, ":call RunTimer()\<CR>")
-  call term_wait(buf, 50)
-  let getstate = ":echo 'state: ' .. g:state .. '; mode: ' .. g:mode\<CR>"
+  call TermWait(buf, 25)
   call term_sendkeys(buf, getstate)
   call WaitForAssert({-> assert_match('state: c; mode: n', term_getline(buf, 6))}, 1000)
 
   " Halfway a mapping
   call term_sendkeys(buf, ":call RunTimer()\<CR>;")
-  call term_wait(buf, 50)
+  call TermWait(buf, 25)
   call term_sendkeys(buf, ";")
   call term_sendkeys(buf, getstate)
   call WaitForAssert({-> assert_match('state: mSc; mode: n', term_getline(buf, 6))}, 1000)
 
   " Insert mode completion (bit slower on Mac)
   call term_sendkeys(buf, ":call RunTimer()\<CR>Got\<C-N>")
-  call term_wait(buf, 200)
+  call TermWait(buf, 25)
   call term_sendkeys(buf, "\<Esc>")
   call term_sendkeys(buf, getstate)
   call WaitForAssert({-> assert_match('state: aSc; mode: i', term_getline(buf, 6))}, 1000)
 
   " Autocommand executing
   call term_sendkeys(buf, ":set filetype=foobar\<CR>")
-  call term_wait(buf, 50)
+  call TermWait(buf, 25)
   call term_sendkeys(buf, getstate)
   call WaitForAssert({-> assert_match('state: xS; mode: n', term_getline(buf, 6))}, 1000)
 
@@ -2616,7 +2643,7 @@ func Test_state()
 
   " messages scrolled
   call term_sendkeys(buf, ":call RunTimer()\<CR>:echo \"one\\ntwo\\nthree\"\<CR>")
-  call term_wait(buf, 50)
+  call TermWait(buf, 25)
   call term_sendkeys(buf, "\<CR>")
   call term_sendkeys(buf, getstate)
   call WaitForAssert({-> assert_match('state: Scs; mode: r', term_getline(buf, 6))}, 1000)
