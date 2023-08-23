@@ -835,9 +835,13 @@ endfunc
 func Test_append()
   enew!
   split
-  call append(0, ["foo"])
-  call append(1, [])
-  call append(1, v:_null_list)
+  call assert_equal(0, append(1, []))
+  call assert_equal(0, append(1, v:_null_list))
+  call assert_equal(0, append(0, ["foo"]))
+  call assert_equal(0, append(1, []))
+  call assert_equal(0, append(1, v:_null_list))
+  call assert_equal(0, append(8, []))
+  call assert_equal(0, append(9, v:_null_list))
   call assert_equal(['foo', ''], getline(1, '$'))
   split
   only
@@ -2625,6 +2629,20 @@ func Test_state()
   call term_sendkeys(buf, ";")
   call term_sendkeys(buf, getstate)
   call WaitForAssert({-> assert_match('state: mSc; mode: n', term_getline(buf, 6))}, 1000)
+
+  " A operator is pending
+  call term_sendkeys(buf, ":call RunTimer()\<CR>y")
+  call TermWait(buf, 25)
+  call term_sendkeys(buf, "y")
+  call term_sendkeys(buf, getstate)
+  call WaitForAssert({-> assert_match('state: oSc; mode: n', term_getline(buf, 6))}, 1000)
+
+  " A register was specified
+  call term_sendkeys(buf, ":call RunTimer()\<CR>\"r")
+  call TermWait(buf, 25)
+  call term_sendkeys(buf, "yy")
+  call term_sendkeys(buf, getstate)
+  call WaitForAssert({-> assert_match('state: oSc; mode: n', term_getline(buf, 6))}, 1000)
 
   " Insert mode completion (bit slower on Mac)
   call term_sendkeys(buf, ":call RunTimer()\<CR>Got\<C-N>")
