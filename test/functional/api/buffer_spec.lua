@@ -16,6 +16,7 @@ local command = helpers.command
 local bufmeths = helpers.bufmeths
 local feed = helpers.feed
 local pcall_err = helpers.pcall_err
+local assert_alive = helpers.assert_alive
 
 describe('api/buf', function()
   before_each(clear)
@@ -39,6 +40,14 @@ describe('api/buf', function()
       curbuf_depr('del_line', -1)
       -- There's always at least one line
       eq(1, curbuf_depr('line_count'))
+    end)
+
+    it("doesn't crash just after set undolevels=1 #24894", function()
+      local buf = meths.create_buf(false, true)
+      meths.buf_set_option(buf, 'undolevels', -1)
+      meths.buf_set_lines(buf, 0, 1, false, { })
+
+      assert_alive()
     end)
 
     it('cursor position is maintained after lines are inserted #9961', function()
@@ -76,6 +85,38 @@ describe('api/buf', function()
       eq({4, 2}, curwin('get_cursor'))
     end)
 
+    it('cursor position is maintained in non-current window', function()
+      meths.buf_set_lines(0, 0, -1, 1, {"line1", "line2", "line3", "line4"})
+      meths.win_set_cursor(0, {3, 2})
+      local win = meths.get_current_win()
+      local buf = meths.get_current_buf()
+
+      command('new')
+
+      meths.buf_set_lines(buf, 1, 2, 1, {"line5", "line6"})
+      eq({"line1", "line5", "line6", "line3", "line4"}, meths.buf_get_lines(buf, 0, -1, true))
+      eq({4, 2}, meths.win_get_cursor(win))
+    end)
+
+    it('cursor position is maintained in TWO non-current windows', function()
+      meths.buf_set_lines(0, 0, -1, 1, {"line1", "line2", "line3", "line4"})
+      meths.win_set_cursor(0, {3, 2})
+      local win = meths.get_current_win()
+      local buf = meths.get_current_buf()
+
+      command('split')
+      meths.win_set_cursor(0, {4, 2})
+      local win2 = meths.get_current_win()
+
+      -- set current window to third one with another buffer
+      command("new")
+
+      meths.buf_set_lines(buf, 1, 2, 1, {"line5", "line6"})
+      eq({"line1", "line5", "line6", "line3", "line4"}, meths.buf_get_lines(buf, 0, -1, true))
+      eq({4, 2}, meths.win_get_cursor(win))
+      eq({5, 2}, meths.win_get_cursor(win2))
+    end)
+
     it('line_count has defined behaviour for unloaded buffers', function()
       -- we'll need to know our bufnr for when it gets unloaded
       local bufnr = curbuf('get_number')
@@ -104,6 +145,139 @@ describe('api/buf', function()
       eq({}, buffer('get_lines', bufnr, 1, 3, 1))
       -- it's impossible to get out-of-bounds errors for an unloaded buffer
       eq({}, buffer('get_lines', bufnr, 8888, 9999, 1))
+    end)
+
+    describe('handles topline', function()
+      local screen
+      before_each(function()
+        screen = Screen.new(20, 12)
+        screen:set_default_attr_ids {
+          [1] = {bold = true, foreground = Screen.colors.Blue1};
+          [2] = {reverse = true, bold = true};
+          [3] = {reverse = true};
+        }
+        screen:attach()
+        meths.buf_set_lines(0, 0, -1, 1, {"aaa", "bbb", "ccc", "ddd", "www", "xxx", "yyy", "zzz"})
+        meths.set_option_value('modified', false, {})
+      end)
+
+      it('of current window', function()
+        local win = meths.get_current_win()
+        local buf = meths.get_current_buf()
+
+        command('new | wincmd w')
+        meths.win_set_cursor(win, {8,0})
+
+        screen:expect{grid=[[
+                              |
+          {1:~                   }|
+          {1:~                   }|
+          {1:~                   }|
+          {1:~                   }|
+          {3:[No Name]           }|
+          www                 |
+          xxx                 |
+          yyy                 |
+          ^zzz                 |
+          {2:[No Name]           }|
+                              |
+        ]]}
+        meths.buf_set_lines(buf, 0, 2, true, {"aaabbb"})
+
+        screen:expect{grid=[[
+                              |
+          {1:~                   }|
+          {1:~                   }|
+          {1:~                   }|
+          {1:~                   }|
+          {3:[No Name]           }|
+          www                 |
+          xxx                 |
+          yyy                 |
+          ^zzz                 |
+          {2:[No Name] [+]       }|
+                              |
+        ]]}
+      end)
+
+      it('of non-current window', function()
+        local win = meths.get_current_win()
+        local buf = meths.get_current_buf()
+
+        command('new')
+        meths.win_set_cursor(win, {8,0})
+
+        screen:expect{grid=[[
+          ^                    |
+          {1:~                   }|
+          {1:~                   }|
+          {1:~                   }|
+          {1:~                   }|
+          {2:[No Name]           }|
+          www                 |
+          xxx                 |
+          yyy                 |
+          zzz                 |
+          {3:[No Name]           }|
+                              |
+        ]]}
+
+        meths.buf_set_lines(buf, 0, 2, true, {"aaabbb"})
+        screen:expect{grid=[[
+          ^                    |
+          {1:~                   }|
+          {1:~                   }|
+          {1:~                   }|
+          {1:~                   }|
+          {2:[No Name]           }|
+          www                 |
+          xxx                 |
+          yyy                 |
+          zzz                 |
+          {3:[No Name] [+]       }|
+                              |
+        ]]}
+      end)
+
+      it('of split windows with same buffer', function()
+        local win = meths.get_current_win()
+        local buf = meths.get_current_buf()
+
+        command('split')
+        meths.win_set_cursor(win, {8,0})
+        meths.win_set_cursor(0, {1,0})
+
+        screen:expect{grid=[[
+          ^aaa                 |
+          bbb                 |
+          ccc                 |
+          ddd                 |
+          www                 |
+          {2:[No Name]           }|
+          www                 |
+          xxx                 |
+          yyy                 |
+          zzz                 |
+          {3:[No Name]           }|
+                              |
+        ]]}
+        meths.buf_set_lines(buf, 0, 2, true, {"aaabbb"})
+
+        screen:expect{grid=[[
+          ^aaabbb              |
+          ccc                 |
+          ddd                 |
+          www                 |
+          xxx                 |
+          {2:[No Name] [+]       }|
+          www                 |
+          xxx                 |
+          yyy                 |
+          zzz                 |
+          {3:[No Name] [+]       }|
+                              |
+        ]]}
+      end)
     end)
   end)
 
@@ -484,6 +658,50 @@ describe('api/buf', function()
       eq({1, 9}, curwin('get_cursor'))
     end)
 
+    it('updates the cursor position in non-current window', function()
+      insert([[
+      hello world!]])
+
+      -- position the cursor on `!`
+      meths.win_set_cursor(0, {1, 11})
+
+      local win = meths.get_current_win()
+      local buf = meths.get_current_buf()
+
+      command("new")
+
+      -- replace 'world' with 'foo'
+      meths.buf_set_text(buf, 0, 6, 0, 11, {'foo'})
+      eq({'hello foo!'}, meths.buf_get_lines(buf, 0, -1, true))
+      -- cursor should be moved left by two columns (replacement is shorter by 2 chars)
+      eq({1, 9}, meths.win_get_cursor(win))
+    end)
+
+    it('updates the cursor position in TWO non-current windows', function()
+      insert([[
+      hello world!]])
+
+      -- position the cursor on `!`
+      meths.win_set_cursor(0, {1, 11})
+      local win = meths.get_current_win()
+      local buf = meths.get_current_buf()
+
+      command("split")
+      local win2 = meths.get_current_win()
+      -- position the cursor on `w`
+      meths.win_set_cursor(0, {1, 6})
+
+      command("new")
+
+      -- replace 'hello' with 'foo'
+      meths.buf_set_text(buf, 0, 0, 0, 5, {'foo'})
+      eq({'foo world!'}, meths.buf_get_lines(buf, 0, -1, true))
+
+      -- both cursors should be moved left by two columns (replacement is shorter by 2 chars)
+      eq({1, 9}, meths.win_get_cursor(win))
+      eq({1, 4}, meths.win_get_cursor(win2))
+    end)
+
     it('can handle NULs', function()
       set_text(0, 0, 0, 0, {'ab\0cd'})
       eq('ab\0cd', curbuf_depr('get_line', 0))
@@ -582,6 +800,139 @@ describe('api/buf', function()
         vim.api.nvim_buf_set_text(0, 0, 3, 1, 0, {''})
       ]])
       eq({'one', 'two'}, get_lines(0, 2, true))
+    end)
+
+    describe('handles topline', function()
+      local screen
+      before_each(function()
+        screen = Screen.new(20, 12)
+        screen:set_default_attr_ids {
+          [1] = {bold = true, foreground = Screen.colors.Blue1};
+          [2] = {reverse = true, bold = true};
+          [3] = {reverse = true};
+        }
+        screen:attach()
+        meths.buf_set_lines(0, 0, -1, 1, {"aaa", "bbb", "ccc", "ddd", "www", "xxx", "yyy", "zzz"})
+        meths.set_option_value('modified', false, {})
+      end)
+
+      it('of current window', function()
+        local win = meths.get_current_win()
+        local buf = meths.get_current_buf()
+
+        command('new | wincmd w')
+        meths.win_set_cursor(win, {8,0})
+
+        screen:expect{grid=[[
+                              |
+          {1:~                   }|
+          {1:~                   }|
+          {1:~                   }|
+          {1:~                   }|
+          {3:[No Name]           }|
+          www                 |
+          xxx                 |
+          yyy                 |
+          ^zzz                 |
+          {2:[No Name]           }|
+                              |
+        ]]}
+        meths.buf_set_text(buf, 0,3, 1,0, {"X"})
+
+        screen:expect{grid=[[
+                              |
+          {1:~                   }|
+          {1:~                   }|
+          {1:~                   }|
+          {1:~                   }|
+          {3:[No Name]           }|
+          www                 |
+          xxx                 |
+          yyy                 |
+          ^zzz                 |
+          {2:[No Name] [+]       }|
+                              |
+        ]]}
+      end)
+
+      it('of non-current window', function()
+        local win = meths.get_current_win()
+        local buf = meths.get_current_buf()
+
+        command('new')
+        meths.win_set_cursor(win, {8,0})
+
+        screen:expect{grid=[[
+          ^                    |
+          {1:~                   }|
+          {1:~                   }|
+          {1:~                   }|
+          {1:~                   }|
+          {2:[No Name]           }|
+          www                 |
+          xxx                 |
+          yyy                 |
+          zzz                 |
+          {3:[No Name]           }|
+                              |
+        ]]}
+
+        meths.buf_set_text(buf, 0,3, 1,0, {"X"})
+        screen:expect{grid=[[
+          ^                    |
+          {1:~                   }|
+          {1:~                   }|
+          {1:~                   }|
+          {1:~                   }|
+          {2:[No Name]           }|
+          www                 |
+          xxx                 |
+          yyy                 |
+          zzz                 |
+          {3:[No Name] [+]       }|
+                              |
+        ]]}
+      end)
+
+      it('of split windows with same buffer', function()
+        local win = meths.get_current_win()
+        local buf = meths.get_current_buf()
+
+        command('split')
+        meths.win_set_cursor(win, {8,0})
+        meths.win_set_cursor(0, {1,1})
+
+        screen:expect{grid=[[
+          a^aa                 |
+          bbb                 |
+          ccc                 |
+          ddd                 |
+          www                 |
+          {2:[No Name]           }|
+          www                 |
+          xxx                 |
+          yyy                 |
+          zzz                 |
+          {3:[No Name]           }|
+                              |
+        ]]}
+        meths.buf_set_text(buf, 0,3, 1,0, {"X"})
+
+        screen:expect{grid=[[
+          a^aaXbbb             |
+          ccc                 |
+          ddd                 |
+          www                 |
+          xxx                 |
+          {2:[No Name] [+]       }|
+          www                 |
+          xxx                 |
+          yyy                 |
+          zzz                 |
+          {3:[No Name] [+]       }|
+                              |
+        ]]}
+      end)
     end)
   end)
 

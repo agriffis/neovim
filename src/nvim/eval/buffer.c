@@ -301,7 +301,8 @@ void f_bufload(typval_T *argvars, typval_T *unused, EvalFuncData fptr)
   buf_T *buf = get_buf_arg(&argvars[0]);
 
   if (buf != NULL) {
-    buffer_ensure_loaded(buf);
+    swap_exists_action = SEA_NONE;
+    buf_ensure_loaded(buf);
   }
 }
 
@@ -604,12 +605,12 @@ static void get_buffer_lines(buf_T *buf, linenr_T start, linenr_T end, int retli
     }
     tv_list_alloc_ret(rettv, end - start + 1);
     while (start <= end) {
-      tv_list_append_string(rettv->vval.v_list, ml_get_buf(buf, start++, false), -1);
+      tv_list_append_string(rettv->vval.v_list, ml_get_buf(buf, start++), -1);
     }
   } else {
     rettv->v_type = VAR_STRING;
     rettv->vval.v_string = ((start >= 1 && start <= buf->b_ml.ml_line_count)
-                            ? xstrdup(ml_get_buf(buf, start, false)) : NULL);
+                            ? xstrdup(ml_get_buf(buf, start)) : NULL);
   }
 }
 

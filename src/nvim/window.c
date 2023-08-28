@@ -562,7 +562,7 @@ wingotofile:
 
       if (wp != NULL && nchar == 'F' && lnum >= 0) {
         curwin->w_cursor.lnum = lnum;
-        check_cursor_lnum();
+        check_cursor_lnum(curwin);
         beginline(BL_SOL | BL_FIX);
       }
       xfree(ptr);
@@ -5132,8 +5132,8 @@ static win_T *win_alloc(win_T *after, bool hidden)
   new_wp->w_ns_hl = -1;
 
   // use global option for global-local options
-  new_wp->w_p_so = -1;
-  new_wp->w_p_siso = -1;
+  new_wp->w_allbuf_opt.wo_so = new_wp->w_p_so = -1;
+  new_wp->w_allbuf_opt.wo_siso = new_wp->w_p_siso = -1;
 
   // We won't calculate w_fraction until resizing the window
   new_wp->w_fraction = 0;
@@ -5239,8 +5239,9 @@ static void win_free(win_T *wp, tabpage_T *tp)
     }
   }
 
-  // free the border title text
+  // free the border text
   clear_virttext(&wp->w_float_config.title_chunks);
+  clear_virttext(&wp->w_float_config.footer_chunks);
 
   clear_matches(wp);
 
@@ -6493,7 +6494,7 @@ void win_fix_scroll(int resize)
         wp->w_valid &= ~VALID_CROW;
       }
 
-      invalidate_botline_win(wp);
+      invalidate_botline(wp);
       validate_botline(wp);
     }
     wp->w_prev_height = wp->w_height;
@@ -6666,7 +6667,7 @@ void scroll_to_fraction(win_T *wp, int prev_height)
   }
 
   redraw_later(wp, UPD_SOME_VALID);
-  invalidate_botline_win(wp);
+  invalidate_botline(wp);
 }
 
 void win_set_inner_size(win_T *wp, bool valid_cursor)
@@ -6713,7 +6714,7 @@ void win_set_inner_size(win_T *wp, bool valid_cursor)
     wp->w_lines_valid = 0;
     if (valid_cursor) {
       changed_line_abv_curs_win(wp);
-      invalidate_botline_win(wp);
+      invalidate_botline(wp);
       if (wp == curwin && *p_spk == 'c') {
         curs_columns(wp, true);  // validate w_wrow
       }

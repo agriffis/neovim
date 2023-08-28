@@ -1551,11 +1551,18 @@ function vim.api.nvim_open_term(buffer, opts) end
 ---                   specified by character: [ ["+", "MyCorner"], ["x",
 ---                   "MyBorder"] ].
 ---
----               • title: Title (optional) in window border, String or list.
----                 List is [text, highlight] tuples. if is string the default
----                 highlight group is `FloatTitle`.
----               • title_pos: Title position must set with title option.
----                 value can be of `left` `center` `right` default is left.
+---               • title: Title (optional) in window border, string or list.
+---                 List should consist of `[text, highlight]` tuples. If
+---                 string, the default highlight group is `FloatTitle`.
+---               • title_pos: Title position. Must be set with `title`
+---                 option. Value can be one of "left", "center", or "right".
+---                 Default is `"left"`.
+---               • footer: Footer (optional) in window border, string or
+---                 list. List should consist of `[text, highlight]` tuples.
+---                 If string, the default highlight group is `FloatFooter`.
+---               • footer_pos: Footer position. Must be set with `footer`
+---                 option. Value can be one of "left", "center", or "right".
+---                 Default is `"left"`.
 ---               • noautocmd: If true then no buffer-related autocommand
 ---                 events such as `BufEnter`, `BufLeave` or `BufWinEnter` may
 ---                 fire from calling this function.
@@ -1679,7 +1686,11 @@ function vim.api.nvim_select_popupmenu_item(item, insert, finish, opts) end
 --- @param type string Must be one of the following values. Client libraries
 ---                   should default to "remote" unless overridden by the
 ---                   user.
----                   • "remote" remote client connected to Nvim.
+---                   • "remote" remote client connected "Nvim flavored"
+---                     MessagePack-RPC (responses must be in reverse order of
+---                     requests). `msgpack-rpc`
+---                   • "msgpack-rpc" remote client connected to Nvim via
+---                     fully MessagePack-RPC compliant protocol.
 ---                   • "ui" gui frontend
 ---                   • "embedder" application using Nvim as a component (for
 ---                     example, IDE/editor implementing a vim mode).

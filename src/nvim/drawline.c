@@ -770,7 +770,7 @@ static void handle_breakindent(win_T *wp, winlinevars_T *wlv)
       wlv->p_extra = NULL;
       wlv->c_extra = ' ';
       wlv->c_final = NUL;
-      wlv->n_extra = get_breakindent_win(wp, ml_get_buf(wp->w_buffer, wlv->lnum, false));
+      wlv->n_extra = get_breakindent_win(wp, ml_get_buf(wp->w_buffer, wlv->lnum));
       if (wlv->row == wlv->startrow) {
         wlv->n_extra -= win_col_off2(wp);
         if (wlv->n_extra < 0) {
@@ -868,8 +868,8 @@ static void apply_cursorline_highlight(win_T *wp, winlinevars_T *wlv)
   }
 }
 
-// Checks if there is more inline virtual text that need to be drawn
-// and sets has_more_virt_inline_chunks to reflect that.
+/// Checks if there is more inline virtual text that need to be drawn
+/// and sets has_more_virt_inline_chunks to reflect that.
 static bool has_more_inline_virt(winlinevars_T *wlv, ptrdiff_t v)
 {
   DecorState *state = &decor_state;
@@ -877,7 +877,8 @@ static bool has_more_inline_virt(winlinevars_T *wlv, ptrdiff_t v)
     DecorRange *item = &kv_A(state->active, i);
     if (item->start_row != state->row
         || !kv_size(item->decor.virt_text)
-        || item->decor.virt_text_pos != kVTInline) {
+        || item->decor.virt_text_pos != kVTInline
+        || item->decor.virt_text_width == 0) {
       continue;
     }
     if (item->draw_col >= -1 && item->start_col >= v) {
@@ -899,7 +900,8 @@ static void handle_inline_virtual_text(win_T *wp, winlinevars_T *wlv, ptrdiff_t 
         DecorRange *item = &kv_A(state->active, i);
         if (item->start_row != state->row
             || !kv_size(item->decor.virt_text)
-            || item->decor.virt_text_pos != kVTInline) {
+            || item->decor.virt_text_pos != kVTInline
+            || item->decor.virt_text_width == 0) {
           continue;
         }
         if (item->draw_col >= -1 && item->start_col == v) {
@@ -935,6 +937,7 @@ static void handle_inline_virtual_text(win_T *wp, winlinevars_T *wlv, ptrdiff_t 
       // If the text didn't reach until the first window
       // column we need to skip cells.
       if (wlv->skip_cells > 0) {
+        // FIXME: this should use virt_text_width instead
         int virt_text_len = wlv->n_attr;
         if (virt_text_len > wlv->skip_cells) {
           int len = mb_charlen2bytelen(wlv->p_extra, wlv->skip_cells);
@@ -1428,11 +1431,11 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool number_onl
     // Trick: skip a few chars for C/shell/Vim comments
     nextline[SPWORDLEN] = NUL;
     if (lnum < wp->w_buffer->b_ml.ml_line_count) {
-      line = ml_get_buf(wp->w_buffer, lnum + 1, false);
+      line = ml_get_buf(wp->w_buffer, lnum + 1);
       spell_cat_line(nextline + SPWORDLEN, line, SPWORDLEN);
     }
     assert(!end_fill);
-    line = ml_get_buf(wp->w_buffer, lnum, false);
+    line = ml_get_buf(wp->w_buffer, lnum);
 
     // If current line is empty, check first word in next line for capital.
     ptr = skipwhite(line);
@@ -1467,7 +1470,7 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool number_onl
     }
   }
 
-  line = end_fill ? "" : ml_get_buf(wp->w_buffer, lnum, false);
+  line = end_fill ? "" : ml_get_buf(wp->w_buffer, lnum);
   ptr = line;
 
   colnr_T trailcol = MAXCOL;  // start of trailing spaces
@@ -1564,7 +1567,7 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool number_onl
       len = spell_move_to(wp, FORWARD, true, true, &spell_hlf);
 
       // spell_move_to() may call ml_get() and make "line" invalid
-      line = ml_get_buf(wp->w_buffer, lnum, false);
+      line = ml_get_buf(wp->w_buffer, lnum);
       ptr = line + linecol;
 
       if (len == 0 || (int)wp->w_cursor.col > ptr - line) {
@@ -1709,7 +1712,7 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool number_onl
             get_statuscol_str(wp, lnum, wlv.row - startrow - wlv.filler_lines, &statuscol);
             if (!end_fill) {
               // Get the line again as evaluating 'statuscolumn' may free it.
-              line = ml_get_buf(wp->w_buffer, lnum, false);
+              line = ml_get_buf(wp->w_buffer, lnum);
               ptr = line + v;
             }
             if (wp->w_redr_statuscol) {
@@ -1909,7 +1912,7 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool number_onl
       wlv.p_extra[wlv.n_extra] = NUL;
 
       // Get the line again as evaluating 'foldtext' may free it.
-      line = ml_get_buf(wp->w_buffer, lnum, false);
+      line = ml_get_buf(wp->w_buffer, lnum);
       ptr = line + v;
     }
 
@@ -2163,7 +2166,7 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool number_onl
 
           // Need to get the line again, a multi-line regexp may
           // have made it invalid.
-          line = ml_get_buf(wp->w_buffer, lnum, false);
+          line = ml_get_buf(wp->w_buffer, lnum);
           ptr = line + v;
 
           // no concealing past the end of the line, it interferes
@@ -3093,8 +3096,8 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool number_onl
             || wlv.filler_todo > 0
             || (wp->w_p_list && wp->w_p_lcs_chars.eol != NUL
                 && wlv.p_extra != at_end_str)
-            || (wlv.n_extra != 0
-                && (wlv.c_extra != NUL || *wlv.p_extra != NUL)) || wlv.more_virt_inline_chunks)) {
+            || (wlv.n_extra != 0 && (wlv.c_extra != NUL || *wlv.p_extra != NUL))
+            || wlv.more_virt_inline_chunks)) {
       bool wrap = wp->w_p_wrap       // Wrapping enabled.
                   && wlv.filler_todo <= 0          // Not drawing diff filler lines.
                   && lcs_eol_one != -1         // Haven't printed the lcs_eol character.

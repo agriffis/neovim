@@ -547,13 +547,7 @@ void set_topline(win_T *wp, linenr_T lnum)
 /// If the line length changed the number of screen lines might change,
 /// requiring updating w_topline.  That may also invalidate w_crow.
 /// Need to take care of w_botline separately!
-void changed_cline_bef_curs(void)
-{
-  curwin->w_valid &= ~(VALID_WROW|VALID_WCOL|VALID_VIRTCOL|VALID_CROW
-                       |VALID_CHEIGHT|VALID_TOPLINE);
-}
-
-void changed_cline_bef_curs_win(win_T *wp)
+void changed_cline_bef_curs(win_T *wp)
 {
   wp->w_valid &= ~(VALID_WROW|VALID_WCOL|VALID_VIRTCOL|VALID_CROW
                    |VALID_CHEIGHT|VALID_TOPLINE);
@@ -595,13 +589,8 @@ void validate_botline(win_T *wp)
   }
 }
 
-// Mark curwin->w_botline as invalid (because of some change in the buffer).
-void invalidate_botline(void)
-{
-  curwin->w_valid &= ~(VALID_BOTLINE|VALID_BOTLINE_AP);
-}
-
-void invalidate_botline_win(win_T *wp)
+// Mark wp->w_botline as invalid (because of some change in the buffer).
+void invalidate_botline(win_T *wp)
 {
   wp->w_valid &= ~(VALID_BOTLINE|VALID_BOTLINE_AP);
 }
@@ -873,15 +862,6 @@ void curs_columns(win_T *wp, int may_scroll)
       n = (wp->w_wcol - wp->w_width_inner) / width2 + 1;
       wp->w_wcol -= n * width2;
       wp->w_wrow += n;
-
-      // When cursor wraps to first char of next line in Insert
-      // mode, the 'showbreak' string isn't shown, backup to first
-      // column
-      char *const sbr = get_showbreak_value(wp);
-      if (*sbr && *get_cursor_pos_ptr() == NUL
-          && wp->w_wcol == vim_strsize(sbr)) {
-        wp->w_wcol = 0;
-      }
     }
   } else if (may_scroll
              && !wp->w_cline_folded) {
@@ -1164,7 +1144,7 @@ void f_screenpos(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 static int virtcol2col(win_T *wp, linenr_T lnum, int vcol)
 {
   int offset = vcol2col(wp, lnum, vcol);
-  char *line = ml_get_buf(wp->w_buffer, lnum, false);
+  char *line = ml_get_buf(wp->w_buffer, lnum);
   char *p = line + offset;
 
   // For a multibyte character, need to return the column number of the first byte.
@@ -1276,7 +1256,7 @@ bool scrolldown(long line_count, int byfold)
       }
     }
     curwin->w_botline--;                // approximate w_botline
-    invalidate_botline();
+    invalidate_botline(curwin);
   }
   curwin->w_wrow += done;               // keep w_wrow updated
   curwin->w_cline_row += done;          // keep w_cline_row updated
@@ -2651,7 +2631,7 @@ void halfpage(bool flag, linenr_T Prenum)
       } else {
         curwin->w_cursor.lnum += n;
       }
-      check_cursor_lnum();
+      check_cursor_lnum(curwin);
     }
   } else {
     // scroll the text down

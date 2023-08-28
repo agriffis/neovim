@@ -761,7 +761,7 @@ static int qf_get_next_buf_line(qfstate_T *state)
   if (state->buflnum > state->lnumlast) {
     return QF_END_OF_INPUT;
   }
-  char *p_buf = ml_get_buf(state->buf, state->buflnum, false);
+  char *p_buf = ml_get_buf(state->buf, state->buflnum);
   state->buflnum += 1;
 
   size_t len = strlen(p_buf);
@@ -3433,14 +3433,17 @@ static void qf_free(qf_list_T *qfl)
   qfl->qf_changedtick = 0L;
 }
 
-// qf_mark_adjust: adjust marks
-bool qf_mark_adjust(win_T *wp, linenr_T line1, linenr_T line2, linenr_T amount,
+/// Adjust error list entries for changed line numbers
+///
+/// Note: `buf` is the changed buffer, but `wp` is a potential location list
+/// into that buffer, or NULL to check the quickfix list.
+bool qf_mark_adjust(buf_T *buf, win_T *wp, linenr_T line1, linenr_T line2, linenr_T amount,
                     linenr_T amount_after)
 {
   qf_info_T *qi = &ql_info;
   int buf_has_flag = wp == NULL ? BUF_HAS_QF_ENTRY : BUF_HAS_LL_ENTRY;
 
-  if (!(curbuf->b_has_qf_entry & buf_has_flag)) {
+  if (!(buf->b_has_qf_entry & buf_has_flag)) {
     return false;
   }
   if (wp != NULL) {
@@ -3457,7 +3460,7 @@ bool qf_mark_adjust(win_T *wp, linenr_T line1, linenr_T line2, linenr_T amount,
     qf_list_T *qfl = qf_get_list(qi, idx);
     if (!qf_list_empty(qfl)) {
       FOR_ALL_QFL_ITEMS(qfl, qfp, i) {
-        if (qfp->qf_fnum == curbuf->b_fnum) {
+        if (qfp->qf_fnum == buf->b_fnum) {
           found_one = true;
           if (qfp->qf_lnum >= line1 && qfp->qf_lnum <= line2) {
             if (amount == MAXLNUM) {
@@ -5245,7 +5248,7 @@ static bool vgr_match_buflines(qf_list_T *qfl, char *fname, buf_T *buf, char *sp
                          fname,
                          NULL,
                          duplicate_name ? 0 : buf->b_fnum,
-                         ml_get_buf(buf, regmatch->startpos[0].lnum + lnum, false),
+                         ml_get_buf(buf, regmatch->startpos[0].lnum + lnum),
                          regmatch->startpos[0].lnum + lnum,
                          regmatch->endpos[0].lnum + lnum,
                          regmatch->startpos[0].col + 1,
@@ -5268,12 +5271,12 @@ static bool vgr_match_buflines(qf_list_T *qfl, char *fname, buf_T *buf, char *sp
           break;
         }
         col = regmatch->endpos[0].col + (col == regmatch->endpos[0].col);
-        if (col > (colnr_T)strlen(ml_get_buf(buf, lnum, false))) {
+        if (col > (colnr_T)strlen(ml_get_buf(buf, lnum))) {
           break;
         }
       }
     } else {
-      char *const str = ml_get_buf(buf, lnum, false);
+      char *const str = ml_get_buf(buf, lnum);
       int score;
       uint32_t matches[MAX_FUZZY_MATCHES];
       const size_t sz = sizeof(matches) / sizeof(matches[0]);

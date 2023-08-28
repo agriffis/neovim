@@ -3,7 +3,6 @@
 
 // plines.c: calculate the vertical and horizontal size of text in a window
 
-#include <assert.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -17,213 +16,20 @@
 #include "nvim/globals.h"
 #include "nvim/indent.h"
 #include "nvim/macros.h"
+#include "nvim/mark.h"
 #include "nvim/mbyte.h"
 #include "nvim/memline.h"
 #include "nvim/move.h"
 #include "nvim/option.h"
 #include "nvim/plines.h"
 #include "nvim/pos.h"
+#include "nvim/state.h"
+#include "nvim/types.h"
 #include "nvim/vim.h"
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "plines.c.generated.h"
 #endif
-
-/// Functions calculating vertical size of text when displayed inside a window.
-/// Calls horizontal size functions defined below.
-
-/// Return the number of window lines occupied by buffer line "lnum".
-/// Includes any filler lines.
-///
-/// @param limit_winheight  when true limit to window height
-int plines_win(win_T *wp, linenr_T lnum, bool limit_winheight)
-{
-  // Check for filler lines above this buffer line.
-  return plines_win_nofill(wp, lnum, limit_winheight) + win_get_fill(wp, lnum);
-}
-
-/// Return the number of filler lines above "lnum".
-///
-/// @param wp
-/// @param lnum
-///
-/// @return Number of filler lines above lnum
-int win_get_fill(win_T *wp, linenr_T lnum)
-{
-  int virt_lines = decor_virt_lines(wp, lnum, NULL, kNone);
-
-  // be quick when there are no filler lines
-  if (diffopt_filler()) {
-    int n = diff_check(wp, lnum);
-
-    if (n > 0) {
-      return virt_lines + n;
-    }
-  }
-  return virt_lines;
-}
-
-bool win_may_fill(win_T *wp)
-{
-  return (wp->w_p_diff && diffopt_filler()) || wp->w_buffer->b_virt_line_blocks;
-}
-
-/// Return the number of window lines occupied by buffer line "lnum".
-/// Does not include filler lines.
-///
-/// @param limit_winheight  when true limit to window height
-int plines_win_nofill(win_T *wp, linenr_T lnum, bool limit_winheight)
-{
-  if (!wp->w_p_wrap) {
-    return 1;
-  }
-
-  if (wp->w_width_inner == 0) {
-    return 1;
-  }
-
-  // Folded lines are handled just like an empty line.
-  if (lineFolded(wp, lnum)) {
-    return 1;
-  }
-
-  const int lines = plines_win_nofold(wp, lnum);
-  if (limit_winheight && lines > wp->w_height_inner) {
-    return wp->w_height_inner;
-  }
-  return lines;
-}
-
-/// Get number of window lines physical line "lnum" will occupy in window "wp".
-/// Does not care about folding, 'wrap' or filler lines.
-int plines_win_nofold(win_T *wp, linenr_T lnum)
-{
-  char *s = ml_get_buf(wp->w_buffer, lnum, false);
-  chartabsize_T cts;
-  init_chartabsize_arg(&cts, wp, lnum, 0, s, s);
-  if (*s == NUL && !cts.cts_has_virt_text) {
-    return 1;  // be quick for an empty line
-  }
-  win_linetabsize_cts(&cts, (colnr_T)MAXCOL);
-  clear_chartabsize_arg(&cts);
-  int64_t col = cts.cts_vcol;
-
-  // If list mode is on, then the '$' at the end of the line may take up one
-  // extra column.
-  if (wp->w_p_list && wp->w_p_lcs_chars.eol != NUL) {
-    col += 1;
-  }
-
-  // Add column offset for 'number', 'relativenumber' and 'foldcolumn'.
-  int width = wp->w_width_inner - win_col_off(wp);
-  if (width <= 0) {
-    return 32000;  // bigger than the number of screen lines
-  }
-  if (col <= width) {
-    return 1;
-  }
-  col -= width;
-  width += win_col_off2(wp);
-  const int64_t lines = (col + (width - 1)) / width + 1;
-  return (lines > 0 && lines <= INT_MAX) ? (int)lines : INT_MAX;
-}
-
-/// Like plines_win(), but only reports the number of physical screen lines
-/// used from the start of the line to the given column number.
-int plines_win_col(win_T *wp, linenr_T lnum, long column)
-{
-  // Check for filler lines above this buffer line.
-  int lines = win_get_fill(wp, lnum);
-
-  if (!wp->w_p_wrap) {
-    return lines + 1;
-  }
-
-  if (wp->w_width_inner == 0) {
-    return lines + 1;
-  }
-
-  char *line = ml_get_buf(wp->w_buffer, lnum, false);
-
-  colnr_T col = 0;
-  chartabsize_T cts;
-
-  init_chartabsize_arg(&cts, wp, lnum, 0, line, line);
-  while (*cts.cts_ptr != NUL && --column >= 0) {
-    cts.cts_vcol += win_lbr_chartabsize(&cts, NULL);
-    MB_PTR_ADV(cts.cts_ptr);
-  }
-
-  // If *cts.cts_ptr is a TAB, and the TAB is not displayed as ^I, and we're not
-  // in MODE_INSERT state, then col must be adjusted so that it represents the
-  // last screen position of the TAB.  This only fixes an error when the TAB
-  // wraps from one screen line to the next (when 'columns' is not a multiple
-  // of 'ts') -- webb.
-  col = cts.cts_vcol;
-  if (*cts.cts_ptr == TAB && (State & MODE_NORMAL)
-      && (!wp->w_p_list || wp->w_p_lcs_chars.tab1)) {
-    col += win_lbr_chartabsize(&cts, NULL) - 1;
-  }
-  clear_chartabsize_arg(&cts);
-
-  // Add column offset for 'number', 'relativenumber', 'foldcolumn', etc.
-  int width = wp->w_width_inner - win_col_off(wp);
-  if (width <= 0) {
-    return 9999;
-  }
-
-  lines += 1;
-  if (col > width) {
-    lines += (col - width) / (width + win_col_off2(wp)) + 1;
-  }
-  return lines;
-}
-
-/// Get the number of screen lines buffer line "lnum" will take in window "wp".
-/// This takes care of both folds and topfill.
-///
-/// XXX: Because of topfill, this only makes sense when lnum >= wp->w_topline.
-///
-/// @param[in]  wp               window the line is in
-/// @param[in]  lnum             line number
-/// @param[out] nextp            if not NULL, the line after a fold
-/// @param[out] foldedp          if not NULL, whether lnum is on a fold
-/// @param[in]  cache            whether to use the window's cache for folds
-/// @param[in]  limit_winheight  when true limit to window height
-///
-/// @return the total number of screen lines
-int plines_win_full(win_T *wp, linenr_T lnum, linenr_T *const nextp, bool *const foldedp,
-                    const bool cache, const bool limit_winheight)
-{
-  bool folded = hasFoldingWin(wp, lnum, &lnum, nextp, cache, NULL);
-  if (foldedp != NULL) {
-    *foldedp = folded;
-  }
-  return ((folded ? 1 : plines_win_nofill(wp, lnum, limit_winheight)) +
-          (lnum == wp->w_topline ? wp->w_topfill : win_get_fill(wp, lnum)));
-}
-
-/// Get the number of screen lines a range of buffer lines will take in window "wp".
-/// This takes care of both folds and topfill.
-///
-/// XXX: Because of topfill, this only makes sense when first >= wp->w_topline.
-///
-/// @param first            first line number
-/// @param last             last line number
-/// @param limit_winheight  when true limit each line to window height
-///
-/// @see win_text_height
-int plines_m_win(win_T *wp, linenr_T first, linenr_T last, bool limit_winheight)
-{
-  int count = 0;
-
-  while (first <= last) {
-    linenr_T next = first;
-    count += plines_win_full(wp, first, &next, NULL, false, limit_winheight);
-    first = next + 1;
-  }
-  return count;
-}
 
 /// Functions calculating horizontal size of text, when displayed in a window.
 
@@ -292,7 +98,7 @@ unsigned win_linetabsize(win_T *wp, linenr_T lnum, char *line, colnr_T len)
 /// screen, taking into account the size of a tab and inline virtual text.
 unsigned linetabsize(win_T *wp, linenr_T lnum)
 {
-  return win_linetabsize(wp, lnum, ml_get_buf(wp->w_buffer, lnum, false), (colnr_T)MAXCOL);
+  return win_linetabsize(wp, lnum, ml_get_buf(wp->w_buffer, lnum), (colnr_T)MAXCOL);
 }
 
 void win_linetabsize_cts(chartabsize_T *cts, colnr_T len)
@@ -319,6 +125,7 @@ void init_chartabsize_arg(chartabsize_T *cts, win_T *wp, linenr_T lnum, colnr_T 
   cts->cts_vcol = col;
   cts->cts_line = line;
   cts->cts_ptr = ptr;
+  cts->cts_max_head_vcol = 0;
   cts->cts_cur_text_width_left = 0;
   cts->cts_cur_text_width_right = 0;
   cts->cts_has_virt_text = false;
@@ -404,8 +211,13 @@ int win_lbr_chartabsize(chartabsize_T *cts, int *headp)
     return win_chartabsize(wp, s, vcol);
   }
 
+  bool has_lcs_eol = wp->w_p_list && wp->w_p_lcs_chars.eol != NUL;
+
   // First get normal size, without 'linebreak' or inline virtual text
   int size = win_chartabsize(wp, s, vcol);
+  if (*s == NUL && !has_lcs_eol) {
+    size = 0;  // NUL is not displayed
+  }
 
   if (cts->cts_has_virt_text) {
     int tab_size = size;
@@ -491,14 +303,11 @@ int win_lbr_chartabsize(chartabsize_T *cts, int *headp)
   }
 
   // May have to add something for 'breakindent' and/or 'showbreak'
-  // string at start of line.
-  // Do not use 'showbreak' at the NUL after the text.
+  // string at the start of a screen line.
   int head = mb_added;
-  char *const sbr
-  // XXX: there should be a better check deeper below
-    = ((c == NUL && cts->cts_cur_text_width_left + cts->cts_cur_text_width_right == 0)
-       ? empty_option : get_showbreak_value(wp));
-  if ((*sbr != NUL || wp->w_p_bri) && wp->w_p_wrap) {
+  char *const sbr = get_showbreak_value(wp);
+  // When "size" is 0, no new screen line is started.
+  if (size > 0 && wp->w_p_wrap && (*sbr != NUL || wp->w_p_bri)) {
     int col_off_prev = win_col_off(wp);
     int width2 = wp->w_width_inner - col_off_prev + win_col_off2(wp);
     colnr_T wcol = vcol + col_off_prev;
@@ -542,34 +351,30 @@ int win_lbr_chartabsize(chartabsize_T *cts, int *headp)
       if (wp->w_p_bri) {
         head_mid += get_breakindent_win(wp, line);
       }
-      if (head_mid > 0) {
-        if (wcol + size > wp->w_width_inner) {
-          // Calculate effective window width.
-          int prev_rem = wp->w_width_inner - wcol;
-          int width = width2 - head_mid;
+      if (head_mid > 0 && wcol + size > wp->w_width_inner) {
+        // Calculate effective window width.
+        int prev_rem = wp->w_width_inner - wcol;
+        int width = width2 - head_mid;
 
-          if (width <= 0) {
-            width = 1;
-          }
-          // divide "size - prev_width" by "width", rounding up
-          int cnt = (size - prev_rem + width - 1) / width;
-          added += cnt * head_mid;
+        if (width <= 0) {
+          width = 1;
+        }
+        // Divide "size - prev_rem" by "width", rounding up.
+        int cnt = (size - prev_rem + width - 1) / width;
+        added += cnt * head_mid;
 
-          if (max_head_vcol == 0 || vcol + size + added < max_head_vcol) {
-            head += cnt * head_mid;
-          } else if (max_head_vcol > vcol + head_prev + prev_rem) {
-            head += (max_head_vcol - (vcol + head_prev + prev_rem)
-                     + width2 - 1) / width2 * head_mid;
-          } else if (max_head_vcol < 0) {
-            int off = 0;
-            if (c != NUL || !(State & MODE_NORMAL)) {
-              off += cts->cts_cur_text_width_left;
-            }
-            if (c != NUL && (State & MODE_NORMAL)) {
-              off += cts->cts_cur_text_width_right;
-            }
-            if (off >= prev_rem) {
+        if (max_head_vcol == 0 || vcol + size + added < max_head_vcol) {
+          head += cnt * head_mid;
+        } else if (max_head_vcol > vcol + head_prev + prev_rem) {
+          head += (max_head_vcol - (vcol + head_prev + prev_rem)
+                   + width2 - 1) / width2 * head_mid;
+        } else if (max_head_vcol < 0) {
+          int off = virt_text_cursor_off(cts, c == NUL);
+          if (off >= prev_rem) {
+            if (size > off) {
               head += (1 + (off - prev_rem) / width) * head_mid;
+            } else {
+              head += (off - prev_rem + width - 1) / width * head_mid;
             }
           }
         }
@@ -616,6 +421,507 @@ static int win_nolbr_chartabsize(chartabsize_T *cts, int *headp)
     return 3;
   }
   return n;
+}
+
+/// Check that virtual column "vcol" is in the rightmost column of window "wp".
+///
+/// @param  wp    window
+/// @param  vcol  column number
+static bool in_win_border(win_T *wp, colnr_T vcol)
+  FUNC_ATTR_PURE FUNC_ATTR_WARN_UNUSED_RESULT FUNC_ATTR_NONNULL_ARG(1)
+{
+  if (wp->w_width_inner == 0) {
+    // there is no border
+    return false;
+  }
+  int width1 = wp->w_width_inner - win_col_off(wp);  // width of first line (after line number)
+
+  if ((int)vcol < width1 - 1) {
+    return false;
+  }
+
+  if ((int)vcol == width1 - 1) {
+    return true;
+  }
+  int width2 = width1 + win_col_off2(wp);  // width of further lines
+
+  if (width2 <= 0) {
+    return false;
+  }
+  return (vcol - width1) % width2 == width2 - 1;
+}
+
+/// Get how many virtual columns inline virtual text should offset the cursor.
+///
+/// @param cts     should contain information stored by win_lbr_chartabsize()
+///                about widths of left and right gravity virtual text
+/// @param on_NUL  whether this is the end of the line
+static int virt_text_cursor_off(chartabsize_T *cts, bool on_NUL)
+{
+  int off = 0;
+  if (!on_NUL || !(State & MODE_NORMAL)) {
+    off += cts->cts_cur_text_width_left;
+  }
+  if (!on_NUL && (State & MODE_NORMAL)) {
+    off += cts->cts_cur_text_width_right;
+  }
+  return off;
+}
+
+/// Get virtual column number of pos.
+///  start: on the first position of this character (TAB, ctrl)
+/// cursor: where the cursor is on this character (first char, except for TAB)
+///    end: on the last position of this character (TAB, ctrl)
+///
+/// This is used very often, keep it fast!
+///
+/// @param wp
+/// @param pos
+/// @param start
+/// @param cursor
+/// @param end
+void getvcol(win_T *wp, pos_T *pos, colnr_T *start, colnr_T *cursor, colnr_T *end)
+{
+  char *ptr;     // points to current char
+  char *posptr;  // points to char at pos->col
+  int incr;
+  int head;
+  long *vts = wp->w_buffer->b_p_vts_array;
+  int ts = (int)wp->w_buffer->b_p_ts;
+
+  colnr_T vcol = 0;
+  char *line = ptr = ml_get_buf(wp->w_buffer, pos->lnum);  // start of the line
+
+  if (pos->col == MAXCOL) {
+    // continue until the NUL
+    posptr = NULL;
+  } else {
+    // In a few cases the position can be beyond the end of the line.
+    for (colnr_T i = 0; i < pos->col; i++) {
+      if (ptr[i] == NUL) {
+        pos->col = i;
+        break;
+      }
+    }
+    posptr = ptr + pos->col;
+    posptr -= utf_head_off(line, posptr);
+  }
+
+  chartabsize_T cts;
+  bool on_NUL = false;
+  init_chartabsize_arg(&cts, wp, pos->lnum, 0, line, line);
+  cts.cts_max_head_vcol = -1;
+
+  // This function is used very often, do some speed optimizations.
+  // When 'list', 'linebreak', 'showbreak' and 'breakindent' are not set
+  // and there are no virtual text use a simple loop.
+  // Also use this when 'list' is set but tabs take their normal size.
+  if ((!wp->w_p_list || (wp->w_p_lcs_chars.tab1 != NUL))
+      && !wp->w_p_lbr
+      && *get_showbreak_value(wp) == NUL
+      && !wp->w_p_bri
+      && !cts.cts_has_virt_text) {
+    while (true) {
+      head = 0;
+      int c = (uint8_t)(*ptr);
+
+      // make sure we don't go past the end of the line
+      if (c == NUL) {
+        // NUL at end of line only takes one column
+        incr = 1;
+        break;
+      }
+
+      // A tab gets expanded, depending on the current column
+      if (c == TAB) {
+        incr = tabstop_padding(vcol, ts, vts);
+      } else {
+        // For utf-8, if the byte is >= 0x80, need to look at
+        // further bytes to find the cell width.
+        if (c >= 0x80) {
+          incr = utf_ptr2cells(ptr);
+        } else {
+          incr = byte2cells(c);
+        }
+
+        // If a double-cell char doesn't fit at the end of a line
+        // it wraps to the next line, it's like this char is three
+        // cells wide.
+        if ((incr == 2)
+            && wp->w_p_wrap
+            && (MB_BYTE2LEN((uint8_t)(*ptr)) > 1)
+            && in_win_border(wp, vcol)) {
+          incr++;
+          head = 1;
+        }
+      }
+
+      if ((posptr != NULL) && (ptr >= posptr)) {
+        // character at pos->col
+        break;
+      }
+
+      vcol += incr;
+      MB_PTR_ADV(ptr);
+    }
+  } else {
+    while (true) {
+      // A tab gets expanded, depending on the current column
+      // Other things also take up space.
+      head = 0;
+      incr = win_lbr_chartabsize(&cts, &head);
+
+      // make sure we don't go past the end of the line
+      if (*cts.cts_ptr == NUL) {
+        // NUL at end of line only takes one column, unless there is virtual text
+        incr = MAX(1, cts.cts_cur_text_width_left + cts.cts_cur_text_width_right);
+        on_NUL = true;
+        break;
+      }
+
+      if ((posptr != NULL) && (cts.cts_ptr >= posptr)) {
+        // character at pos->col
+        break;
+      }
+
+      cts.cts_vcol += incr;
+      MB_PTR_ADV(cts.cts_ptr);
+    }
+    vcol = cts.cts_vcol;
+    ptr = cts.cts_ptr;
+  }
+  clear_chartabsize_arg(&cts);
+
+  if (start != NULL) {
+    *start = vcol + head;
+  }
+
+  if (end != NULL) {
+    *end = vcol + incr - 1;
+  }
+
+  if (cursor != NULL) {
+    if ((*ptr == TAB)
+        && (State & MODE_NORMAL)
+        && !wp->w_p_list
+        && !virtual_active()
+        && !(VIsual_active && ((*p_sel == 'e') || ltoreq(*pos, VIsual)))) {
+      // cursor at end
+      *cursor = vcol + incr - 1;
+    } else {
+      vcol += virt_text_cursor_off(&cts, on_NUL);
+      // cursor at start
+      *cursor = vcol + head;
+    }
+  }
+}
+
+/// Get virtual cursor column in the current window, pretending 'list' is off.
+///
+/// @param posp
+///
+/// @retujrn The virtual cursor column.
+colnr_T getvcol_nolist(pos_T *posp)
+{
+  int list_save = curwin->w_p_list;
+  colnr_T vcol;
+
+  curwin->w_p_list = false;
+  if (posp->coladd) {
+    getvvcol(curwin, posp, NULL, &vcol, NULL);
+  } else {
+    getvcol(curwin, posp, NULL, &vcol, NULL);
+  }
+  curwin->w_p_list = list_save;
+  return vcol;
+}
+
+/// Get virtual column in virtual mode.
+///
+/// @param wp
+/// @param pos
+/// @param start
+/// @param cursor
+/// @param end
+void getvvcol(win_T *wp, pos_T *pos, colnr_T *start, colnr_T *cursor, colnr_T *end)
+{
+  colnr_T col;
+
+  if (virtual_active()) {
+    // For virtual mode, only want one value
+    getvcol(wp, pos, &col, NULL, NULL);
+
+    colnr_T coladd = pos->coladd;
+    colnr_T endadd = 0;
+
+    // Cannot put the cursor on part of a wide character.
+    char *ptr = ml_get_buf(wp->w_buffer, pos->lnum);
+
+    if (pos->col < (colnr_T)strlen(ptr)) {
+      int c = utf_ptr2char(ptr + pos->col);
+      if ((c != TAB) && vim_isprintc(c)) {
+        endadd = (colnr_T)(char2cells(c) - 1);
+        if (coladd > endadd) {
+          // past end of line
+          endadd = 0;
+        } else {
+          coladd = 0;
+        }
+      }
+    }
+    col += coladd;
+
+    if (start != NULL) {
+      *start = col;
+    }
+
+    if (cursor != NULL) {
+      *cursor = col;
+    }
+
+    if (end != NULL) {
+      *end = col + endadd;
+    }
+  } else {
+    getvcol(wp, pos, start, cursor, end);
+  }
+}
+
+/// Get the leftmost and rightmost virtual column of pos1 and pos2.
+/// Used for Visual block mode.
+///
+/// @param wp
+/// @param pos1
+/// @param pos2
+/// @param left
+/// @param right
+void getvcols(win_T *wp, pos_T *pos1, pos_T *pos2, colnr_T *left, colnr_T *right)
+{
+  colnr_T from1;
+  colnr_T from2;
+  colnr_T to1;
+  colnr_T to2;
+
+  if (lt(*pos1, *pos2)) {
+    getvvcol(wp, pos1, &from1, NULL, &to1);
+    getvvcol(wp, pos2, &from2, NULL, &to2);
+  } else {
+    getvvcol(wp, pos2, &from1, NULL, &to1);
+    getvvcol(wp, pos1, &from2, NULL, &to2);
+  }
+
+  if (from2 < from1) {
+    *left = from2;
+  } else {
+    *left = from1;
+  }
+
+  if (to2 > to1) {
+    if ((*p_sel == 'e') && (from2 - 1 >= to1)) {
+      *right = from2 - 1;
+    } else {
+      *right = to2;
+    }
+  } else {
+    *right = to1;
+  }
+}
+
+/// Functions calculating vertical size of text when displayed inside a window.
+/// Calls horizontal size functions defined above.
+
+/// Check if there may be filler lines anywhere in window "wp".
+bool win_may_fill(win_T *wp)
+{
+  return (wp->w_p_diff && diffopt_filler()) || wp->w_buffer->b_virt_line_blocks;
+}
+
+/// Return the number of filler lines above "lnum".
+///
+/// @param wp
+/// @param lnum
+///
+/// @return Number of filler lines above lnum
+int win_get_fill(win_T *wp, linenr_T lnum)
+{
+  int virt_lines = decor_virt_lines(wp, lnum, NULL, kNone);
+
+  // be quick when there are no filler lines
+  if (diffopt_filler()) {
+    int n = diff_check(wp, lnum);
+
+    if (n > 0) {
+      return virt_lines + n;
+    }
+  }
+  return virt_lines;
+}
+
+/// Return the number of window lines occupied by buffer line "lnum".
+/// Includes any filler lines.
+///
+/// @param limit_winheight  when true limit to window height
+int plines_win(win_T *wp, linenr_T lnum, bool limit_winheight)
+{
+  // Check for filler lines above this buffer line.
+  return plines_win_nofill(wp, lnum, limit_winheight) + win_get_fill(wp, lnum);
+}
+
+/// Return the number of window lines occupied by buffer line "lnum".
+/// Does not include filler lines.
+///
+/// @param limit_winheight  when true limit to window height
+int plines_win_nofill(win_T *wp, linenr_T lnum, bool limit_winheight)
+{
+  if (!wp->w_p_wrap) {
+    return 1;
+  }
+
+  if (wp->w_width_inner == 0) {
+    return 1;
+  }
+
+  // Folded lines are handled just like an empty line.
+  if (lineFolded(wp, lnum)) {
+    return 1;
+  }
+
+  const int lines = plines_win_nofold(wp, lnum);
+  if (limit_winheight && lines > wp->w_height_inner) {
+    return wp->w_height_inner;
+  }
+  return lines;
+}
+
+/// Get number of window lines physical line "lnum" will occupy in window "wp".
+/// Does not care about folding, 'wrap' or filler lines.
+int plines_win_nofold(win_T *wp, linenr_T lnum)
+{
+  char *s = ml_get_buf(wp->w_buffer, lnum);
+  chartabsize_T cts;
+  init_chartabsize_arg(&cts, wp, lnum, 0, s, s);
+  if (*s == NUL && !cts.cts_has_virt_text) {
+    return 1;  // be quick for an empty line
+  }
+  win_linetabsize_cts(&cts, (colnr_T)MAXCOL);
+  clear_chartabsize_arg(&cts);
+  int64_t col = cts.cts_vcol;
+
+  // If list mode is on, then the '$' at the end of the line may take up one
+  // extra column.
+  if (wp->w_p_list && wp->w_p_lcs_chars.eol != NUL) {
+    col += 1;
+  }
+
+  // Add column offset for 'number', 'relativenumber' and 'foldcolumn'.
+  int width = wp->w_width_inner - win_col_off(wp);
+  if (width <= 0) {
+    return 32000;  // bigger than the number of screen lines
+  }
+  if (col <= width) {
+    return 1;
+  }
+  col -= width;
+  width += win_col_off2(wp);
+  const int64_t lines = (col + (width - 1)) / width + 1;
+  return (lines > 0 && lines <= INT_MAX) ? (int)lines : INT_MAX;
+}
+
+/// Like plines_win(), but only reports the number of physical screen lines
+/// used from the start of the line to the given column number.
+int plines_win_col(win_T *wp, linenr_T lnum, long column)
+{
+  // Check for filler lines above this buffer line.
+  int lines = win_get_fill(wp, lnum);
+
+  if (!wp->w_p_wrap) {
+    return lines + 1;
+  }
+
+  if (wp->w_width_inner == 0) {
+    return lines + 1;
+  }
+
+  char *line = ml_get_buf(wp->w_buffer, lnum);
+
+  colnr_T col = 0;
+  chartabsize_T cts;
+
+  init_chartabsize_arg(&cts, wp, lnum, 0, line, line);
+  while (*cts.cts_ptr != NUL && --column >= 0) {
+    cts.cts_vcol += win_lbr_chartabsize(&cts, NULL);
+    MB_PTR_ADV(cts.cts_ptr);
+  }
+
+  // If *cts.cts_ptr is a TAB, and the TAB is not displayed as ^I, and we're not
+  // in MODE_INSERT state, then col must be adjusted so that it represents the
+  // last screen position of the TAB.  This only fixes an error when the TAB
+  // wraps from one screen line to the next (when 'columns' is not a multiple
+  // of 'ts') -- webb.
+  col = cts.cts_vcol;
+  if (*cts.cts_ptr == TAB && (State & MODE_NORMAL)
+      && (!wp->w_p_list || wp->w_p_lcs_chars.tab1)) {
+    col += win_lbr_chartabsize(&cts, NULL) - 1;
+  }
+  clear_chartabsize_arg(&cts);
+
+  // Add column offset for 'number', 'relativenumber', 'foldcolumn', etc.
+  int width = wp->w_width_inner - win_col_off(wp);
+  if (width <= 0) {
+    return 9999;
+  }
+
+  lines += 1;
+  if (col > width) {
+    lines += (col - width) / (width + win_col_off2(wp)) + 1;
+  }
+  return lines;
+}
+
+/// Get the number of screen lines buffer line "lnum" will take in window "wp".
+/// This takes care of both folds and topfill.
+///
+/// XXX: Because of topfill, this only makes sense when lnum >= wp->w_topline.
+///
+/// @param[in]  wp               window the line is in
+/// @param[in]  lnum             line number
+/// @param[out] nextp            if not NULL, the line after a fold
+/// @param[out] foldedp          if not NULL, whether lnum is on a fold
+/// @param[in]  cache            whether to use the window's cache for folds
+/// @param[in]  limit_winheight  when true limit to window height
+///
+/// @return the total number of screen lines
+int plines_win_full(win_T *wp, linenr_T lnum, linenr_T *const nextp, bool *const foldedp,
+                    const bool cache, const bool limit_winheight)
+{
+  bool folded = hasFoldingWin(wp, lnum, &lnum, nextp, cache, NULL);
+  if (foldedp != NULL) {
+    *foldedp = folded;
+  }
+  return ((folded ? 1 : plines_win_nofill(wp, lnum, limit_winheight)) +
+          (lnum == wp->w_topline ? wp->w_topfill : win_get_fill(wp, lnum)));
+}
+
+/// Get the number of screen lines a range of buffer lines will take in window "wp".
+/// This takes care of both folds and topfill.
+///
+/// XXX: Because of topfill, this only makes sense when first >= wp->w_topline.
+///
+/// @param first            first line number
+/// @param last             last line number
+/// @param limit_winheight  when true limit each line to window height
+///
+/// @see win_text_height
+int plines_m_win(win_T *wp, linenr_T first, linenr_T last, bool limit_winheight)
+{
+  int count = 0;
+
+  while (first <= last) {
+    linenr_T next = first;
+    count += plines_win_full(wp, first, &next, NULL, false, limit_winheight);
+    first = next + 1;
+  }
+  return count;
 }
 
 /// Get the number of screen lines a range of text will take in window "wp".

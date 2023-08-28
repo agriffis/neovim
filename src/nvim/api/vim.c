@@ -912,14 +912,17 @@ Buffer nvim_create_buf(Boolean listed, Boolean scratch, Error *err)
     goto fail;
   }
 
+  // Only strictly needed for scratch, but could just as well be consistent
+  // and do this now. buffer is created NOW, not when it latter first happen
+  // to reach a window or aucmd_prepbuf() ..
+  buf_copy_options(buf, BCO_ENTER | BCO_NOHELP);
+
   if (scratch) {
-    aco_save_T aco;
-    aucmd_prepbuf(&aco, buf);
-    set_option_value("bufhidden", STATIC_CSTR_AS_OPTVAL("hide"), OPT_LOCAL);
-    set_option_value("buftype", STATIC_CSTR_AS_OPTVAL("nofile"), OPT_LOCAL);
-    set_option_value("swapfile", BOOLEAN_OPTVAL(false), OPT_LOCAL);
-    set_option_value("modeline", BOOLEAN_OPTVAL(false), OPT_LOCAL);  // 'nomodeline'
-    aucmd_restbuf(&aco);
+    set_string_option_direct_in_buf(buf, "bufhidden", -1, "hide", OPT_LOCAL, 0);
+    set_string_option_direct_in_buf(buf, "buftype", -1, "nofile", OPT_LOCAL, 0);
+    assert(buf->b_ml.ml_mfp->mf_fd < 0);  // ml_open() should not have opened swapfile already
+    buf->b_p_swf = false;
+    buf->b_p_ml = false;
   }
   return buf->b_fnum;
 
@@ -1497,7 +1500,10 @@ Array nvim_get_api_info(uint64_t channel_id, Arena *arena)
 ///     - "commit" hash or similar identifier of commit
 /// @param type Must be one of the following values. Client libraries should
 ///             default to "remote" unless overridden by the user.
-///     - "remote" remote client connected to Nvim.
+///     - "remote" remote client connected "Nvim flavored" MessagePack-RPC (responses
+///                must be in reverse order of requests). |msgpack-rpc|
+///     - "msgpack-rpc" remote client connected to Nvim via fully MessagePack-RPC
+///                     compliant protocol.
 ///     - "ui" gui frontend
 ///     - "embedder" application using Nvim as a component (for example,
 ///                  IDE/editor implementing a vim mode).

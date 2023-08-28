@@ -1708,7 +1708,7 @@ void change_indent(int type, int amount, int round, int replaced, int call_chang
     curwin->w_cursor.col = (colnr_T)new_cursor_col;
   }
   curwin->w_set_curswant = true;
-  changed_cline_bef_curs();
+  changed_cline_bef_curs(curwin);
 
   // May have to adjust the start of the insert.
   if (State & MODE_INSERT) {
@@ -3775,7 +3775,7 @@ static bool ins_bs(int c, int mode, int *inserted_space_p)
         // again when auto-formatting.
         if (has_format_option(FO_AUTO)
             && has_format_option(FO_WHITE_PAR)) {
-          char *ptr = ml_get_buf(curbuf, curwin->w_cursor.lnum, true);
+          char *ptr = ml_get_buf_mut(curbuf, curwin->w_cursor.lnum);
           int len;
 
           len = (int)strlen(ptr);

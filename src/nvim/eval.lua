@@ -54,7 +54,7 @@ M.funcs = {
     name = 'abs',
     params = { { 'expr', 'any' } },
     signature = 'abs({expr})',
-    returns = 'number'
+    returns = 'number',
   },
   acos = {
     args = 1,
@@ -2075,6 +2075,7 @@ M.funcs = {
     fast = true,
     name = 'executable',
     params = { { 'expr', 'any' } },
+    returns = '0|1|-1',
     signature = 'executable({expr})',
   },
   execute = {
@@ -3130,6 +3131,7 @@ M.funcs = {
     name = 'getbufinfo',
     params = { { 'buf', 'integer|string' } },
     signature = 'getbufinfo([{buf}])',
+    returns = 'vim.fn.getbufinfo.ret.item[]',
   },
   getbufinfo__1 = {
     args = { 0, 1 },
@@ -3201,8 +3203,9 @@ M.funcs = {
       <
     ]=],
     name = 'getbufinfo',
-    params = { { 'dict', 'table<string,any>' } },
+    params = { { 'dict', 'vim.fn.getbufinfo.dict' } },
     signature = 'getbufinfo([{dict}])',
+    returns = 'vim.fn.getbufinfo.ret.item[]',
   },
   getbufline = {
     args = { 2, 3 },
@@ -3245,8 +3248,9 @@ M.funcs = {
       as a string.
     ]=],
     name = 'getbufoneline',
-    params = { { 'buf', 'any' }, { 'lnum', 'integer' } },
+    params = { { 'buf', 'integer|string' }, { 'lnum', 'integer' } },
     signature = 'getbufoneline({buf}, {lnum})',
+    returns = 'string',
   },
   getbufvar = {
     args = { 2, 3 },
@@ -3875,6 +3879,7 @@ M.funcs = {
     name = 'getjumplist',
     params = { { 'winnr', 'integer' }, { 'tabnr', 'integer' } },
     signature = 'getjumplist([{winnr} [, {tabnr}]])',
+    returns = 'vim.fn.getjumplist.ret',
   },
   getline = {
     args = { 1, 2 },
@@ -4045,6 +4050,7 @@ M.funcs = {
     name = 'getmousepos',
     params = {},
     signature = 'getmousepos()',
+    returns = 'vim.fn.getmousepos.ret',
   },
   getpid = {
     desc = [=[
@@ -4091,7 +4097,8 @@ M.funcs = {
 
     ]=],
     name = 'getpos',
-    params = { { 'expr', 'any' } },
+    params = { { 'expr', 'string' } },
+    returns = 'integer[]',
     signature = 'getpos({expr})',
   },
   getqflist = {
@@ -4505,6 +4512,7 @@ M.funcs = {
     name = 'getwininfo',
     params = { { 'winid', 'integer' } },
     signature = 'getwininfo([{winid}])',
+    returns = 'vim.fn.getwininfo.ret.item[]'
   },
   getwinpos = {
     args = { 0, 1 },
@@ -4729,7 +4737,7 @@ M.funcs = {
       	clipboard	|clipboard| provider is available.
       	fname_case	Case in file names matters (for Darwin and MS-Windows
       			this is not present).
-                              gui_running	Nvim has a GUI.
+      	gui_running	Nvim has a GUI.
       	iconv		Can use |iconv()| for conversion.
       	linux		Linux system.
       	mac		MacOS system.
@@ -6189,7 +6197,12 @@ M.funcs = {
 
     ]=],
     name = 'maparg',
-    params = { { 'name', 'string' }, { 'mode', 'string' }, { 'abbr', 'boolean' }, { 'dict', 'boolean' } },
+    params = {
+      { 'name', 'string' },
+      { 'mode', 'string' },
+      { 'abbr', 'boolean' },
+      { 'dict', 'boolean' },
+    },
     returns = 'string|table<string,any>',
     signature = 'maparg({name} [, {mode} [, {abbr} [, {dict}]]])',
   },
@@ -9611,8 +9624,9 @@ M.funcs = {
     args = { 1, 2 },
     base = 1,
     name = 'sign_define',
-    params = { { 'name', 'string' }, { 'dict', 'any' } },
+    params = { { 'name', 'string' }, { 'dict', 'vim.fn.sign_define.dict' } },
     signature = 'sign_define({name} [, {dict}])',
+    returns = '0|-1',
   },
   sign_define__1 = {
     args = { 1, 2 },
@@ -9664,8 +9678,9 @@ M.funcs = {
       <
     ]=],
     name = 'sign_define',
-    params = { { 'list', 'any' } },
+    params = { { 'list', 'vim.fn.sign_define.dict[]' } },
     signature = 'sign_define({list})',
+    returns = '(0|-1)[]',
   },
   sign_getdefined = {
     args = { 0, 1 },
@@ -9709,6 +9724,7 @@ M.funcs = {
     name = 'sign_getdefined',
     params = { { 'name', 'string' } },
     signature = 'sign_getdefined([{name}])',
+    returns = 'vim.fn.sign_getdefined.ret.item[]',
   },
   sign_getplaced = {
     args = { 0, 2 },
@@ -9775,8 +9791,9 @@ M.funcs = {
       <
     ]=],
     name = 'sign_getplaced',
-    params = { { 'buf', 'any' }, { 'dict', 'any' } },
+    params = { { 'buf', 'any' }, { 'dict', 'vim.fn.sign_getplaced.dict' } },
     signature = 'sign_getplaced([{buf} [, {dict}]])',
+    returns = 'vim.fn.sign_getplaced.ret.item[]',
   },
   sign_jump = {
     args = 3,
@@ -9798,8 +9815,9 @@ M.funcs = {
       <
     ]=],
     name = 'sign_jump',
-    params = { { 'id', 'any' }, { 'group', 'any' }, { 'buf', 'any' } },
+    params = { { 'id', 'integer' }, { 'group', 'string' }, { 'buf', 'integer|string' } },
     signature = 'sign_jump({id}, {group}, {buf})',
+    returns = 'integer'
   },
   sign_place = {
     args = { 4, 5 },
@@ -9859,9 +9877,10 @@ M.funcs = {
       { 'group', 'any' },
       { 'name', 'string' },
       { 'buf', 'any' },
-      { 'dict', 'any' },
+      { 'dict', 'vim.fn.sign_place.dict' },
     },
     signature = 'sign_place({id}, {group}, {name}, {buf} [, {dict}])',
+    returns = 'integer'
   },
   sign_placelist = {
     args = 1,
@@ -9926,8 +9945,9 @@ M.funcs = {
       <
     ]=],
     name = 'sign_placelist',
-    params = { { 'list', 'any' } },
+    params = { { 'list', 'vim.fn.sign_placelist.list.item[]' } },
     signature = 'sign_placelist({list})',
+    returns = 'integer[]'
   },
   sign_undefine = {
     args = { 0, 1 },
@@ -9935,6 +9955,7 @@ M.funcs = {
     name = 'sign_undefine',
     params = { { 'name', 'string' } },
     signature = 'sign_undefine([{name}])',
+    returns = '0|-1',
   },
   sign_undefine__1 = {
     args = { 0, 1 },
@@ -9963,8 +9984,9 @@ M.funcs = {
       <
     ]=],
     name = 'sign_undefine',
-    params = { { 'list', 'any' } },
+    params = { { 'list', 'string[]' } },
     signature = 'sign_undefine({list})',
+    returns = 'integer[]',
   },
   sign_unplace = {
     args = { 1, 2 },
@@ -10013,8 +10035,9 @@ M.funcs = {
 
     ]=],
     name = 'sign_unplace',
-    params = { { 'group', 'any' }, { 'dict', 'any' } },
+    params = { { 'group', 'string' }, { 'dict', 'vim.fn.sign_unplace.dict' } },
     signature = 'sign_unplace({group} [, {dict}])',
+    returns = '0|-1',
   },
   sign_unplacelist = {
     args = 1,
@@ -10049,8 +10072,9 @@ M.funcs = {
       <
     ]=],
     name = 'sign_unplacelist',
-    params = { { 'list', 'any' } },
+    params = { { 'list', 'vim.fn.sign_unplacelist.list.item' } },
     signature = 'sign_unplacelist({list})',
+    returns = '(0|-1)[]',
   },
   simplify = {
     args = 1,
@@ -10453,7 +10477,8 @@ M.funcs = {
     ]=],
     fast = true,
     name = 'stdpath',
-    params = { { 'what', 'any' } },
+    params = { { 'what', "'cache'|'config'|'config_dirs'|'data'|'data_dirs'|'log'|'run'|'state'" } },
+    returns = 'string|string[]',
     signature = 'stdpath({what})',
   },
   state = {
@@ -10476,7 +10501,7 @@ M.funcs = {
       added.  E.g, this checks if the screen has scrolled: >vim
       	if state('s') == ''
       	   " screen has not scrolled
-
+      <
       These characters indicate the state, generally indicating that
       something is busy:
           m	halfway a mapping, :normal command, feedkeys() or
@@ -10644,6 +10669,7 @@ M.funcs = {
     ]=],
     name = 'strchars',
     params = { { 'string', 'string' }, { 'skipcc', 'any' } },
+    returns = 'integer',
     signature = 'strchars({string} [, {skipcc}])',
   },
   strdisplaywidth = {
@@ -10666,6 +10692,7 @@ M.funcs = {
     ]=],
     name = 'strdisplaywidth',
     params = { { 'string', 'string' }, { 'col', 'integer' } },
+    returns = 'integer',
     signature = 'strdisplaywidth({string} [, {col}])',
   },
   strftime = {
@@ -10691,6 +10718,7 @@ M.funcs = {
     ]=],
     name = 'strftime',
     params = { { 'format', 'any' }, { 'time', 'any' } },
+    returns = 'string',
     signature = 'strftime({format} [, {time}])',
   },
   strgetchar = {
@@ -10707,7 +10735,8 @@ M.funcs = {
 
     ]=],
     name = 'strgetchar',
-    params = { { 'str', 'any' }, { 'index', 'any' } },
+    params = { { 'str', 'string' }, { 'index', 'integer' } },
+    returns = 'integer',
     signature = 'strgetchar({str}, {index})',
   },
   stridx = {
@@ -10735,7 +10764,8 @@ M.funcs = {
     ]=],
     fast = true,
     name = 'stridx',
-    params = { { 'haystack', 'any' }, { 'needle', 'any' }, { 'start', 'any' } },
+    params = { { 'haystack', 'string' }, { 'needle', 'string' }, { 'start', 'integer' } },
+    returns = 'integer',
     signature = 'stridx({haystack}, {needle} [, {start}])',
   },
   string = {
@@ -10768,6 +10798,7 @@ M.funcs = {
     ]=],
     name = 'string',
     params = { { 'expr', 'any' } },
+    returns = 'string',
     signature = 'string({expr})',
   },
   strlen = {
@@ -10785,6 +10816,7 @@ M.funcs = {
     ]=],
     name = 'strlen',
     params = { { 'string', 'string' } },
+    returns = 'integer',
     signature = 'strlen({string})',
   },
   strpart = {
@@ -10818,7 +10850,13 @@ M.funcs = {
     ]=],
     fast = true,
     name = 'strpart',
-    params = { { 'src', 'any' }, { 'start', 'any' }, { 'len', 'any' }, { 'chars', 'any' } },
+    params = {
+      { 'src', 'string' },
+      { 'start', 'integer' },
+      { 'len', 'integer' },
+      { 'chars', '0|1' },
+    },
+    returns = 'string',
     signature = 'strpart({src}, {start} [, {len} [, {chars}]])',
   },
   strptime = {
@@ -10850,7 +10888,8 @@ M.funcs = {
 
     ]=],
     name = 'strptime',
-    params = { { 'format', 'any' }, { 'timestring', 'any' } },
+    params = { { 'format', 'string' }, { 'timestring', 'string' } },
+    returns = 'integer',
     signature = 'strptime({format}, {timestring})',
   },
   strridx = {
@@ -10876,7 +10915,12 @@ M.funcs = {
 
     ]=],
     name = 'strridx',
-    params = { { 'haystack', 'any' }, { 'needle', 'any' }, { 'start', 'any' } },
+    params = {
+      { 'haystack', 'string' },
+      { 'needle', 'string' },
+      { 'start', 'integer' },
+    },
+    returns = 'integer',
     signature = 'strridx({haystack}, {needle} [, {start}])',
   },
   strtrans = {
@@ -10896,6 +10940,7 @@ M.funcs = {
     fast = true,
     name = 'strtrans',
     params = { { 'string', 'string' } },
+    returns = 'string',
     signature = 'strtrans({string})',
   },
   strutf16len = {
@@ -10922,7 +10967,8 @@ M.funcs = {
 
     ]=],
     name = 'strutf16len',
-    params = { { 'string', 'string' }, { 'countcc', 'any' } },
+    params = { { 'string', 'string' }, { 'countcc', '0|1' } },
+    returns = 'integer',
     signature = 'strutf16len({string} [, {countcc}])',
   },
   strwidth = {
@@ -10941,6 +10987,7 @@ M.funcs = {
     fast = true,
     name = 'strwidth',
     params = { { 'string', 'string' } },
+    returns = 'integer',
     signature = 'strwidth({string})',
   },
   submatch = {
@@ -10977,7 +11024,8 @@ M.funcs = {
 
     ]=],
     name = 'submatch',
-    params = { { 'nr', 'integer' }, { 'list', 'any' } },
+    params = { { 'nr', 'integer' }, { 'list', 'integer' } },
+    returns = 'string|string[]',
     signature = 'submatch({nr} [, {list}])',
   },
   substitute = {
@@ -11028,7 +11076,13 @@ M.funcs = {
 
     ]=],
     name = 'substitute',
-    params = { { 'string', 'string' }, { 'pat', 'any' }, { 'sub', 'any' }, { 'flags', 'string' } },
+    params = {
+      { 'string', 'string' },
+      { 'pat', 'string' },
+      { 'sub', 'string' },
+      { 'flags', 'string' },
+    },
+    returns = 'string',
     signature = 'substitute({string}, {pat}, {sub}, {flags})',
   },
   swapfilelist = {
@@ -11045,6 +11099,7 @@ M.funcs = {
     ]=],
     name = 'swapfilelist',
     params = {},
+    returns = 'string[]',
     signature = 'swapfilelist()',
   },
   swapinfo = {
@@ -11085,7 +11140,8 @@ M.funcs = {
 
     ]=],
     name = 'swapname',
-    params = { { 'buf', 'any' } },
+    params = { { 'buf', 'integer|string' } },
+    returns = 'string',
     signature = 'swapname({buf})',
   },
   synID = {
@@ -11117,7 +11173,8 @@ M.funcs = {
       <
     ]=],
     name = 'synID',
-    params = { { 'lnum', 'integer' }, { 'col', 'integer' }, { 'trans', 'any' } },
+    params = { { 'lnum', 'integer' }, { 'col', 'integer' }, { 'trans', '0|1' } },
+    returns = 'integer',
     signature = 'synID({lnum}, {col}, {trans})',
   },
   synIDattr = {
@@ -11170,7 +11227,8 @@ M.funcs = {
       <
     ]=],
     name = 'synIDattr',
-    params = { { 'synID', 'any' }, { 'what', 'any' }, { 'mode', 'string' } },
+    params = { { 'synID', 'integer' }, { 'what', 'string' }, { 'mode', 'string' } },
+    returns = 'string',
     signature = 'synIDattr({synID}, {what} [, {mode}])',
   },
   synIDtrans = {
@@ -11186,7 +11244,8 @@ M.funcs = {
 
     ]=],
     name = 'synIDtrans',
-    params = { { 'synID', 'any' } },
+    params = { { 'synID', 'integer' } },
+    returns = 'integer',
     signature = 'synIDtrans({synID})',
   },
   synconcealed = {
@@ -11215,10 +11274,10 @@ M.funcs = {
       	synconcealed(lnum, 4)   [1, 'X', 2]
       	synconcealed(lnum, 5)   [1, 'X', 2]
       	synconcealed(lnum, 6)   [0, '', 0]
-      <
     ]=],
     name = 'synconcealed',
     params = { { 'lnum', 'integer' }, { 'col', 'integer' } },
+    returns = '{[1]: integer, [2]: string, [3]: integer}[]',
     signature = 'synconcealed({lnum}, {col})',
   },
   synstack = {
@@ -11244,6 +11303,7 @@ M.funcs = {
     ]=],
     name = 'synstack',
     params = { { 'lnum', 'integer' }, { 'col', 'integer' } },
+    returns = 'integer[]',
     signature = 'synstack({lnum}, {col})',
   },
   system = {
@@ -11301,7 +11361,11 @@ M.funcs = {
 
     ]=],
     name = 'system',
-    params = { { 'cmd', 'any' }, { 'input', 'any' } },
+    params = {
+      { 'cmd', 'string|string[]' },
+      { 'input', 'string|string[]|integer' },
+    },
+    returns = 'string',
     signature = 'system({cmd} [, {input}])',
   },
   systemlist = {
@@ -11323,7 +11387,14 @@ M.funcs = {
 
     ]=],
     name = 'systemlist',
-    params = { { 'cmd', 'any' }, { 'input', 'any' }, { 'keepempty', 'any' } },
+    params = {
+      { 'cmd', 'string|string[]' },
+      { 'input', 'string|string[]|integer' },
+      { 'keepempty', 'integer' },
+    },
+    -- TODO(lewis6991): Not sure the '' return case is possible via vim.fn
+    -- returns = "string[]|''",
+    returns = 'string[]',
     signature = 'systemlist({cmd} [, {input} [, {keepempty}]])',
   },
   tabpagebuflist = {
@@ -11364,7 +11435,8 @@ M.funcs = {
       Returns zero on error.
     ]=],
     name = 'tabpagenr',
-    params = { { 'arg', 'any' } },
+    params = { { 'arg', "'$'|'#'" } },
+    returns = 'integer',
     signature = 'tabpagenr([{arg}])',
   },
   tabpagewinnr = {
@@ -11385,7 +11457,8 @@ M.funcs = {
 
     ]=],
     name = 'tabpagewinnr',
-    params = { { 'tabarg', 'any' }, { 'arg', 'any' } },
+    params = { { 'tabarg', 'integer' }, { 'arg', "'$'|'#'" } },
+    returns = 'integer',
     signature = 'tabpagewinnr({tabarg} [, {arg}])',
   },
   tagfiles = {
@@ -11395,6 +11468,7 @@ M.funcs = {
     ]=],
     name = 'tagfiles',
     params = {},
+    returns = 'string[]',
     signature = 'tagfiles()',
   },
   taglist = {
@@ -11445,7 +11519,7 @@ M.funcs = {
 
     ]=],
     name = 'taglist',
-    params = { { 'expr', 'any' }, { 'filename', 'any' } },
+    params = { { 'expr', 'any' }, { 'filename', 'string' } },
     signature = 'taglist({expr} [, {filename}])',
   },
   tan = {
@@ -11465,7 +11539,8 @@ M.funcs = {
     ]=],
     float_func = 'tan',
     name = 'tan',
-    params = { { 'expr', 'any' } },
+    params = { { 'expr', 'number' } },
+    returns = 'number',
     signature = 'tan({expr})',
   },
   tanh = {
@@ -11485,7 +11560,8 @@ M.funcs = {
     ]=],
     float_func = 'tanh',
     name = 'tanh',
-    params = { { 'expr', 'any' } },
+    params = { { 'expr', 'number' } },
+    returns = 'number',
     signature = 'tanh({expr})',
   },
   tempname = {
@@ -11537,7 +11613,7 @@ M.funcs = {
   },
   test_write_list_log = {
     args = 1,
-    params = { { 'fname' } },
+    params = { { 'fname', 'string' } },
     signature = '',
     lua = false,
   },
@@ -11699,7 +11775,8 @@ M.funcs = {
 
     ]=],
     name = 'tr',
-    params = { { 'src', 'any' }, { 'fromstr', 'any' }, { 'tostr', 'any' } },
+    params = { { 'src', 'string' }, { 'fromstr', 'string' }, { 'tostr', 'string' } },
+    returns = 'string',
     signature = 'tr({src}, {fromstr}, {tostr})',
   },
   trim = {
@@ -11732,7 +11809,7 @@ M.funcs = {
 
     ]=],
     name = 'trim',
-    params = { { 'text', 'any' }, { 'mask', 'any' }, { 'dir', 'string' } },
+    params = { { 'text', 'any' }, { 'mask', 'string' }, { 'dir', '0|1|2' } },
     returns = 'string',
     signature = 'trim({text} [, {mask} [, {dir}]])',
   },
@@ -11756,6 +11833,7 @@ M.funcs = {
     float_func = 'trunc',
     name = 'trunc',
     params = { { 'expr', 'any' } },
+    returns = 'integer',
     signature = 'trunc({expr})',
   },
   type = {
@@ -11765,15 +11843,15 @@ M.funcs = {
       The result is a Number representing the type of {expr}.
       Instead of using the number directly, it is better to use the
       v:t_ variable that has the value:
-              Number:     0 (|v:t_number|)
-      	String:     1 (|v:t_string|)
-      	Funcref:    2 (|v:t_func|)
-      	List:       3 (|v:t_list|)
-      	Dictionary: 4 (|v:t_dict|)
-      	Float:      5 (|v:t_float|)
-      	Boolean:    6 (|v:true| and |v:false|)
-      	Null:       7 (|v:null|)
-      	Blob:      10 (|v:t_blob|)
+      	Number:	    0  |v:t_number|
+      	String:	    1  |v:t_string|
+      	Funcref:    2  |v:t_func|
+      	List:	    3  |v:t_list|
+      	Dictionary: 4  |v:t_dict|
+      	Float:	    5  |v:t_float|
+      	Boolean:    6  |v:t_bool| (|v:false| and |v:true|)
+      	Null:	    7  (|v:null|)
+      	Blob:	   10  |v:t_blob|
       For backward compatibility, this method can be used: >vim
       	if type(myvar) == type(0) | endif
       	if type(myvar) == type("") | endif
@@ -11792,6 +11870,7 @@ M.funcs = {
     fast = true,
     name = 'type',
     params = { { 'expr', 'any' } },
+    returns = 'integer',
     signature = 'type({expr})',
   },
   undofile = {
@@ -11862,7 +11941,7 @@ M.funcs = {
       		item.
     ]=],
     name = 'undotree',
-    params = { { 'buf', 'any' } },
+    params = { { 'buf', 'integer|string' } },
     signature = 'undotree([{buf}])',
   },
   uniq = {
@@ -12492,7 +12571,7 @@ M.funcs = {
 
     ]=],
     name = 'winrestview',
-    params = { { 'dict', 'any' } },
+    params = { { 'dict', 'vim.fn.winrestview.dict' } },
     signature = 'winrestview({dict})',
   },
   winsaveview = {
@@ -12526,6 +12605,7 @@ M.funcs = {
     name = 'winsaveview',
     params = {},
     signature = 'winsaveview()',
+    returns = 'vim.fn.winsaveview.ret'
   },
   winwidth = {
     args = 1,

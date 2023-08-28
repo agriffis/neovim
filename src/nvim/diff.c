@@ -266,24 +266,25 @@ void diff_invalidate(buf_T *buf)
   }
 }
 
-/// Called by mark_adjust(): update line numbers in "curbuf".
+/// Called by mark_adjust(): update line numbers in "buf".
 ///
 /// @param line1
 /// @param line2
 /// @param amount
 /// @param amount_after
-void diff_mark_adjust(linenr_T line1, linenr_T line2, linenr_T amount, linenr_T amount_after)
+void diff_mark_adjust(buf_T *buf, linenr_T line1, linenr_T line2, linenr_T amount,
+                      linenr_T amount_after)
 {
-  // Handle all tab pages that use the current buffer in a diff.
+  // Handle all tab pages that use "buf" in a diff.
   FOR_ALL_TABS(tp) {
-    int idx = diff_buf_idx_tp(curbuf, tp);
+    int idx = diff_buf_idx_tp(buf, tp);
     if (idx != DB_COUNT) {
       diff_mark_adjust_tp(tp, idx, line1, line2, amount, amount_after);
     }
   }
 }
 
-/// Update line numbers in tab page "tp" for "curbuf" with index "idx".
+/// Update line numbers in tab page "tp" for the buffer with index "idx".
 ///
 /// This attempts to update the changes as much as possible:
 /// When inserting/deleting lines outside of existing change blocks, create a
@@ -596,9 +597,7 @@ static void diff_check_unchanged(tabpage_T *tp, diff_T *dp)
       if (dir == BACKWARD) {
         off_org = dp->df_count[i_org] - 1;
       }
-      char *line_org = xstrdup(ml_get_buf(tp->tp_diffbuf[i_org],
-                                          dp->df_lnum[i_org] + off_org,
-                                          false));
+      char *line_org = xstrdup(ml_get_buf(tp->tp_diffbuf[i_org], dp->df_lnum[i_org] + off_org));
 
       int i_new;
       for (i_new = i_org + 1; i_new < DB_COUNT; i_new++) {
@@ -616,8 +615,7 @@ static void diff_check_unchanged(tabpage_T *tp, diff_T *dp)
         }
 
         if (diff_cmp(line_org, ml_get_buf(tp->tp_diffbuf[i_new],
-                                          dp->df_lnum[i_new] + off_new,
-                                          false)) != 0) {
+                                          dp->df_lnum[i_new] + off_new)) != 0) {
           break;
         }
       }
@@ -756,7 +754,7 @@ static int diff_write_buffer(buf_T *buf, mmfile_t *m, linenr_T start, linenr_T e
 
   // xdiff requires one big block of memory with all the text.
   for (linenr_T lnum = start; lnum <= end; lnum++) {
-    len += strlen(ml_get_buf(buf, lnum, false)) + 1;
+    len += strlen(ml_get_buf(buf, lnum)) + 1;
   }
   char *ptr = try_malloc(len);
   if (ptr == NULL) {
@@ -777,7 +775,7 @@ static int diff_write_buffer(buf_T *buf, mmfile_t *m, linenr_T start, linenr_T e
 
   len = 0;
   for (linenr_T lnum = start; lnum <= end; lnum++) {
-    char *s = ml_get_buf(buf, lnum, false);
+    char *s = ml_get_buf(buf, lnum);
     if (diff_flags & DIFF_ICASE) {
       while (*s != NUL) {
         char cbuf[MB_MAXBYTES + 1];
@@ -2244,11 +2242,9 @@ static bool diff_equal_entry(diff_T *dp, int idx1, int idx2)
   }
 
   for (int i = 0; i < dp->df_count[idx1]; i++) {
-    char *line = xstrdup(ml_get_buf(curtab->tp_diffbuf[idx1],
-                                    dp->df_lnum[idx1] + i, false));
+    char *line = xstrdup(ml_get_buf(curtab->tp_diffbuf[idx1], dp->df_lnum[idx1] + i));
 
-    int cmp = diff_cmp(line, ml_get_buf(curtab->tp_diffbuf[idx2],
-                                        dp->df_lnum[idx2] + i, false));
+    int cmp = diff_cmp(line, ml_get_buf(curtab->tp_diffbuf[idx2], dp->df_lnum[idx2] + i));
     xfree(line);
 
     if (cmp != 0) {
@@ -2449,7 +2445,7 @@ void diff_set_topline(win_T *fromwin, win_T *towin)
   }
 
   // When w_topline changes need to recompute w_botline and cursor position
-  invalidate_botline_win(towin);
+  invalidate_botline(towin);
   changed_line_abv_curs_win(towin);
 
   check_topfill(towin, false);
@@ -2617,7 +2613,7 @@ bool diff_find_change(win_T *wp, linenr_T lnum, int *startp, int *endp)
   FUNC_ATTR_WARN_UNUSED_RESULT FUNC_ATTR_NONNULL_ALL
 {
   // Make a copy of the line, the next ml_get() will invalidate it.
-  char *line_org = xstrdup(ml_get_buf(wp->w_buffer, lnum, false));
+  char *line_org = xstrdup(ml_get_buf(wp->w_buffer, lnum));
 
   int idx = diff_buf_idx(wp->w_buffer);
   if (idx == DB_COUNT) {
@@ -2661,7 +2657,7 @@ bool diff_find_change(win_T *wp, linenr_T lnum, int *startp, int *endp)
         continue;
       }
       added = false;
-      char *line_new = ml_get_buf(curtab->tp_diffbuf[i], dp->df_lnum[i] + off, false);
+      char *line_new = ml_get_buf(curtab->tp_diffbuf[i], dp->df_lnum[i] + off);
 
       // Search for start of difference
       si_org = si_new = 0;
@@ -3097,7 +3093,7 @@ static void diffgetput(const int addr_count, const int idx_cur, const int idx_fr
         if (nr > curtab->tp_diffbuf[idx_from]->b_ml.ml_line_count) {
           break;
         }
-        char *p = xstrdup(ml_get_buf(curtab->tp_diffbuf[idx_from], nr, false));
+        char *p = xstrdup(ml_get_buf(curtab->tp_diffbuf[idx_from], nr));
         ml_append(lnum + i - 1, p, 0, false);
         xfree(p);
         added++;
@@ -3149,7 +3145,7 @@ static void diffgetput(const int addr_count, const int idx_cur, const int idx_fr
         }
       }
       extmark_adjust(curbuf, lnum, lnum + count - 1, (long)MAXLNUM, added, kExtmarkUndo);
-      changed_lines(lnum, 0, lnum + count, added, true);
+      changed_lines(curbuf, lnum, 0, lnum + count, added, true);
 
       if (did_free) {
         // Diff is deleted, update folds in other windows.

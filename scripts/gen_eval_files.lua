@@ -1,5 +1,8 @@
 #!/usr/bin/env -S nvim -l
--- Generator for src/nvim/eval.lua
+-- Generator for various vimdoc and Lua type files
+
+local DEP_API_METADATA = 'build/api_metadata.mpack'
+local DEP_API_DOC  = 'runtime/doc/api.mpack'
 
 --- @class vim.api.metadata
 --- @field name string
@@ -168,11 +171,11 @@ end
 
 --- @return table<string, vim.EvalFn>
 local function get_api_meta()
-  local mpack_f = assert(io.open('build/api_metadata.mpack', 'rb'))
+  local mpack_f = assert(io.open(DEP_API_METADATA, 'rb'))
   local metadata = vim.mpack.decode(mpack_f:read('*all')) --[[@as vim.api.metadata[] ]]
   local ret = {} --- @type table<string, vim.EvalFn>
 
-  local doc_mpack_f = assert(io.open('runtime/doc/api.mpack', 'rb'))
+  local doc_mpack_f = assert(io.open(DEP_API_DOC, 'rb'))
   local doc_metadata = vim.mpack.decode(doc_mpack_f:read('*all')) --[[@as table<string,vim.gen_vim_doc_fun>]]
 
   for _, fun in ipairs(metadata) do
@@ -282,7 +285,7 @@ end
 
 --- @return table<string, vim.EvalFn>
 local function get_api_keysets_meta()
-  local mpack_f = assert(io.open('build/api_metadata.mpack', 'rb'))
+  local mpack_f = assert(io.open(DEP_API_METADATA, 'rb'))
 
   --- @diagnostic disable-next-line:no-unknown
   local metadata = assert(vim.mpack.decode(mpack_f:read('*all')))
@@ -434,6 +437,8 @@ local function render_eval_doc(f, fun, write)
     l = l:gsub('^      ', '')
     if vim.startswith(l, '<') and not l:match('^<[^ \t]+>') then
       write('<\t\t' .. l:sub(2))
+    elseif l:match('^>[a-z0-9]*$') then
+      write(l)
     else
       write('\t\t' .. l)
     end
@@ -542,6 +547,36 @@ local function scope_to_doc(s)
   return 'global or '..m[s[2]]..' |global-local|'
 end
 
+-- @param o vim.option_meta
+-- @return string
+local function scope_more_doc(o)
+  if
+    vim.list_contains({
+      'previewwindow',
+      'scroll',
+      'winfixheight',
+      'winfixwidth',
+    }, o.full_name)
+  then
+    return '  |special-local-window-option|'
+  end
+
+  if
+    vim.list_contains({
+      'bufhidden',
+      'buftype',
+      'filetype',
+      'modified',
+      'readonly',
+      'syntax',
+    }, o.full_name)
+  then
+    return '  |special-local-buffer-option|'
+  end
+
+  return ''
+end
+
 --- @return table<string,vim.option_meta>
 local function get_option_meta()
   local opts = require('src/nvim/options').options
@@ -624,7 +659,7 @@ local function render_option_doc(_f, opt, write)
     write(string.format('%s\t%s', name_str, otype))
   end
 
-  write('\t\t\t'..scope_to_doc(opt.scope))
+  write('\t\t\t'..scope_to_doc(opt.scope)..scope_more_doc(opt))
   for _, l in ipairs(split(opt.desc)) do
     if l == '<' or l:match('^<%s') then
       write(l)

@@ -398,6 +398,7 @@ local extension = {
   EXW = detect.euphoria,
   ex = detect.ex,
   exp = 'expect',
+  f = detect.f,
   factor = 'factor',
   fal = 'falcon',
   fan = 'fan',
@@ -410,8 +411,9 @@ local extension = {
   fish = 'fish',
   focexec = 'focexec',
   fex = 'focexec',
-  fth = 'forth',
   ft = 'forth',
+  fth = 'forth',
+  ['4th'] = 'forth',
   FOR = 'fortran',
   f77 = 'fortran',
   f03 = 'fortran',
@@ -427,7 +429,6 @@ local extension = {
   F77 = 'fortran',
   f95 = 'fortran',
   FPP = 'fortran',
-  f = 'fortran',
   F = 'fortran',
   F08 = 'fortran',
   f08 = 'fortran',
@@ -2060,7 +2061,8 @@ end
 --- pattern, if any) and should return a string that will be used as the
 --- buffer's filetype. Optionally, the function can return a second function
 --- value which, when called, modifies the state of the buffer. This can be used
---- to, for example, set filetype-specific buffer variables.
+--- to, for example, set filetype-specific buffer variables. This function will
+--- be called by Nvim before setting the buffer's filetype.
 ---
 --- Filename patterns can specify an optional priority to resolve cases when a
 --- file path matches multiple patterns. Higher priorities are matched first.
@@ -2375,11 +2377,16 @@ function M.match(args)
     -- If the function tries to use the filename that is nil then it will fail,
     -- but this enables checks which do not need a filename to still work.
     local ok
-    ok, ft = pcall(require('vim.filetype.detect').match_contents, contents, name, function(ext)
-      return dispatch(extension[ext], name, bufnr)
-    end)
-    if ok and ft then
-      return ft
+    ok, ft, on_detect = pcall(
+      require('vim.filetype.detect').match_contents,
+      contents,
+      name,
+      function(ext)
+        return dispatch(extension[ext], name, bufnr)
+      end
+    )
+    if ok then
+      return ft, on_detect
     end
   end
 end

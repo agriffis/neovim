@@ -378,10 +378,7 @@ int get_indent_lnum(linenr_T lnum)
 // "buf".
 int get_indent_buf(buf_T *buf, linenr_T lnum)
 {
-  return get_indent_str_vtab(ml_get_buf(buf, lnum, false),
-                             buf->b_p_ts,
-                             buf->b_p_vts_array,
-                             false);
+  return get_indent_str_vtab(ml_get_buf(buf, lnum), buf->b_p_ts, buf->b_p_vts_array, false);
 }
 
 /// Count the size (in window cells) of the indent in line "ptr", with
@@ -1086,7 +1083,7 @@ void ex_retab(exarg_T *eap)
     redraw_curbuf_later(UPD_NOT_VALID);
   }
   if (first_line != 0) {
-    changed_lines(first_line, 0, last_line + 1, 0L, true);
+    changed_lines(curbuf, first_line, 0, last_line + 1, 0L, true);
   }
 
   curwin->w_p_list = save_list;         // restore 'list'
@@ -1110,7 +1107,7 @@ void ex_retab(exarg_T *eap)
   }
   coladvance(curwin->w_curswant);
 
-  u_clearline();
+  u_clearline(curbuf);
 }
 
 /// Get indent level from 'indentexpr'.

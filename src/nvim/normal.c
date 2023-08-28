@@ -1411,7 +1411,6 @@ static int normal_check(VimState *state)
   }
   quit_more = false;
 
-  // it's not safe unless normal_check_safe_state() is called
   state_no_longer_safe(NULL);
 
   // If skip redraw is set (for ":" in wait_return()), don't redraw now.
@@ -1638,7 +1637,7 @@ size_t find_ident_at_pos(win_T *wp, linenr_T lnum, colnr_T startcol, char **text
 
   // if i == 0: try to find an identifier
   // if i == 1: try to find any non-white text
-  char *ptr = ml_get_buf(wp->w_buffer, lnum, false);
+  char *ptr = ml_get_buf(wp->w_buffer, lnum);
   for (i = (find_type & FIND_IDENT) ? 0 : 1; i < 2; i++) {
     // 1. skip to start of identifier/text
     col = startcol;
@@ -2472,7 +2471,7 @@ bool find_decl(char *ptr, size_t len, bool locally, bool thisblock, int flags_ar
 /// @return  true if able to move cursor, false otherwise.
 static bool nv_screengo(oparg_T *oap, int dir, long dist)
 {
-  int linelen = linetabsize_str(get_cursor_line_ptr());
+  int linelen = (int)linetabsize(curwin, curwin->w_cursor.lnum);
   bool retval = true;
   bool atend = false;
   int col_off1;                 // margin offset for first screen line
@@ -2536,7 +2535,7 @@ static bool nv_screengo(oparg_T *oap, int dir, long dist)
           }
           cursor_up_inner(curwin, 1);
 
-          linelen = linetabsize_str(get_cursor_line_ptr());
+          linelen = (int)linetabsize(curwin, curwin->w_cursor.lnum);
           if (linelen > width1) {
             int w = (((linelen - width1 - 1) / width2) + 1) * width2;
             assert(curwin->w_curswant <= INT_MAX - w);
@@ -2569,7 +2568,7 @@ static bool nv_screengo(oparg_T *oap, int dir, long dist)
           if (curwin->w_curswant >= width1) {
             curwin->w_curswant -= width2;
           }
-          linelen = linetabsize_str(get_cursor_line_ptr());
+          linelen = (int)linetabsize(curwin, curwin->w_cursor.lnum);
         }
       }
     }
@@ -3923,7 +3922,7 @@ static void nv_gotofile(cmdarg_T *cap)
                 buf_hide(curbuf) ? ECMD_HIDE : 0, curwin) == OK
         && cap->nchar == 'F' && lnum >= 0) {
       curwin->w_cursor.lnum = lnum;
-      check_cursor_lnum();
+      check_cursor_lnum(curwin);
       beginline(BL_SOL | BL_FIX);
     }
     xfree(ptr);
@@ -4772,7 +4771,7 @@ static void n_swapchar(cmdarg_T *cap)
           if (u_savesub(curwin->w_cursor.lnum) == false) {
             break;
           }
-          u_clearline();
+          u_clearline(curbuf);
         }
       } else {
         break;
@@ -4783,7 +4782,7 @@ static void n_swapchar(cmdarg_T *cap)
   check_cursor();
   curwin->w_set_curswant = true;
   if (did_change) {
-    changed_lines(startpos.lnum, startpos.col, curwin->w_cursor.lnum + 1,
+    changed_lines(curbuf, startpos.lnum, startpos.col, curwin->w_cursor.lnum + 1,
                   0L, true);
     curbuf->b_op_start = startpos;
     curbuf->b_op_end = curwin->w_cursor;
@@ -5364,7 +5363,7 @@ static void nv_gi_cmd(cmdarg_T *cap)
 {
   if (curbuf->b_last_insert.mark.lnum != 0) {
     curwin->w_cursor = curbuf->b_last_insert.mark;
-    check_cursor_lnum();
+    check_cursor_lnum(curwin);
     int i = (int)strlen(get_cursor_line_ptr());
     if (curwin->w_cursor.col > (colnr_T)i) {
       if (virtual_active()) {
@@ -5493,7 +5492,7 @@ static void nv_g_cmd(cmdarg_T *cap)
   case 'M':
     oap->motion_type = kMTCharWise;
     oap->inclusive = false;
-    i = linetabsize_str(get_cursor_line_ptr());
+    i = (int)linetabsize(curwin, curwin->w_cursor.lnum);
     if (cap->count0 > 0 && cap->count0 <= 100) {
       coladvance((colnr_T)(i * cap->count0 / 100));
     } else {
