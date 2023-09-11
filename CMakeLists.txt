@@ -224,7 +224,9 @@ add_glob_target(
   FLAGS -ll ${PROJECT_SOURCE_DIR}/test/lua_runner.lua ${CMAKE_BINARY_DIR}/usr luacheck -q
   GLOB_DIRS runtime/ scripts/ src/ test/
   GLOB_PAT *.lua
-  EXCLUDE runtime/lua/vim/_meta/.*
+  EXCLUDE
+    runtime/lua/vim/_meta/.*
+    runtime/lua/coxpcall.lua
   TOUCH_STRATEGY SINGLE)
 add_dependencies(lintlua-luacheck lua-dev-deps)
 
@@ -237,6 +239,7 @@ add_glob_target(
   EXCLUDE
     /runtime/lua/vim/re.lua
     /runtime/lua/vim/_meta/.*
+    /runtime/lua/coxpcall.lua
   TOUCH_STRATEGY SINGLE)
 
 add_custom_target(lintlua)
@@ -295,8 +298,6 @@ ExternalProject_Add(uncrustify
   CMAKE_CACHE_ARGS ${DEPS_CMAKE_CACHE_ARGS}
   EXCLUDE_FROM_ALL TRUE)
 
-include(BuildLuarocks)
-
 ExternalProject_Add(lua-dev-deps
   URL https://github.com/neovim/deps/raw/5a1f71cceb24990a0b15fd9a472a5f549f019248/opt/lua-dev-deps.tar.gz
   URL_HASH SHA256=27db2495f5eddc7fc191701ec9b291486853530c6125609d3197d03481e8d5a2
@@ -307,4 +308,3 @@ ExternalProject_Add(lua-dev-deps
   BUILD_COMMAND ""
   INSTALL_COMMAND ""
   EXCLUDE_FROM_ALL TRUE)
-add_dependencies(test_deps lua-dev-deps)
