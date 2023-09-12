@@ -4,8 +4,8 @@ LIBUV_SHA256 7aa66be3413ae10605e1f5c9ae934504ffe317ef68ea16fdaa83e23905c681bd
 MSGPACK_URL https://github.com/msgpack/msgpack-c/releases/download/c-6.0.0/msgpack-c-6.0.0.tar.gz
 MSGPACK_SHA256 3654f5e2c652dc52e0a993e270bb57d5702b262703f03771c152bba51602aeba
 
-LUAJIT_URL https://github.com/LuaJIT/LuaJIT/archive/5a18d4582ff3a22898e49a039c05ed7d5720999d.tar.gz
-LUAJIT_SHA256 76f0a93ee9674aedf8604b6e8246a8a70ebfa487d6592703c2efdf9162c0debc
+LUAJIT_URL https://github.com/LuaJIT/LuaJIT/archive/8af63f992058ebbac2d72ef92811cf22a90fa347.tar.gz
+LUAJIT_SHA256 dd97df7f2ef20721549cfd2ddb2c23b4b3f450358c525ea57a46f67ceb5ba813
 
 LUA_URL https://www.lua.org/ftp/lua-5.1.5.tar.gz
 LUA_SHA256 2640fc56a795f29d28ef15e13c34a47e223960b0240e8cb0a82d9b0738695333
@@ -60,5 +60,5 @@ TREESITTER_BASH_URL https://github.com/tree-sitter/tree-sitter-bash/archive/4936
 TREESITTER_BASH_SHA256 99ebe9f2886efecc1a5e9e1360d804a1b49ad89976a66bb5c3871539cca5fb7e
 TREESITTER_MARKDOWN_URL https://github.com/MDeiml/tree-sitter-markdown/archive/v0.1.6.tar.gz
 TREESITTER_MARKDOWN_SHA256 34cbeadfbe07454a5040163d04b3118ef0ac427a5cba39089de7384992729088
-TREESITTER_URL https://github.com/tree-sitter/tree-sitter/archive/a0d0b35c046681485fa19203cd121ce830968248.tar.gz
-TREESITTER_SHA256 02c0e9d0ba72978dafcd86e0eb0980e23fc378989b988d95861e0621da70ce65
+TREESITTER_URL https://github.com/tree-sitter/tree-sitter/archive/46af27796a76c72d8466627d499f2bca4af958ee.tar.gz
+TREESITTER_SHA256 2e35fa4c4d66c34d04fdb4a3a6c3abe01a05dff571ed9553b15aabf25d870f69
