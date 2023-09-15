@@ -136,8 +136,6 @@ typedef struct {
                              ///< or w_skipcol or concealing
   int skipped_cells;         ///< nr of skipped cells for virtual text
                              ///< to be added to wlv.vcol later
-  bool more_virt_inline_chunks;  ///< indicates if there is more inline virtual text
-                                 ///< after n_extra
 } winlinevars_T;
 
 /// for line_putchar. Contains the state that needs to be remembered from
@@ -284,6 +282,10 @@ static void draw_virt_text(win_T *wp, buf_T *buf, int col_off, int *end_col, int
       } else if (item->decor.virt_text_pos == kVTWinCol) {
         item->draw_col = MAX(item->decor.col + col_off, 0);
       }
+    } else if (item->draw_col == -2) {
+      item->draw_col = col_off;
+    } else if (item->draw_col == -3) {
+      item->draw_col = item->decor.virt_text_pos == kVTOverlay ? -2 : -1;
     }
     if (item->draw_col < 0) {
       continue;
@@ -868,10 +870,12 @@ static void apply_cursorline_highlight(win_T *wp, winlinevars_T *wlv)
   }
 }
 
-/// Checks if there is more inline virtual text that need to be drawn
-/// and sets has_more_virt_inline_chunks to reflect that.
+/// Checks if there is more inline virtual text that need to be drawn.
 static bool has_more_inline_virt(winlinevars_T *wlv, ptrdiff_t v)
 {
+  if (wlv->virt_inline_i < kv_size(wlv->virt_inline)) {
+    return true;
+  }
   DecorState *state = &decor_state;
   for (size_t i = 0; i < kv_size(state->active); i++) {
     DecorRange *item = &kv_A(state->active, i);
@@ -911,7 +915,6 @@ static void handle_inline_virtual_text(win_T *wp, winlinevars_T *wlv, ptrdiff_t 
           break;
         }
       }
-      wlv->more_virt_inline_chunks = has_more_inline_virt(wlv, v);
       if (!kv_size(wlv->virt_inline)) {
         // no more inline virtual text here
         break;
@@ -929,11 +932,6 @@ static void handle_inline_virtual_text(win_T *wp, winlinevars_T *wlv, ptrdiff_t 
       wlv->c_final = NUL;
       wlv->extra_attr = vtc.hl_id ? syn_id2attr(vtc.hl_id) : 0;
       wlv->n_attr = mb_charlen(vtc.text);
-
-      // Checks if there is more inline virtual text chunks that need to be drawn.
-      wlv->more_virt_inline_chunks = has_more_inline_virt(wlv, v)
-                                     || wlv->virt_inline_i < kv_size(wlv->virt_inline);
-
       // If the text didn't reach until the first window
       // column we need to skip cells.
       if (wlv->skip_cells > 0) {
@@ -2890,15 +2888,14 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool number_onl
         && wlv.filler_todo <= 0
         && (wp->w_p_rl ? wlv.col == 0 : wlv.col == grid->cols - 1)
         && !has_fold) {
-      if (*ptr == NUL && lcs_eol_one == 0 && has_decor) {
+      if (has_decor && *ptr == NUL && lcs_eol_one == 0) {
         // Tricky: there might be a virtual text just _after_ the last char
         decor_redraw_col(wp, (colnr_T)v, wlv.off, false, &decor_state);
-        handle_inline_virtual_text(wp, &wlv, v);
       }
       if (*ptr != NUL
           || lcs_eol_one > 0
           || (wlv.n_extra > 0 && (wlv.c_extra != NUL || *wlv.p_extra != NUL))
-          || wlv.more_virt_inline_chunks) {
+          || has_more_inline_virt(&wlv, v)) {
         c = wp->w_p_lcs_chars.ext;
         wlv.char_attr = win_hl_attr(wp, HLF_AT);
         mb_c = c;
@@ -3085,13 +3082,19 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool number_onl
       wlv.char_attr = saved_attr2;
     }
 
-    if ((wp->w_p_rl ? (wlv.col < 0) : (wlv.col >= grid->cols)) && has_decor) {
+    if (has_decor && wlv.filler_todo <= 0
+        && (wp->w_p_rl ? (wlv.col < 0) : (wlv.col >= grid->cols))) {
       // At the end of screen line: might need to peek for decorations just after
-      // this position. Without wrapping, we might need to display win_pos overlays
-      // from the entire text line.
-      colnr_T nextpos = wp->w_p_wrap ? (colnr_T)(ptr - line) : (colnr_T)strlen(line);
-      decor_redraw_col(wp, nextpos, wlv.off, true, &decor_state);
-      handle_inline_virtual_text(wp, &wlv, v);
+      // this position.
+      if (!has_fold && wp->w_p_wrap && wlv.n_extra == 0) {
+        // FIXME: virt_text_hide doesn't work for overlay virt_text at the next char
+        // as it's not easy to check if the next char is inside Visual selection.
+        decor_redraw_col(wp, (int)(ptr - line), -3, false, &decor_state);
+      } else if (has_fold || !wp->w_p_wrap) {
+        // Without wrapping, we might need to display right_align and win_col
+        // virt_text for the entire text line.
+        decor_redraw_col(wp, MAXCOL, -1, true, &decor_state);
+      }
     }
 
     // At end of screen line and there is more to come: Display the line
@@ -3104,7 +3107,7 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool number_onl
             || (wp->w_p_list && wp->w_p_lcs_chars.eol != NUL
                 && wlv.p_extra != at_end_str)
             || (wlv.n_extra != 0 && (wlv.c_extra != NUL || *wlv.p_extra != NUL))
-            || wlv.more_virt_inline_chunks)) {
+            || has_more_inline_virt(&wlv, v))) {
       bool wrap = wp->w_p_wrap       // Wrapping enabled.
                   && wlv.filler_todo <= 0          // Not drawing diff filler lines.
                   && lcs_eol_one != -1         // Haven't printed the lcs_eol character.
@@ -3117,7 +3120,7 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool number_onl
       if (virt_line_offset >= 0) {
         draw_virt_text_item(buf, virt_line_offset, kv_A(virt_lines, virt_line_index).line,
                             kHlModeReplace, grid->cols, 0);
-      } else {
+      } else if (wlv.filler_todo <= 0) {
         draw_virt_text(wp, buf, win_col_offset, &draw_col, grid->cols, wlv.row);
       }
 

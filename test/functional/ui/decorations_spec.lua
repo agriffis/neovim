@@ -692,6 +692,11 @@ describe('extmark decorations', function()
       [34] = {background = Screen.colors.Yellow};
       [35] = {background = Screen.colors.Yellow, bold = true, foreground = Screen.colors.Blue};
       [36] = {foreground = Screen.colors.Blue1, bold = true, background = Screen.colors.Red};
+      [37] = {background = Screen.colors.WebGray, foreground = Screen.colors.DarkBlue};
+      [38] = {background = Screen.colors.LightBlue};
+      [39] = {foreground = Screen.colors.Blue1, background = Screen.colors.LightCyan1, bold = true};
+      [40] = {reverse = true};
+      [41] = {bold = true, reverse = true};
     }
 
     ns = meths.create_namespace 'test'
@@ -856,6 +861,53 @@ describe('extmark decorations', function()
           end  -- ??????????                                                            |
       end  -- ?古古古古?古古                                                            |
                                                                                         |
+    ]]}
+  end)
+
+  it('overlay virtual text works with wrapped lines #25158', function()
+    screen:try_resize(50, 6)
+    insert(('ab'):rep(100))
+    for i = 0, 9 do
+      meths.buf_set_extmark(0, ns, 0, 42 + i, { virt_text={{tostring(i), 'ErrorMsg'}}, virt_text_pos='overlay'})
+      meths.buf_set_extmark(0, ns, 0, 91 + i, { virt_text={{tostring(i), 'ErrorMsg'}}, virt_text_pos='overlay', virt_text_hide = true})
+    end
+    screen:expect{grid=[[
+      ababababababababababababababababababababab{4:01234567}|
+      {4:89}abababababababababababababababababababa{4:012345678}|
+      {4:9}babababababababababababababababababababababababab|
+      ababababababababababababababababababababababababa^b|
+      {1:~                                                 }|
+                                                        |
+    ]]}
+
+    command('set number')
+    screen:expect{grid=[[
+      {2:  1 }ababababababababababababababababababababab{4:0123}|
+      {2:    }{4:456789}abababababababababababababababababababa{4:0}|
+      {2:    }{4:123456789}babababababababababababababababababab|
+      {2:    }ababababababababababababababababababababababab|
+      {2:    }abababababababa^b                              |
+                                                        |
+    ]]}
+
+    command('set cpoptions+=n')
+    screen:expect{grid=[[
+      {2:  1 }ababababababababababababababababababababab{4:0123}|
+      {4:456789}abababababababababababababababababababa{4:01234}|
+      {4:56789}babababababababababababababababababababababab|
+      ababababababababababababababababababababababababab|
+      aba^b                                              |
+                                                        |
+    ]]}
+
+    feed('0g$hi<Tab>')
+    screen:expect{grid=[[
+      {2:  1 }ababababababababababababababababababababab{4:01}  |
+        {4:^23456789}abababababababababababababababababababa{4:0}|
+      {4:123456789}babababababababababababababababababababab|
+      ababababababababababababababababababababababababab|
+      abababab                                          |
+      {24:-- INSERT --}                                      |
     ]]}
   end)
 
@@ -1028,12 +1080,12 @@ describe('extmark decorations', function()
   it('can have virtual text of right_align and fixed win_col position', function()
     insert(example_text)
     feed 'gg'
-    meths.buf_set_extmark(0, ns, 1, 0, { virt_text={{'Very', 'ErrorMsg'}},   virt_text_win_col=31, hl_mode='blend'})
+    meths.buf_set_extmark(0, ns, 1, 0, { virt_text={{'Very', 'ErrorMsg'}}, virt_text_win_col=31, hl_mode='blend'})
     meths.buf_set_extmark(0, ns, 1, 0, { virt_text={{'VERY', 'ErrorMsg'}}, virt_text_pos='right_align', hl_mode='blend'})
-    meths.buf_set_extmark(0, ns, 2, 10, { virt_text={{'Much', 'ErrorMsg'}},   virt_text_win_col=31, hl_mode='blend'})
+    meths.buf_set_extmark(0, ns, 2, 10, { virt_text={{'Much', 'ErrorMsg'}}, virt_text_win_col=31, hl_mode='blend'})
     meths.buf_set_extmark(0, ns, 2, 10, { virt_text={{'MUCH', 'ErrorMsg'}}, virt_text_pos='right_align', hl_mode='blend'})
-    meths.buf_set_extmark(0, ns, 3, 15, { virt_text={{'Error', 'ErrorMsg'}}, virt_text_win_col=31, hl_mode='blend'})
-    meths.buf_set_extmark(0, ns, 3, 15, { virt_text={{'ERROR', 'ErrorMsg'}}, virt_text_pos='right_align', hl_mode='blend'})
+    meths.buf_set_extmark(0, ns, 3, 14, { virt_text={{'Error', 'ErrorMsg'}}, virt_text_win_col=31, hl_mode='blend'})
+    meths.buf_set_extmark(0, ns, 3, 14, { virt_text={{'ERROR', 'ErrorMsg'}}, virt_text_pos='right_align', hl_mode='blend'})
     meths.buf_set_extmark(0, ns, 7, 21, { virt_text={{'-', 'NonText'}}, virt_text_win_col=4, hl_mode='blend'})
     meths.buf_set_extmark(0, ns, 7, 21, { virt_text={{'-', 'NonText'}}, virt_text_pos='right_align', hl_mode='blend'})
     -- empty virt_text should not change anything
@@ -1191,40 +1243,78 @@ describe('extmark decorations', function()
                                                         |
     ]]}
 
-    command 'set cpoptions-=n nonumber nowrap'
+    command 'set cpoptions-=n nowrap'
     screen:expect{grid=[[
-      for _,item in ipairs(items) do                    |
-          local text, hl_id_cell, cou{4:Very} unpack(ite{4:VERY}|
-          if                                            |
-      hl_id_cell ~= nil then         {4:Much}           {4:MUCH}|
-              --^ -- -- -- -- -- -- --{4:Error}- -- -- h{4:ERROR}|
-          end                                           |
-          for _ = 1, (count or 1) do                    |
-              local cell = line[colpos]                 |
-          {1:-}   cell.text = text                         {1:-}|
-              cell.hl_id = hl_id                        |
-              colpos = colpos+1                         |
-          end                                           |
-      end                                               |
+      {2:  1 }for _,item in ipairs(items) do                |
+      {2:  2 }    local text, hl_id_cell, cou{4:Very} unpack{4:VERY}|
+      {2:  3 }    if                                        |
+      {2:  4 }hl_id_cell ~= nil then         {4:Much}       {4:MUCH}|
+      {2:  5 }        --^ -- -- -- -- -- -- --{4:Error}- -- {4:ERROR}|
+      {2:  6 }    end                                       |
+      {2:  7 }    for _ = 1, (count or 1) do                |
+      {2:  8 }        local cell = line[colpos]             |
+      {2:  9 }    {1:-}   cell.text = text                     {1:-}|
+      {2: 10 }        cell.hl_id = hl_id                    |
+      {2: 11 }        colpos = colpos+1                     |
+      {2: 12 }    end                                       |
+      {2: 13 }end                                           |
       {1:~                                                 }|
                                                         |
     ]]}
 
-    feed '8zl'
+    feed '12zl'
     screen:expect{grid=[[
-      em in ipairs(items) do                            |
-      l text, hl_id_cell, count = unp{4:Very}item)      {4:VERY}|
+      {2:  1 }n ipairs(items) do                            |
+      {2:  2 }xt, hl_id_cell, count = unpack({4:Very})      {4:VERY}|
+      {2:  3 }                                              |
+      {2:  4 }= nil then                     {4:Much}       {4:MUCH}|
+      {2:  5 }^- -- -- -- -- -- -- -- -- -- --{4:Error}d = h{4:ERROR}|
+      {2:  6 }                                              |
+      {2:  7 }1, (count or 1) do                            |
+      {2:  8 }l cell = line[colpos]                         |
+      {2:  9 }.tex{1:-} = text                                 {1:-}|
+      {2: 10 }.hl_id = hl_id                                |
+      {2: 11 }os = colpos+1                                 |
+      {2: 12 }                                              |
+      {2: 13 }                                              |
+      {1:~                                                 }|
                                                         |
-      ll ~= nil then                 {4:Much}           {4:MUCH}|
-      --^ -- -- -- -- -- -- -- -- -- -{4:Error}hl_id = h{4:ERROR}|
-                                                        |
-      _ = 1, (count or 1) do                            |
-      local cell = line[colpos]                         |
-      cell{1:-}text = text                                 {1:-}|
-      cell.hl_id = hl_id                                |
-      colpos = colpos+1                                 |
-                                                        |
-                                                        |
+    ]]}
+
+    feed('fhi<Tab>')
+    screen:expect{grid=[[
+      {2:  1 }n ipairs(items) do                            |
+      {2:  2 }xt, hl_id_cell, count = unpack({4:Very})      {4:VERY}|
+      {2:  3 }                                              |
+      {2:  4 }= nil then                     {4:Much}       {4:MUCH}|
+      {2:  5 }- -- -- -- -- -- -- -- -- -- --{4:Error}^hl_id{4:ERROR}|
+      {2:  6 }                                              |
+      {2:  7 }1, (count or 1) do                            |
+      {2:  8 }l cell = line[colpos]                         |
+      {2:  9 }.tex{1:-} = text                                 {1:-}|
+      {2: 10 }.hl_id = hl_id                                |
+      {2: 11 }os = colpos+1                                 |
+      {2: 12 }                                              |
+      {2: 13 }                                              |
+      {1:~                                                 }|
+      {24:-- INSERT --}                                      |
+    ]]}
+
+    feed('<Esc>0')
+    screen:expect{grid=[[
+      {2:  1 }for _,item in ipairs(items) do                |
+      {2:  2 }    local text, hl_id_cell, cou{4:Very} unpack{4:VERY}|
+      {2:  3 }    if                                        |
+      {2:  4 }hl_id_cell ~= nil then         {4:Much}       {4:MUCH}|
+      {2:  5 }^        -- -- -- -- -- -- -- --{4:Error}- -- {4:ERROR}|
+      {2:  6 }    end                                       |
+      {2:  7 }    for _ = 1, (count or 1) do                |
+      {2:  8 }        local cell = line[colpos]             |
+      {2:  9 }    {1:-}   cell.text = text                     {1:-}|
+      {2: 10 }        cell.hl_id = hl_id                    |
+      {2: 11 }        colpos = colpos+1                     |
+      {2: 12 }    end                                       |
+      {2: 13 }end                                           |
       {1:~                                                 }|
                                                         |
     ]]}
@@ -1236,20 +1326,21 @@ describe('extmark decorations', function()
       22222
       33333]])
     command('1,2fold')
-    command('set nowrap')
     screen:try_resize(50, 3)
     feed('zb')
     -- XXX: the behavior of overlay virtual text at non-zero column is strange:
     -- 1. With 'wrap' it is never shown.
     -- 2. With 'nowrap' it is shown only if the extmark is hidden before leftcol.
     meths.buf_set_extmark(0, ns, 0, 0, { virt_text = {{'AA', 'Underlined'}}, hl_mode = 'combine', virt_text_pos = 'overlay' })
-    meths.buf_set_extmark(0, ns, 0, 1, { virt_text = {{'BB', 'Underlined'}}, hl_mode = 'combine', virt_text_win_col = 10 })
+    meths.buf_set_extmark(0, ns, 0, 5, { virt_text = {{'BB', 'Underlined'}}, hl_mode = 'combine', virt_text_win_col = 10 })
     meths.buf_set_extmark(0, ns, 0, 2, { virt_text = {{'CC', 'Underlined'}}, hl_mode = 'combine', virt_text_pos = 'right_align' })
     screen:expect{grid=[[
       {29:AA}{33:-  2 lin}{29:BB}{33:: 11111·····························}{29:CC}|
       3333^3                                             |
                                                         |
     ]]}
+    command('set nowrap')
+    screen:expect_unchanged()
     feed('zl')
     screen:expect{grid=[[
       {29:AA}{33:-  2 lin}{29:BB}{33:: 11111·····························}{29:CC}|
@@ -1268,6 +1359,38 @@ describe('extmark decorations', function()
       3^3                                                |
                                                         |
     ]]}
+  end)
+
+  it('virtual text works below diff filler lines', function()
+    screen:try_resize(53, 8)
+    insert([[
+      aaaaa
+      bbbbb
+      ccccc
+      ddddd
+      eeeee]])
+    command('rightbelow vnew')
+    insert([[
+      bbbbb
+      ccccc
+      ddddd
+      eeeee]])
+    command('windo diffthis')
+    meths.buf_set_extmark(0, ns, 0, 0, { virt_text = {{'AA', 'Underlined'}}, virt_text_pos = 'overlay' })
+    meths.buf_set_extmark(0, ns, 0, 0, { virt_text = {{'BB', 'Underlined'}}, virt_text_win_col = 10 })
+    meths.buf_set_extmark(0, ns, 0, 0, { virt_text = {{'CC', 'Underlined'}}, virt_text_pos = 'right_align' })
+    screen:expect{grid=[[
+      {37:  }{38:aaaaa                   }│{37:  }{39:------------------------}|
+      {37:  }bbbbb                   │{37:  }{28:AA}bbb     {28:BB}          {28:CC}|
+      {37:  }ccccc                   │{37:  }ccccc                   |
+      {37:  }ddddd                   │{37:  }ddddd                   |
+      {37:  }eeeee                   │{37:  }eeee^e                   |
+      {1:~                         }│{1:~                         }|
+      {40:[No Name] [+]              }{41:[No Name] [+]             }|
+                                                           |
+    ]]}
+    command('windo set wrap')
+    screen:expect_unchanged()
   end)
 
   it('can have virtual text which combines foreground and background groups', function()
