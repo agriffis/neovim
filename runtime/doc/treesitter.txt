@@ -853,13 +853,17 @@ add_predicate({name}, {handler}, {force})
                      meanings
       • {force}    (boolean|nil)
 
-edit()                                           *vim.treesitter.query.edit()*
+edit({lang})                                     *vim.treesitter.query.edit()*
     Open a window for live editing of a treesitter query.
 
     Can also be shown with `:EditQuery`.                          *:EditQuery*
 
     Note that the editor opens a scratch buffer, and so queries aren't
     persisted on disk.
+
+    Parameters: ~
+      • {lang}  (string|nil) language to open the query editor for. If
+                omitted, inferred from the current buffer's filetype.
 
 get({lang}, {query_name})                         *vim.treesitter.query.get()*
     Returns the runtime query {query_name} for {lang}.
@@ -976,8 +980,8 @@ Query:iter_captures({node}, {source}, {start}, {stop})
       • {stop}    (integer) Stopping line for the search (end-exclusive)
 
     Return: ~
-        (fun(): integer, TSNode, TSMetadata): capture id, capture node,
-        metadata
+        (fun(end_line: integer|nil): integer, TSNode, TSMetadata): capture id,
+        capture node, metadata
 
                                                         *Query:iter_matches()*
 Query:iter_matches({node}, {source}, {start}, {stop}, {opts})

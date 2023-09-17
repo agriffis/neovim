@@ -734,7 +734,8 @@ local has_parser = function(lang)
     or #vim.api.nvim_get_runtime_file('parser/' .. lang .. '.*', false) > 0
 end
 
---- Return parser name for language (if exists) or filetype (if registered and exists)
+--- Return parser name for language (if exists) or filetype (if registered and exists).
+--- Also attempts with the input lower-cased.
 ---
 ---@param alias string language or filetype name
 ---@return string? # resolved parser name
@@ -743,7 +744,16 @@ local function resolve_lang(alias)
     return alias
   end
 
+  if has_parser(alias:lower()) then
+    return alias:lower()
+  end
+
   local lang = vim.treesitter.language.get_lang(alias)
+  if lang and has_parser(lang) then
+    return lang
+  end
+
+  lang = vim.treesitter.language.get_lang(alias:lower())
   if lang and has_parser(lang) then
     return lang
   end
@@ -758,9 +768,10 @@ end
 function LanguageTree:_get_injection(match, metadata)
   local ranges = {} ---@type Range6[]
   local combined = metadata['injection.combined'] ~= nil
+  local injection_lang = metadata['injection.language'] --[[@as string?]]
   local lang = metadata['injection.self'] ~= nil and self:lang()
     or metadata['injection.parent'] ~= nil and self._parent_lang
-    or metadata['injection.language'] --[[@as string?]]
+    or (injection_lang and resolve_lang(injection_lang))
   local include_children = metadata['injection.include-children'] ~= nil
 
   for id, node in pairs(match) do
@@ -768,13 +779,26 @@ function LanguageTree:_get_injection(match, metadata)
     -- Lang should override any other language tag
     if name == 'injection.language' then
       local text = vim.treesitter.get_node_text(node, self._source, { metadata = metadata[id] })
-      lang = resolve_lang(text) or resolve_lang(text:lower())
+      lang = resolve_lang(text)
     elseif name == 'injection.content' then
       ranges = get_node_ranges(node, self._source, metadata[id], include_children)
     end
   end
 
   return lang, combined, ranges
+end
+
+--- Can't use vim.tbl_flatten since a range is just a table.
+---@param regions Range6[][]
+---@return Range6[]
+local function combine_regions(regions)
+  local result = {} ---@type Range6[]
+  for _, region in ipairs(regions) do
+    for _, range in ipairs(region) do
+      result[#result + 1] = range
+    end
+  end
+  return result
 end
 
 --- Gets language injection points by language.
@@ -822,11 +846,7 @@ function LanguageTree:_get_injections()
 
       for _, entry in pairs(patterns) do
         if entry.combined then
-          ---@diagnostic disable-next-line:no-unknown
-          local regions = vim.tbl_map(function(e)
-            return vim.tbl_flatten(e)
-          end, entry.regions)
-          table.insert(result[lang], regions)
+          table.insert(result[lang], combine_regions(entry.regions))
         else
           for _, ranges in pairs(entry.regions) do
             table.insert(result[lang], ranges)
