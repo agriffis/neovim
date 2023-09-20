@@ -80,6 +80,9 @@ function vim.api.nvim__id_float(flt) end
 function vim.api.nvim__inspect_cell(grid, row, col) end
 
 --- @private
+function vim.api.nvim__invalidate_glyph_cache() end
+
+--- @private
 --- @return any[]
 function vim.api.nvim__runtime_inspect() end
 
@@ -1608,6 +1611,8 @@ function vim.api.nvim_open_term(buffer, opts) end
 ---               • noautocmd: If true then no buffer-related autocommand
 ---                 events such as `BufEnter`, `BufLeave` or `BufWinEnter` may
 ---                 fire from calling this function.
+---               • fixed: If true when anchor is NW or SW, the float window
+---                 would be kept fixed even if the window would be truncated.
 --- @return integer
 function vim.api.nvim_open_win(buffer, enter, config) end
 

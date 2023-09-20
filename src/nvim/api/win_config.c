@@ -16,7 +16,7 @@
 #include "nvim/drawscreen.h"
 #include "nvim/extmark_defs.h"
 #include "nvim/globals.h"
-#include "nvim/grid_defs.h"
+#include "nvim/grid.h"
 #include "nvim/highlight_group.h"
 #include "nvim/macros.h"
 #include "nvim/mbyte.h"
@@ -163,6 +163,8 @@
 ///   - noautocmd: If true then no buffer-related autocommand events such as
 ///                  |BufEnter|, |BufLeave| or |BufWinEnter| may fire from
 ///                  calling this function.
+///   - fixed: If true when anchor is NW or SW, the float window
+///            would be kept fixed even if the window would be truncated.
 ///
 /// @param[out] err Error details, if any
 ///
@@ -195,6 +197,9 @@ Window nvim_open_win(Buffer buffer, Boolean enter, Dict(float_config) *config, E
   if (win_valid(wp) && buffer > 0) {
     Boolean noautocmd = !enter || fconfig.noautocmd;
     win_set_buf(wp, buf, noautocmd, err);
+    if (!fconfig.noautocmd) {
+      apply_autocmds(EVENT_WINNEW, NULL, NULL, false, buf);
+    }
   }
   if (!win_valid(wp)) {
     api_set_error(err, kErrorTypeException, "Window was closed immediately");
@@ -348,7 +353,7 @@ Dictionary nvim_win_get_config(Window window, Error *err)
       for (size_t i = 0; i < 8; i++) {
         Array tuple = ARRAY_DICT_INIT;
 
-        String s = cstrn_to_string(config->border_chars[i], sizeof(schar_T));
+        String s = cstrn_to_string(config->border_chars[i], MAX_SCHAR_SIZE);
 
         int hi_id = config->border_hl_ids[i];
         char *hi_name = syn_id2name(hi_id);
@@ -520,7 +525,7 @@ static void parse_border_style(Object style,  FloatConfig *fconfig, Error *err)
 {
   struct {
     const char *name;
-    schar_T chars[8];
+    char chars[8][MAX_SCHAR_SIZE];
     bool shadow_color;
   } defaults[] = {
     { "double", { "╔", "═", "╗", "║", "╝", "═", "╚", "║" }, false },
@@ -531,7 +536,7 @@ static void parse_border_style(Object style,  FloatConfig *fconfig, Error *err)
     { NULL, { { NUL } }, false },
   };
 
-  schar_T *chars = fconfig->border_chars;
+  char (*chars)[MAX_SCHAR_SIZE] = fconfig->border_chars;
   int *hl_ids = fconfig->border_hl_ids;
 
   fconfig->border = true;
@@ -843,6 +848,10 @@ static bool parse_float_config(Dict(float_config) *config, FloatConfig *fconfig,
       return false;
     }
     fconfig->noautocmd = config->noautocmd;
+  }
+
+  if (HAS_KEY_X(config, fixed)) {
+    fconfig->fixed = config->fixed;
   }
 
   return true;

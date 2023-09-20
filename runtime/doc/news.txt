@@ -232,6 +232,11 @@ The following changes to existing APIs or features add new behavior.
   In addition, |nvim_buf_get_extmarks()| has gained an "overlap" option to
   return such ranges even if they started before the specified position.
 
+• LSP hover and signature help now use Treesitter for highlighting of Markdown
+  content.
+  Note that syntax highlighting of code examples requires a matching parser
+  and may be affected by custom queries.
+
 ==============================================================================
 REMOVED FEATURES                                                 *news-removed*
 
@@ -267,6 +272,7 @@ release.
   - |vim.lsp.util.get_progress_messages()|	Use |vim.lsp.status()| instead.
   - |vim.lsp.get_active_clients()|		Use |vim.lsp.get_clients()| instead.
   - |vim.lsp.for_each_buffer_client()|		Use |vim.lsp.get_clients()| instead.
+  - |vim.lsp.util.trim_empty_lines()|		Use |vim.split()| with `trimempty` instead.
 
 • `vim.loop` has been renamed to `vim.uv`.
 

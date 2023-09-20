@@ -103,6 +103,29 @@ describe('float window', function()
     assert_alive()
   end)
 
+  it('open with WinNew autocmd', function()
+    local res = exec_lua([[
+      local triggerd = false
+      local buf = vim.api.nvim_create_buf(true, true)
+      vim.api.nvim_create_autocmd('WinNew', {
+        callback = function(opt)
+          if opt.buf == buf then
+            triggerd = true
+          end
+        end
+      })
+      local opts = {
+        relative = "win",
+        row = 0, col = 0,
+        width = 1, height = 1,
+        noautocmd = false,
+      }
+      vim.api.nvim_open_win(buf, true, opts)
+      return triggerd
+    ]])
+    eq(true, res)
+  end)
+
   it('opened with correct height', function()
     local height = exec_lua([[
       vim.go.winheight = 20
@@ -934,6 +957,71 @@ describe('float window', function()
           {0:~                                       }|
           {0:~                                       }|
           {0:~                                       }|
+                                                  |
+        ]])
+      end
+    end)
+
+    it('window position fixed', function()
+      command('rightbelow 20vsplit')
+      local buf = meths.create_buf(false,false)
+      local win = meths.open_win(buf, false, {
+        relative='win', width=15, height=2, row=2, col=10, anchor='NW', fixed=true})
+
+      if multigrid then
+        screen:expect{grid=[[
+        ## grid 1
+          [2:-------------------]{5:│}[4:--------------------]|
+          [2:-------------------]{5:│}[4:--------------------]|
+          [2:-------------------]{5:│}[4:--------------------]|
+          [2:-------------------]{5:│}[4:--------------------]|
+          [2:-------------------]{5:│}[4:--------------------]|
+          {5:[No Name]           }{4:[No Name]           }|
+          [3:----------------------------------------]|
+        ## grid 2
+                             |
+          {0:~                  }|
+          {0:~                  }|
+          {0:~                  }|
+          {0:~                  }|
+        ## grid 3
+                                                  |
+        ## grid 4
+          ^                    |
+          {0:~                   }|
+          {0:~                   }|
+          {0:~                   }|
+          {0:~                   }|
+        ## grid 5
+          {1:               }|
+          {2:~              }|
+        ]], float_pos={
+          [5] = {{id = 1002}, "NW", 4, 2, 10, true, 50};
+        }}
+      else
+        screen:expect([[
+                             {5:│}^                    |
+          {0:~                  }{5:│}{0:~                   }|
+          {0:~                  }{5:│}{0:~         }{1:          }|
+          {0:~                  }{5:│}{0:~         }{2:~         }|
+          {0:~                  }{5:│}{0:~                   }|
+          {5:[No Name]           }{4:[No Name]           }|
+                                                  |
+        ]])
+      end
+
+      meths.win_set_config(win, {fixed=false})
+
+      if multigrid then
+        screen:expect_unchanged()
+      else
+        screen:expect([[
+                             {5:│}^                    |
+          {0:~                  }{5:│}{0:~                   }|
+          {0:~                  }{5:│}{0:~    }{1:               }|
+          {0:~                  }{5:│}{0:~    }{2:~              }|
+          {0:~                  }{5:│}{0:~                   }|
+          {5:[No Name]           }{4:[No Name]           }|
                                                   |
         ]])
       end
