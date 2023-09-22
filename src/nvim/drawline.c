@@ -332,23 +332,17 @@ static int draw_virt_text_item(buf_T *buf, int col, VirtText vt, HlMode hl_mode,
   size_t virt_pos = 0;
 
   while (rl ? col > max_col : col < max_col) {
-    if (!*s.p) {
+    if (*s.p == NUL) {
       if (virt_pos >= kv_size(vt)) {
         break;
       }
       virt_attr = 0;
-      do {
-        s.p = kv_A(vt, virt_pos).text;
-        int hl_id = kv_A(vt, virt_pos).hl_id;
-        virt_attr = hl_combine_attr(virt_attr,
-                                    hl_id > 0 ? syn_id2attr(hl_id) : 0);
-        virt_pos++;
-      } while (!s.p && virt_pos < kv_size(vt));
-      if (!s.p) {
+      s.p = next_virt_text_chunk(vt, &virt_pos, &virt_attr);
+      if (s.p == NULL) {
         break;
       }
     }
-    if (!*s.p) {
+    if (*s.p == NUL) {
       continue;
     }
     int attr;
@@ -950,17 +944,20 @@ static void handle_inline_virtual_text(win_T *wp, winlinevars_T *wlv, ptrdiff_t 
       }
     } else {
       // already inside existing inline virtual text with multiple chunks
-      VirtTextChunk vtc = kv_A(wlv->virt_inline, wlv->virt_inline_i);
-      wlv->virt_inline_i++;
-      wlv->p_extra = vtc.text;
-      wlv->n_extra = (int)strlen(vtc.text);
+      int attr = 0;
+      char *text = next_virt_text_chunk(wlv->virt_inline, &wlv->virt_inline_i, &attr);
+      if (text == NULL) {
+        continue;
+      }
+      wlv->p_extra = text;
+      wlv->n_extra = (int)strlen(text);
       if (wlv->n_extra == 0) {
         continue;
       }
       wlv->c_extra = NUL;
       wlv->c_final = NUL;
-      wlv->extra_attr = vtc.hl_id ? syn_id2attr(vtc.hl_id) : 0;
-      wlv->n_attr = mb_charlen(vtc.text);
+      wlv->extra_attr = attr;
+      wlv->n_attr = mb_charlen(text);
       // If the text didn't reach until the first window
       // column we need to skip cells.
       if (wlv->skip_cells > 0) {
@@ -3024,14 +3021,17 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool number_onl
         linebuf_attr[wlv.off] = wlv.char_attr;
       }
 
-      linebuf_vcol[wlv.off] = wlv.vcol;
-
-      if (wlv.draw_state == WL_FOLD) {
-        linebuf_vcol[wlv.off] = -2;
+      if (wlv.draw_state > WL_STC && wlv.filler_todo <= 0) {
+        linebuf_vcol[wlv.off] = wlv.vcol;
+      } else if (wlv.draw_state == WL_FOLD) {
         if (wlv.n_closing > 0) {
           linebuf_vcol[wlv.off] = -3;
           wlv.n_closing--;
+        } else {
+          linebuf_vcol[wlv.off] = -2;
         }
+      } else {
+        linebuf_vcol[wlv.off] = -1;
       }
 
       if (utf_char2cells(mb_c) > 1) {
@@ -3041,16 +3041,18 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool number_onl
         // UTF-8: Put a 0 in the second screen char.
         linebuf_char[wlv.off] = 0;
         linebuf_attr[wlv.off] = linebuf_attr[wlv.off - 1];
+
         if (wlv.draw_state > WL_STC && wlv.filler_todo <= 0) {
-          wlv.vcol++;
+          linebuf_vcol[wlv.off] = ++wlv.vcol;
+        } else {
+          linebuf_vcol[wlv.off] = -1;
         }
+
         // When "wlv.tocol" is halfway through a character, set it to the end
         // of the character, otherwise highlighting won't stop.
         if (wlv.tocol == wlv.vcol) {
           wlv.tocol++;
         }
-
-        linebuf_vcol[wlv.off] = wlv.vcol;
 
         if (wp->w_p_rl) {
           // now it's time to backup one cell
