@@ -45,7 +45,7 @@ Defaults					            *nvim-defaults*
 - 'directory' defaults to ~/.local/state/nvim/swap// (|xdg|), auto-created
 - 'display' defaults to "lastline"
 - 'encoding' is UTF-8 (cf. 'fileencoding' for file-content encoding)
-- 'fillchars' defaults (in effect) to "vert:│,fold:·,sep:│"
+- 'fillchars' defaults (in effect) to "vert:│,fold:·,foldsep:│"
 - 'formatoptions' defaults to "tcqj"
 - 'fsync' is disabled
 - 'hidden' is enabled
@@ -534,6 +534,10 @@ Vimscript compatibility:
   `shell_error` does not alias to |v:shell_error|
   `this_session` does not alias to |v:this_session|
 
+UI/Display:
+  'statusline' always uses the "stl" and "stlnc" fields of 'fillchars', even
+  if they are the same and |hl-StatusLine| and |hl-StatusLineNC| are equal.
+
 Working directory (Vim implemented some of these after Nvim):
 - |DirChanged| and |DirChangedPre| can be triggered when switching to another
   window or tab.
@@ -727,6 +731,7 @@ Options:
     Everything is allowed in 'exrc' files since they must be explicitly marked
     trusted.
   *'shelltype'*
+  'shortmess' *shm-f* flag (always on, never show "file" in "(3 of 5)")
   *'shortname'* *'sn'* *'noshortname'* *'nosn'*
   *'swapsync'* *'sws'*
   *'termencoding'* *'tenc'* (Vim 7.4.852 also removed this for Windows)
