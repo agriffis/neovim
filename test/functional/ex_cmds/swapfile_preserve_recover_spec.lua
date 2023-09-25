@@ -17,10 +17,14 @@ local pesc = helpers.pesc
 local os_kill = helpers.os_kill
 local set_session = helpers.set_session
 local spawn = helpers.spawn
-local nvim_async = helpers.nvim_async
+local async_meths = helpers.async_meths
 local expect_msg_seq = helpers.expect_msg_seq
 local pcall_err = helpers.pcall_err
 local mkdir = helpers.mkdir
+local poke_eventloop = helpers.poke_eventloop
+local meths = helpers.meths
+local retry = helpers.retry
+local write_file = helpers.write_file
 
 describe(':recover', function()
   before_each(clear)
@@ -49,10 +53,10 @@ describe("preserve and (R)ecover with custom 'directory'", function()
     set swapfile fileformat=unix undolevels=-1
   ]]
 
-  local nvim1
+  local nvim0
   before_each(function()
-    nvim1 = spawn(new_argv())
-    set_session(nvim1)
+    nvim0 = spawn(new_argv())
+    set_session(nvim0)
     rmdir(swapdir)
     mkdir(swapdir)
   end)
@@ -71,8 +75,7 @@ describe("preserve and (R)ecover with custom 'directory'", function()
 
   local function test_recover(swappath1)
     -- Start another Nvim instance.
-    local nvim2 = spawn({nvim_prog, '-u', 'NONE', '-i', 'NONE', '--embed'},
-                                true)
+    local nvim2 = spawn({nvim_prog, '-u', 'NONE', '-i', 'NONE', '--embed'}, true)
     set_session(nvim2)
 
     exec(init)
@@ -103,23 +106,23 @@ describe("preserve and (R)ecover with custom 'directory'", function()
 
   it('closing stdio channel without :preserve #22096', function()
     local swappath1 = setup_swapname()
-    nvim1:close()
+    nvim0:close()
     test_recover(swappath1)
   end)
 
   it('killing TUI process without :preserve #22096', function()
     helpers.skip(helpers.is_os('win'))
-    local screen = Screen.new()
-    screen:attach()
+    local screen0 = Screen.new()
+    screen0:attach()
     local child_server = new_pipename()
     funcs.termopen({nvim_prog, '-u', 'NONE', '-i', 'NONE', '--listen', child_server})
-    screen:expect({any = pesc('[No Name]')})  -- Wait for the child process to start.
+    screen0:expect({any = pesc('[No Name]')})  -- Wait for the child process to start.
     local child_session = helpers.connect(child_server)
     set_session(child_session)
     local swappath1 = setup_swapname()
-    set_session(nvim1)
+    set_session(nvim0)
     command('call chanclose(&channel)')  -- Kill the child process.
-    screen:expect({any = pesc('[Process exited 1]')})  -- Wait for the child process to stop.
+    screen0:expect({any = pesc('[Process exited 1]')})  -- Wait for the child process to stop.
     test_recover(swappath1)
   end)
 
@@ -200,7 +203,7 @@ describe('swapfile detection', function()
     screen2:expect(expected_no_dialog)
 
     -- With API call and shortmess+=F
-    nvim_async('command', 'edit %')
+    async_meths.command('edit %')
     screen2:expect{any=[[Found a swap file by the name ".*]]
                        ..[[Xtest_swapdialog_dir[/\].*]]..testfile..[[%.swp"]]}
     feed('e')  -- Chose "Edit" at the swap dialog.
@@ -371,5 +374,93 @@ describe('swapfile detection', function()
     }, '.*')})
 
     feed('e')
+  end)
+end)
+
+describe('quitting swapfile dialog on startup stops TUI properly', function()
+  local swapdir = luv.cwd()..'/Xtest_swapquit_dir'
+  local testfile = 'Xtest_swapquit_file1'
+  local otherfile = 'Xtest_swapquit_file2'
+  -- Put swapdir at the start of the 'directory' list. #1836
+  -- Note: `set swapfile` *must* go after `set directory`: otherwise it may
+  -- attempt to create a swapfile in different directory.
+  local init_dir = [[set directory^=]]..swapdir:gsub([[\]], [[\\]])..[[//]]
+  local init_set = [[set swapfile fileformat=unix nomodified undolevels=-1 nohidden]]
+
+  before_each(function()
+    clear({args = {'--cmd', init_dir, '--cmd', init_set}})
+    rmdir(swapdir)
+    mkdir(swapdir)
+    write_file(testfile, [[
+      first
+      second
+      third
+
+    ]])
+    command('edit! '..testfile)
+    feed('Gisometext<esc>')
+    poke_eventloop()
+    clear()  -- Leaves a swap file behind
+    meths.ui_attach(80, 30, {})
+  end)
+  after_each(function()
+    rmdir(swapdir)
+    os.remove(testfile)
+    os.remove(otherfile)
+  end)
+
+  it('(Q)uit at first file argument', function()
+    local chan = funcs.termopen({nvim_prog, '-u', 'NONE', '-i', 'NONE',
+                                 '--cmd', init_dir, '--cmd', init_set,
+                                 testfile})
+    retry(nil, nil, function()
+      eq('[O]pen Read-Only, (E)dit anyway, (R)ecover, (D)elete it, (Q)uit, (A)bort:',
+         eval("getline('$')->trim(' ', 2)"))
+    end)
+    meths.chan_send(chan, 'q')
+    retry(nil, nil, function()
+      eq({'', '[Process exited 1]', ''},
+         eval("[1, 2, '$']->map({_, lnum -> getline(lnum)->trim(' ', 2)})"))
+    end)
+  end)
+
+  it('(A)bort at second file argument with -p', function()
+    local chan = funcs.termopen({nvim_prog, '-u', 'NONE', '-i', 'NONE',
+                                 '--cmd', init_dir, '--cmd', init_set,
+                                 '-p', otherfile, testfile})
+    retry(nil, nil, function()
+      eq('[O]pen Read-Only, (E)dit anyway, (R)ecover, (D)elete it, (Q)uit, (A)bort:',
+         eval("getline('$')->trim(' ', 2)"))
+    end)
+    meths.chan_send(chan, 'a')
+    retry(nil, nil, function()
+      eq({'', '[Process exited 1]', ''},
+         eval("[1, 2, '$']->map({_, lnum -> getline(lnum)->trim(' ', 2)})"))
+    end)
+  end)
+
+  it('(Q)uit at file opened by -t', function()
+    write_file(otherfile, ([[
+      !_TAG_FILE_ENCODING	utf-8	//
+      first	%s	/^  \zsfirst$/
+      second	%s	/^  \zssecond$/
+      third	%s	/^  \zsthird$/]]):format(testfile, testfile, testfile))
+    local chan = funcs.termopen({nvim_prog, '-u', 'NONE', '-i', 'NONE',
+                                 '--cmd', init_dir, '--cmd', init_set,
+                                 '--cmd', 'set tags='..otherfile, '-tsecond'})
+    retry(nil, nil, function()
+      eq('[O]pen Read-Only, (E)dit anyway, (R)ecover, (D)elete it, (Q)uit, (A)bort:',
+         eval("getline('$')->trim(' ', 2)"))
+    end)
+    meths.chan_send(chan, 'q')
+    retry(nil, nil, function()
+      eq('Press ENTER or type command to continue',
+         eval("getline('$')->trim(' ', 2)"))
+    end)
+    meths.chan_send(chan, '\r')
+    retry(nil, nil, function()
+      eq({'', '[Process exited 1]', ''},
+         eval("[1, 2, '$']->map({_, lnum -> getline(lnum)->trim(' ', 2)})"))
+    end)
   end)
 end)

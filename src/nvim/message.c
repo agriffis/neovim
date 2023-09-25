@@ -640,7 +640,7 @@ int emsg_not_now(void)
   return false;
 }
 
-static bool emsg_multiline(const char *s, bool multiline)
+bool emsg_multiline(const char *s, bool multiline)
 {
   int attr;
   bool ignore = false;
@@ -663,7 +663,7 @@ static bool emsg_multiline(const char *s, bool multiline)
     // be found, the message will be displayed later on.)  "ignore" is set
     // when the message should be ignored completely (used for the
     // interrupt message).
-    if (cause_errthrow(s, severe, &ignore)) {
+    if (cause_errthrow(s, multiline, severe, &ignore)) {
       if (!ignore) {
         did_emsg++;
       }
@@ -1907,10 +1907,13 @@ void msg_prt_line(const char *s, int list)
       continue;
     } else {
       attr = 0;
-      c = (unsigned char)(*s++);
-      in_multispace = c == ' ' && ((col > 0 && s[-2] == ' ') || *s == ' ');
-      if (!in_multispace) {
-        multispace_pos = 0;
+      c = (uint8_t)(*s++);
+      if (list) {
+        in_multispace = c == ' ' && (*s == ' '
+                                     || (col > 0 && s[-2] == ' '));
+        if (!in_multispace) {
+          multispace_pos = 0;
+        }
       }
       if (c == TAB && (!list || curwin->w_p_lcs_chars.tab1)) {
         // tab amount depends on current column
@@ -1950,7 +1953,7 @@ void msg_prt_line(const char *s, int list)
         // the same in plain text.
         attr = HL_ATTR(HLF_0);
       } else if (c == ' ') {
-        if (list && lead != NULL && s <= lead && in_multispace
+        if (lead != NULL && s <= lead && in_multispace
             && curwin->w_p_lcs_chars.leadmultispace != NULL) {
           c = curwin->w_p_lcs_chars.leadmultispace[multispace_pos++];
           if (curwin->w_p_lcs_chars.leadmultispace[multispace_pos] == NUL) {
@@ -1963,7 +1966,7 @@ void msg_prt_line(const char *s, int list)
         } else if (trail != NULL && s > trail) {
           c = curwin->w_p_lcs_chars.trail;
           attr = HL_ATTR(HLF_0);
-        } else if (list && in_multispace
+        } else if (in_multispace
                    && curwin->w_p_lcs_chars.multispace != NULL) {
           c = curwin->w_p_lcs_chars.multispace[multispace_pos++];
           if (curwin->w_p_lcs_chars.multispace[multispace_pos] == NUL) {
