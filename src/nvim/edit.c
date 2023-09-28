@@ -878,6 +878,10 @@ static int insert_handle_key(InsertState *s)
 
   case K_EVENT:       // some event
     state_handle_k_event();
+    // If CTRL-G U was used apply it to the next typed key.
+    if (dont_sync_undo == kTrue) {
+      dont_sync_undo = kNone;
+    }
     goto check_pum;
 
   case K_COMMAND:     // <Cmd>command<CR>
@@ -1306,9 +1310,9 @@ void ins_redraw(bool ready)
     last_cursormoved = curwin->w_cursor;
   }
 
-  // Trigger TextChangedI if changedtick differs.
+  // Trigger TextChangedI if changedtick_i differs.
   if (ready && has_event(EVENT_TEXTCHANGEDI)
-      && curbuf->b_last_changedtick != buf_get_changedtick(curbuf)
+      && curbuf->b_last_changedtick_i != buf_get_changedtick(curbuf)
       && !pum_visible()) {
     aco_save_T aco;
     varnumber_T tick = buf_get_changedtick(curbuf);
@@ -1317,16 +1321,16 @@ void ins_redraw(bool ready)
     aucmd_prepbuf(&aco, curbuf);
     apply_autocmds(EVENT_TEXTCHANGEDI, NULL, NULL, false, curbuf);
     aucmd_restbuf(&aco);
-    curbuf->b_last_changedtick = buf_get_changedtick(curbuf);
+    curbuf->b_last_changedtick_i = buf_get_changedtick(curbuf);
     if (tick != buf_get_changedtick(curbuf)) {  // see ins_apply_autocmds()
       u_save(curwin->w_cursor.lnum,
              (linenr_T)(curwin->w_cursor.lnum + 1));
     }
   }
 
-  // Trigger TextChangedP if changedtick differs. When the popupmenu closes
-  // TextChangedI will need to trigger for backwards compatibility, thus use
-  // different b_last_changedtick* variables.
+  // Trigger TextChangedP if changedtick_pum differs. When the popupmenu
+  // closes TextChangedI will need to trigger for backwards compatibility,
+  // thus use different b_last_changedtick* variables.
   if (ready && has_event(EVENT_TEXTCHANGEDP)
       && curbuf->b_last_changedtick_pum != buf_get_changedtick(curbuf)
       && pum_visible()) {
@@ -3488,7 +3492,7 @@ static bool ins_esc(long *count, int cmdchar, bool nomove)
     showmode();
   } else if (p_smd && (got_int || !skip_showmode())
              && !(p_ch == 0 && !ui_has(kUIMessages))) {
-    msg("");
+    msg("", 0);
   }
   // Exit Insert mode
   return true;

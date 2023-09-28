@@ -118,7 +118,7 @@ void filemess(buf_T *buf, char *name, char *s, int attr)
   msg_scroll = msg_scroll_save;
   msg_scrolled_ign = true;
   // may truncate the message to avoid a hit-return prompt
-  msg_outtrans_attr(msg_may_trunc(false, IObuff), attr);
+  msg_outtrans(msg_may_trunc(false, IObuff), attr);
   msg_clr_eos();
   ui_flush();
   msg_scrolled_ign = false;
@@ -1762,7 +1762,7 @@ failed:
         if (msg_col > 0) {
           msg_putchar('\r');  // overwrite previous message
         }
-        p = (uint8_t *)msg_trunc_attr(IObuff, false, 0);
+        p = (uint8_t *)msg_trunc(IObuff, false, 0);
       }
 
       if (read_stdin || read_buffer || restart_edit != 0
@@ -2035,7 +2035,7 @@ static char *readfile_charconvert(char *fname, char *fenc, int *fdp)
   if (errmsg != NULL) {
     // Don't use emsg(), it breaks mappings, the retry with
     // another type of conversion might still work.
-    msg(errmsg);
+    msg(errmsg, 0);
     if (tmpname != NULL) {
       os_remove(tmpname);  // delete converted file
       XFREE_CLEAR(tmpname);
@@ -3279,11 +3279,17 @@ static void vim_mktempdir(void)
   char tmp[TEMP_FILE_PATH_MAXLEN];
   char path[TEMP_FILE_PATH_MAXLEN];
   char user[40] = { 0 };
+  char appname[40] = { 0 };
 
   (void)os_get_username(user, sizeof(user));
   // Usernames may contain slashes! #19240
   memchrsub(user, '/', '_', sizeof(user));
   memchrsub(user, '\\', '_', sizeof(user));
+
+  // Appname may be a relative path, replace slashes to make it name-like.
+  xstrlcpy(appname, get_appname(), sizeof(appname));
+  memchrsub(appname, '/', '%', sizeof(appname));
+  memchrsub(appname, '\\', '%', sizeof(appname));
 
   // Make sure the umask doesn't remove the executable bit.
   // "repl" has been reported to use "0177".
@@ -3298,7 +3304,6 @@ static void vim_mktempdir(void)
     // "/tmp/" exists, now try to create "/tmp/nvim.<user>/".
     add_pathsep(tmp);
 
-    const char *appname = get_appname();
     xstrlcat(tmp, appname, sizeof(tmp));
     xstrlcat(tmp, ".", sizeof(tmp));
     xstrlcat(tmp, user, sizeof(tmp));
