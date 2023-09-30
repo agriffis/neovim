@@ -14,16 +14,16 @@
 #include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "nvim/ascii.h"
 #include "nvim/buffer.h"
-#include "nvim/charset.h"
 #include "nvim/cursor.h"
 #include "nvim/diff.h"
+#include "nvim/drawline.h"
 #include "nvim/drawscreen.h"
 #include "nvim/edit.h"
 #include "nvim/eval/typval.h"
-#include "nvim/eval/typval_defs.h"
 #include "nvim/eval/window.h"
 #include "nvim/fold.h"
 #include "nvim/getchar.h"
@@ -33,11 +33,12 @@
 #include "nvim/highlight.h"
 #include "nvim/macros.h"
 #include "nvim/mbyte.h"
-#include "nvim/memline_defs.h"
+#include "nvim/memline.h"
 #include "nvim/message.h"
 #include "nvim/mouse.h"
 #include "nvim/move.h"
 #include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/plines.h"
 #include "nvim/popupmenu.h"
 #include "nvim/pos.h"
@@ -213,8 +214,8 @@ static void reset_skipcol(win_T *wp)
 void update_topline(win_T *wp)
 {
   bool check_botline = false;
-  long *so_ptr = wp->w_p_so >= 0 ? &wp->w_p_so : &p_so;
-  long save_so = *so_ptr;
+  OptInt *so_ptr = wp->w_p_so >= 0 ? &wp->w_p_so : &p_so;
+  OptInt save_so = *so_ptr;
 
   // Cursor is updated instead when this is true for 'splitkeep'.
   if (skip_update_topline) {
@@ -288,7 +289,7 @@ void update_topline(win_T *wp)
       if (halfheight < 2) {
         halfheight = 2;
       }
-      long n;
+      int64_t n;
       if (hasAnyFolding(wp)) {
         // Count the number of logical lines between the cursor and
         // topline + p_so (approximation of how much will be
@@ -371,7 +372,7 @@ void update_topline(win_T *wp)
         }
       }
       if (check_botline) {
-        long line_count = 0;
+        int line_count = 0;
         if (hasAnyFolding(wp)) {
           // Count the number of logical lines between the cursor and
           // botline - p_so (approximation of how much will be
@@ -386,7 +387,7 @@ void update_topline(win_T *wp)
             (void)hasFolding(lnum, &lnum, NULL);
           }
         } else {
-          line_count = wp->w_cursor.lnum - wp->w_botline + 1 + *so_ptr;
+          line_count = wp->w_cursor.lnum - wp->w_botline + 1 + (int)(*so_ptr);
         }
         if (line_count <= wp->w_height_inner + 1) {
           scroll_cursor_bot(scrolljump_value(), false);
@@ -427,9 +428,8 @@ void update_topline(win_T *wp)
 // When 'scrolljump' is negative use it as a percentage of the window height.
 static int scrolljump_value(void)
 {
-  long result = p_sj >= 0 ? p_sj : (curwin->w_height_inner * -p_sj) / 100;
-  assert(result <= INT_MAX);
-  return (int)result;
+  int result = p_sj >= 0 ? (int)p_sj : (curwin->w_height_inner * (int)(-p_sj)) / 100;
+  return result;
 }
 
 // Return true when there are not 'scrolloff' lines above the cursor for the

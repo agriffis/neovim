@@ -48,12 +48,12 @@
 #include "nvim/normal.h"
 #include "nvim/ops.h"
 #include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/os/input.h"
 #include "nvim/plines.h"
 #include "nvim/popupmenu.h"
 #include "nvim/pos.h"
 #include "nvim/search.h"
-#include "nvim/spell.h"
 #include "nvim/state.h"
 #include "nvim/strings.h"
 #include "nvim/syntax.h"
@@ -4636,8 +4636,6 @@ static int ins_ctrl_ey(int tc)
   } else {
     c = ins_copychar(curwin->w_cursor.lnum + (c == Ctrl_Y ? -1 : 1));
     if (c != NUL) {
-      long tw_save;
-
       // The character must be taken literally, insert like it
       // was typed after a CTRL-V, and pretend 'textwidth'
       // wasn't set.  Digits, 'o' and 'x' are special after a
@@ -4645,7 +4643,7 @@ static int ins_ctrl_ey(int tc)
       if (c < 256 && !isalnum(c)) {
         AppendToRedobuff(CTRL_V_STR);
       }
-      tw_save = curbuf->b_p_tw;
+      OptInt tw_save = curbuf->b_p_tw;
       curbuf->b_p_tw = -1;
       insert_special(c, true, false);
       curbuf->b_p_tw = tw_save;

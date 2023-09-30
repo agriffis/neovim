@@ -7,6 +7,7 @@
 #include <inttypes.h>
 #include <limits.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -45,6 +46,7 @@
 #include "nvim/highlight_group.h"
 #include "nvim/keycodes.h"
 #include "nvim/macros.h"
+#include "nvim/map.h"
 #include "nvim/mapping.h"
 #include "nvim/mark.h"
 #include "nvim/mbyte.h"
@@ -56,6 +58,8 @@
 #include "nvim/normal.h"
 #include "nvim/ops.h"
 #include "nvim/option.h"
+#include "nvim/option_defs.h"
+#include "nvim/option_vars.h"
 #include "nvim/optionstr.h"
 #include "nvim/os/input.h"
 #include "nvim/os/os.h"
@@ -127,7 +131,7 @@ typedef struct command_line_state {
   int ignore_drag_release;
   int break_ctrl_c;
   expand_T xpc;
-  long *b_im_ptr;
+  OptInt *b_im_ptr;
   buf_T *b_im_ptr_buf;  ///< buffer where b_im_ptr is valid
 } CommandLineState;
 
@@ -149,7 +153,7 @@ typedef struct cmdpreview_undo_info {
 
 typedef struct cmdpreview_buf_info {
   buf_T *buf;
-  long save_b_p_ul;
+  OptInt save_b_p_ul;
   int save_b_changed;
   varnumber_T save_changedtick;
   CpUndoInfo undo_info;
@@ -1560,7 +1564,7 @@ static int command_line_erase_chars(CommandLineState *s)
 /// language :lmap mappings and/or Input Method.
 static void command_line_toggle_langmap(CommandLineState *s)
 {
-  long *b_im_ptr = buf_valid(s->b_im_ptr_buf) ? s->b_im_ptr : NULL;
+  OptInt *b_im_ptr = buf_valid(s->b_im_ptr_buf) ? s->b_im_ptr : NULL;
   if (map_to_exists_mode("", MODE_LANGMAP, false)) {
     // ":lmap" mappings exists, toggle use of mappings.
     State ^= MODE_LANGMAP;

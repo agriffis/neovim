@@ -3,9 +3,9 @@
 
 // plines.c: calculate the vertical and horizontal size of text in a window
 
-#include <inttypes.h>
 #include <limits.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "nvim/ascii.h"
@@ -21,6 +21,7 @@
 #include "nvim/memline.h"
 #include "nvim/move.h"
 #include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/plines.h"
 #include "nvim/pos.h"
 #include "nvim/state.h"
@@ -476,7 +477,7 @@ void getvcol(win_T *wp, pos_T *pos, colnr_T *start, colnr_T *cursor, colnr_T *en
   char *posptr;  // points to char at pos->col
   int incr;
   int head;
-  long *vts = wp->w_buffer->b_p_vts_array;
+  colnr_T *vts = wp->w_buffer->b_p_vts_array;
   int ts = (int)wp->w_buffer->b_p_ts;
 
   colnr_T vcol = 0;

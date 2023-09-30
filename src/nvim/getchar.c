@@ -5,9 +5,10 @@
 // file, manipulations with redo buffer and stuff buffer.
 
 #include <assert.h>
-#include <inttypes.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,7 +25,6 @@
 #include "nvim/eval.h"
 #include "nvim/eval/typval.h"
 #include "nvim/eval/typval_defs.h"
-#include "nvim/event/loop.h"
 #include "nvim/event/multiqueue.h"
 #include "nvim/ex_cmds.h"
 #include "nvim/ex_docmd.h"
@@ -48,7 +48,7 @@
 #include "nvim/move.h"
 #include "nvim/normal.h"
 #include "nvim/ops.h"
-#include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/os/fileio.h"
 #include "nvim/os/input.h"
 #include "nvim/os/os.h"
@@ -2695,9 +2695,9 @@ static int vgetorpeek(bool advance)
             // blocking wait
             wait_time = -1L;
           } else if (keylen == KEYLEN_PART_KEY && p_ttm >= 0) {
-            wait_time = p_ttm;
+            wait_time = (long)p_ttm;
           } else {
-            wait_time = p_tm;
+            wait_time = (long)p_tm;
           }
         }
 

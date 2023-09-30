@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <uv.h>
@@ -17,7 +18,6 @@
 #include "nvim/api/private/helpers.h"
 #include "nvim/ascii.h"
 #include "nvim/autocmd.h"
-#include "nvim/buffer_defs.h"
 #include "nvim/charset.h"
 #include "nvim/cmdexpand.h"
 #include "nvim/debugger.h"
@@ -31,6 +31,7 @@
 #include "nvim/getchar.h"
 #include "nvim/gettext.h"
 #include "nvim/globals.h"
+#include "nvim/hashtab.h"
 #include "nvim/lua/executor.h"
 #include "nvim/macros.h"
 #include "nvim/map.h"
@@ -39,6 +40,8 @@
 #include "nvim/memory.h"
 #include "nvim/message.h"
 #include "nvim/option.h"
+#include "nvim/option_defs.h"
+#include "nvim/option_vars.h"
 #include "nvim/os/input.h"
 #include "nvim/os/os.h"
 #include "nvim/os/stdpaths_defs.h"
@@ -353,9 +356,9 @@ int do_in_path(const char *path, const char *prefix, char *name, int flags,
     if (p_verbose > 10 && name != NULL) {
       verbose_enter();
       if (*prefix != NUL) {
-        smsg(_("Searching for \"%s\" under \"%s\" in \"%s\""), name, prefix, path);
+        smsg(0, _("Searching for \"%s\" under \"%s\" in \"%s\""), name, prefix, path);
       } else {
-        smsg(_("Searching for \"%s\" in \"%s\""), name, path);
+        smsg(0, _("Searching for \"%s\" in \"%s\""), name, path);
       }
       verbose_leave();
     }
@@ -396,7 +399,7 @@ int do_in_path(const char *path, const char *prefix, char *name, int flags,
 
           if (p_verbose > 10) {
             verbose_enter();
-            smsg(_("Searching for \"%s\""), buf);
+            smsg(0, _("Searching for \"%s\""), buf);
             verbose_leave();
           }
 
@@ -418,7 +421,7 @@ int do_in_path(const char *path, const char *prefix, char *name, int flags,
       semsg(_(e_dirnotf), basepath, name);
     } else if (p_verbose > 1) {
       verbose_enter();
-      smsg(_("not found in '%s': \"%s\""), basepath, name);
+      smsg(0, _("not found in '%s': \"%s\""), basepath, name);
       verbose_leave();
     }
   }
@@ -481,7 +484,7 @@ int do_in_cached_path(char *name, int flags, DoInRuntimepathCB callback, void *c
 
   if (p_verbose > 10 && name != NULL) {
     verbose_enter();
-    smsg(_("Searching for \"%s\" in runtime path"), name);
+    smsg(0, _("Searching for \"%s\" in runtime path"), name);
     verbose_leave();
   }
 
@@ -520,7 +523,7 @@ int do_in_cached_path(char *name, int flags, DoInRuntimepathCB callback, void *c
 
         if (p_verbose > 10) {
           verbose_enter();
-          smsg(_("Searching for \"%s\""), buf);
+          smsg(0, _("Searching for \"%s\""), buf);
           verbose_leave();
         }
 
@@ -540,7 +543,7 @@ int do_in_cached_path(char *name, int flags, DoInRuntimepathCB callback, void *c
       semsg(_(e_dirnotf), "runtime path", name);
     } else if (p_verbose > 1) {
       verbose_enter();
-      smsg(_("not found in runtime path: \"%s\""), name);
+      smsg(0, _("not found in runtime path: \"%s\""), name);
       verbose_leave();
     }
   }
@@ -2047,7 +2050,7 @@ int do_source(char *fname, int check_other, int is_vimrc, int *ret_sid)
     return retval;
   }
   if (os_isdir(fname_exp)) {
-    smsg(_("Cannot source a directory: \"%s\""), fname);
+    smsg(0, _("Cannot source a directory: \"%s\""), fname);
     goto theend;
   }
 
@@ -2091,9 +2094,9 @@ int do_source(char *fname, int check_other, int is_vimrc, int *ret_sid)
     if (p_verbose > 1) {
       verbose_enter();
       if (SOURCING_NAME == NULL) {
-        smsg(_("could not source \"%s\""), fname);
+        smsg(0, _("could not source \"%s\""), fname);
       } else {
-        smsg(_("line %" PRId64 ": could not source \"%s\""),
+        smsg(0, _("line %" PRId64 ": could not source \"%s\""),
              (int64_t)SOURCING_LNUM, fname);
       }
       verbose_leave();
@@ -2107,9 +2110,9 @@ int do_source(char *fname, int check_other, int is_vimrc, int *ret_sid)
   if (p_verbose > 1) {
     verbose_enter();
     if (SOURCING_NAME == NULL) {
-      smsg(_("sourcing \"%s\""), fname);
+      smsg(0, _("sourcing \"%s\""), fname);
     } else {
-      smsg(_("line %" PRId64 ": sourcing \"%s\""), (int64_t)SOURCING_LNUM, fname);
+      smsg(0, _("line %" PRId64 ": sourcing \"%s\""), (int64_t)SOURCING_LNUM, fname);
     }
     verbose_leave();
   }
@@ -2242,9 +2245,9 @@ int do_source(char *fname, int check_other, int is_vimrc, int *ret_sid)
   estack_pop();
   if (p_verbose > 1) {
     verbose_enter();
-    smsg(_("finished sourcing %s"), fname);
+    smsg(0, _("finished sourcing %s"), fname);
     if (SOURCING_NAME != NULL) {
-      smsg(_("continuing in %s"), SOURCING_NAME);
+      smsg(0, _("continuing in %s"), SOURCING_NAME);
     }
     verbose_leave();
   }

@@ -11,12 +11,10 @@
 
 #include "nvim/ascii.h"
 #include "nvim/autocmd.h"
-#include "nvim/buffer_defs.h"
 #include "nvim/charset.h"
 #include "nvim/cursor.h"
 #include "nvim/eval.h"
 #include "nvim/eval/typval.h"
-#include "nvim/eval/typval_defs.h"
 #include "nvim/ex_cmds_defs.h"
 #include "nvim/ex_docmd.h"
 #include "nvim/garray.h"
@@ -31,14 +29,13 @@
 #include "nvim/menu.h"
 #include "nvim/menu_defs.h"
 #include "nvim/message.h"
-#include "nvim/option_defs.h"
+#include "nvim/option_vars.h"
 #include "nvim/popupmenu.h"
 #include "nvim/pos.h"
 #include "nvim/state.h"
 #include "nvim/strings.h"
 #include "nvim/types.h"
 #include "nvim/ui.h"
-#include "nvim/undo_defs.h"
 #include "nvim/vim.h"
 
 #define MENUDEPTH   10          // maximum depth of menus

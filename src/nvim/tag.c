@@ -20,7 +20,6 @@
 #include "nvim/drawscreen.h"
 #include "nvim/eval.h"
 #include "nvim/eval/typval.h"
-#include "nvim/eval/typval_defs.h"
 #include "nvim/ex_cmds.h"
 #include "nvim/ex_cmds_defs.h"
 #include "nvim/ex_docmd.h"
@@ -42,6 +41,8 @@
 #include "nvim/message.h"
 #include "nvim/move.h"
 #include "nvim/option.h"
+#include "nvim/option_defs.h"
+#include "nvim/option_vars.h"
 #include "nvim/optionstr.h"
 #include "nvim/os/input.h"
 #include "nvim/os/os.h"
@@ -719,7 +720,7 @@ void do_tag(char *tag, int type, int count, int forceit, int verbose)
       // Only when going to try the next match, report that the previous
       // file didn't exist.  Otherwise an emsg() is given below.
       if (nofile_fname != NULL && error_cur_match != cur_match) {
-        smsg(_("File \"%s\" does not exist"), nofile_fname);
+        smsg(0, _("File \"%s\" does not exist"), nofile_fname);
       }
 
       ic = (matches[cur_match][0] & MT_IC_OFF);
@@ -2211,7 +2212,7 @@ static void findtags_in_file(findtags_state_T *st, int flags, char *buf_ffname)
 
   if (p_verbose >= 5) {
     verbose_enter();
-    smsg(_("Searching tags file %s"), st->tag_fname);
+    smsg(0, _("Searching tags file %s"), st->tag_fname);
     verbose_leave();
   }
   st->did_open = true;   // remember that we found at least one file
@@ -3279,7 +3280,7 @@ static int add_tag_field(dict_T *dict, const char *field_name, const char *start
   if (tv_dict_find(dict, field_name, -1) != NULL) {
     if (p_verbose > 0) {
       verbose_enter();
-      smsg(_("Duplicate field name: %s"), field_name);
+      smsg(0, _("Duplicate field name: %s"), field_name);
       verbose_leave();
     }
     return FAIL;

@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "nvim/ascii.h"
@@ -19,7 +20,6 @@
 #include "nvim/eval/encode.h"
 #include "nvim/eval/funcs.h"
 #include "nvim/eval/typval.h"
-#include "nvim/eval/typval_defs.h"
 #include "nvim/eval/userfunc.h"
 #include "nvim/eval/vars.h"
 #include "nvim/eval/window.h"
@@ -27,6 +27,7 @@
 #include "nvim/ex_cmds_defs.h"
 #include "nvim/ex_docmd.h"
 #include "nvim/ex_eval.h"
+#include "nvim/garray.h"
 #include "nvim/gettext.h"
 #include "nvim/globals.h"
 #include "nvim/hashtab.h"
@@ -35,6 +36,7 @@
 #include "nvim/message.h"
 #include "nvim/ops.h"
 #include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/os/os.h"
 #include "nvim/search.h"
 #include "nvim/strings.h"
@@ -801,8 +803,8 @@ static char *ex_let_option(char *arg, typval_T *const tv, const bool is_const,
 
   if (op != NULL && *op != '=') {
     if (!hidden && is_num) {  // number or bool
-      Integer cur_n = curval.type == kOptValTypeNumber ? curval.data.number : curval.data.boolean;
-      Integer new_n = newval.type == kOptValTypeNumber ? newval.data.number : newval.data.boolean;
+      OptInt cur_n = curval.type == kOptValTypeNumber ? curval.data.number : curval.data.boolean;
+      OptInt new_n = newval.type == kOptValTypeNumber ? newval.data.number : newval.data.boolean;
 
       switch (*op) {
       case '+':
@@ -1356,7 +1358,7 @@ static void list_one_var_a(const char *prefix, const char *name, const ptrdiff_t
   msg_start();
   msg_puts(prefix);
   if (name != NULL) {  // "a:" vars don't have a name stored
-    msg_puts_attr_len(name, name_len, 0);
+    msg_puts_len(name, name_len, 0);
   }
   msg_putchar(' ');
   msg_advance(22);
@@ -1873,7 +1875,7 @@ static OptVal tv_to_optval(typval_T *tv, const char *option, uint32_t flags, boo
         semsg(_("E521: Number required: &%s = '%s'"), option, tv->vval.v_string);
       }
     }
-    value = (flags & P_NUM) ? NUMBER_OPTVAL(n)
+    value = (flags & P_NUM) ? NUMBER_OPTVAL((OptInt)n)
                             : BOOLEAN_OPTVAL(n == 0 ? kFalse : (n >= 1 ? kTrue : kNone));
   } else if ((flags & P_STRING) || is_tty_option(option)) {
     // Avoid setting string option to a boolean or a special value.

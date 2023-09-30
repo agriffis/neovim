@@ -5,6 +5,7 @@
 // like yes/no or number prompts.
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "nvim/ascii.h"
@@ -21,7 +22,6 @@
 #include "nvim/message.h"
 #include "nvim/mouse.h"
 #include "nvim/os/input.h"
-#include "nvim/types.h"
 #include "nvim/ui.h"
 #include "nvim/vim.h"
 
@@ -56,7 +56,7 @@ int ask_yesno(const char *const str, const bool direct)
   int r = ' ';
   while (r != 'y' && r != 'n') {
     // same highlighting as for wait_return()
-    smsg_attr(HL_ATTR(HLF_R), "%s (y/n)?", str);
+    smsg(HL_ATTR(HLF_R), "%s (y/n)?", str);
     if (direct) {
       r = get_keystroke(NULL);
     } else {

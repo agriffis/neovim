@@ -66,6 +66,7 @@
 #include "nvim/normal.h"
 #include "nvim/ops.h"
 #include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/optionstr.h"
 #include "nvim/os/fs_defs.h"
 #include "nvim/os/input.h"
@@ -836,8 +837,8 @@ int do_move(linenr_T line1, linenr_T line2, linenr_T dest)
     ml_delete(line1 + extra, true);
   }
   if (!global_busy && num_lines > p_report) {
-    smsg(NGETTEXT("%" PRId64 " line moved",
-                  "%" PRId64 " lines moved", num_lines),
+    smsg(0, NGETTEXT("%" PRId64 " line moved",
+                     "%" PRId64 " lines moved", num_lines),
          (int64_t)num_lines);
   }
 
@@ -2148,7 +2149,6 @@ int do_ecmd(int fnum, char *ffname, char *sfname, exarg_T *eap, linenr_T newlnum
   bufref_T old_curbuf;
   char *free_fname = NULL;
   int retval = FAIL;
-  long n;
   pos_T orig_pos;
   linenr_T topline = 0;
   int newcol = -1;
@@ -2158,7 +2158,7 @@ int do_ecmd(int fnum, char *ffname, char *sfname, exarg_T *eap, linenr_T newlnum
   bool did_get_winopts = false;
   int readfile_flags = 0;
   bool did_inc_redrawing_disabled = false;
-  long *so_ptr = curwin->w_p_so >= 0 ? &curwin->w_p_so : &p_so;
+  OptInt *so_ptr = curwin->w_p_so >= 0 ? &curwin->w_p_so : &p_so;
 
   if (eap != NULL) {
     command = eap->do_ecmd_cmd;
@@ -2719,7 +2719,7 @@ int do_ecmd(int fnum, char *ffname, char *sfname, exarg_T *eap, linenr_T newlnum
   RedrawingDisabled--;
   did_inc_redrawing_disabled = false;
   if (!skip_redraw) {
-    n = *so_ptr;
+    OptInt n = *so_ptr;
     if (topline == 0 && command == NULL) {
       *so_ptr = 999;    // force cursor to be vertically centered in the window
     }
@@ -3801,8 +3801,8 @@ static int do_sub(exarg_T *eap, const proftime_T timeout, const long cmdpreview_
                                                         // needed
               msg_no_more = true;
               msg_ext_set_kind("confirm_sub");
-              smsg_attr(HL_ATTR(HLF_R),  // Same highlight as wait_return().
-                        _("replace with %s (y/n/a/q/l/^E/^Y)?"), sub);
+              // Same highlight as wait_return().
+              smsg(HL_ATTR(HLF_R), _("replace with %s (y/n/a/q/l/^E/^Y)?"), sub);
               msg_no_more = false;
               msg_scroll = (int)i;
               if (!ui_has(kUIMessages)) {
@@ -4471,9 +4471,9 @@ void ex_global(exarg_T *eap)
       msg(_(e_interr), 0);
     } else if (ndone == 0) {
       if (type == 'v') {
-        smsg(_("Pattern found in every line: %s"), used_pat);
+        smsg(0, _("Pattern found in every line: %s"), used_pat);
       } else {
-        smsg(_("Pattern not found: %s"), used_pat);
+        smsg(0, _("Pattern not found: %s"), used_pat);
       }
     } else {
       global_exe(cmd);

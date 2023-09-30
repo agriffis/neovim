@@ -17,7 +17,6 @@
 #include "klib/kvec.h"
 #include "nvim/api/private/defs.h"
 #include "nvim/ascii.h"
-#include "nvim/buffer_defs.h"
 #include "nvim/globals.h"
 #include "nvim/grid.h"
 #include "nvim/highlight.h"
@@ -26,7 +25,7 @@
 #include "nvim/macros.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
-#include "nvim/option_defs.h"
+#include "nvim/option_vars.h"
 #include "nvim/os/time.h"
 #include "nvim/types.h"
 #include "nvim/ui.h"
@@ -461,7 +460,7 @@ static void compose_debug(Integer startrow, Integer endrow, Integer startcol, In
 static void debug_delay(Integer lines)
 {
   ui_call_flush();
-  uint64_t wd = (uint64_t)labs(p_wd);
+  uint64_t wd = (uint64_t)llabs(p_wd);
   uint64_t factor = (uint64_t)MAX(MIN(lines, 5), 1);
   os_sleep(factor * wd);
 }

@@ -33,10 +33,9 @@
 #include "nvim/globals.h"
 #include "nvim/log.h"
 #include "nvim/macros.h"
-#include "nvim/main.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
-#include "nvim/option_defs.h"
+#include "nvim/option_vars.h"
 #include "nvim/os/fs_defs.h"
 #include "nvim/os/os.h"
 #include "nvim/path.h"
@@ -76,7 +75,7 @@ int os_chdir(const char *path)
 {
   if (p_verbose >= 5) {
     verbose_enter();
-    smsg("chdir(%s)", path);
+    smsg(0, "chdir(%s)", path);
     verbose_leave();
   }
   return uv_chdir(path);

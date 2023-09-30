@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "klib/kvec.h"
 #include "lauxlib.h"
 #include "nvim/api/private/converter.h"
 #include "nvim/api/private/defs.h"
@@ -17,7 +18,6 @@
 #include "nvim/eval.h"
 #include "nvim/eval/encode.h"
 #include "nvim/eval/typval.h"
-#include "nvim/event/loop.h"
 #include "nvim/event/rstream.h"
 #include "nvim/event/socket.h"
 #include "nvim/event/wstream.h"
@@ -788,7 +788,7 @@ void channel_terminal_open(buf_T *buf, Channel *chan)
   topts.write_cb = term_write;
   topts.resize_cb = term_resize;
   topts.close_cb = term_close;
-  buf->b_p_channel = (long)chan->id;  // 'channel' option
+  buf->b_p_channel = (OptInt)chan->id;  // 'channel' option
   Terminal *term = terminal_open(buf, topts);
   chan->term = term;
   channel_incref(chan);

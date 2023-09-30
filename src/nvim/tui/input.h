@@ -12,6 +12,7 @@
 #include "nvim/rbuffer.h"
 #include "nvim/tui/input_defs.h"
 #include "nvim/tui/tui.h"
+#include "nvim/types.h"
 
 typedef enum {
   kExtkeysNone,
@@ -27,7 +28,7 @@ typedef struct term_input {
   int8_t waiting_for_bg_response;
   int8_t waiting_for_csiu_response;
   ExtkeysType extkeys_type;
-  long ttimeoutlen;
+  OptInt ttimeoutlen;
   TermKey *tk;
   TermKey_Terminfo_Getstr_Hook *tk_ti_hook_fn;  ///< libtermkey terminfo hook
   TimeWatcher timer_handle;

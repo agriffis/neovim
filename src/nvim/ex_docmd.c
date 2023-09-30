@@ -18,6 +18,7 @@
 #include "nvim/ascii.h"
 #include "nvim/autocmd.h"
 #include "nvim/buffer.h"
+#include "nvim/buffer_defs.h"
 #include "nvim/change.h"
 #include "nvim/charset.h"
 #include "nvim/cmdexpand.h"
@@ -28,7 +29,6 @@
 #include "nvim/edit.h"
 #include "nvim/eval.h"
 #include "nvim/eval/typval.h"
-#include "nvim/eval/typval_defs.h"
 #include "nvim/eval/userfunc.h"
 #include "nvim/event/loop.h"
 #include "nvim/ex_cmds.h"
@@ -48,11 +48,11 @@
 #include "nvim/highlight_group.h"
 #include "nvim/input.h"
 #include "nvim/keycodes.h"
+#include "nvim/lua/executor.h"
 #include "nvim/macros.h"
 #include "nvim/main.h"
 #include "nvim/mark.h"
 #include "nvim/mbyte.h"
-#include "nvim/memfile_defs.h"
 #include "nvim/memline.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
@@ -61,6 +61,7 @@
 #include "nvim/normal.h"
 #include "nvim/ops.h"
 #include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/optionstr.h"
 #include "nvim/os/input.h"
 #include "nvim/os/os.h"
@@ -273,9 +274,9 @@ static void msg_verbose_cmd(linenr_T lnum, char *cmd)
   verbose_enter_scroll();
 
   if (lnum == 0) {
-    smsg(_("Executing: %s"), cmd);
+    smsg(0, _("Executing: %s"), cmd);
   } else {
-    smsg(_("line %" PRIdLINENR ": %s"), lnum, cmd);
+    smsg(0, _("line %" PRIdLINENR ": %s"), lnum, cmd);
   }
   if (msg_silent == 0) {
     msg_puts("\n");   // don't overwrite this
@@ -5692,7 +5693,7 @@ static void ex_pwd(exarg_T *eap)
       } else if (curtab->tp_localdir != NULL) {
         context = "tabpage";
       }
-      smsg("[%s] %s", context, NameBuff);
+      smsg(0, "[%s] %s", context, NameBuff);
     } else {
       msg(NameBuff, 0);
     }
@@ -5709,7 +5710,7 @@ static void ex_equal(exarg_T *eap)
     ex_lua(eap);
   } else {
     eap->nextcmd = find_nextcmd(eap->arg);
-    smsg("%" PRId64, (int64_t)eap->line2);
+    smsg(0, "%" PRId64, (int64_t)eap->line2);
   }
 }
 
@@ -7121,7 +7122,7 @@ static void ex_filetype(exarg_T *eap)
 {
   if (*eap->arg == NUL) {
     // Print current status.
-    smsg("filetype detection:%s  plugin:%s  indent:%s",
+    smsg(0, "filetype detection:%s  plugin:%s  indent:%s",
          filetype_detect == kTrue ? "ON" : "OFF",
          filetype_plugin == kTrue ? (filetype_detect == kTrue ? "ON" : "(on)") : "OFF",
          filetype_indent == kTrue ? (filetype_detect == kTrue ? "ON" : "(on)") : "OFF");

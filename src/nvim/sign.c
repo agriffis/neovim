@@ -7,6 +7,7 @@
 
 #include <inttypes.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,7 +21,6 @@
 #include "nvim/edit.h"
 #include "nvim/eval/funcs.h"
 #include "nvim/eval/typval.h"
-#include "nvim/eval/typval_defs.h"
 #include "nvim/ex_cmds_defs.h"
 #include "nvim/ex_docmd.h"
 #include "nvim/fold.h"
@@ -31,7 +31,6 @@
 #include "nvim/highlight_group.h"
 #include "nvim/macros.h"
 #include "nvim/mbyte.h"
-#include "nvim/memline_defs.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
 #include "nvim/move.h"
@@ -1660,7 +1659,7 @@ static void sign_get_placed(buf_T *buf, linenr_T lnum, int sign_id, const char *
 /// List one sign.
 static void sign_list_defined(sign_T *sp)
 {
-  smsg("sign %s", sp->sn_name);
+  smsg(0, "sign %s", sp->sn_name);
   if (sp->sn_icon != NULL) {
     msg_puts(" icon=");
     msg_outtrans(sp->sn_icon, 0);

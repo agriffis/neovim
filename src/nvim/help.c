@@ -4,6 +4,7 @@
 // help.c: functions for Vim help
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,6 +17,7 @@
 #include "nvim/ex_cmds.h"
 #include "nvim/ex_cmds_defs.h"
 #include "nvim/ex_docmd.h"
+#include "nvim/extmark_defs.h"
 #include "nvim/fileio.h"
 #include "nvim/garray.h"
 #include "nvim/gettext.h"
@@ -28,6 +30,7 @@
 #include "nvim/memory.h"
 #include "nvim/message.h"
 #include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/optionstr.h"
 #include "nvim/os/input.h"
 #include "nvim/os/os.h"
@@ -148,7 +151,7 @@ void ex_help(exarg_T *eap)
       // There is no help window yet.
       // Try to open the file specified by the "helpfile" option.
       if ((helpfd = os_fopen(p_hf, READBIN)) == NULL) {
-        smsg(_("Sorry, help file \"%s\" not found"), p_hf);
+        smsg(0, _("Sorry, help file \"%s\" not found"), p_hf);
         goto erret;
       }
       fclose(helpfd);

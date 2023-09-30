@@ -1,13 +1,15 @@
 // This is an open source non-commercial project. Dear PVS-Studio, please check
 // it. PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 
+#include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdlib.h>
+#include <string.h>
 
 #include "nvim/api/buffer.h"
 #include "nvim/api/deprecated.h"
 #include "nvim/api/extmark.h"
+#include "nvim/api/keysets.h"
 #include "nvim/api/options.h"
 #include "nvim/api/private/defs.h"
 #include "nvim/api/private/helpers.h"
@@ -729,7 +731,7 @@ static void set_option_to(uint64_t channel_id, void *to, int type, String name, 
              "Option '%s' value is out of range", name.data, {
       return;
     });
-    optval = NUMBER_OPTVAL(value.data.integer);
+    optval = NUMBER_OPTVAL((OptInt)value.data.integer);
   } else {
     VALIDATE(value.type == kObjectTypeString, "Option '%s' value must be String", name.data, {
       return;

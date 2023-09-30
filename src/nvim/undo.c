@@ -95,7 +95,6 @@
 #include "nvim/edit.h"
 #include "nvim/eval/funcs.h"
 #include "nvim/eval/typval.h"
-#include "nvim/eval/typval_defs.h"
 #include "nvim/ex_cmds_defs.h"
 #include "nvim/ex_docmd.h"
 #include "nvim/ex_getln.h"
@@ -113,6 +112,7 @@
 #include "nvim/memory.h"
 #include "nvim/message.h"
 #include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/os/fs_defs.h"
 #include "nvim/os/input.h"
 #include "nvim/os/os.h"
@@ -183,12 +183,12 @@ static void u_check_tree(u_header_T *uhp, u_header_T *exp_uh_next, u_header_T *e
     // Check pointers back are correct.
     if (uhp->uh_next.ptr != exp_uh_next) {
       emsg("uh_next wrong");
-      smsg("expected: 0x%x, actual: 0x%x",
+      smsg(0, "expected: 0x%x, actual: 0x%x",
            exp_uh_next, uhp->uh_next.ptr);
     }
     if (uhp->uh_alt_prev.ptr != exp_uh_alt_prev) {
       emsg("uh_alt_prev wrong");
-      smsg("expected: 0x%x, actual: 0x%x",
+      smsg(0, "expected: 0x%x, actual: 0x%x",
            exp_uh_alt_prev, uhp->uh_alt_prev.ptr);
     }
 
@@ -225,7 +225,7 @@ static void u_check(int newhead_may_be_NULL)
   }
   if (header_count != curbuf->b_u_numhead) {
     emsg("b_u_numhead invalid");
-    smsg("expected: %" PRId64 ", actual: %" PRId64,
+    smsg(0, "expected: %" PRId64 ", actual: %" PRId64,
          (int64_t)header_count, (int64_t)curbuf->b_u_numhead);
   }
 }
@@ -324,7 +324,7 @@ bool undo_allowed(buf_T *buf)
 }
 
 /// Get the 'undolevels' value for the current buffer.
-static long get_undolevel(buf_T *buf)
+static OptInt get_undolevel(buf_T *buf)
 {
   if (buf->b_p_ul == NO_LOCAL_UNDOLEVEL) {
     return p_ul;
@@ -1179,7 +1179,7 @@ void u_write_undo(const char *const name, const bool forceit, buf_T *const buf, 
     if (file_name == NULL) {
       if (p_verbose > 0) {
         verbose_enter();
-        smsg("%s", _("Cannot write undo file in any directory in 'undodir'"));
+        smsg(0, "%s", _("Cannot write undo file in any directory in 'undodir'"));
         verbose_leave();
       }
       return;
@@ -1215,7 +1215,7 @@ void u_write_undo(const char *const name, const bool forceit, buf_T *const buf, 
           if (name == NULL) {
             verbose_enter();
           }
-          smsg(_("Will not overwrite with undo file, cannot read: %s"),
+          smsg(0, _("Will not overwrite with undo file, cannot read: %s"),
                file_name);
           if (name == NULL) {
             verbose_leave();
@@ -1232,7 +1232,7 @@ void u_write_undo(const char *const name, const bool forceit, buf_T *const buf, 
             if (name == NULL) {
               verbose_enter();
             }
-            smsg(_("Will not overwrite, this is not an undo file: %s"),
+            smsg(0, _("Will not overwrite, this is not an undo file: %s"),
                  file_name);
             if (name == NULL) {
               verbose_leave();
@@ -1262,7 +1262,7 @@ void u_write_undo(const char *const name, const bool forceit, buf_T *const buf, 
   (void)os_setperm(file_name, perm);
   if (p_verbose > 0) {
     verbose_enter();
-    smsg(_("Writing undo file: %s"), file_name);
+    smsg(0, _("Writing undo file: %s"), file_name);
     verbose_leave();
   }
 
@@ -1399,7 +1399,7 @@ void u_read_undo(char *name, const uint8_t *hash, const char *orig_name FUNC_ATT
         && file_info_undo.stat.st_uid != getuid()) {
       if (p_verbose > 0) {
         verbose_enter();
-        smsg(_("Not reading undo file, owner differs: %s"),
+        smsg(0, _("Not reading undo file, owner differs: %s"),
              file_name);
         verbose_leave();
       }
@@ -1412,7 +1412,7 @@ void u_read_undo(char *name, const uint8_t *hash, const char *orig_name FUNC_ATT
 
   if (p_verbose > 0) {
     verbose_enter();
-    smsg(_("Reading undo file: %s"), file_name);
+    smsg(0, _("Reading undo file: %s"), file_name);
     verbose_leave();
   }
 
@@ -1648,7 +1648,7 @@ void u_read_undo(char *name, const uint8_t *hash, const char *orig_name FUNC_ATT
 #endif
 
   if (name != NULL) {
-    smsg(_("Finished reading undo file %s"), file_name);
+    smsg(0, _("Finished reading undo file %s"), file_name);
   }
   goto theend;
 

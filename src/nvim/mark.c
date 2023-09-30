@@ -17,7 +17,6 @@
 #include "nvim/diff.h"
 #include "nvim/edit.h"
 #include "nvim/eval/typval.h"
-#include "nvim/eval/typval_defs.h"
 #include "nvim/ex_cmds_defs.h"
 #include "nvim/extmark.h"
 #include "nvim/extmark_defs.h"
@@ -32,7 +31,7 @@
 #include "nvim/message.h"
 #include "nvim/move.h"
 #include "nvim/normal.h"
-#include "nvim/option_defs.h"
+#include "nvim/option_vars.h"
 #include "nvim/os/input.h"
 #include "nvim/os/os.h"
 #include "nvim/path.h"
@@ -40,7 +39,6 @@
 #include "nvim/sign.h"
 #include "nvim/strings.h"
 #include "nvim/textobject.h"
-#include "nvim/undo_defs.h"
 #include "nvim/vim.h"
 
 // This file contains routines to maintain and manipulate marks.

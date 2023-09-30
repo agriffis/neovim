@@ -43,6 +43,7 @@
 #include "nvim/move.h"
 #include "nvim/normal.h"
 #include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/os/fs.h"
 #include "nvim/os/input.h"
 #include "nvim/os/time.h"
@@ -2293,8 +2294,8 @@ void showmatch(int c)
 {
   pos_T *lpos;
   colnr_T vcol;
-  long *so = curwin->w_p_so >= 0 ? &curwin->w_p_so : &p_so;
-  long *siso = curwin->w_p_siso >= 0 ? &curwin->w_p_siso : &p_siso;
+  OptInt *so = curwin->w_p_so >= 0 ? &curwin->w_p_so : &p_so;
+  OptInt *siso = curwin->w_p_siso >= 0 ? &curwin->w_p_siso : &p_siso;
   char *p;
 
   // Only show match for chars in the 'matchpairs' option.
@@ -2338,8 +2339,8 @@ void showmatch(int c)
 
   pos_T mpos = *lpos;  // save the pos, update_screen() may change it
   pos_T save_cursor = curwin->w_cursor;
-  long save_so = *so;
-  long save_siso = *siso;
+  OptInt save_so = *so;
+  OptInt save_siso = *siso;
   // Handle "$" in 'cpo': If the ')' is typed on top of the "$",
   // stop displaying the "$".
   if (dollar_vcol >= 0 && dollar_vcol == curwin->w_virtcol) {
@@ -3798,7 +3799,7 @@ void find_pattern_in_path(char *ptr, Direction dir, size_t len, bool whole, bool
             msg_trunc(IObuff, true, HL_ATTR(HLF_R));
           } else if (p_verbose >= 5) {
             verbose_enter();
-            smsg(_("Searching included file %s"), new_fname);
+            smsg(0, _("Searching included file %s"), new_fname);
             verbose_leave();
           }
         }

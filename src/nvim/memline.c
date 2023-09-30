@@ -39,6 +39,7 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -55,7 +56,6 @@
 #include "nvim/drawscreen.h"
 #include "nvim/eval.h"
 #include "nvim/eval/typval.h"
-#include "nvim/eval/typval_defs.h"
 #include "nvim/ex_cmds_defs.h"
 #include "nvim/fileio.h"
 #include "nvim/getchar.h"
@@ -65,6 +65,7 @@
 #include "nvim/input.h"
 #include "nvim/macros.h"
 #include "nvim/main.h"
+#include "nvim/map.h"
 #include "nvim/mark.h"
 #include "nvim/mbyte.h"
 #include "nvim/memfile.h"
@@ -72,6 +73,7 @@
 #include "nvim/memory.h"
 #include "nvim/message.h"
 #include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/os/fs.h"
 #include "nvim/os/input.h"
 #include "nvim/os/os.h"
@@ -82,7 +84,6 @@
 #include "nvim/spell.h"
 #include "nvim/statusline.h"
 #include "nvim/strings.h"
-#include "nvim/types.h"
 #include "nvim/ui.h"
 #include "nvim/undo.h"
 #include "nvim/version.h"
@@ -918,14 +919,14 @@ void ml_recover(bool checkext)
   }
 
   home_replace(NULL, mfp->mf_fname, NameBuff, MAXPATHL, true);
-  smsg(_("Using swap file \"%s\""), NameBuff);
+  smsg(0, _("Using swap file \"%s\""), NameBuff);
 
   if (buf_spname(curbuf) != NULL) {
     xstrlcpy(NameBuff, buf_spname(curbuf), MAXPATHL);
   } else {
     home_replace(NULL, curbuf->b_ffname, NameBuff, MAXPATHL, true);
   }
-  smsg(_("Original file \"%s\""), NameBuff);
+  smsg(0, _("Original file \"%s\""), NameBuff);
   msg_putchar('\n');
 
   // check date of swap file and original file

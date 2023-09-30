@@ -28,29 +28,25 @@
 #include "nvim/indent.h"
 #include "nvim/indent_c.h"
 #include "nvim/insexpand.h"
-#include "nvim/keycodes.h"
 #include "nvim/macros.h"
-#include "nvim/mapping.h"
 #include "nvim/mbyte.h"
 #include "nvim/memline.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
 #include "nvim/mouse.h"
 #include "nvim/move.h"
-#include "nvim/ops.h"
 #include "nvim/option.h"
 #include "nvim/option_defs.h"
+#include "nvim/option_vars.h"
 #include "nvim/optionstr.h"
 #include "nvim/os/os.h"
 #include "nvim/pos.h"
-#include "nvim/quickfix.h"
 #include "nvim/runtime.h"
 #include "nvim/spell.h"
 #include "nvim/spellfile.h"
 #include "nvim/spellsuggest.h"
-#include "nvim/statusline.h"
 #include "nvim/strings.h"
-#include "nvim/tag.h"
+#include "nvim/types.h"
 #include "nvim/ui.h"
 #include "nvim/vim.h"
 #include "nvim/window.h"
@@ -527,8 +523,8 @@ static bool valid_filetype(const char *val)
 /// @return error message, NULL if it's OK.
 const char *did_set_mousescroll(optset_T *args FUNC_ATTR_UNUSED)
 {
-  long vertical = -1;
-  long horizontal = -1;
+  OptInt vertical = -1;
+  OptInt horizontal = -1;
 
   char *string = p_mousescroll;
 
@@ -542,7 +538,7 @@ const char *did_set_mousescroll(optset_T *args FUNC_ATTR_UNUSED)
       return e_invarg;
     }
 
-    long *direction;
+    OptInt *direction;
 
     if (memcmp(string, "ver:", 4) == 0) {
       direction = &vertical;
@@ -1944,7 +1940,7 @@ const char *did_set_varsofttabstop(optset_T *args)
     return e_invarg;
   }
 
-  long *oldarray = buf->b_p_vsts_array;
+  colnr_T *oldarray = buf->b_p_vsts_array;
   if (tabstop_set(*varp, &(buf->b_p_vsts_array))) {
     xfree(oldarray);
   } else {
@@ -1975,7 +1971,7 @@ const char *did_set_vartabstop(optset_T *args)
     return e_invarg;
   }
 
-  long *oldarray = buf->b_p_vts_array;
+  colnr_T *oldarray = buf->b_p_vts_array;
   if (tabstop_set(*varp, &(buf->b_p_vts_array))) {
     xfree(oldarray);
     if (foldmethodIsIndent(win)) {

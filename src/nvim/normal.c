@@ -17,7 +17,6 @@
 #include <string.h>
 #include <time.h>
 
-#include "nvim/api/private/defs.h"
 #include "nvim/api/private/helpers.h"
 #include "nvim/ascii.h"
 #include "nvim/autocmd.h"
@@ -57,6 +56,7 @@
 #include "nvim/normal.h"
 #include "nvim/ops.h"
 #include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/os/input.h"
 #include "nvim/os/time.h"
 #include "nvim/plines.h"
@@ -73,7 +73,6 @@
 #include "nvim/tag.h"
 #include "nvim/textformat.h"
 #include "nvim/textobject.h"
-#include "nvim/types.h"
 #include "nvim/ui.h"
 #include "nvim/undo.h"
 #include "nvim/vim.h"
@@ -803,13 +802,13 @@ static void normal_get_additional_char(NormalState *s)
                && s->ca.cmdchar == 'g') {
       s->ca.oap->op_type = get_op_type(*cp, NUL);
     } else if (*cp == Ctrl_BSL) {
-      long towait = (p_ttm >= 0 ? p_ttm : p_tm);
+      int towait = (p_ttm >= 0 ? (int)p_ttm : (int)p_tm);
 
       // There is a busy wait here when typing "f<C-\>" and then
       // something different from CTRL-N.  Can't be avoided.
-      while ((s->c = vpeekc()) <= 0 && towait > 0L) {
-        do_sleep(towait > 50L ? 50L : towait);
-        towait -= 50L;
+      while ((s->c = vpeekc()) <= 0 && towait > 0) {
+        do_sleep(towait > 50 ? 50 : towait);
+        towait -= 50;
       }
       if (s->c > 0) {
         s->c = plain_vgetc();
@@ -2087,7 +2086,7 @@ static void display_showcmd(void)
   // clear the rest of an old message by outputting up to SHOWCMD_COLS spaces
   grid_line_puts(sc_col + len, (char *)"          " + len, -1, HL_ATTR(HLF_MSG));
 
-  grid_line_flush(false);
+  grid_line_flush();
 }
 
 /// When "check" is false, prepare for commands that scroll the window.
@@ -2785,7 +2784,7 @@ static void nv_zet(cmdarg_T *cap)
 {
   colnr_T col;
   int nchar = cap->nchar;
-  long old_fdl = curwin->w_p_fdl;
+  long old_fdl = (long)curwin->w_p_fdl;
   int old_fen = curwin->w_p_fen;
 
   int siso = get_sidescrolloff_value(curwin);

@@ -23,7 +23,6 @@
 #include "nvim/edit.h"
 #include "nvim/eval.h"
 #include "nvim/eval/typval.h"
-#include "nvim/eval/typval_defs.h"
 #include "nvim/eval/window.h"
 #include "nvim/ex_cmds.h"
 #include "nvim/ex_cmds2.h"
@@ -33,6 +32,7 @@
 #include "nvim/ex_getln.h"
 #include "nvim/fileio.h"
 #include "nvim/fold.h"
+#include "nvim/garray.h"
 #include "nvim/gettext.h"
 #include "nvim/globals.h"
 #include "nvim/help.h"
@@ -41,13 +41,14 @@
 #include "nvim/macros.h"
 #include "nvim/mark.h"
 #include "nvim/mbyte.h"
-#include "nvim/memfile_defs.h"
 #include "nvim/memline.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
 #include "nvim/move.h"
 #include "nvim/normal.h"
 #include "nvim/option.h"
+#include "nvim/option_defs.h"
+#include "nvim/option_vars.h"
 #include "nvim/optionstr.h"
 #include "nvim/os/fs_defs.h"
 #include "nvim/os/input.h"
@@ -5187,7 +5188,7 @@ static buf_T *vgr_load_dummy_buf(char *fname, char *dirname_start, char *dirname
   // indent scripts, a great speed improvement.
   char *save_ei = au_event_disable(",Filetype");
 
-  long save_mls = p_mls;
+  OptInt save_mls = p_mls;
   p_mls = 0;
 
   // Load file into a buffer, so that 'fileencoding' is detected,
@@ -5458,7 +5459,7 @@ static int vgr_process_files(win_T *wp, qf_info_T *qi, vgr_args_T *cmd_args, boo
 
     if (buf == NULL) {
       if (!got_int) {
-        smsg(_("Cannot open file \"%s\""), fname);
+        smsg(0, _("Cannot open file \"%s\""), fname);
       }
     } else {
       // Try for a match in all lines of the buffer.
