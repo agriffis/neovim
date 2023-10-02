@@ -2,6 +2,7 @@
 #define NVIM_OPTIONSTR_H
 
 #include "nvim/buffer_defs.h"
+#include "nvim/cmdexpand_defs.h"
 #include "nvim/option_defs.h"
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS

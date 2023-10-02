@@ -71,6 +71,7 @@
 #include "nvim/search.h"
 #include "nvim/state.h"
 #include "nvim/strings.h"
+#include "nvim/types.h"
 #include "nvim/ui.h"
 #include "nvim/undo.h"
 #include "nvim/usercmd.h"
@@ -2766,6 +2767,7 @@ int check_opt_wim(void)
   }
 
   for (char *p = p_wim; *p; p++) {
+    // Note: Keep this in sync with p_wim_values.
     for (i = 0; ASCII_ISALPHA(p[i]); i++) {}
     if (p[i] != NUL && p[i] != ',' && p[i] != ':') {
       return FAIL;

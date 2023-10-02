@@ -43,6 +43,7 @@
 #include "nvim/ascii.h"
 #include "nvim/buffer_defs.h"
 #include "nvim/charset.h"
+#include "nvim/cmdexpand_defs.h"
 #include "nvim/cursor.h"
 #include "nvim/drawscreen.h"
 #include "nvim/eval/typval.h"
@@ -2829,4 +2830,15 @@ void f_charclass(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     return;
   }
   rettv->vval.v_number = mb_get_class(argvars[0].vval.v_string);
+}
+
+/// Function given to ExpandGeneric() to obtain the possible arguments of the
+/// encoding options.
+char *get_encoding_name(expand_T *xp FUNC_ATTR_UNUSED, int idx)
+{
+  if (idx >= (int)ARRAY_SIZE(enc_canon_table)) {
+    return NULL;
+  }
+
+  return (char *)enc_canon_table[idx].name;
 }
