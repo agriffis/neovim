@@ -6619,8 +6619,8 @@ void scroll_to_fraction(win_T *wp, int prev_height)
     if (lnum < 1) {             // can happen when starting up
       lnum = 1;
     }
-    wp->w_wrow = (int)((long)wp->w_fraction * (long)height - 1L) / FRACTION_MULT;
-    int line_size = plines_win_col(wp, lnum, (long)(wp->w_cursor.col)) - 1;
+    wp->w_wrow = (int)(wp->w_fraction * height - 1L) / FRACTION_MULT;
+    int line_size = plines_win_col(wp, lnum, wp->w_cursor.col) - 1;
     int sline = wp->w_wrow - line_size;
 
     if (sline >= 0) {
@@ -6898,7 +6898,7 @@ char *grab_file_name(int count, linenr_T *file_lnum)
     if (file_lnum != NULL && ptr[len] == ':' && isdigit((uint8_t)ptr[len + 1])) {
       char *p = ptr + len + 1;
 
-      *file_lnum = (linenr_T)getdigits_long(&p, false, 0);
+      *file_lnum = getdigits_int32(&p, false, 0);
     }
     return find_file_name_in_path(ptr, len, options, count, curbuf->b_ffname);
   }
@@ -6952,9 +6952,7 @@ char *file_name_in_line(char *line, int col, int options, int count, char *rel_f
   while (ptr > line) {
     if ((len = (size_t)(utf_head_off(line, ptr - 1))) > 0) {
       ptr -= len + 1;
-    } else if (vim_isfilec((uint8_t)ptr[-1])
-               || (len >= 2 && path_has_drive_letter(ptr - 2))
-               || ((options & FNAME_HYP) && path_is_url(ptr - 1))) {
+    } else if (vim_isfilec((uint8_t)ptr[-1]) || ((options & FNAME_HYP) && path_is_url(ptr - 1))) {
       ptr--;
     } else {
       break;
