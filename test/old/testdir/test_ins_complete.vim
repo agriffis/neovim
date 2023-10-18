@@ -530,10 +530,8 @@ func Test_ins_completeslash()
   CheckMSWindows
 
   call mkdir('Xdir')
-
   let orig_shellslash = &shellslash
   set cpt&
-
   new
 
   set noshellslash
@@ -653,6 +651,24 @@ func Test_pum_with_preview_win()
   call term_sendkeys(buf, "\<Esc>")
   call StopVimInTerminal(buf)
   call delete('Xpreviewscript')
+endfunc
+
+func Test_scrollbar_on_wide_char()
+  CheckScreendump
+
+  let lines =<< trim END
+    call setline(1, ['a', '            啊啊啊',
+                        \ '             哦哦哦',
+                        \ '              呃呃呃'])
+    call setline(5, range(10)->map({i, v -> 'aa' .. v .. 'bb'}))
+  END
+  call writefile(lines, 'Xwidescript')
+  let buf = RunVimInTerminal('-S Xwidescript', #{rows: 10})
+  call term_sendkeys(buf, "A\<C-N>")
+  call VerifyScreenDump(buf, 'Test_scrollbar_on_wide_char', {})
+
+  call StopVimInTerminal(buf)
+  call delete('Xwidescript')
 endfunc
 
 " Test for inserting the tag search pattern in insert mode
@@ -864,7 +880,7 @@ func Test_complete_add_onechar()
   setlocal complete=.
   call setline(1, ['workhorse', 'workload'])
   normal Go
-  exe "normal aWOR\<C-P>\<bs>\<bs>\<bs>\<bs>\<bs>\<bs>\<C-L>r\<C-L>\<C-L>"
+  exe "normal aWOR\<C-P>\<bs>\<bs>\<bs>\<bs>\<bs>\<bs>\<C-L>\<C-L>\<C-L>"
   call assert_equal('workh', getline(3))
   set ignorecase& backspace&
   close!
@@ -2278,6 +2294,17 @@ endfunc
 func GetCompleteInfo()
   let g:compl_info = complete_info()
   return ''
+endfunc
+
+func Test_completion_restart()
+  new
+  set complete=. completeopt=menuone backspace=2
+  call setline(1, 'workhorse workhorse')
+  exe "normal $a\<C-N>\<BS>\<BS>\<C-R>=GetCompleteInfo()\<CR>"
+  call assert_equal(1, len(g:compl_info['items']))
+  call assert_equal('workhorse', g:compl_info['items'][0]['word'])
+  set complete& completeopt& backspace&
+  bwipe!
 endfunc
 
 func Test_complete_info_index()
