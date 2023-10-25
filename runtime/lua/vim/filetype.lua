@@ -282,7 +282,7 @@ local extension = {
   atg = 'coco',
   recipe = 'conaryrecipe',
   hook = function(path, bufnr)
-    return M._getline(bufnr, 1) == '[Trigger]' and 'conf' or nil
+    return M._getline(bufnr, 1) == '[Trigger]' and 'confini' or nil
   end,
   nmconnection = 'confini',
   mklx = 'context',
@@ -459,6 +459,8 @@ local extension = {
   gift = 'gift',
   gleam = 'gleam',
   glsl = 'glsl',
+  gn = 'gn',
+  gni = 'gn',
   gpi = 'gnuplot',
   go = 'go',
   gp = 'gp',
@@ -534,6 +536,7 @@ local extension = {
   jal = 'jal',
   jpr = 'jam',
   jpl = 'jam',
+  janet = 'janet',
   jav = 'java',
   java = 'java',
   jj = 'javacc',
@@ -1980,6 +1983,11 @@ local pattern = {
   ['.*/Xresources/.*'] = starsetf('xdefaults'),
   ['.*/app%-defaults/.*'] = starsetf('xdefaults'),
   ['.*/etc/xinetd%.conf'] = 'xinetd',
+  ['.*/usr/share/X11/xkb/compat/.*'] = starsetf('xkb'),
+  ['.*/usr/share/X11/xkb/geometry/.*'] = starsetf('xkb'),
+  ['.*/usr/share/X11/xkb/keycodes/.*'] = starsetf('xkb'),
+  ['.*/usr/share/X11/xkb/symbols/.*'] = starsetf('xkb'),
+  ['.*/usr/share/X11/xkb/types/.*'] = starsetf('xkb'),
   ['.*/etc/blkid%.tab'] = 'xml',
   ['.*/etc/blkid%.tab%.old'] = 'xml',
   ['.*%.vbproj%.user'] = 'xml',
