@@ -67,8 +67,23 @@ describe(':terminal mouse', function()
       eq('nt', eval('mode(1)'))
     end)
 
-    it('does not leave terminal mode on left-release', function()
-      feed('<LeftRelease>')
+    it('will not exit focus on left-release', function()
+      eq('t', eval('mode(1)'))
+      feed('<LeftRelease><0,0>')
+      eq('t', eval('mode(1)'))
+      command('setlocal number')
+      eq('t', eval('mode(1)'))
+      feed('<LeftRelease><0,0>')
+      eq('t', eval('mode(1)'))
+    end)
+
+    it('will not exit focus on mouse movement', function()
+      eq('t', eval('mode(1)'))
+      feed('<MouseMove><0,0>')
+      eq('t', eval('mode(1)'))
+      command('setlocal number')
+      eq('t', eval('mode(1)'))
+      feed('<MouseMove><0,0>')
       eq('t', eval('mode(1)'))
     end)
 
@@ -309,7 +324,7 @@ describe(':terminal mouse', function()
           {3:-- TERMINAL --}                                    |
         ]])
         command('set mousescroll=ver:10')
-        feed('<ScrollWheelUp><4,0>')
+        feed('<ScrollWheelUp><0,0>')
         screen:expect([[
           {7: 16 }line                 │line30                  |
           {7: 17 }line                 │rows: 5, cols: 25       |
@@ -320,7 +335,7 @@ describe(':terminal mouse', function()
           {3:-- TERMINAL --}                                    |
         ]])
         command('set mousescroll=ver:0')
-        feed('<ScrollWheelUp><4,0>')
+        feed('<ScrollWheelUp><0,0>')
         screen:expect_unchanged()
         feed([[<C-\><C-N><C-W>w]])
         command('setlocal nowrap')
