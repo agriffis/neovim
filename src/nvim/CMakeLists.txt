@@ -362,12 +362,6 @@ list(APPEND LINT_NVIM_SOURCES ${NVIM_SOURCES} ${NVIM_HEADERS})
 
 foreach(sfile ${NVIM_SOURCES})
   get_filename_component(f ${sfile} NAME)
-  if(${f} MATCHES "^(regexp_nfa.c)$")
-    list(APPEND to_remove ${sfile})
-  endif()
-  if(${f} MATCHES "^(regexp_bt.c)$")
-    list(APPEND to_remove ${sfile})
-  endif()
   if(WIN32 AND ${f} MATCHES "^(pty_process_unix.c)$")
     list(APPEND to_remove ${sfile})
   endif()
@@ -456,8 +450,6 @@ set(LUA_GEN_DEPS ${GENERATOR_PRELOAD} $<TARGET_FILE:nlua0>)
 # NVIM_GENERATED_SOURCES: generated source files
 # These lists must be mutually exclusive.
 foreach(sfile ${NVIM_SOURCES}
-              "${CMAKE_CURRENT_LIST_DIR}/regexp_bt.c"
-              "${CMAKE_CURRENT_LIST_DIR}/regexp_nfa.c"
               ${GENERATED_API_DISPATCH}
               "${GENERATED_UI_EVENTS_CALL}"
               "${GENERATED_UI_EVENTS_REMOTE}"
@@ -772,17 +764,20 @@ target_link_libraries(libnvim PRIVATE main_lib PUBLIC libuv)
 
 if(ENABLE_ASAN_UBSAN)
   message(STATUS "Enabling address sanitizer and undefined behavior sanitizer for nvim.")
-  if(CI_BUILD)
-    # Try to recover from all sanitize issues so we get reports about all failures
-    target_compile_options(nvim PRIVATE -fsanitize-recover=all)
-  else()
-    target_compile_options(nvim PRIVATE -fno-sanitize-recover=all)
+  if(NOT MSVC)
+    if(CI_BUILD)
+      # Try to recover from all sanitize issues so we get reports about all failures
+      target_compile_options(nvim PRIVATE -fsanitize-recover=all)
+    else()
+      target_compile_options(nvim PRIVATE -fno-sanitize-recover=all)
+    endif()
+    target_compile_options(nvim PRIVATE
+      -fno-omit-frame-pointer
+      -fno-optimize-sibling-calls
+      -fsanitize=undefined)
   endif()
-  target_compile_options(nvim PRIVATE
-    -fno-omit-frame-pointer
-    -fno-optimize-sibling-calls
-    -fsanitize=address
-    -fsanitize=undefined)
+
+  target_compile_options(nvim PRIVATE -fsanitize=address)
   target_link_libraries(nvim PRIVATE -fsanitize=address -fsanitize=undefined)
   target_compile_definitions(nvim PRIVATE ENABLE_ASAN_UBSAN)
 elseif(ENABLE_MSAN)
