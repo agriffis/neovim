@@ -2318,18 +2318,10 @@ v:t_string	Value of |String| type.  Read-only.  See: |type()|
 v:t_blob	Value of |Blob| type.  Read-only.  See: |type()|
 
 				*v:termresponse* *termresponse-variable*
-v:termresponse	The escape sequence returned by the terminal for the DA
-		(request primary device attributes) control sequence.  It is
-		set when Vim receives an escape sequence that starts with ESC
-		[ or CSI and ends in a 'c', with only digits, ';' and '.' in
-		between.
-		When this option is set, the TermResponse autocommand event is
-		fired, so that you can react to the response from the
-		terminal.
-		The response from a new xterm is: "<Esc>[ Pp ; Pv ; Pc c".  Pp
-		is the terminal type: 0 for vt100 and 1 for vt220.  Pv is the
-		patch level (since this was introduced in patch 95, it's
-		always 95 or bigger).  Pc is always zero.
+v:termresponse	The value of the most recent OSC escape sequence received by
+		Nvim from the terminal. This can be read in a |TermResponse|
+		event handler after querying the terminal using another escape
+		sequence.
 
 					*v:testing* *testing-variable*
 v:testing	Must be set before using `test_garbagecollect_now()`.
@@ -4352,6 +4344,33 @@ This is not allowed when the textlock is active:
 	- editing another file
 	- closing a window or quitting Vim
 	- etc.
+
+==============================================================================
+Vim script library					*vim-script-library*
+
+Vim comes bundled with a Vim script library, that can be used by runtime,
+script authors.  Currently, it only includes very few functions, but it may
+grow over time.
+
+								*dist#vim*
+The functions make use of the autoloaded prefix "dist#vim".
+
+The following functions are available:
+
+dist#vim#IsSafeExecutable(filetype, executable) ~
+
+This function takes a filetype and an executable and checks whether it is safe
+to execute the given executable.  For security reasons users may not want to
+have Vim execute random executables or may have forbidden to do so for
+specific filetypes by setting the "<filetype>_exec" variable (|plugin_exec|).
+
+It returns |TRUE| or |FALSE| to indicate whether the plugin should run the given
+exectuable.  It takes the following arguments:
+
+	argument	type ~
+
+	filetype	string
+	executable	string
 
 ==============================================================================
 Command-line expressions highlighting		*expr-highlight*
