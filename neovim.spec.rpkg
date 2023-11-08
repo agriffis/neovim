@@ -77,9 +77,9 @@ BuildRequires:  jemalloc-devel
 BuildRequires:  msgpack-devel >= 3.1.0
 BuildRequires:  pkgconfig(termkey)
 BuildRequires:  pkgconfig(libuv) >= 1.42.0
-BuildRequires:  pkgconfig(vterm) >= 0.3
+BuildRequires:  pkgconfig(vterm) >= 0.3.3
 # need the build with the fix for the resize buffer issue
-Requires:       libvterm >= 0.3
+Requires:       libvterm >= 0.3.3
 BuildRequires:  pkgconfig(unibilium)
 BuildRequires:  pkgconfig(tree-sitter) >= %{tree_sitter_min_ver}
 # tree-sitter didn't do an soname bump. enforce the min version
