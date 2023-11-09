@@ -2,7 +2,7 @@
 "
 " Author: Bram Moolenaar
 " Copyright: Vim license applies, see ":help license"
-" Last Change: 2023 Aug 23
+" Last Change: 2023 Nov 02
 "
 " WORK IN PROGRESS - The basics works stable, more to come
 " Note: In general you need at least GDB 7.12 because this provides the
@@ -894,7 +894,9 @@ func s:ParseVarinfo(varinfo)
   let nameIdx = matchstrpos(a:varinfo, '{name="\([^"]*\)"')
   let dict['name'] = a:varinfo[nameIdx[1] + 7 : nameIdx[2] - 2]
   let typeIdx = matchstrpos(a:varinfo, ',type="\([^"]*\)"')
-  let dict['type'] = a:varinfo[typeIdx[1] + 7 : typeIdx[2] - 2]
+  " 'type' maybe is a url-like string,
+  " try to shorten it and show only the /tail
+  let dict['type'] = (a:varinfo[typeIdx[1] + 7 : typeIdx[2] - 2])->fnamemodify(':t')
   let valueIdx = matchstrpos(a:varinfo, ',value="\(.*\)"}')
   if valueIdx[1] == -1
     let dict['value'] = 'Complex value'
@@ -1022,7 +1024,9 @@ func s:InstallCommands()
   endif
   if map
     let s:k_map_saved = maparg('K', 'n', 0, 1)
-    nnoremap K :Evaluate<CR>
+    if !empty(s:k_map_saved) && !s:k_map_saved.buffer || empty(s:k_map_saved)
+      nnoremap K :Evaluate<CR>
+    endif
   endif
 
   let map = 1
@@ -1031,7 +1035,9 @@ func s:InstallCommands()
   endif
   if map
     let s:plus_map_saved = maparg('+', 'n', 0, 1)
-    nnoremap <expr> + $'<Cmd>{v:count1}Up<CR>'
+    if !empty(s:plus_map_saved) && !s:plus_map_saved.buffer || empty(s:plus_map_saved)
+      nnoremap <expr> + $'<Cmd>{v:count1}Up<CR>'
+    endif
   endif
 
   let map = 1
@@ -1040,7 +1046,9 @@ func s:InstallCommands()
   endif
   if map
     let s:minus_map_saved = maparg('-', 'n', 0, 1)
-    nnoremap <expr> - $'<Cmd>{v:count1}Down<CR>'
+    if !empty(s:minus_map_saved) && !s:minus_map_saved.buffer || empty(s:minus_map_saved)
+      nnoremap <expr> - $'<Cmd>{v:count1}Down<CR>'
+    endif
   endif
 
 
@@ -1106,29 +1114,32 @@ func s:DeleteCommands()
   delcommand Winbar
 
   if exists('s:k_map_saved')
-    if empty(s:k_map_saved)
+    if !empty(s:k_map_saved) && !s:k_map_saved.buffer
       nunmap K
-    else
       " call mapset(s:k_map_saved)
       call mapset('n', 0, s:k_map_saved)
+    elseif empty(s:k_map_saved)
+      nunmap K
     endif
     unlet s:k_map_saved
   endif
   if exists('s:plus_map_saved')
-    if empty(s:plus_map_saved)
+    if !empty(s:plus_map_saved) && !s:plus_map_saved.buffer
       nunmap +
-    else
       " call mapset(s:plus_map_saved)
       call mapset('n', 0, s:plus_map_saved)
+    elseif empty(s:plus_map_saved)
+      nunmap +
     endif
     unlet s:plus_map_saved
   endif
   if exists('s:minus_map_saved')
-    if empty(s:minus_map_saved)
+    if !empty(s:minus_map_saved) && !s:minus_map_saved.buffer
       nunmap -
-    else
       " call mapset(s:minus_map_saved)
       call mapset('n', 0, s:minus_map_saved)
+    elseif empty(s:minus_map_saved)
+      nunmap -
     endif
     unlet s:minus_map_saved
   endif
@@ -1556,8 +1567,15 @@ endfunc
 
 func s:GotoAsmwinOrCreateIt()
   if !win_gotoid(s:asmwin)
+    let mdf = ''
     if win_gotoid(s:sourcewin)
-      exe 'rightbelow new'
+      " 60 is approx spaceBuffer * 3
+      if winwidth(0) > (78 + 60)
+        let mdf = 'vert'
+        exe mdf .. ' ' .. 60 .. 'new'
+      else
+        exe 'rightbelow new'
+      endif
     else
       exe 'new'
     endif
@@ -1579,7 +1597,7 @@ func s:GotoAsmwinOrCreateIt()
       let s:asmbuf = bufnr('Termdebug-asm-listing')
     endif
 
-    if s:GetDisasmWindowHeight() > 0
+    if mdf != 'vert' && s:GetDisasmWindowHeight() > 0
       exe 'resize ' .. s:GetDisasmWindowHeight()
     endif
   endif
@@ -1619,8 +1637,15 @@ endfunc
 
 func s:GotoVariableswinOrCreateIt()
   if !win_gotoid(s:varwin)
+    let mdf = ''
     if win_gotoid(s:sourcewin)
-      exe 'rightbelow new'
+      " 60 is approx spaceBuffer * 3
+      if winwidth(0) > (78 + 60)
+        let mdf = 'vert'
+        exe mdf .. ' ' .. 60 .. 'new'
+      else
+        exe 'rightbelow new'
+      endif
     else
       exe 'new'
     endif
@@ -1641,7 +1666,7 @@ func s:GotoVariableswinOrCreateIt()
       let s:varbuf = bufnr('Termdebug-variables-listing')
     endif
 
-    if s:GetVariablesWindowHeight() > 0
+    if mdf != 'vert' && s:GetVariablesWindowHeight() > 0
       exe 'resize ' .. s:GetVariablesWindowHeight()
     endif
   endif
@@ -1910,3 +1935,5 @@ call s:InitAutocmd()
 
 let &cpo = s:keepcpo
 unlet s:keepcpo
+
+" vim: sw=2 sts=2 et
