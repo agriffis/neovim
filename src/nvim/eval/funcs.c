@@ -2911,6 +2911,9 @@ static void f_wait(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   bool error = false;
   const int called_emsg_before = called_emsg;
 
+  // Flush screen updates before blocking.
+  ui_flush();
+
   LOOP_PROCESS_EVENTS_UNTIL(&main_loop, main_loop.events, timeout,
                             eval_expr_typval(&expr, false, &argv, 0, &exprval) != OK
                             || tv_get_number_chk(&exprval, &error)
@@ -5669,7 +5672,7 @@ static void read_file_or_blob(typval_T *argvars, typval_T *rettv, bool always_bl
         }
         if (prevlen == 0) {
           assert(len < INT_MAX);
-          s = xstrnsave(start, len);
+          s = xmemdupz(start, len);
         } else {
           // Change "prev" buffer to be the right size.  This way
           // the bytes are only copied once, and very long lines are
@@ -6305,7 +6308,7 @@ static void reduce_string(typval_T *argvars, typval_T *expr, typval_T *rettv)
     *rettv = (typval_T){
       .v_type = VAR_STRING,
       .v_lock = VAR_UNLOCKED,
-      .vval.v_string = xstrnsave(p, (size_t)len),
+      .vval.v_string = xmemdupz(p, (size_t)len),
     };
     p += len;
   } else if (tv_check_for_string_arg(argvars, 2) == FAIL) {
@@ -6321,7 +6324,7 @@ static void reduce_string(typval_T *argvars, typval_T *expr, typval_T *rettv)
     argv[1] = (typval_T){
       .v_type = VAR_STRING,
       .v_lock = VAR_UNLOCKED,
-      .vval.v_string = xstrnsave(p, (size_t)len),
+      .vval.v_string = xmemdupz(p, (size_t)len),
     };
 
     const int r = eval_expr_typval(expr, true, argv, 2, rettv);
