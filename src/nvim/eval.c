@@ -1,6 +1,3 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check
-// it. PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-
 // eval.c: Expression evaluation.
 
 #include <assert.h>
@@ -89,6 +86,8 @@
 // TODO(ZyX-I): Remove DICT_MAXNEST, make users be non-recursive instead
 
 #define DICT_MAXNEST 100        // maximum nesting of lists and dicts
+
+#define MAX_CALLBACK_DEPTH 20
 
 static const char *e_missbrac = N_("E111: Missing ']'");
 static const char *e_list_end = N_("E697: Missing end of List ']': %s");
@@ -6064,7 +6063,7 @@ bool callback_call(Callback *const callback, const int argcount_in, typval_T *co
                    typval_T *const rettv)
   FUNC_ATTR_NONNULL_ALL
 {
-  if (callback_depth > p_mfd) {
+  if (callback_depth > MAX_CALLBACK_DEPTH) {
     emsg(_(e_command_too_recursive));
     return false;
   }

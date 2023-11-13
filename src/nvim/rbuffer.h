@@ -11,8 +11,7 @@
 //   stopped(automatic backpressure handling)
 //
 // Reference: http://en.wikipedia.org/wiki/Circular_buffer
-#ifndef NVIM_RBUFFER_H
-#define NVIM_RBUFFER_H
+#pragma once
 
 #include <stddef.h>
 #include <stdint.h>
@@ -38,8 +37,6 @@ struct rbuffer;
 //
 // Note that the rbuffer_{produced,consumed} calls are necessary or these macros
 // create infinite loops
-//
-// -V:RBUFFER_UNTIL_EMPTY:1044
 #define RBUFFER_UNTIL_EMPTY(buf, rptr, rcnt) \
   for (size_t rcnt = 0, _r = 1; _r; _r = 0)  /* NOLINT(readability/braces) */ \
   for (char *rptr = rbuffer_read_ptr(buf, &rcnt);  /* NOLINT(readability/braces) */ \
@@ -88,5 +85,3 @@ struct rbuffer {
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "rbuffer.h.generated.h"
 #endif
-
-#endif  // NVIM_RBUFFER_H

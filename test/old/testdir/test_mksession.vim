@@ -168,7 +168,6 @@ func Test_mksession_rtp()
     return
   endif
   new
-  set sessionoptions+=options
   let _rtp=&rtp
   " Make a real long (invalid) runtimepath value,
   " that should exceed PATH_MAX (hopefully)
@@ -188,7 +187,6 @@ func Test_mksession_rtp()
   call assert_equal(expected, li)
 
   call delete('Xtest_mks.out')
-  set sessionoptions&
 endfunc
 
 func Test_mksession_arglist()
@@ -207,7 +205,6 @@ func Test_mksession_arglist()
   enew | only
   argdel *
 endfunc
-
 
 func Test_mksession_one_buffer_two_windows()
   edit Xtest1
@@ -260,6 +257,48 @@ func Test_mksession_lcd_multiple_tabs()
   call delete('Xtest_mks.out')
 endfunc
 
+" Test for tabpage-local directory
+func Test_mksession_tcd_multiple_tabs()
+  let save_cwd = getcwd()
+  call mkdir('Xtopdir')
+  cd Xtopdir
+  call mkdir('Xtabdir1')
+  call mkdir('Xtabdir2')
+  call mkdir('Xtabdir3')
+  call mkdir('Xwindir1')
+  call mkdir('Xwindir2')
+  call mkdir('Xwindir3')
+  tcd Xtabdir1
+  botright new
+  wincmd t
+  lcd ../Xwindir1
+  tabnew
+  tcd ../Xtabdir2
+  botright new
+  lcd ../Xwindir2
+  tabnew
+  tcd ../Xtabdir3
+  botright new
+  lcd ../Xwindir3
+  tabfirst
+  1wincmd w
+  mksession! Xtest_mks.out
+  only | tabonly
+  source Xtest_mks.out
+  call assert_equal('Xtabdir1', fnamemodify(getcwd(-1, 1), ':t'))
+  call assert_equal('Xwindir1', fnamemodify(getcwd(1, 1), ':t'))
+  call assert_equal('Xtabdir1', fnamemodify(getcwd(2, 1), ':t'))
+  call assert_equal('Xtabdir2', fnamemodify(getcwd(-1, 2), ':t'))
+  call assert_equal('Xtabdir2', fnamemodify(getcwd(1, 2), ':t'))
+  call assert_equal('Xwindir2', fnamemodify(getcwd(2, 2), ':t'))
+  call assert_equal('Xtabdir3', fnamemodify(getcwd(-1, 3), ':t'))
+  call assert_equal('Xtabdir3', fnamemodify(getcwd(1, 3), ':t'))
+  call assert_equal('Xwindir3', fnamemodify(getcwd(2, 3), ':t'))
+  %bwipe
+  call chdir(save_cwd)
+  call delete("Xtopdir", "rf")
+endfunc
+
 func Test_mksession_blank_tabs()
   tabnew
   tabnew
@@ -272,21 +311,6 @@ func Test_mksession_blank_tabs()
   source Xtest_mks.out
   call assert_equal(4, tabpagenr('$'), 'session restore should restore number of tabs')
   call assert_equal(3, tabpagenr(), 'session restore should restore the active tab')
-  call delete('Xtest_mks.out')
-endfunc
-
-func Test_mksession_blank_windows()
-  split
-  split
-  split
-  3 wincmd w
-  mksession! Xtest_mks.out
-  split
-  split
-  2 wincmd w
-  source Xtest_mks.out
-  call assert_equal(4, winnr('$'), 'session restore should restore number of windows')
-  call assert_equal(3, winnr(), 'session restore should restore the active window')
   call delete('Xtest_mks.out')
 endfunc
 
@@ -310,7 +334,7 @@ func Test_mksession_buffer_count()
   call delete('Xbaz')
   call delete('Xtest_mks.out')
   %bwipe!
-  set nohidden
+  set hidden&
 endfunc
 
 func Test_mksession_buffer_order()
@@ -341,7 +365,6 @@ endfunc
 if has('extra_search')
 
 func Test_mksession_hlsearch()
-  set sessionoptions+=options
   set hlsearch
   mksession! Xtest_mks.out
   nohlsearch
@@ -351,11 +374,132 @@ func Test_mksession_hlsearch()
   mksession! Xtest_mks.out
   source Xtest_mks.out
   call assert_equal(0, v:hlsearch, 'session should restore search highlighting state')
-  set sessionoptions&
   call delete('Xtest_mks.out')
 endfunc
 
 endif
+
+
+func Test_mksession_blank_windows()
+  split
+  split
+  split
+  3 wincmd w
+  mksession! Xtest_mks.out
+  split
+  split
+  2 wincmd w
+  source Xtest_mks.out
+  call assert_equal(4, winnr('$'), 'session restore should restore number of windows')
+  call assert_equal(3, winnr(), 'session restore should restore the active window')
+  call delete('Xtest_mks.out')
+endfunc
+
+if has('terminal')
+
+func Test_mksession_terminal_shell()
+  CheckFeature quickfix
+
+  terminal
+  mksession! Xtest_mks.out
+  let lines = readfile('Xtest_mks.out')
+  let term_cmd = ''
+  for line in lines
+    if line =~ '^terminal'
+      let term_cmd = line
+    elseif line =~ 'badd.*' . &shell
+      call assert_report('unexpected shell line: ' . line)
+    endif
+  endfor
+  call assert_match('terminal ++curwin ++cols=\d\+ ++rows=\d\+\s*.*$', term_cmd)
+
+  call StopShellInTerminal(bufnr('%'))
+  call delete('Xtest_mks.out')
+endfunc
+
+func Test_mksession_terminal_no_restore_cmdarg()
+  terminal ++norestore
+  mksession! Xtest_mks.out
+  let lines = readfile('Xtest_mks.out')
+  let term_cmd = ''
+  for line in lines
+    if line =~ '^terminal'
+      call assert_report('session must not restore terminal')
+    endif
+  endfor
+
+  call StopShellInTerminal(bufnr('%'))
+  call delete('Xtest_mks.out')
+endfunc
+
+func Test_mksession_terminal_no_restore_funcarg()
+  call term_start(&shell, {'norestore': 1})
+  mksession! Xtest_mks.out
+  let lines = readfile('Xtest_mks.out')
+  let term_cmd = ''
+  for line in lines
+    if line =~ '^terminal'
+      call assert_report('session must not restore terminal')
+    endif
+  endfor
+
+  call StopShellInTerminal(bufnr('%'))
+  call delete('Xtest_mks.out')
+endfunc
+
+func Test_mksession_terminal_no_restore_func()
+  terminal
+  call term_setrestore(bufnr('%'), 'NONE')
+  mksession! Xtest_mks.out
+  let lines = readfile('Xtest_mks.out')
+  let term_cmd = ''
+  for line in lines
+    if line =~ '^terminal'
+      call assert_report('session must not restore terminal')
+    endif
+  endfor
+
+  call StopShellInTerminal(bufnr('%'))
+  call delete('Xtest_mks.out')
+endfunc
+
+func Test_mksession_terminal_no_ssop()
+  terminal
+  set sessionoptions-=terminal
+  mksession! Xtest_mks.out
+  let lines = readfile('Xtest_mks.out')
+  let term_cmd = ''
+  for line in lines
+    if line =~ '^terminal'
+      call assert_report('session must not restore terminal')
+    endif
+  endfor
+
+  call StopShellInTerminal(bufnr('%'))
+  call delete('Xtest_mks.out')
+  set sessionoptions&
+endfunc
+
+func Test_mksession_terminal_restore_other()
+  CheckFeature quickfix
+
+  terminal
+  eval bufnr('%')->term_setrestore('other')
+  mksession! Xtest_mks.out
+  let lines = readfile('Xtest_mks.out')
+  let term_cmd = ''
+  for line in lines
+    if line =~ '^terminal'
+      let term_cmd = line
+    endif
+  endfor
+  call assert_match('terminal ++curwin ++cols=\d\+ ++rows=\d\+.*other', term_cmd)
+
+  call StopShellInTerminal(bufnr('%'))
+  call delete('Xtest_mks.out')
+endfunc
+
+endif " has('terminal')
 
 func Test_mkview_open_folds()
   enew!
@@ -641,6 +785,7 @@ endfunc
 
 " Test for changing directory to the session file directory
 func Test_mksession_sesdir()
+  let save_cwd = getcwd()
   call mkdir('Xproj')
   mksession! Xproj/Xtest_mks1.out
   set sessionoptions-=curdir
@@ -651,10 +796,40 @@ func Test_mksession_sesdir()
   call assert_equal('testdir', fnamemodify(getcwd(), ':t'))
   source Xproj/Xtest_mks2.out
   call assert_equal('Xproj', fnamemodify(getcwd(), ':t'))
-  cd ..
+  call chdir(save_cwd)
+  %bwipe
 
   set sessionoptions&
   call delete('Xproj', 'rf')
+endfunc
+
+" Test for saving and restoring the tab-local working directory when there is
+" only a single tab and 'tabpages' is not in 'sessionoptions'.
+func Test_mksession_tcd_single_tabs()
+  only | tabonly
+
+  let save_cwd = getcwd()
+  set sessionoptions-=tabpages
+  set sessionoptions+=curdir
+  call mkdir('Xtopdir1')
+  call mkdir('Xtopdir2')
+
+  " There are two tab pages, the current one has local cwd set to 'Xtopdir2'.
+  exec 'tcd ' .. save_cwd .. '/Xtopdir1'
+  tabnew
+  exec 'tcd ' .. save_cwd .. '/Xtopdir2'
+  mksession! Xtest_tcd_single
+
+  source Xtest_tcd_single
+  " call assert_equal(2, haslocaldir())
+  call assert_equal(1, haslocaldir(-1))
+  call assert_equal('Xtopdir2', fnamemodify(getcwd(-1, 0), ':t'))
+  %bwipe
+
+  set sessionoptions&
+  call chdir(save_cwd)
+  call delete('Xtopdir1', 'rf')
+  call delete('Xtopdir2', 'rf')
 endfunc
 
 " Test for storing the 'lines' and 'columns' settings
@@ -689,7 +864,6 @@ endfunc
 
 " Test for mksession with a named scratch buffer
 func Test_mksession_scratch()
-  set sessionoptions+=options
   enew | only
   file Xscratch
   set buftype=nofile
@@ -700,7 +874,6 @@ func Test_mksession_scratch()
   call assert_equal('nofile', &buftype)
   %bwipe
   call delete('Xtest_mks.out')
-  set sessionoptions&
 endfunc
 
 " Test for mksession with fold options

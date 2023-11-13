@@ -1,6 +1,3 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check
-// it. PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-
 // insexpand.c: functions for Insert mode completion
 
 #include <assert.h>
@@ -1243,9 +1240,6 @@ void ins_compl_show_pum(void)
   if (!pum_wanted() || !pum_enough_matches()) {
     return;
   }
-
-  // Dirty hard-coded hack: remove any matchparen highlighting.
-  do_cmdline_cmd("if exists('g:loaded_matchparen')|3match none|endif");
 
   // Update the screen before drawing the popup menu over it.
   update_screen();

@@ -1,6 +1,3 @@
-// This is an open source non-commercial project. Dear PVS-Studio, please check
-// it. PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-
 // drawline.c: Functions for drawing window lines on the screen.
 // This is the middle level, drawscreen.c is the top and grid.c the lower level.
 
@@ -1439,7 +1436,7 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool number_onl
       } else {
         // Long line, use only the last SPWORDLEN bytes.
         nextlinecol = (int)v - SPWORDLEN;
-        memmove(nextline, line + nextlinecol, SPWORDLEN);  // -V1086
+        memmove(nextline, line + nextlinecol, SPWORDLEN);
         nextline_idx = SPWORDLEN + 1;
       }
     }
@@ -2146,7 +2143,7 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool number_onl
           decor_attr = get_syntax_attr((colnr_T)v - 1,
                                        spv->spv_has_spell ? &can_spell : NULL, false);
 
-          if (did_emsg) {  // -V547
+          if (did_emsg) {
             wp->w_s->b_syn_error = true;
             has_syntax = false;
           } else {
@@ -3127,16 +3124,10 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, bool number_onl
         wlv.need_showbreak = true;
       }
       if (statuscol.draw) {
-        if (wlv.row == startrow + wlv.filler_lines) {
-          statuscol.textp = NULL;  // re-evaluate for first non-filler line
-        } else if (vim_strchr(p_cpo, CPO_NUMCOL) && wlv.row > startrow + wlv.filler_lines) {
+        if (vim_strchr(p_cpo, CPO_NUMCOL) && wlv.row > startrow + wlv.filler_lines) {
           statuscol.draw = false;  // don't draw status column if "n" is in 'cpo'
-        } else if (wlv.row == startrow + wlv.filler_lines + 1) {
-          statuscol.textp = NULL;  // re-evaluate for first wrapped line
         } else {
-          // Draw the already built 'statuscolumn' on the next wrapped or filler line
-          statuscol.textp = statuscol.text;
-          statuscol.hlrecp = statuscol.hlrec;
+          statuscol.textp = NULL;  // re-evaluate with new v:virtnum
         }
       }
       wlv.filler_todo--;

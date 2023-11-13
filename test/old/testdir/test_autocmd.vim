@@ -2447,7 +2447,7 @@ function Test_dirchanged_auto()
   set acd
   cd ..
   call assert_equal([], s:li)
-  exe 'edit ' . s:dir_foo . '/Xfile'
+  exe 'edit ' . s:dir_foo . '/Xautofile'
   call assert_equal(s:dir_foo, getcwd())
   let expected = ["pre cd " .. s:dir_foo, "auto:", s:dir_foo]
   call assert_equal(expected, s:li)
@@ -2548,7 +2548,13 @@ func Test_Changed_FirstTime()
   let buf = term_start([GetVimProg(), '--clean', '-c', 'set noswapfile'], {'term_rows': 3})
   call assert_equal('running', term_getstatus(buf))
   " Wait for the ruler (in the status line) to be shown.
-  call WaitForAssert({-> assert_match('\<All$', term_getline(buf, 3))})
+  " In ConPTY, there is additional character which is drawn up to the width of
+  " the screen.
+  if has('conpty')
+    call WaitForAssert({-> assert_match('\<All.*$', term_getline(buf, 3))})
+  else
+    call WaitForAssert({-> assert_match('\<All$', term_getline(buf, 3))})
+  endif
   " It's only adding autocmd, so that no event occurs.
   call term_sendkeys(buf, ":au! TextChanged <buffer> call writefile(['No'], 'Xchanged.txt')\<cr>")
   call term_sendkeys(buf, "\<C-\\>\<C-N>:qa!\<cr>")
@@ -3022,6 +3028,8 @@ func Test_autocmd_CmdWinEnter()
 endfunc
 
 func Test_autocmd_was_using_freed_memory()
+  CheckFeature quickfix
+
   pedit xx
   n x
   augroup winenter
@@ -3124,7 +3132,7 @@ func Test_FileChangedRO_winclose()
 
   augroup FileChangedROTest
     au!
-    autocmd FileChangedRO * edit Xfile
+    autocmd FileChangedRO * edit Xrofile
   augroup END
   new
   set readonly
@@ -3200,13 +3208,13 @@ endfunc
 " Test for passing invalid arguments to autocmd
 func Test_autocmd_invalid_args()
   " Additional character after * for event
-  call assert_fails('autocmd *a Xfile set ff=unix', 'E215:')
+  call assert_fails('autocmd *a Xinvfile set ff=unix', 'E215:')
   augroup Test
   augroup END
   " Invalid autocmd event
-  call assert_fails('autocmd Bufabc Xfile set ft=vim', 'E216:')
+  call assert_fails('autocmd Bufabc Xinvfile set ft=vim', 'E216:')
   " Invalid autocmd event in a autocmd group
-  call assert_fails('autocmd Test Bufabc Xfile set ft=vim', 'E216:')
+  call assert_fails('autocmd Test Bufabc Xinvfile set ft=vim', 'E216:')
   augroup! Test
   " Execute all autocmds
   call assert_fails('doautocmd * BufEnter', 'E217:')
@@ -3217,9 +3225,9 @@ endfunc
 
 " Test for deep nesting of autocmds
 func Test_autocmd_deep_nesting()
-  autocmd BufEnter Xfile doautocmd BufEnter Xfile
-  call assert_fails('doautocmd BufEnter Xfile', 'E218:')
-  autocmd! BufEnter Xfile
+  autocmd BufEnter Xdeepfile doautocmd BufEnter Xdeepfile
+  call assert_fails('doautocmd BufEnter Xdeepfile', 'E218:')
+  autocmd! BufEnter Xdeepfile
 endfunc
 
 " Tests for SigUSR1 autocmd event, which is only available on posix systems.

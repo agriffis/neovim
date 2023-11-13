@@ -1,5 +1,4 @@
-#ifndef NVIM_GLOBALS_H
-#define NVIM_GLOBALS_H
+#pragma once
 
 #include <inttypes.h>
 #include <stdbool.h>
@@ -426,7 +425,6 @@ EXTERN win_T *prevwin INIT( = NULL);  // previous window
   FOR_ALL_TABS(tp) \
   FOR_ALL_WINDOWS_IN_TAB(wp, tp)
 
-// -V:FOR_ALL_WINDOWS_IN_TAB:501
 #define FOR_ALL_WINDOWS_IN_TAB(wp, tp) \
   for (win_T *wp = ((tp) == curtab) \
        ? firstwin : (tp)->tp_firstwin; wp != NULL; wp = wp->w_next)
@@ -1104,5 +1102,3 @@ EXTERN bool skip_win_fix_cursor INIT( = false);
 EXTERN bool skip_win_fix_scroll INIT( = false);
 /// Skip update_topline() call while executing win_fix_scroll().
 EXTERN bool skip_update_topline INIT( = false);
-
-#endif  // NVIM_GLOBALS_H

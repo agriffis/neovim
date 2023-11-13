@@ -1,5 +1,4 @@
-#ifndef NVIM_UGRID_H
-#define NVIM_UGRID_H
+#pragma once
 
 #include "nvim/globals.h"
 #include "nvim/grid_defs.h"
@@ -22,8 +21,6 @@ struct ugrid {
   UCell **cells;
 };
 
-// -V:UGRID_FOREACH_CELL:625
-
 #define UGRID_FOREACH_CELL(grid, row, startcol, endcol, code) \
   do { \
     UCell *row_cells = (grid)->cells[row]; \
@@ -37,4 +34,3 @@ struct ugrid {
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "ugrid.h.generated.h"
 #endif
-#endif  // NVIM_UGRID_H
