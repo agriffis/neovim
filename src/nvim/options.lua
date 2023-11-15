@@ -3307,7 +3307,7 @@ return {
     },
     {
       abbreviation = 'fs',
-      defaults = { if_true = false },
+      defaults = { if_true = true },
       desc = [=[
         When on, the OS function fsync() will be called after saving a file
         (|:write|, |writefile()|, …), |swap-file|, |undo-persistence| and |shada-file|.
@@ -8808,6 +8808,21 @@ return {
       scope = { 'global' },
       type = 'string',
       varname = 'p_tpf',
+    },
+    {
+      defaults = { if_true = true },
+      desc = [=[
+        If the host terminal supports it, buffer all screen updates
+        made during a redraw cycle so that each screen is displayed in
+        the terminal all at once. This can prevent tearing or flickering
+        when the terminal updates faster than Nvim can redraw.
+      ]=],
+      full_name = 'termsync',
+      redraw = { 'ui_option' },
+      scope = { 'global' },
+      short_desc = N_('synchronize redraw output with the host terminal'),
+      type = 'bool',
+      varname = 'p_termsync',
     },
     {
       defaults = { if_true = false },
