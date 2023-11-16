@@ -84,6 +84,7 @@
 #include "nvim/os/time.h"
 #include "nvim/path.h"
 #include "nvim/plines.h"
+#include "nvim/pos.h"
 #include "nvim/quickfix.h"
 #include "nvim/regexp.h"
 #include "nvim/runtime.h"
@@ -101,6 +102,7 @@
 #include "nvim/version.h"
 #include "nvim/vim.h"
 #include "nvim/window.h"
+#include "nvim/winfloat.h"
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "buffer.c.generated.h"
