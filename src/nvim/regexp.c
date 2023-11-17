@@ -1294,9 +1294,7 @@ static bool reg_match_visual(void)
     rex.line = (uint8_t *)reg_getline(rex.lnum);
     rex.input = rex.line + col;
 
-    unsigned cols_u = win_linetabsize(wp, rex.reg_firstlnum + rex.lnum, (char *)rex.line, col);
-    assert(cols_u <= MAXCOL);
-    colnr_T cols = (colnr_T)cols_u;
+    colnr_T cols = win_linetabsize(wp, rex.reg_firstlnum + rex.lnum, (char *)rex.line, col);
     if (cols < start || cols > end - (*p_sel == 'e')) {
       return false;
     }
@@ -1642,41 +1640,46 @@ static void do_lower(int *d, int c)
 char *regtilde(char *source, int magic, bool preview)
 {
   char *newsub = source;
-  char *tmpsub;
-  char *p;
-  int len;
-  int prevlen;
 
-  for (p = newsub; *p; p++) {
+  for (char *p = newsub; *p; p++) {
     if ((*p == '~' && magic) || (*p == '\\' && *(p + 1) == '~' && !magic)) {
       if (reg_prev_sub != NULL) {
         // length = len(newsub) - 1 + len(prev_sub) + 1
-        prevlen = (int)strlen(reg_prev_sub);
-        tmpsub = xmalloc(strlen(newsub) + (size_t)prevlen);
+        // Avoid making the text longer than MAXCOL, it will cause
+        // trouble at some point.
+        size_t prevsublen = strlen(reg_prev_sub);
+        size_t newsublen = strlen(newsub);
+        if (prevsublen > MAXCOL || newsublen > MAXCOL
+            || newsublen + prevsublen > MAXCOL) {
+          emsg(_(e_resulting_text_too_long));
+          break;
+        }
+
+        char *tmpsub = xmalloc(newsublen + prevsublen);
         // copy prefix
-        len = (int)(p - newsub);              // not including ~
-        memmove(tmpsub, newsub, (size_t)len);
+        size_t prefixlen = (size_t)(p - newsub);  // not including ~
+        memmove(tmpsub, newsub, prefixlen);
         // interpret tilde
-        memmove(tmpsub + len, reg_prev_sub, (size_t)prevlen);
+        memmove(tmpsub + prefixlen, reg_prev_sub, prevsublen);
         // copy postfix
         if (!magic) {
-          p++;                                // back off backslash
+          p++;  // back off backslash
         }
-        STRCPY(tmpsub + len + prevlen, p + 1);
+        STRCPY(tmpsub + prefixlen + prevsublen, p + 1);
 
-        if (newsub != source) {               // already allocated newsub
+        if (newsub != source) {  // allocated newsub before
           xfree(newsub);
         }
         newsub = tmpsub;
-        p = newsub + len + prevlen;
+        p = newsub + prefixlen + prevsublen;
       } else if (magic) {
-        STRMOVE(p, p + 1);              // remove '~'
+        STRMOVE(p, p + 1);  // remove '~'
       } else {
-        STRMOVE(p, p + 2);              // remove '\~'
+        STRMOVE(p, p + 2);  // remove '\~'
       }
       p--;
     } else {
-      if (*p == '\\' && p[1]) {         // skip escaped characters
+      if (*p == '\\' && p[1]) {  // skip escaped characters
         p++;
       }
       p += utfc_ptr2len(p) - 1;
@@ -6024,11 +6027,10 @@ static bool regmatch(uint8_t *scan, proftime_T *tm, int *timed_out)
           break;
 
         case RE_VCOL:
-          if (!re_num_cmp(win_linetabsize(rex.reg_win == NULL
-                                          ? curwin : rex.reg_win,
-                                          rex.reg_firstlnum + rex.lnum,
-                                          (char *)rex.line,
-                                          (colnr_T)(rex.input - rex.line)) + 1,
+          if (!re_num_cmp((unsigned)win_linetabsize(rex.reg_win == NULL ? curwin : rex.reg_win,
+                                                    rex.reg_firstlnum + rex.lnum,
+                                                    (char *)rex.line,
+                                                    (colnr_T)(rex.input - rex.line)) + 1,
                           scan)) {
             status = RA_NOMATCH;
           }
@@ -14749,9 +14751,9 @@ static int nfa_regmatch(nfa_regprog_T *prog, nfa_state_T *start, regsubs_T *subm
           result = col > t->state->val * ts;
         }
         if (!result) {
-          uintmax_t lts = win_linetabsize(wp, rex.reg_firstlnum + rex.lnum, (char *)rex.line, col);
+          int lts = win_linetabsize(wp, rex.reg_firstlnum + rex.lnum, (char *)rex.line, col);
           assert(t->state->val >= 0);
-          result = nfa_re_num_cmp((uintmax_t)t->state->val, op, lts + 1);
+          result = nfa_re_num_cmp((uintmax_t)t->state->val, op, (uintmax_t)lts + 1);
         }
         if (result) {
           add_here = true;
