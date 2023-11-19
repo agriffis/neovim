@@ -15,24 +15,7 @@
 
 EXTERN int extmark_splice_pending INIT( = 0);
 
-typedef struct {
-  uint64_t ns_id;
-  uint64_t mark_id;
-  int row;
-  colnr_T col;
-  int end_row;
-  colnr_T end_col;
-  bool right_gravity;
-  bool end_right_gravity;
-  bool invalidate;
-  bool invalid;
-  bool no_undo;
-  Decoration decor;  // TODO(bfredl): CHONKY
-} ExtmarkInfo;
-#define EXTMARKINFO_INIT { 0, 0, -1, -1, -1, -1, false, false, false, false, false, \
-                           DECORATION_INIT };
-
-typedef kvec_t(ExtmarkInfo) ExtmarkInfoArray;
+typedef kvec_t(MTPair) ExtmarkInfoArray;
 
 // TODO(bfredl): good enough name for now.
 typedef ptrdiff_t bcount_t;
@@ -84,9 +67,10 @@ typedef enum {
 typedef enum {
   kExtmarkNone = 0x1,
   kExtmarkSign = 0x2,
-  kExtmarkVirtText = 0x4,
-  kExtmarkVirtLines = 0x8,
-  kExtmarkHighlight = 0x10,
+  kExtmarkSignHL = 0x4,
+  kExtmarkVirtText = 0x8,
+  kExtmarkVirtLines = 0x10,
+  kExtmarkHighlight = 0x20,
 } ExtmarkType;
 
 // TODO(bfredl): reduce the number of undo action types

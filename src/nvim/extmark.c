@@ -159,21 +159,22 @@ static bool extmark_setraw(buf_T *buf, uint64_t mark, int row, colnr_T col)
   return true;
 }
 
-linenr_T extmark_del_id(buf_T *buf, uint32_t ns_id, uint32_t id)
+/// Remove an extmark in "ns_id" by "id"
+///
+/// @return false on missing id
+bool extmark_del_id(buf_T *buf, uint32_t ns_id, uint32_t id)
 {
-  MarkTreeIter it[1] = { 0 };
-  MTKey key = marktree_lookup_ns(buf->b_marktree, ns_id, id, false, it);
-  if (!key.id) {
-    return 0;
+  MarkTreeIter itr[1] = { 0 };
+  MTKey key = marktree_lookup_ns(buf->b_marktree, ns_id, id, false, itr);
+  if (key.id) {
+    extmark_del(buf, itr, key, false);
   }
 
-  return extmark_del(buf, it, key, false);
+  return key.id > 0;
 }
 
 /// Remove a (paired) extmark "key" pointed to by "itr"
-///
-/// @return  line number of the deleted mark
-linenr_T extmark_del(buf_T *buf, MarkTreeIter *itr, MTKey key, bool restore)
+void extmark_del(buf_T *buf, MarkTreeIter *itr, MTKey key, bool restore)
 {
   assert(key.pos.row >= 0);
 
@@ -193,7 +194,6 @@ linenr_T extmark_del(buf_T *buf, MarkTreeIter *itr, MTKey key, bool restore)
   }
 
   // TODO(bfredl): delete it from current undo header, opportunistically?
-  return key.pos.row + 1;
 }
 
 /// Free extmarks in a ns between lines
@@ -240,8 +240,8 @@ bool extmark_clear(buf_T *buf, uint32_t ns_id, int l_row, colnr_T l_col, int u_r
 ///
 /// if upper_lnum or upper_col are negative the buffer
 /// will be searched to the start, or end
-/// dir can be set to control the order of the array
-/// amount = amount of marks to find or -1 for all
+/// reverse can be set to control the order of the array
+/// amount = amount of marks to find or INT64_MAX for all
 ExtmarkInfoArray extmark_get(buf_T *buf, uint32_t ns_id, int l_row, colnr_T l_col, int u_row,
                              colnr_T u_col, int64_t amount, bool reverse, ExtmarkType type_filter,
                              bool overlap)
@@ -257,7 +257,7 @@ ExtmarkInfoArray extmark_get(buf_T *buf, uint32_t ns_id, int l_row, colnr_T l_co
 
     MTPair pair;
     while (marktree_itr_step_overlap(buf->b_marktree, itr, &pair)) {
-      push_mark(&array, ns_id, type_filter, pair.start, pair.end_pos, pair.end_right_gravity);
+      push_mark(&array, ns_id, type_filter, pair);
     }
   } else {
     // Find all the marks beginning with the start position
@@ -278,7 +278,7 @@ ExtmarkInfoArray extmark_get(buf_T *buf, uint32_t ns_id, int l_row, colnr_T l_co
     }
 
     MTKey end = marktree_get_alt(buf->b_marktree, mark, NULL);
-    push_mark(&array, ns_id, type_filter, mark, end.pos, mt_right(end));
+    push_mark(&array, ns_id, type_filter, mtpair_from(mark, end));
 next_mark:
     if (reverse) {
       marktree_itr_prev(buf->b_marktree, itr);
@@ -289,17 +289,19 @@ next_mark:
   return array;
 }
 
-static void push_mark(ExtmarkInfoArray *array, uint32_t ns_id, ExtmarkType type_filter, MTKey mark,
-                      MTPos end_pos, bool end_right)
+static void push_mark(ExtmarkInfoArray *array, uint32_t ns_id, ExtmarkType type_filter, MTPair mark)
 {
-  if (!(ns_id == UINT32_MAX || mark.ns == ns_id)) {
+  if (!(ns_id == UINT32_MAX || mark.start.ns == ns_id)) {
     return;
   }
   uint16_t type_flags = kExtmarkNone;
   if (type_filter != kExtmarkNone) {
-    Decoration *decor = mark.decor_full;
+    Decoration *decor = mark.start.decor_full;
     if (decor && (decor->sign_text || decor->number_hl_id)) {
-      type_flags |= kExtmarkSign;
+      type_flags |= (kExtmarkSignHL|kExtmarkSign);
+    }
+    if (decor && (decor->line_hl_id || decor->cursorline_hl_id)) {
+      type_flags |= (kExtmarkSignHL|kExtmarkHighlight);
     }
     if (decor && decor->virt_text.size) {
       type_flags |= kExtmarkVirtText;
@@ -307,8 +309,7 @@ static void push_mark(ExtmarkInfoArray *array, uint32_t ns_id, ExtmarkType type_
     if (decor && decor->virt_lines.size) {
       type_flags |= kExtmarkVirtLines;
     }
-    if ((decor && (decor->line_hl_id || decor->cursorline_hl_id))
-        || mark.hl_id) {
+    if (mark.start.hl_id) {
       type_flags |= kExtmarkHighlight;
     }
 
@@ -317,44 +318,20 @@ static void push_mark(ExtmarkInfoArray *array, uint32_t ns_id, ExtmarkType type_
     }
   }
 
-  kv_push(*array, ((ExtmarkInfo) { .ns_id = mark.ns,
-                                   .mark_id = mark.id,
-                                   .row = mark.pos.row, .col = mark.pos.col,
-                                   .end_row = end_pos.row,
-                                   .end_col = end_pos.col,
-                                   .invalidate = mt_invalidate(mark),
-                                   .invalid = mt_invalid(mark),
-                                   .right_gravity = mt_right(mark),
-                                   .end_right_gravity = end_right,
-                                   .no_undo = mt_no_undo(mark),
-                                   .decor = get_decor(mark) }));
+  kv_push(*array, mark);
 }
 
 /// Lookup an extmark by id
-ExtmarkInfo extmark_from_id(buf_T *buf, uint32_t ns_id, uint32_t id)
+MTPair extmark_from_id(buf_T *buf, uint32_t ns_id, uint32_t id)
 {
-  ExtmarkInfo ret = EXTMARKINFO_INIT;
   MTKey mark = marktree_lookup_ns(buf->b_marktree, ns_id, id, false, NULL);
   if (!mark.id) {
-    return ret;
+    return mtpair_from(mark, mark);  // invalid
   }
   assert(mark.pos.row >= 0);
   MTKey end = marktree_get_alt(buf->b_marktree, mark, NULL);
 
-  ret.ns_id = ns_id;
-  ret.mark_id = id;
-  ret.row = mark.pos.row;
-  ret.col = mark.pos.col;
-  ret.end_row = end.pos.row;
-  ret.end_col = end.pos.col;
-  ret.right_gravity = mt_right(mark);
-  ret.end_right_gravity = mt_right(end);
-  ret.no_undo = mt_no_undo(mark);
-  ret.invalidate = mt_invalidate(mark);
-  ret.invalid = mt_invalid(mark);
-  ret.decor = get_decor(mark);
-
-  return ret;
+  return mtpair_from(mark, end);
 }
 
 /// free extmarks from the buffer
@@ -594,6 +571,20 @@ void extmark_splice_impl(buf_T *buf, int start_row, colnr_T start_col, bcount_t 
     int end_row = start_row + old_row;
     int end_col = (old_row ? 0 : start_col) + old_col;
     extmark_splice_delete(buf, start_row, start_col, end_row, end_col, undo);
+  }
+
+  // Move the signcolumn sentinel line
+  if (buf->b_signs_with_text && buf->b_signcols.sentinel) {
+    linenr_T se_lnum = buf->b_signcols.sentinel;
+    if (se_lnum >= start_row) {
+      if (old_row != 0 && se_lnum > old_row + start_row) {
+        buf->b_signcols.sentinel += new_row - old_row;
+      } else if (new_row == 0) {
+        buf->b_signcols.sentinel = 0;
+      } else {
+        buf->b_signcols.sentinel += new_row;
+      }
+    }
   }
 
   marktree_splice(buf->b_marktree, (int32_t)start_row, start_col,
