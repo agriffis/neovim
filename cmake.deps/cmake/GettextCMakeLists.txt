@@ -1,5 +1,13 @@
 cmake_minimum_required(VERSION 3.10)
+
+# Can be removed once minimum version is at least 3.15
+if(POLICY CMP0092)
+  cmake_policy(SET CMP0092 NEW)
+endif()
 project(gettext C)
+
+add_compile_options(-w)
+set(CMAKE_STATIC_LINKER_FLAGS "${CMAKE_STATIC_LINKER_FLAGS} /ignore:4006")
 
 # Adds PREFIX to each item in LIST
 macro(PREFIX_LIST_ITEMS LIST PREFIX)
@@ -73,8 +81,7 @@ set_property(TARGET libintl APPEND PROPERTY COMPILE_DEFINITIONS
   NO_XMALLOC
   set_relocation_prefix=libintl_set_relocation_prefix
   relocate=libintl_relocate
-  HAVE_CONFIG_H
-  _CRT_SECURE_NO_WARNINGS)
+  HAVE_CONFIG_H)
 
 
 file(READ gettext-tools/config.h.in CONFIG_CONTENT)

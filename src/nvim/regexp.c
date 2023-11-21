@@ -3826,7 +3826,7 @@ static uint8_t *regnext(uint8_t *p)
 }
 
 // Set the next-pointer at the end of a node chain.
-static void regtail(uint8_t *p, uint8_t *val)
+static void regtail(uint8_t *p, const uint8_t *val)
 {
   int offset;
 
@@ -5109,9 +5109,9 @@ static uint8_t *reg(int paren, int *flagp)
   }
 
   // Make a closing node, and hook it on the end.
-  ender = regnode(paren == REG_ZPAREN ? ZCLOSE + parno :
-                  paren == REG_PAREN ? MCLOSE + parno :
-                  paren == REG_NPAREN ? NCLOSE : END);
+  ender = regnode(paren == REG_ZPAREN ? ZCLOSE + parno
+                                      : paren == REG_PAREN ? MCLOSE + parno
+                                                           : paren == REG_NPAREN ? NCLOSE : END);
   regtail(ret, ender);
 
   // Hook the tails of the branches to the closing node.
@@ -5843,7 +5843,7 @@ static void restore_subexpr(regbehind_T *bp)
 ///         just after the last matched character.
 ///         - false when there is no match.  Leaves rex.input and rex.lnum in an
 ///         undefined state!
-static bool regmatch(uint8_t *scan, proftime_T *tm, int *timed_out)
+static bool regmatch(uint8_t *scan, const proftime_T *tm, int *timed_out)
 {
   uint8_t *next;          // Next node.
   int op;
@@ -5985,8 +5985,8 @@ static bool regmatch(uint8_t *scan, proftime_T *tm, int *timed_out)
             pos = &fm->mark;
             const colnr_T pos_col = pos->lnum == rex.lnum + rex.reg_firstlnum
                                     && pos->col == MAXCOL
-              ? (colnr_T)strlen(reg_getline(pos->lnum - rex.reg_firstlnum))
-              : pos->col;
+                                    ? (colnr_T)strlen(reg_getline(pos->lnum - rex.reg_firstlnum))
+                                    : pos->col;
 
             if (pos->lnum == rex.lnum + rex.reg_firstlnum
                 ? (pos_col == (colnr_T)(rex.input - rex.line)
@@ -7505,7 +7505,7 @@ static int bt_regexec_multi(regmmatch_T *rmp, win_T *win, buf_T *buf, linenr_T l
 }
 
 // Compare a number with the operand of RE_LNUM, RE_COL or RE_VCOL.
-static int re_num_cmp(uint32_t val, uint8_t *scan)
+static int re_num_cmp(uint32_t val, const uint8_t *scan)
 {
   uint32_t n = (uint32_t)OPERAND_MIN(scan);
 
@@ -8472,7 +8472,7 @@ static void realloc_post_list(void)
 // to the closing brace.
 // Keep in mind that 'ignorecase' applies at execution time, thus [a-z] may
 // need to be interpreted as [a-zA-Z].
-static int nfa_recognize_char_class(uint8_t *start, uint8_t *end, int extra_newl)
+static int nfa_recognize_char_class(uint8_t *start, const uint8_t *end, int extra_newl)
 {
 #define CLASS_not            0x80
 #define CLASS_af             0x40
@@ -10064,8 +10064,8 @@ static int nfa_regatom(void)
             n = curwin->w_cursor.lnum;
           }
           // \%{n}l  \%{n}<l  \%{n}>l
-          EMIT(cmp == '<' ? NFA_LNUM_LT :
-               cmp == '>' ? NFA_LNUM_GT : NFA_LNUM);
+          EMIT(cmp == '<' ? NFA_LNUM_LT
+                          : cmp == '>' ? NFA_LNUM_GT : NFA_LNUM);
           if (save_prev_at_start) {
             at_start = true;
           }
@@ -10075,8 +10075,8 @@ static int nfa_regatom(void)
             n++;
           }
           // \%{n}c  \%{n}<c  \%{n}>c
-          EMIT(cmp == '<' ? NFA_COL_LT :
-               cmp == '>' ? NFA_COL_GT : NFA_COL);
+          EMIT(cmp == '<' ? NFA_COL_LT
+                          : cmp == '>' ? NFA_COL_GT : NFA_COL);
         } else {
           if (cur) {
             colnr_T vcol = 0;
@@ -10084,8 +10084,8 @@ static int nfa_regatom(void)
             n = ++vcol;
           }
           // \%{n}v  \%{n}<v  \%{n}>v
-          EMIT(cmp == '<' ? NFA_VCOL_LT :
-               cmp == '>' ? NFA_VCOL_GT : NFA_VCOL);
+          EMIT(cmp == '<' ? NFA_VCOL_LT
+                          : cmp == '>' ? NFA_VCOL_GT : NFA_VCOL);
           limit = INT32_MAX / MB_MAXBYTES;
         }
         if (n >= limit) {
@@ -10096,8 +10096,8 @@ static int nfa_regatom(void)
         break;
       } else if (c == '\'' && n == 0) {
         // \%'m  \%<'m  \%>'m
-        EMIT(cmp == '<' ? NFA_MARK_LT :
-             cmp == '>' ? NFA_MARK_GT : NFA_MARK);
+        EMIT(cmp == '<' ? NFA_MARK_LT
+                        : cmp == '>' ? NFA_MARK_GT : NFA_MARK);
         EMIT(getchr());
         break;
       }
@@ -10271,7 +10271,7 @@ collection:
 
           if (*regparse == 'n') {
             startc = (reg_string || emit_range || regparse[1] == '-')
-              ? NL : NFA_NEWL;
+                     ? NL : NFA_NEWL;
           } else if (*regparse == 'd'
                      || *regparse == 'o'
                      || *regparse == 'x'
@@ -13356,7 +13356,7 @@ static void nfa_save_listids(nfa_regprog_T *prog, int *list)
 }
 
 // Restore list IDs from "list" to all NFA states.
-static void nfa_restore_listids(nfa_regprog_T *prog, int *list)
+static void nfa_restore_listids(nfa_regprog_T *prog, const int *list)
 {
   int i;
   nfa_state_T *p;
@@ -14435,9 +14435,9 @@ static int nfa_regmatch(nfa_regprog_T *prog, nfa_state_T *start, regsubs_T *subm
               }
             }
           } else if (state->c < 0 ? check_char_class(state->c, curc)
-                     : (curc == state->c
-                        || (rex.reg_ic
-                            && utf_fold(curc) == utf_fold(state->c)))) {
+                                  : (curc == state->c
+                                     || (rex.reg_ic
+                                         && utf_fold(curc) == utf_fold(state->c)))) {
             result = result_if_matched;
             break;
           }
@@ -14780,18 +14780,18 @@ static int nfa_regmatch(nfa_regprog_T *prog, nfa_state_T *start, regsubs_T *subm
           pos_T *pos = &fm->mark;
           const colnr_T pos_col = pos->lnum == rex.lnum + rex.reg_firstlnum
                                   && pos->col == MAXCOL
-            ? (colnr_T)strlen(reg_getline(pos->lnum - rex.reg_firstlnum))
-            : pos->col;
+                                  ? (colnr_T)strlen(reg_getline(pos->lnum - rex.reg_firstlnum))
+                                  : pos->col;
 
           result = pos->lnum == rex.lnum + rex.reg_firstlnum
-            ? (pos_col == (colnr_T)(rex.input - rex.line)
-               ? t->state->c == NFA_MARK
-               : (pos_col < (colnr_T)(rex.input - rex.line)
-                  ? t->state->c == NFA_MARK_GT
-                  : t->state->c == NFA_MARK_LT))
-            : (pos->lnum < rex.lnum + rex.reg_firstlnum
-               ? t->state->c == NFA_MARK_GT
-               : t->state->c == NFA_MARK_LT);
+                   ? (pos_col == (colnr_T)(rex.input - rex.line)
+                      ? t->state->c == NFA_MARK
+                      : (pos_col < (colnr_T)(rex.input - rex.line)
+                         ? t->state->c == NFA_MARK_GT
+                         : t->state->c == NFA_MARK_LT))
+                   : (pos->lnum < rex.lnum + rex.reg_firstlnum
+                      ? t->state->c == NFA_MARK_GT
+                      : t->state->c == NFA_MARK_LT);
           if (result) {
             add_here = true;
             add_state = t->state->out;

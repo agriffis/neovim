@@ -1260,11 +1260,10 @@ int recover_names(char *fname, bool do_list, list_T *ret_list, int nr, char **fn
 #ifdef HAVE_READLINK
     // Expand symlink in the file name, because the swapfile is created
     // with the actual file instead of with the symlink.
-    if (resolve_symlink(fname, fname_buf) == OK) {
-      fname_res = fname_buf;
-    } else
-#endif
+    fname_res = (resolve_symlink(fname, fname_buf) == OK) ? fname_buf : fname;
+#else
     fname_res = fname;
+#endif
   }
 
   if (do_list) {
@@ -3437,9 +3436,9 @@ static char *findswapname(buf_T *buf, char **dirp, char *old_fname, bool *found_
                                name,
                                process_running
                                ? _("&Open Read-Only\n&Edit anyway\n&Recover"
-                                   "\n&Quit\n&Abort") :
-                               _("&Open Read-Only\n&Edit anyway\n&Recover"
-                                 "\n&Delete it\n&Quit\n&Abort"),
+                                   "\n&Quit\n&Abort")
+                               : _("&Open Read-Only\n&Edit anyway\n&Recover"
+                                   "\n&Delete it\n&Quit\n&Abort"),
                                1, NULL, false);
 
             if (process_running && choice >= 4) {

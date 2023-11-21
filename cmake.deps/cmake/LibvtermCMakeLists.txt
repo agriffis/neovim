@@ -1,11 +1,13 @@
 cmake_minimum_required(VERSION 3.10)
+# Can be removed once minimum version is at least 3.15
+if(POLICY CMP0092)
+  cmake_policy(SET CMP0092 NEW)
+endif()
 project(libvterm C)
 
-include(GNUInstallDirs)
+add_compile_options(-w)
 
-if(MSVC)
-  add_definitions(-D_CRT_SECURE_NO_WARNINGS -D_CRT_NONSTDC_NO_DEPRECATE)
-endif()
+include(GNUInstallDirs)
 
 set(DECDRAWING [[
  static const struct StaticTableEncoding encoding_DECdrawing = {
