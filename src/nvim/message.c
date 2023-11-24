@@ -1395,7 +1395,11 @@ void msg_ext_set_kind(const char *msg_kind)
 /// Prepare for outputting characters in the command line.
 void msg_start(void)
 {
-  int did_return = false;
+  bool did_return = false;
+
+  if (msg_row < cmdline_row) {
+    msg_row = cmdline_row;
+  }
 
   if (!msg_silent) {
     XFREE_CLEAR(keep_msg);              // don't display old message now
@@ -2986,10 +2990,13 @@ void msg_clr_eos_force(void)
   int msg_startcol = (cmdmsg_rl) ? 0 : msg_col;
   int msg_endcol = (cmdmsg_rl) ? Columns - msg_col : Columns;
 
+  // TODO(bfredl): ugly, this state should already been validated at this
+  // point. But msg_clr_eos() is called in a lot of places.
   if (msg_grid.chars && msg_row < msg_grid_pos) {
-    // TODO(bfredl): ugly, this state should already been validated at this
-    // point. But msg_clr_eos() is called in a lot of places.
-    msg_row = msg_grid_pos;
+    msg_grid_validate();
+    if (msg_row < msg_grid_pos) {
+      msg_row = msg_grid_pos;
+    }
   }
 
   grid_fill(&msg_grid_adj, msg_row, msg_row + 1, msg_startcol, msg_endcol,

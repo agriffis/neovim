@@ -46,22 +46,17 @@ describe('statuscolumn', function()
   end)
 
   it("widens with irregular 'statuscolumn' width", function()
-    command([[set stc=%{v:relnum?v:relnum:(v:lnum==5?'bbbbb':v:lnum)}]])
-    command('norm 5G | redraw!')
+    screen:try_resize(screen._width, 4)
+    command([=[
+      set stc=%{v:relnum?v:relnum:(v:lnum==5?'bbbbb':v:lnum)}
+      let ns = nvim_create_namespace('')
+      call nvim_buf_set_extmark(0, ns, 3, 0, {'virt_text':[['virt_text']]})
+      norm 5G | redraw!
+    ]=])
     screen:expect([[
-      1    aaaaa                                           |
+      1    aaaaa virt_text                                 |
       bbbbba^eaaa                                           |
       1    aaaaa                                           |
-      2    aaaaa                                           |
-      3    aaaaa                                           |
-      4    aaaaa                                           |
-      5    aaaaa                                           |
-      6    aaaaa                                           |
-      7    aaaaa                                           |
-      8    aaaaa                                           |
-      9    aaaaa                                           |
-      10   aaaaa                                           |
-      11   aaaaa                                           |
                                                            |
     ]])
   end)
@@ -593,6 +588,33 @@ describe('statuscolumn', function()
         eq('0 1 r 10', eval("g:testvar"))
         meths.input_mouse('left', 'press', '', 0, 7, 7)
         eq('0 1 l 11', eval("g:testvar"))
+      end)
+
+      it('selecting popupmenu does not drag mouse', function()
+        screen:try_resize(screen._width, 2)
+        screen:set_default_attr_ids({
+          [0] = {foreground = Screen.colors.Brown},
+          [1] = {background = Screen.colors.Plum1},
+        })
+        meths.set_option_value('statuscolumn', '%0@MyClickFunc@%l%T', {})
+        exec([[
+          function! MyClickFunc(minwid, clicks, button, mods)
+            let g:testvar = printf("%d %d %s %d", a:minwid, a:clicks, a:button, getmousepos().line)
+            menu PopupStc.Echo <cmd>echo g:testvar<CR>
+            popup PopupStc
+          endfunction
+        ]])
+        meths.input_mouse('left', 'press', '', 0, 0, 0)
+        screen:expect([[
+          {0:8 }^aaaaa                                              |
+           {1: Echo }                                              |
+        ]])
+        meths.input_mouse('left', 'press', '', 0, 1, 5)
+        meths.input_mouse('left', 'release', '', 0, 1, 5)
+        screen:expect([[
+          {0:8 }^aaaaa                                              |
+          0 1 l 8                                              |
+        ]])
       end)
     end)
   end
