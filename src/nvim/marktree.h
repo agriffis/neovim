@@ -8,12 +8,12 @@
 #include "klib/kvec.h"
 #include "nvim/assert.h"
 #include "nvim/decoration_defs.h"
-#include "nvim/garray.h"
+#include "nvim/garray_defs.h"
 #include "nvim/map.h"
 #include "nvim/pos.h"
 #include "nvim/types.h"
 // only for debug functions:
-#include "api/private/defs.h"
+#include "nvim/api/private/defs.h"
 
 struct mtnode_s;
 

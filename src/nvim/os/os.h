@@ -5,8 +5,9 @@
 
 #include "nvim/buffer_defs.h"
 #include "nvim/cmdexpand_defs.h"
-#include "nvim/garray.h"
+#include "nvim/garray_defs.h"
 #include "nvim/os/fs_defs.h"
+#include "nvim/os/os_defs.h"  // IWYU pragma: export
 #include "nvim/os/stdpaths_defs.h"
 #include "nvim/types.h"
 
