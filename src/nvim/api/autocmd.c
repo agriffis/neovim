@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <lauxlib.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -6,16 +7,17 @@
 #include <string.h>
 
 #include "klib/kvec.h"
-#include "lauxlib.h"
 #include "nvim/api/autocmd.h"
-#include "nvim/api/keysets.h"
+#include "nvim/api/keysets_defs.h"
 #include "nvim/api/private/defs.h"
+#include "nvim/api/private/dispatch.h"
 #include "nvim/api/private/helpers.h"
 #include "nvim/api/private/validate.h"
 #include "nvim/autocmd.h"
 #include "nvim/buffer.h"
 #include "nvim/eval/typval.h"
 #include "nvim/ex_cmds_defs.h"
+#include "nvim/func_attr.h"
 #include "nvim/globals.h"
 #include "nvim/lua/executor.h"
 #include "nvim/memory.h"

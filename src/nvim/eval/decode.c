@@ -14,13 +14,14 @@
 #include "nvim/eval/encode.h"
 #include "nvim/eval/typval.h"
 #include "nvim/eval/typval_defs.h"
+#include "nvim/func_attr.h"
 #include "nvim/garray.h"
 #include "nvim/gettext.h"
 #include "nvim/macros.h"
 #include "nvim/mbyte.h"
 #include "nvim/memory.h"
 #include "nvim/message.h"
-#include "nvim/types.h"
+#include "nvim/types_defs.h"
 #include "nvim/vim.h"
 
 /// Helper structure for container_struct

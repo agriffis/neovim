@@ -18,6 +18,7 @@
 #include "nvim/event/loop.h"
 #include "nvim/event/signal.h"
 #include "nvim/event/stream.h"
+#include "nvim/func_attr.h"
 #include "nvim/globals.h"
 #include "nvim/grid.h"
 #include "nvim/highlight_defs.h"
@@ -32,7 +33,7 @@
 #include "nvim/tui/input.h"
 #include "nvim/tui/terminfo.h"
 #include "nvim/tui/tui.h"
-#include "nvim/types.h"
+#include "nvim/types_defs.h"
 #include "nvim/ugrid.h"
 #include "nvim/ui.h"
 #include "nvim/ui_client.h"
@@ -1051,7 +1052,7 @@ void tui_grid_cursor_goto(TUIData *tui, Integer grid, Integer row, Integer col)
   tui->col = (int)col;
 }
 
-CursorShape tui_cursor_decode_shape(const char *shape_str)
+static CursorShape tui_cursor_decode_shape(const char *shape_str)
 {
   CursorShape shape;
   if (strequal(shape_str, "block")) {
@@ -1144,7 +1145,7 @@ void tui_mouse_off(TUIData *tui)
   }
 }
 
-void tui_set_mode(TUIData *tui, ModeShape mode)
+static void tui_set_mode(TUIData *tui, ModeShape mode)
 {
   if (!cursor_style_enabled) {
     return;

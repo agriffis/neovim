@@ -1,13 +1,17 @@
 #pragma once
 
-#include "nvim/ex_cmds_defs.h"
-#include "nvim/option_defs.h"
-#include "nvim/types.h"
+#include "nvim/eval/typval_defs.h"  // IWYU pragma: keep
+#include "nvim/ex_cmds_defs.h"  // IWYU pragma: keep
+#include "nvim/option_defs.h"  // IWYU pragma: keep
+#include "nvim/pos_defs.h"  // IWYU pragma: keep
+#include "nvim/types_defs.h"  // IWYU pragma: keep
 
-// flags for skip_vimgrep_pat()
-#define VGR_GLOBAL      1
-#define VGR_NOJUMP      2
-#define VGR_FUZZY       4
+/// flags for skip_vimgrep_pat()
+enum {
+  VGR_GLOBAL = 1,
+  VGR_NOJUMP = 2,
+  VGR_FUZZY  = 4,
+};
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "quickfix.h.generated.h"

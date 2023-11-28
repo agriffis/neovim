@@ -10,7 +10,7 @@
 #include "nvim/highlight_defs.h"
 #include "nvim/macros.h"
 #include "nvim/memory.h"
-#include "nvim/types.h"
+#include "nvim/types_defs.h"
 
 struct ui_t;
 
@@ -122,7 +122,7 @@ typedef struct ui_event_callback {
 // uncrustify:off
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "ui.h.generated.h"
-# include "ui_events_call.h.generated.h"
+# include "ui_events_call.h.generated.h"  // IWYU pragma: export
 #endif
 // uncrustify:on
 

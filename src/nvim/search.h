@@ -7,8 +7,8 @@
 #include "nvim/eval/typval_defs.h"
 #include "nvim/normal.h"
 #include "nvim/os/time.h"
-#include "nvim/pos.h"
-#include "nvim/types.h"
+#include "nvim/pos_defs.h"
+#include "nvim/types_defs.h"
 #include "nvim/vim.h"
 
 // Values for the find_pattern_in_path() function args 'type' and 'action':

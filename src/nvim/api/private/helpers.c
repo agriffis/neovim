@@ -1,10 +1,10 @@
 #include <assert.h>
-#include <inttypes.h>
 #include <limits.h>
 #include <msgpack/unpack.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,8 +17,10 @@
 #include "nvim/ascii.h"
 #include "nvim/buffer_defs.h"
 #include "nvim/eval/typval.h"
+#include "nvim/eval/typval_defs.h"
 #include "nvim/eval/vars.h"
 #include "nvim/ex_eval.h"
+#include "nvim/func_attr.h"
 #include "nvim/garray.h"
 #include "nvim/globals.h"
 #include "nvim/highlight_group.h"
@@ -29,8 +31,8 @@
 #include "nvim/memory.h"
 #include "nvim/message.h"
 #include "nvim/msgpack_rpc/helpers.h"
-#include "nvim/pos.h"
-#include "nvim/types.h"
+#include "nvim/pos_defs.h"
+#include "nvim/types_defs.h"
 #include "nvim/ui.h"
 #include "nvim/version.h"
 

@@ -10,8 +10,8 @@
 #include "nvim/decoration_defs.h"
 #include "nvim/garray_defs.h"
 #include "nvim/map.h"
-#include "nvim/pos.h"
-#include "nvim/types.h"
+#include "nvim/pos_defs.h"
+#include "nvim/types_defs.h"
 // only for debug functions:
 #include "nvim/api/private/defs.h"
 
@@ -48,7 +48,7 @@ typedef struct {
 } MarkTreeIter;
 
 #define marktree_itr_valid(itr) ((itr)->x != NULL)
-// accces raw key: flags in MT_FLAG_EXTERNAL_MASK and decor_data are safe to modify.
+// access raw key: flags in MT_FLAG_EXTERNAL_MASK and decor_data are safe to modify.
 #define mt_itr_rawkey(itr) ((itr)->x->key[(itr)->i])
 
 // Internal storage

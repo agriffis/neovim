@@ -1,8 +1,8 @@
 #include <assert.h>
+#include <lauxlib.h>
 #include <string.h>
 
 #include "klib/kvec.h"
-#include "lauxlib.h"
 #include "nvim/api/extmark.h"
 #include "nvim/api/private/defs.h"
 #include "nvim/api/private/helpers.h"
@@ -14,7 +14,7 @@
 #include "nvim/log.h"
 #include "nvim/lua/executor.h"
 #include "nvim/message.h"
-#include "nvim/pos.h"
+#include "nvim/pos_defs.h"
 
 static kvec_t(DecorProvider) decor_providers = KV_INITIAL_VALUE;
 

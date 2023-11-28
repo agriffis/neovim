@@ -1,16 +1,17 @@
 #include <assert.h>
-#include <inttypes.h>
 #include <stdbool.h>
 #include <string.h>
 
-#include "nvim/api/keysets.h"
+#include "nvim/api/keysets_defs.h"
 #include "nvim/api/options.h"
 #include "nvim/api/private/defs.h"
+#include "nvim/api/private/dispatch.h"
 #include "nvim/api/private/helpers.h"
 #include "nvim/api/private/validate.h"
 #include "nvim/autocmd.h"
 #include "nvim/buffer.h"
 #include "nvim/eval/window.h"
+#include "nvim/func_attr.h"
 #include "nvim/globals.h"
 #include "nvim/macros.h"
 #include "nvim/memory.h"

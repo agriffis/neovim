@@ -6,18 +6,19 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <uv.h>
 
+#include "klib/kvec.h"
 #include "nvim/api/private/defs.h"
 #include "nvim/api/private/helpers.h"
 #include "nvim/ascii.h"
 #include "nvim/autocmd.h"
 #include "nvim/charset.h"
 #include "nvim/cmdexpand.h"
-#include "nvim/cmdexpand_defs.h"
 #include "nvim/debugger.h"
 #include "nvim/eval.h"
 #include "nvim/eval/typval.h"
@@ -25,6 +26,7 @@
 #include "nvim/ex_cmds_defs.h"
 #include "nvim/ex_docmd.h"
 #include "nvim/ex_eval.h"
+#include "nvim/func_attr.h"
 #include "nvim/garray.h"
 #include "nvim/getchar.h"
 #include "nvim/gettext.h"
@@ -40,14 +42,17 @@
 #include "nvim/option.h"
 #include "nvim/option_defs.h"
 #include "nvim/option_vars.h"
+#include "nvim/os/fs.h"
 #include "nvim/os/input.h"
 #include "nvim/os/os.h"
 #include "nvim/os/stdpaths_defs.h"
 #include "nvim/path.h"
+#include "nvim/pos_defs.h"
 #include "nvim/profile.h"
 #include "nvim/regexp.h"
 #include "nvim/runtime.h"
 #include "nvim/strings.h"
+#include "nvim/types_defs.h"
 #include "nvim/usercmd.h"
 #include "nvim/vim.h"
 
@@ -70,6 +75,15 @@ struct source_cookie {
   int level;                    ///< top nesting level of sourced file
   vimconv_T conv;               ///< type of conversion
 };
+
+typedef struct {
+  char *path;
+  bool after;
+  TriState has_lua;
+} SearchPathItem;
+
+typedef kvec_t(SearchPathItem) RuntimeSearchPath;
+typedef kvec_t(char *) CharVec;
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "runtime.c.generated.h"
@@ -427,7 +441,7 @@ int do_in_path(const char *path, const char *prefix, char *name, int flags,
   return did_one ? OK : FAIL;
 }
 
-RuntimeSearchPath runtime_search_path_get_cached(int *ref)
+static RuntimeSearchPath runtime_search_path_get_cached(int *ref)
   FUNC_ATTR_NONNULL_ALL
 {
   runtime_search_path_validate();
@@ -442,7 +456,7 @@ RuntimeSearchPath runtime_search_path_get_cached(int *ref)
   return runtime_search_path;
 }
 
-RuntimeSearchPath copy_runtime_search_path(const RuntimeSearchPath src)
+static RuntimeSearchPath copy_runtime_search_path(const RuntimeSearchPath src)
 {
   RuntimeSearchPath dst = KV_INITIAL_VALUE;
   for (size_t j = 0; j < kv_size(src); j++) {
@@ -453,7 +467,7 @@ RuntimeSearchPath copy_runtime_search_path(const RuntimeSearchPath src)
   return dst;
 }
 
-void runtime_search_path_unref(RuntimeSearchPath path, const int *ref)
+static void runtime_search_path_unref(RuntimeSearchPath path, const int *ref)
   FUNC_ATTR_NONNULL_ALL
 {
   if (*ref) {
@@ -473,7 +487,7 @@ void runtime_search_path_unref(RuntimeSearchPath path, const int *ref)
 /// When "flags" has DIP_ERR: give an error message if there is no match.
 ///
 /// return FAIL when no file could be sourced, OK otherwise.
-int do_in_cached_path(char *name, int flags, DoInRuntimepathCB callback, void *cookie)
+static int do_in_cached_path(char *name, int flags, DoInRuntimepathCB callback, void *cookie)
 {
   char *tail;
   bool did_one = false;
@@ -592,8 +606,8 @@ ArrayOf(String) runtime_get_named_thread(bool lua, Array pat, bool all)
   return rv;
 }
 
-ArrayOf(String) runtime_get_named_common(bool lua, Array pat, bool all,
-                                         RuntimeSearchPath path, char *buf, size_t buf_len)
+static ArrayOf(String) runtime_get_named_common(bool lua, Array pat, bool all,
+                                                RuntimeSearchPath path, char *buf, size_t buf_len)
 {
   ArrayOf(String) rv = ARRAY_DICT_INIT;
   for (size_t i = 0; i < kv_size(path); i++) {
@@ -729,7 +743,7 @@ static bool path_is_after(char *buf, size_t buflen)
          && strcmp(buf + buflen - 5, "after") == 0;
 }
 
-RuntimeSearchPath runtime_search_path_build(void)
+static RuntimeSearchPath runtime_search_path_build(void)
 {
   kvec_t(String) pack_entries = KV_INITIAL_VALUE;
   Map(String, int) pack_used = MAP_INIT;
@@ -804,7 +818,7 @@ const char *did_set_runtimepackpath(optset_T *args)
   return NULL;
 }
 
-void runtime_search_path_free(RuntimeSearchPath path)
+static void runtime_search_path_free(RuntimeSearchPath path)
 {
   for (size_t j = 0; j < kv_size(path); j++) {
     SearchPathItem item = kv_A(path, j);

@@ -4,8 +4,8 @@
 #include <stdint.h>
 
 #include "nvim/api/private/defs.h"
-#include "nvim/memory.h"
-#include "nvim/types.h"
+#include "nvim/memory_defs.h"
+#include "nvim/types_defs.h"
 
 typedef Object (*ApiDispatchWrapper)(uint64_t channel_id, Array args, Arena *arena, Error *error);
 
@@ -26,6 +26,6 @@ extern const MsgpackRpcRequestHandler method_handlers[];
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "api/private/dispatch.h.generated.h"
-# include "api/private/dispatch_wrappers.h.generated.h"
+# include "api/private/dispatch_wrappers.h.generated.h"  // IWYU pragma: export
 # include "keysets_defs.generated.h"
 #endif

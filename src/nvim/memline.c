@@ -39,6 +39,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/types.h>
 #include <time.h>
 #include <uv.h>
 
@@ -55,6 +56,7 @@
 #include "nvim/eval/typval.h"
 #include "nvim/ex_cmds_defs.h"
 #include "nvim/fileio.h"
+#include "nvim/func_attr.h"
 #include "nvim/getchar.h"
 #include "nvim/gettext.h"
 #include "nvim/globals.h"
@@ -77,7 +79,7 @@
 #include "nvim/os/process.h"
 #include "nvim/os/time.h"
 #include "nvim/path.h"
-#include "nvim/pos.h"
+#include "nvim/pos_defs.h"
 #include "nvim/spell.h"
 #include "nvim/statusline.h"
 #include "nvim/strings.h"

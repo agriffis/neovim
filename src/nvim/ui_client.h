@@ -7,7 +7,7 @@
 #include "nvim/api/private/defs.h"
 #include "nvim/grid_defs.h"
 #include "nvim/macros.h"
-#include "nvim/types.h"
+#include "nvim/types_defs.h"
 
 typedef struct {
   const char *name;
@@ -39,6 +39,6 @@ EXTERN bool ui_client_forward_stdin INIT( = false);
 // uncrustify:off
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "ui_client.h.generated.h"
-# include "ui_events_client.h.generated.h"
+# include "ui_events_client.h.generated.h"  // IWYU pragma: export
 #endif
 // uncrustify:on

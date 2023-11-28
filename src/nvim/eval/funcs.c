@@ -58,6 +58,7 @@
 #include "nvim/ex_getln.h"
 #include "nvim/file_search.h"
 #include "nvim/fileio.h"
+#include "nvim/func_attr.h"
 #include "nvim/garray.h"
 #include "nvim/getchar.h"
 #include "nvim/gettext.h"
@@ -90,7 +91,7 @@
 #include "nvim/optionstr.h"
 #include "nvim/os/dl.h"
 #include "nvim/os/fileio.h"
-#include "nvim/os/fs_defs.h"
+#include "nvim/os/fs.h"
 #include "nvim/os/os.h"
 #include "nvim/os/pty_process.h"
 #include "nvim/os/shell.h"
@@ -99,7 +100,7 @@
 #include "nvim/path.h"
 #include "nvim/plines.h"
 #include "nvim/popupmenu.h"
-#include "nvim/pos.h"
+#include "nvim/pos_defs.h"
 #include "nvim/profile.h"
 #include "nvim/regexp.h"
 #include "nvim/runtime.h"
@@ -7440,7 +7441,7 @@ static void f_setenv(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   char valbuf[NUMBUFLEN];
   const char *name = tv_get_string_buf(&argvars[0], namebuf);
 
-  // seting an environment variable may be dangerous, e.g. you could
+  // setting an environment variable may be dangerous, e.g. you could
   // setenv GCONV_PATH=/tmp and then have iconv() unexpectedly call
   // a shell command using some shared library:
   if (check_secure()) {

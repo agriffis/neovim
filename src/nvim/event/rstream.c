@@ -2,12 +2,13 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
+#include <sys/types.h>
 #include <uv.h>
 
 #include "nvim/event/loop.h"
 #include "nvim/event/rstream.h"
 #include "nvim/event/stream.h"
+#include "nvim/func_attr.h"
 #include "nvim/log.h"
 #include "nvim/macros.h"
 #include "nvim/main.h"

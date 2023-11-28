@@ -17,6 +17,7 @@
 #include "nvim/eval.h"
 #include "nvim/eval/typval.h"
 #include "nvim/fileio.h"
+#include "nvim/func_attr.h"
 #include "nvim/garray.h"
 #include "nvim/garray_defs.h"
 #include "nvim/getchar.h"
@@ -36,13 +37,13 @@
 #include "nvim/os/fs.h"
 #include "nvim/os/input.h"
 #include "nvim/os/os_defs.h"
-#include "nvim/pos.h"
+#include "nvim/pos_defs.h"
 #include "nvim/profile.h"
 #include "nvim/spell.h"
 #include "nvim/spellfile.h"
 #include "nvim/spellsuggest.h"
 #include "nvim/strings.h"
-#include "nvim/types.h"
+#include "nvim/types_defs.h"
 #include "nvim/ui.h"
 #include "nvim/undo.h"
 #include "nvim/vim.h"
@@ -3140,8 +3141,7 @@ static void check_suggestions(suginfo_T *su, garray_T *gap)
     // Need to append what follows to check for "the the".
     xstrlcpy(longword, stp[i].st_word, MAXWLEN + 1);
     int len = stp[i].st_wordlen;
-    xstrlcpy(longword + len, su->su_badptr + stp[i].st_orglen,
-             (size_t)(MAXWLEN - len + 1));
+    xstrlcpy(longword + len, su->su_badptr + stp[i].st_orglen, MAXWLEN + 1 - (size_t)len);
     hlf_T attr = HLF_COUNT;
     (void)spell_check(curwin, longword, &attr, NULL, false);
     if (attr != HLF_COUNT) {

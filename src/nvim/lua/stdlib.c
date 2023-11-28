@@ -5,8 +5,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <string.h>
+#include <sys/types.h>
 
 #ifdef NVIM_VENDOR_BIT
 # include "bit.h"
@@ -22,6 +22,7 @@
 #include "nvim/eval/vars.h"
 #include "nvim/ex_eval.h"
 #include "nvim/fold.h"
+#include "nvim/func_attr.h"
 #include "nvim/globals.h"
 #include "nvim/lua/base64.h"
 #include "nvim/lua/converter.h"
@@ -32,10 +33,10 @@
 #include "nvim/mbyte.h"
 #include "nvim/memline.h"
 #include "nvim/memory.h"
-#include "nvim/pos.h"
+#include "nvim/pos_defs.h"
 #include "nvim/regexp.h"
 #include "nvim/runtime.h"
-#include "nvim/types.h"
+#include "nvim/types_defs.h"
 #include "nvim/vim.h"
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS

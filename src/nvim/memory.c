@@ -16,6 +16,7 @@
 #include "nvim/decoration_provider.h"
 #include "nvim/drawline.h"
 #include "nvim/eval.h"
+#include "nvim/func_attr.h"
 #include "nvim/gettext.h"
 #include "nvim/globals.h"
 #include "nvim/highlight.h"
@@ -577,7 +578,9 @@ void alloc_block(Arena *arena)
 
 static size_t arena_align_offset(uint64_t off)
 {
+#define ARENA_ALIGN MAX(sizeof(void *), sizeof(double))
   return ((off + (ARENA_ALIGN - 1)) & ~(ARENA_ALIGN - 1));
+#undef ARENA_ALIGN
 }
 
 /// @param arena if NULL, do a global allocation. caller must then free the value!

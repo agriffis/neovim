@@ -10,6 +10,7 @@
 #include "nvim/decoration.h"
 #include "nvim/diff.h"
 #include "nvim/fold.h"
+#include "nvim/func_attr.h"
 #include "nvim/globals.h"
 #include "nvim/indent.h"
 #include "nvim/macros.h"
@@ -20,9 +21,9 @@
 #include "nvim/option.h"
 #include "nvim/option_vars.h"
 #include "nvim/plines.h"
-#include "nvim/pos.h"
+#include "nvim/pos_defs.h"
 #include "nvim/state.h"
-#include "nvim/types.h"
+#include "nvim/types_defs.h"
 #include "nvim/vim.h"
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS

@@ -1,12 +1,12 @@
 #include <inttypes.h>
+#include <lauxlib.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "klib/kvec.h"
-#include "lauxlib.h"
 #include "nvim/api/command.h"
-#include "nvim/api/keysets.h"
+#include "nvim/api/keysets_defs.h"
 #include "nvim/api/private/defs.h"
 #include "nvim/api/private/dispatch.h"
 #include "nvim/api/private/helpers.h"
@@ -15,10 +15,10 @@
 #include "nvim/autocmd.h"
 #include "nvim/buffer_defs.h"
 #include "nvim/cmdexpand_defs.h"
-#include "nvim/decoration.h"
 #include "nvim/ex_cmds.h"
 #include "nvim/ex_docmd.h"
 #include "nvim/ex_eval.h"
+#include "nvim/func_attr.h"
 #include "nvim/garray.h"
 #include "nvim/globals.h"
 #include "nvim/lua/executor.h"
@@ -26,10 +26,10 @@
 #include "nvim/mbyte.h"
 #include "nvim/memory.h"
 #include "nvim/ops.h"
-#include "nvim/pos.h"
+#include "nvim/pos_defs.h"
 #include "nvim/regexp.h"
 #include "nvim/strings.h"
-#include "nvim/types.h"
+#include "nvim/types_defs.h"
 #include "nvim/usercmd.h"
 #include "nvim/vim.h"
 #include "nvim/window.h"
