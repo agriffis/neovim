@@ -18,7 +18,7 @@
 #include "nvim/api/private/helpers.h"
 #include "nvim/api/private/validate.h"
 #include "nvim/api/vim.h"
-#include "nvim/ascii.h"
+#include "nvim/ascii_defs.h"
 #include "nvim/autocmd.h"
 #include "nvim/buffer.h"
 #include "nvim/channel.h"
@@ -40,7 +40,7 @@
 #include "nvim/keycodes.h"
 #include "nvim/log.h"
 #include "nvim/lua/executor.h"
-#include "nvim/macros.h"
+#include "nvim/macros_defs.h"
 #include "nvim/mapping.h"
 #include "nvim/mark.h"
 #include "nvim/mbyte.h"
@@ -55,7 +55,6 @@
 #include "nvim/option_vars.h"
 #include "nvim/optionstr.h"
 #include "nvim/os/input.h"
-#include "nvim/os/os_defs.h"
 #include "nvim/os/process.h"
 #include "nvim/popupmenu.h"
 #include "nvim/pos_defs.h"
@@ -67,7 +66,7 @@
 #include "nvim/terminal.h"
 #include "nvim/types_defs.h"
 #include "nvim/ui.h"
-#include "nvim/vim.h"
+#include "nvim/vim_defs.h"
 #include "nvim/window.h"
 
 #define LINE_BUFFER_MIN_SIZE 4096
@@ -1999,9 +1998,12 @@ void nvim__screenshot(String path)
   ui_call_screenshot(path);
 }
 
+/// For testing. The condition in schar_cache_clear_if_full is hard to
+/// reach, so this function can be used to force a cache clear in a test.
 void nvim__invalidate_glyph_cache(void)
 {
-  schar_cache_clear_force();
+  schar_cache_clear();
+  must_redraw = UPD_CLEAR;
 }
 
 Object nvim__unpack(String str, Error *err)

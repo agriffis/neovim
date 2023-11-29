@@ -13,6 +13,7 @@ local curbufmeths = helpers.curbufmeths
 local command = helpers.command
 local eq = helpers.eq
 local assert_alive = helpers.assert_alive
+local pcall_err = helpers.pcall_err
 
 describe('decorations providers', function()
   local screen
@@ -1650,6 +1651,34 @@ describe('extmark decorations', function()
     ]])
     command('set conceallevel=1')
     screen:expect_unchanged()
+
+    eq("conceal char has to be printable", pcall_err(meths.buf_set_extmark, 0, ns, 0, 0, {end_col=0, end_row=2, conceal='\255'}))
+  end)
+
+  it('conceal with composed conceal char', function()
+    screen:try_resize(50, 5)
+    insert('foo\n')
+    meths.buf_set_extmark(0, ns, 0, 0, {end_col=0, end_row=2, conceal='ẍ̲'})
+    command('set conceallevel=2')
+    screen:expect([[
+      {26:ẍ̲}                                                 |
+      ^                                                  |
+      {1:~                                                 }|
+      {1:~                                                 }|
+                                                        |
+    ]])
+    command('set conceallevel=1')
+    screen:expect_unchanged()
+
+    -- this is rare, but could happen. Save at least the first codepoint
+    meths._invalidate_glyph_cache()
+    screen:expect{grid=[[
+      {26:x}                                                 |
+      ^                                                  |
+      {1:~                                                 }|
+      {1:~                                                 }|
+                                                        |
+    ]]}
   end)
 
   it('conceal without conceal char #24782', function()
@@ -4689,21 +4718,19 @@ l5
       {2:~                                                 }|
                                                         |
     ]]}
-
   end)
 
   it('can add multiple signs (multiple extmarks) 2', function()
     insert(example_test3)
     feed 'gg'
 
-    meths.buf_set_extmark(0, ns, 1, -1, {sign_text='S1'})
-    meths.buf_set_extmark(0, ns, 1, -1, {sign_text='S2'})
-
+    meths.buf_set_extmark(0, ns, 3, -1, {sign_text='S1'})
+    meths.buf_set_extmark(0, ns, 1, -1, {sign_text='S2', end_row = 3})
     screen:expect{grid=[[
       {1:    }^l1                                            |
-      S1S2l2                                            |
-      {1:    }l3                                            |
-      {1:    }l4                                            |
+      S2{1:  }l2                                            |
+      S2{1:  }l3                                            |
+      S1S2l4                                            |
       {1:    }l5                                            |
       {1:    }                                              |
       {2:~                                                 }|
@@ -4711,23 +4738,6 @@ l5
       {2:~                                                 }|
                                                         |
     ]]}
-
-    -- TODO(lewis6991): Support ranged signs
-    -- meths.buf_set_extmark(1, ns, 1, -1, {sign_text='S3', end_row = 2})
-
-    -- screen:expect{grid=[[
-    --   {1:      }^l1                                          |
-    --   S3S2S1l2                                          |
-    --   S3{1:    }l3                                          |
-    --   {1:      }l4                                          |
-    --   {1:      }l5                                          |
-    --   {1:      }                                            |
-    --   {2:~                                                 }|
-    --   {2:~                                                 }|
-    --   {2:~                                                 }|
-    --                                                     |
-    -- ]]}
-
   end)
 
   it('can add multiple signs (multiple extmarks) 3', function()

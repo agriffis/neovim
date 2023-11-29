@@ -11,7 +11,7 @@
 #include "nvim/api/private/defs.h"
 #include "nvim/api/private/helpers.h"
 #include "nvim/arglist.h"
-#include "nvim/ascii.h"
+#include "nvim/ascii_defs.h"
 #include "nvim/autocmd.h"
 #include "nvim/buffer.h"
 #include "nvim/buffer_defs.h"
@@ -41,9 +41,9 @@
 #include "nvim/grid.h"
 #include "nvim/hashtab.h"
 #include "nvim/keycodes.h"
-#include "nvim/macros.h"
+#include "nvim/macros_defs.h"
 #include "nvim/main.h"
-#include "nvim/map.h"
+#include "nvim/map_defs.h"
 #include "nvim/mapping.h"  // IWYU pragma: keep (langmap_adjust_mb)
 #include "nvim/mark.h"
 #include "nvim/match.h"
@@ -57,7 +57,6 @@
 #include "nvim/option_defs.h"
 #include "nvim/option_vars.h"
 #include "nvim/os/fs.h"
-#include "nvim/os/os_defs.h"
 #include "nvim/path.h"
 #include "nvim/plines.h"
 #include "nvim/pos_defs.h"
@@ -72,7 +71,7 @@
 #include "nvim/ui.h"
 #include "nvim/ui_compositor.h"
 #include "nvim/undo.h"
-#include "nvim/vim.h"
+#include "nvim/vim_defs.h"
 #include "nvim/window.h"
 #include "nvim/winfloat.h"
 
@@ -7102,8 +7101,9 @@ void reset_lnums(void)
 {
   FOR_ALL_TAB_WINDOWS(tp, wp) {
     if (wp->w_buffer == curbuf) {
-      // Restore the value if the autocommand didn't change it and it was
-      // set.
+      // Restore the value if the autocommand didn't change it and it was set.
+      // Note: This triggers e.g. on BufReadPre, when the buffer is not yet
+      //       loaded, so cannot validate the buffer line
       if (equalpos(wp->w_save_cursor.w_cursor_corr, wp->w_cursor)
           && wp->w_save_cursor.w_cursor_save.lnum != 0) {
         wp->w_cursor = wp->w_save_cursor.w_cursor_save;
@@ -7111,6 +7111,9 @@ void reset_lnums(void)
       if (wp->w_save_cursor.w_topline_corr == wp->w_topline
           && wp->w_save_cursor.w_topline_save != 0) {
         wp->w_topline = wp->w_save_cursor.w_topline_save;
+      }
+      if (wp->w_save_cursor.w_topline_save > wp->w_buffer->b_ml.ml_line_count) {
+        wp->w_valid &= ~VALID_TOPLINE;
       }
     }
   }

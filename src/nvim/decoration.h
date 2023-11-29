@@ -8,7 +8,7 @@
 #include "nvim/buffer_defs.h"
 #include "nvim/decoration_defs.h"  // IWYU pragma: export
 #include "nvim/extmark_defs.h"
-#include "nvim/macros.h"
+#include "nvim/macros_defs.h"
 #include "nvim/marktree.h"
 #include "nvim/pos_defs.h"
 #include "nvim/types_defs.h"
@@ -67,7 +67,7 @@ typedef struct {
   int eol_col;
 
   int conceal;
-  int conceal_char;
+  schar_T conceal_char;
   int conceal_attr;
 
   TriState spell;

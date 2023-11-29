@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "nvim/ascii.h"
+#include "nvim/ascii_defs.h"
 #include "nvim/autocmd.h"
 #include "nvim/buffer.h"
 #include "nvim/charset.h"
@@ -32,7 +32,7 @@
 #include "nvim/highlight_defs.h"
 #include "nvim/input.h"
 #include "nvim/insexpand.h"
-#include "nvim/macros.h"
+#include "nvim/macros_defs.h"
 #include "nvim/mark.h"
 #include "nvim/mbyte.h"
 #include "nvim/memory.h"
@@ -44,7 +44,6 @@
 #include "nvim/optionstr.h"
 #include "nvim/os/fs.h"
 #include "nvim/os/input.h"
-#include "nvim/os/os_defs.h"
 #include "nvim/os/time.h"
 #include "nvim/path.h"
 #include "nvim/pos_defs.h"
@@ -55,7 +54,7 @@
 #include "nvim/strings.h"
 #include "nvim/tag.h"
 #include "nvim/ui.h"
-#include "nvim/vim.h"
+#include "nvim/vim_defs.h"
 #include "nvim/window.h"
 
 // Structure to hold pointers to various items in a tag line.

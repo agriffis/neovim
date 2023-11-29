@@ -29,8 +29,8 @@
 #include "klib/kvec.h"
 #include "nvim/api/private/helpers.h"
 #include "nvim/arglist.h"
-#include "nvim/ascii.h"
-#include "nvim/assert.h"
+#include "nvim/ascii_defs.h"
+#include "nvim/assert_defs.h"
 #include "nvim/autocmd.h"
 #include "nvim/buffer.h"
 #include "nvim/buffer_updates.h"
@@ -65,7 +65,7 @@
 #include "nvim/indent.h"
 #include "nvim/indent_c.h"
 #include "nvim/main.h"
-#include "nvim/map.h"
+#include "nvim/map_defs.h"
 #include "nvim/mapping.h"
 #include "nvim/mark.h"
 #include "nvim/mbyte.h"
@@ -100,7 +100,7 @@
 #include "nvim/undo.h"
 #include "nvim/usercmd.h"
 #include "nvim/version.h"
-#include "nvim/vim.h"
+#include "nvim/vim_defs.h"
 #include "nvim/window.h"
 #include "nvim/winfloat.h"
 
@@ -4055,7 +4055,7 @@ void buf_signcols_del_check(buf_T *buf, linenr_T line1, linenr_T line2)
 ///
 /// @param buf   buffer to check
 /// @param added sign being added
-void buf_signcols_add_check(buf_T *buf, linenr_T lnum)
+void buf_signcols_add_check(buf_T *buf, linenr_T line1, linenr_T line2)
 {
   if (!buf->b_signcols.valid) {
     return;
@@ -4066,7 +4066,9 @@ void buf_signcols_add_check(buf_T *buf, linenr_T lnum)
     return;
   }
 
-  if (lnum == buf->b_signcols.sentinel) {
+  linenr_T sent = buf->b_signcols.sentinel;
+
+  if (sent >= line1 && sent <= line2) {
     if (buf->b_signcols.size == buf->b_signcols.max) {
       buf->b_signcols.max++;
     }
@@ -4075,12 +4077,11 @@ void buf_signcols_add_check(buf_T *buf, linenr_T lnum)
     return;
   }
 
-  int signcols = decor_signcols(buf, lnum - 1, lnum - 1, SIGN_SHOW_MAX);
+  int signcols = decor_signcols(buf, line1 - 1, line2 - 1, SIGN_SHOW_MAX);
 
   if (signcols > buf->b_signcols.size) {
     buf->b_signcols.size = signcols;
     buf->b_signcols.max = signcols;
-    buf->b_signcols.sentinel = lnum;
     redraw_buf_later(buf, UPD_NOT_VALID);
   }
 }
