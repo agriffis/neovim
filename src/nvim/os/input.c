@@ -12,7 +12,6 @@
 #include "nvim/event/multiqueue.h"
 #include "nvim/event/rstream.h"
 #include "nvim/event/stream.h"
-#include "nvim/func_attr.h"
 #include "nvim/getchar.h"
 #include "nvim/gettext.h"
 #include "nvim/globals.h"
@@ -28,7 +27,6 @@
 #include "nvim/profile.h"
 #include "nvim/rbuffer.h"
 #include "nvim/state.h"
-#include "nvim/vim_defs.h"
 
 #define READ_BUFFER_SIZE 0xfff
 #define INPUT_BUFFER_SIZE (READ_BUFFER_SIZE * 4)

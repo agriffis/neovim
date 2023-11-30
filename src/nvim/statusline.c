@@ -37,11 +37,11 @@
 #include "nvim/plines.h"
 #include "nvim/pos_defs.h"
 #include "nvim/sign.h"
+#include "nvim/state_defs.h"
 #include "nvim/statusline.h"
 #include "nvim/strings.h"
 #include "nvim/ui.h"
 #include "nvim/undo.h"
-#include "nvim/vim_defs.h"
 #include "nvim/window.h"
 
 // Determines how deeply nested %{} blocks will be evaluated in statusline.

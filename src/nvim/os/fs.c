@@ -17,7 +17,6 @@
 #endif
 
 #include "auto/config.h"
-#include "nvim/func_attr.h"
 #include "nvim/os/fs.h"
 
 #if defined(HAVE_ACL)
@@ -53,6 +52,7 @@
 #ifdef MSWIN
 # include "nvim/mbyte.h"
 # include "nvim/option.h"
+# include "nvim/strings.h"
 #endif
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS

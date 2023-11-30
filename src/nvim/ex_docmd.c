@@ -39,12 +39,11 @@
 #include "nvim/file_search.h"
 #include "nvim/fileio.h"
 #include "nvim/fold.h"
-#include "nvim/func_attr.h"
 #include "nvim/garray.h"
 #include "nvim/getchar.h"
 #include "nvim/gettext.h"
 #include "nvim/globals.h"
-#include "nvim/highlight_defs.h"
+#include "nvim/highlight.h"
 #include "nvim/highlight_group.h"
 #include "nvim/input.h"
 #include "nvim/keycodes.h"
@@ -7424,7 +7423,9 @@ static void ex_terminal(exarg_T *eap)
     char shell_argv[512] = { 0 };
 
     while (*p != NULL) {
-      snprintf(tempstring, sizeof(tempstring), ",\"%s\"", *p);
+      char *escaped = vim_strsave_escaped(*p, "\"\\");
+      snprintf(tempstring, sizeof(tempstring), ",\"%s\"", escaped);
+      xfree(escaped);
       xstrlcat(shell_argv, tempstring, sizeof(shell_argv));
       p++;
     }

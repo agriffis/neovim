@@ -26,7 +26,6 @@
 #include "nvim/ex_cmds_defs.h"
 #include "nvim/ex_docmd.h"
 #include "nvim/ex_eval.h"
-#include "nvim/func_attr.h"
 #include "nvim/garray.h"
 #include "nvim/getchar.h"
 #include "nvim/gettext.h"
@@ -55,6 +54,9 @@
 #include "nvim/types_defs.h"
 #include "nvim/usercmd.h"
 #include "nvim/vim_defs.h"
+#ifdef USE_CRNL
+# include "nvim/highlight.h"
+#endif
 
 /// Structure used to store info for each sourced file.
 /// It is shared between do_source() and getsourceline().
@@ -65,7 +67,7 @@ struct source_cookie {
   char *nextline;               ///< if not NULL: line that was read ahead
   linenr_T sourcing_lnum;       ///< line number of the source file
   int finished;                 ///< ":finish" used
-#if defined(USE_CRNL)
+#ifdef USE_CRNL
   int fileformat;               ///< EOL_UNKNOWN, EOL_UNIX or EOL_DOS
   bool error;                   ///< true if LF found after CR-LF
 #endif

@@ -9,7 +9,6 @@
 #include "nvim/charset.h"
 #include "nvim/cursor.h"
 #include "nvim/edit.h"
-#include "nvim/func_attr.h"
 #include "nvim/globals.h"
 #include "nvim/indent.h"
 #include "nvim/indent_c.h"
@@ -22,6 +21,7 @@
 #include "nvim/plines.h"
 #include "nvim/pos_defs.h"
 #include "nvim/search.h"
+#include "nvim/state_defs.h"
 #include "nvim/strings.h"
 #include "nvim/vim_defs.h"
 

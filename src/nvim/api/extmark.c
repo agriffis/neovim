@@ -17,7 +17,6 @@
 #include "nvim/decoration_provider.h"
 #include "nvim/drawscreen.h"
 #include "nvim/extmark.h"
-#include "nvim/func_attr.h"
 #include "nvim/grid.h"
 #include "nvim/highlight_group.h"
 #include "nvim/marktree.h"
@@ -780,9 +779,6 @@ Integer nvim_buf_set_extmark(Buffer buffer, Integer ns_id, Integer line, Integer
     if (has_hl) {
       DecorSignHighlight sh = decor_sh_from_inline(hl);
       decor_range_add_sh(&decor_state, r, c, line2, col2, &sh, true, (uint32_t)ns_id, id);
-    }
-    if (sign.flags & kSHIsSign) {
-      decor_range_add_sh(&decor_state, r, c, line2, col2, &sign, true, (uint32_t)ns_id, id);
     }
   } else {
     if (opts->ephemeral) {

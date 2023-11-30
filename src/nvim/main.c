@@ -17,10 +17,6 @@
 # include <sanitizer/ubsan_interface.h>
 #endif
 
-// uncrustify:off
-#include "nvim/vim_defs.h"
-// uncrustify:on
-
 #include "auto/config.h"  // IWYU pragma: keep
 #include "nvim/api/extmark.h"
 #include "nvim/api/private/defs.h"
@@ -48,7 +44,6 @@
 #include "nvim/ex_getln.h"
 #include "nvim/fileio.h"
 #include "nvim/fold.h"
-#include "nvim/func_attr.h"
 #include "nvim/garray.h"
 #include "nvim/getchar.h"
 #include "nvim/gettext.h"
@@ -99,6 +94,7 @@
 #include "nvim/ui_client.h"
 #include "nvim/ui_compositor.h"
 #include "nvim/version.h"
+#include "nvim/vim_defs.h"
 #include "nvim/window.h"
 #ifdef MSWIN
 # include "nvim/os/os_win_console.h"

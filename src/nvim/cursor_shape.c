@@ -8,16 +8,15 @@
 #include "nvim/charset.h"
 #include "nvim/cursor_shape.h"
 #include "nvim/ex_getln.h"
-#include "nvim/func_attr.h"
 #include "nvim/gettext.h"
 #include "nvim/globals.h"
 #include "nvim/highlight_group.h"
 #include "nvim/log.h"
 #include "nvim/macros_defs.h"
 #include "nvim/option_vars.h"
+#include "nvim/state_defs.h"
 #include "nvim/strings.h"
 #include "nvim/ui.h"
-#include "nvim/vim_defs.h"
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "cursor_shape.c.generated.h"

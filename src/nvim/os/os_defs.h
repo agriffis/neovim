@@ -6,10 +6,12 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "auto/config.h"
+
 // Note: Some systems need both string.h and strings.h (Savage).
 #include <string.h>
 #ifdef HAVE_STRINGS_H
-# include <strings.h>
+# include <strings.h>  // IWYU pragma: export
 #endif
 
 #ifdef MSWIN
@@ -40,6 +42,8 @@
 
 // Command-processing buffer. Use large buffers for all platforms.
 #define CMDBUFFSIZE 1024
+
+#define ROOT_UID 0
 
 /// Converts libuv error (negative int) to error description string.
 #define os_strerror uv_strerror
@@ -102,4 +106,10 @@
 # else
 #  define S_ISLNK(m)    0
 # endif
+#endif
+
+// BSD is supposed to cover FreeBSD and similar systems.
+#if (defined(BSD) || defined(__FreeBSD_kernel__)) \
+  && (defined(S_ISCHR) || defined(S_IFCHR))
+# define OPEN_CHR_FILES
 #endif

@@ -8,6 +8,7 @@ local M = {}
 ---@field opts table Options table with the following keys:
 ---                  - anon (boolean): If true, display anonymous nodes
 ---                  - lang (boolean): If true, display the language alongside each node
+---                  - indent (number): Number of spaces to indent nested lines. Default is 2.
 ---@field nodes TSP.Node[]
 ---@field named TSP.Node[]
 local TSTreeView = {}
@@ -24,6 +25,10 @@ local TSTreeView = {}
 ---@field lang string Source language of this node
 ---@field root TSNode
 
+---@class TSP.Injection
+---@field lang string Source language of this injection
+---@field root TSNode Root node of the injection
+
 --- Traverse all child nodes starting at {node}.
 ---
 --- This is a recursive function. The {depth} parameter indicates the current recursion level.
@@ -39,8 +44,8 @@ local TSTreeView = {}
 ---@param node TSNode Starting node to begin traversal |tsnode|
 ---@param depth integer Current recursion depth
 ---@param lang string Language of the tree currently being traversed
----@param injections table<integer,TSP.Node> Mapping of node ids to root nodes of injected language trees (see
----                        explanation above)
+---@param injections table<string, TSP.Injection> Mapping of node ids to root nodes
+---                  of injected language trees (see explanation above)
 ---@param tree TSP.Node[] Output table containing a list of tables each representing a node in the tree
 local function traverse(node, depth, lang, injections, tree)
   local injection = injections[node:id()]
@@ -55,12 +60,12 @@ local function traverse(node, depth, lang, injections, tree)
     local text ---@type string
     if named then
       if field then
-        text = string.format('%s: (%s)', field, type)
+        text = string.format('%s: (%s', field, type)
       else
-        text = string.format('(%s)', type)
+        text = string.format('(%s', type)
       end
     else
-      text = string.format('"%s"', type:gsub('\n', '\\n'))
+      text = string.format('"%s"', type:gsub('\n', '\\n'):gsub('"', '\\"'))
     end
 
     table.insert(tree, {
@@ -76,6 +81,10 @@ local function traverse(node, depth, lang, injections, tree)
     })
 
     traverse(child, depth + 1, lang, injections, tree)
+
+    if named then
+      tree[#tree].text = string.format('%s)', tree[#tree].text)
+    end
   end
 
   return tree
@@ -100,19 +109,24 @@ function TSTreeView:new(bufnr, lang)
   -- the primary tree that contains that root. Add a mapping from the node in the primary tree to
   -- the root in the child tree to the {injections} table.
   local root = parser:parse(true)[1]:root()
-  local injections = {} ---@type table<integer,table>
-  for _, child in pairs(parser:children()) do
-    child:for_each_tree(function(tree, ltree)
-      local r = tree:root()
-      local node = root:named_descendant_for_range(r:range())
-      if node then
-        injections[node:id()] = {
-          lang = ltree:lang(),
-          root = r,
-        }
-      end
-    end)
-  end
+  local injections = {} ---@type table<string, TSP.Injection>
+
+  parser:for_each_tree(function(parent_tree, parent_ltree)
+    local parent = parent_tree:root()
+    for _, child in pairs(parent_ltree:children()) do
+      child:for_each_tree(function(tree, ltree)
+        local r = tree:root()
+        local node = assert(parent:named_descendant_for_range(r:range()))
+        local id = node:id()
+        if not injections[id] or r:byte_length() > injections[id].root:byte_length() then
+          injections[id] = {
+            lang = ltree:lang(),
+            root = r,
+          }
+        end
+      end)
+    end
+  end)
 
   local nodes = traverse(root, 0, parser:lang(), injections, {})
 
@@ -130,6 +144,7 @@ function TSTreeView:new(bufnr, lang)
     opts = {
       anon = false,
       lang = false,
+      indent = 2,
     },
   }
 
@@ -150,12 +165,6 @@ local function get_range_str(lnum, col, end_lnum, end_col)
     return string.format('[%d:%d - %d]', lnum + 1, col + 1, end_col)
   end
   return string.format('[%d:%d - %d:%d]', lnum + 1, col + 1, end_lnum + 1, end_col)
-end
-
----@param text string
----@return string
-local function escape_quotes(text)
-  return string.format('"%s"', text:sub(2, #text - 1):gsub('"', '\\"'))
 end
 
 ---@param w integer
@@ -183,14 +192,14 @@ end
 
 --- Updates the cursor position in the inspector to match the node under the cursor.
 ---
---- @param pg TSTreeView
+--- @param treeview TSTreeView
 --- @param lang string
 --- @param source_buf integer
 --- @param inspect_buf integer
 --- @param inspect_win integer
 --- @param pos? { [1]: integer, [2]: integer }
-local function set_inspector_cursor(pg, lang, source_buf, inspect_buf, inspect_win, pos)
-  api.nvim_buf_clear_namespace(inspect_buf, pg.ns, 0, -1)
+local function set_inspector_cursor(treeview, lang, source_buf, inspect_buf, inspect_win, pos)
+  api.nvim_buf_clear_namespace(inspect_buf, treeview.ns, 0, -1)
 
   local cursor_node = vim.treesitter.get_node({
     bufnr = source_buf,
@@ -203,11 +212,11 @@ local function set_inspector_cursor(pg, lang, source_buf, inspect_buf, inspect_w
   end
 
   local cursor_node_id = cursor_node:id()
-  for i, v in pg:iter() do
+  for i, v in treeview:iter() do
     if v.id == cursor_node_id then
-      local start = v.depth
+      local start = v.depth * treeview.opts.indent ---@type integer
       local end_col = start + #v.text
-      api.nvim_buf_set_extmark(inspect_buf, pg.ns, i - 1, start, {
+      api.nvim_buf_set_extmark(inspect_buf, treeview.ns, i - 1, start, {
         end_col = end_col,
         hl_group = 'Visual',
       })
@@ -229,9 +238,13 @@ function TSTreeView:draw(bufnr)
   for _, item in self:iter() do
     local range_str = get_range_str(item.lnum, item.col, item.end_lnum, item.end_col)
     local lang_str = self.opts.lang and string.format(' %s', item.lang) or ''
-    local text = item.named and item.text or escape_quotes(item.text)
-    local line =
-      string.format('%s%s ; %s%s', string.rep(' ', item.depth), text, range_str, lang_str)
+    local line = string.format(
+      '%s%s ; %s%s',
+      string.rep(' ', item.depth * self.opts.indent),
+      item.text,
+      range_str,
+      lang_str
+    )
 
     if self.opts.lang then
       lang_hl_marks[#lang_hl_marks + 1] = {
@@ -304,7 +317,7 @@ function M.inspect_tree(opts)
 
   local buf = api.nvim_get_current_buf()
   local win = api.nvim_get_current_win()
-  local pg = assert(TSTreeView:new(buf, opts.lang))
+  local treeview = assert(TSTreeView:new(buf, opts.lang))
 
   -- Close any existing inspector window
   if vim.b[buf].dev_inspect then
@@ -341,17 +354,17 @@ function M.inspect_tree(opts)
   assert(type(title) == 'string', 'Window title must be a string')
   api.nvim_buf_set_name(b, title)
 
-  pg:draw(b)
+  treeview:draw(b)
 
   local cursor = api.nvim_win_get_cursor(win)
-  set_inspector_cursor(pg, opts.lang, buf, b, w, { cursor[1] - 1, cursor[2] })
+  set_inspector_cursor(treeview, opts.lang, buf, b, w, { cursor[1] - 1, cursor[2] })
 
-  api.nvim_buf_clear_namespace(buf, pg.ns, 0, -1)
+  api.nvim_buf_clear_namespace(buf, treeview.ns, 0, -1)
   api.nvim_buf_set_keymap(b, 'n', '<CR>', '', {
     desc = 'Jump to the node under the cursor in the source buffer',
     callback = function()
       local row = api.nvim_win_get_cursor(w)[1]
-      local pos = pg:get(row)
+      local pos = treeview:get(row)
       api.nvim_set_current_win(win)
       api.nvim_win_set_cursor(win, { pos.lnum + 1, pos.col })
     end,
@@ -360,21 +373,21 @@ function M.inspect_tree(opts)
     desc = 'Toggle anonymous nodes',
     callback = function()
       local row, col = unpack(api.nvim_win_get_cursor(w)) ---@type integer, integer
-      local curnode = pg:get(row)
+      local curnode = treeview:get(row)
       while curnode and not curnode.named do
         row = row - 1
-        curnode = pg:get(row)
+        curnode = treeview:get(row)
       end
 
-      pg.opts.anon = not pg.opts.anon
-      pg:draw(b)
+      treeview.opts.anon = not treeview.opts.anon
+      treeview:draw(b)
 
       if not curnode then
         return
       end
 
       local id = curnode.id
-      for i, node in pg:iter() do
+      for i, node in treeview:iter() do
         if node.id == id then
           api.nvim_win_set_cursor(w, { i, col })
           break
@@ -385,8 +398,8 @@ function M.inspect_tree(opts)
   api.nvim_buf_set_keymap(b, 'n', 'I', '', {
     desc = 'Toggle language display',
     callback = function()
-      pg.opts.lang = not pg.opts.lang
-      pg:draw(b)
+      treeview.opts.lang = not treeview.opts.lang
+      treeview:draw(b)
     end,
   })
   api.nvim_buf_set_keymap(b, 'n', 'o', '', {
@@ -409,10 +422,10 @@ function M.inspect_tree(opts)
         return true
       end
 
-      api.nvim_buf_clear_namespace(buf, pg.ns, 0, -1)
+      api.nvim_buf_clear_namespace(buf, treeview.ns, 0, -1)
       local row = api.nvim_win_get_cursor(w)[1]
-      local pos = pg:get(row)
-      api.nvim_buf_set_extmark(buf, pg.ns, pos.lnum, pos.col, {
+      local pos = treeview:get(row)
+      api.nvim_buf_set_extmark(buf, treeview.ns, pos.lnum, pos.col, {
         end_row = pos.end_lnum,
         end_col = math.max(0, pos.end_col),
         hl_group = 'Visual',
@@ -437,7 +450,7 @@ function M.inspect_tree(opts)
         return true
       end
 
-      set_inspector_cursor(pg, opts.lang, buf, b, w)
+      set_inspector_cursor(treeview, opts.lang, buf, b, w)
     end,
   })
 
@@ -449,8 +462,8 @@ function M.inspect_tree(opts)
         return true
       end
 
-      pg = assert(TSTreeView:new(buf, opts.lang))
-      pg:draw(b)
+      treeview = assert(TSTreeView:new(buf, opts.lang))
+      treeview:draw(b)
     end,
   })
 
@@ -461,7 +474,7 @@ function M.inspect_tree(opts)
       if not api.nvim_buf_is_loaded(buf) then
         return true
       end
-      api.nvim_buf_clear_namespace(buf, pg.ns, 0, -1)
+      api.nvim_buf_clear_namespace(buf, treeview.ns, 0, -1)
     end,
   })
 
@@ -472,7 +485,7 @@ function M.inspect_tree(opts)
       if not api.nvim_buf_is_loaded(b) then
         return true
       end
-      api.nvim_buf_clear_namespace(b, pg.ns, 0, -1)
+      api.nvim_buf_clear_namespace(b, treeview.ns, 0, -1)
     end,
   })
 

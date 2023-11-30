@@ -16,6 +16,7 @@
 #include "nvim/log.h"
 #include "nvim/macros_defs.h"
 #include "nvim/main.h"
+#include "nvim/memory.h"
 #include "nvim/option.h"
 #include "nvim/option_vars.h"
 #include "nvim/os/input.h"
@@ -23,13 +24,13 @@
 #include "nvim/strings.h"
 #include "nvim/types_defs.h"
 #include "nvim/ui.h"
-#include "nvim/vim_defs.h"
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS
-# include "state.c.generated.h"  // IWYU pragma: export
+# include "state.c.generated.h"
 #endif
 
 void state_enter(VimState *s)
+  FUNC_ATTR_NONNULL_ALL
 {
   while (true) {
     int check_result = s->check ? s->check(s) : 1;
@@ -168,6 +169,7 @@ int get_real_state(void)
 /// The first character represents the major mode, the following ones the minor
 /// ones.
 void get_mode(char *buf)
+  FUNC_ATTR_NONNULL_ALL
 {
   int i = 0;
 

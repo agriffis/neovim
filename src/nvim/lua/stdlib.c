@@ -22,7 +22,6 @@
 #include "nvim/eval/vars.h"
 #include "nvim/ex_eval.h"
 #include "nvim/fold.h"
-#include "nvim/func_attr.h"
 #include "nvim/globals.h"
 #include "nvim/lua/base64.h"
 #include "nvim/lua/converter.h"
@@ -36,8 +35,8 @@
 #include "nvim/pos_defs.h"
 #include "nvim/regexp.h"
 #include "nvim/runtime.h"
+#include "nvim/strings.h"
 #include "nvim/types_defs.h"
-#include "nvim/vim_defs.h"
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "lua/stdlib.c.generated.h"
