@@ -143,24 +143,16 @@ iwyu: build/.ran-cmake
 	cmake --build build > build/iwyu.log
 	iwyu-fix-includes --only_re="src/nvim" --ignore_re="(src/nvim/eval/encode.c|src/nvim/auto/|src/nvim/os/lang.c|src/nvim/map.c\
 	|src/nvim/api/extmark.h\
-	|src/nvim/api/private/dispatch.h\
 	|src/nvim/api/private/helpers.h\
 	|src/nvim/api/private/validate.h\
-	|src/nvim/api/ui.h\
-	|src/nvim/ascii_defs.h\
 	|src/nvim/assert_defs.h\
 	|src/nvim/autocmd.h\
-	|src/nvim/autocmd_defs.h\
 	|src/nvim/buffer.h\
 	|src/nvim/buffer_defs.h\
 	|src/nvim/channel.h\
 	|src/nvim/charset.h\
-	|src/nvim/cmdexpand.h\
-	|src/nvim/cmdhist.h\
 	|src/nvim/decoration.h\
-	|src/nvim/diff.h\
 	|src/nvim/drawline.h\
-	|src/nvim/drawscreen.h\
 	|src/nvim/eval.h\
 	|src/nvim/eval/encode.h\
 	|src/nvim/eval/typval.h\
@@ -177,53 +169,30 @@ iwyu: build/.ran-cmake
 	|src/nvim/event/stream.h\
 	|src/nvim/event/time.h\
 	|src/nvim/event/wstream.h\
-	|src/nvim/ex_cmds.h\
-	|src/nvim/ex_cmds_defs.h\
-	|src/nvim/ex_docmd.h\
 	|src/nvim/extmark.h\
-	|src/nvim/file_search.h\
-	|src/nvim/fileio.h\
-	|src/nvim/fold.h\
 	|src/nvim/garray.h\
-	|src/nvim/getchar.h\
 	|src/nvim/globals.h\
 	|src/nvim/grid.h\
 	|src/nvim/highlight.h\
-	|src/nvim/highlight_group.h\
 	|src/nvim/input.h\
-	|src/nvim/insexpand.h\
 	|src/nvim/keycodes.h\
-	|src/nvim/log.h\
 	|src/nvim/lua/executor.h\
 	|src/nvim/main.h\
 	|src/nvim/mark.h\
-	|src/nvim/mouse.h\
-	|src/nvim/move.h\
 	|src/nvim/msgpack_rpc/channel.h\
 	|src/nvim/msgpack_rpc/channel_defs.h\
 	|src/nvim/msgpack_rpc/helpers.h\
 	|src/nvim/msgpack_rpc/unpacker.h\
 	|src/nvim/option.h\
-	|src/nvim/os/fileio.h\
 	|src/nvim/os/input.h\
 	|src/nvim/os/pty_conpty_win.h\
 	|src/nvim/os/pty_process_unix.h\
 	|src/nvim/os/pty_process_win.h\
-	|src/nvim/path.h\
 	|src/nvim/plines.h\
-	|src/nvim/popupmenu.h\
-	|src/nvim/search.h\
-	|src/nvim/spell.h\
-	|src/nvim/syntax.h\
-	|src/nvim/textobject.h\
 	|src/nvim/tui/input.h\
-	|src/nvim/tui/tui.h\
 	|src/nvim/ui.h\
-	|src/nvim/ui_client.h\
-	|src/nvim/ui_compositor.h\
 	|src/nvim/viml/parser/expressions.h\
 	|src/nvim/viml/parser/parser.h\
-	|src/nvim/window.h\
 	)" --nosafe_headers < build/iwyu.log
 	cmake -B build -U ENABLE_IWYU
 	cmake --build build

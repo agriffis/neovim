@@ -880,42 +880,37 @@ def CheckForHeaderGuard(filename, lines, error):
         error(filename, 0, 'build/header_guard', 5,
               'No "#pragma once" found in header')
 
+
 def CheckIncludes(filename, lines, error):
-    """Checks that headers only include _defs headers
+    """Checks that headers only include _defs headers.
 
     Args:
       filename: The name of the C++ header file.
       lines: An array of strings, each representing a line of the file.
       error: The function to call with any errors found.
     """
-    if filename.endswith('.c.h') or filename.endswith('.in.h') or FileInfo(filename).RelativePath() in {
+    if (filename.endswith('.c.h')
+            or filename.endswith('.in.h')
+            or FileInfo(filename).RelativePath() in {
         'func_attr.h',
         'os/pty_process.h',
-    }:
+    }):
         return
 
     # These should be synced with the ignored headers in the `iwyu` target in
     # the Makefile.
     check_includes_ignore = [
             "src/nvim/api/extmark.h",
-            "src/nvim/api/private/dispatch.h",
             "src/nvim/api/private/helpers.h",
             "src/nvim/api/private/validate.h",
-            "src/nvim/api/ui.h",
-            "src/nvim/ascii_defs.h",
             "src/nvim/assert_defs.h",
             "src/nvim/autocmd.h",
-            "src/nvim/autocmd_defs.h",
             "src/nvim/buffer.h",
             "src/nvim/buffer_defs.h",
             "src/nvim/channel.h",
             "src/nvim/charset.h",
-            "src/nvim/cmdexpand.h",
-            "src/nvim/cmdhist.h",
             "src/nvim/decoration.h",
-            "src/nvim/diff.h",
             "src/nvim/drawline.h",
-            "src/nvim/drawscreen.h",
             "src/nvim/eval.h",
             "src/nvim/eval/encode.h",
             "src/nvim/eval/typval.h",
@@ -932,53 +927,30 @@ def CheckIncludes(filename, lines, error):
             "src/nvim/event/stream.h",
             "src/nvim/event/time.h",
             "src/nvim/event/wstream.h",
-            "src/nvim/ex_cmds.h",
-            "src/nvim/ex_cmds_defs.h",
-            "src/nvim/ex_docmd.h",
             "src/nvim/extmark.h",
-            "src/nvim/file_search.h",
-            "src/nvim/fileio.h",
-            "src/nvim/fold.h",
             "src/nvim/garray.h",
-            "src/nvim/getchar.h",
             "src/nvim/globals.h",
             "src/nvim/grid.h",
             "src/nvim/highlight.h",
-            "src/nvim/highlight_group.h",
             "src/nvim/input.h",
-            "src/nvim/insexpand.h",
             "src/nvim/keycodes.h",
-            "src/nvim/log.h",
             "src/nvim/lua/executor.h",
             "src/nvim/main.h",
             "src/nvim/mark.h",
-            "src/nvim/mouse.h",
-            "src/nvim/move.h",
             "src/nvim/msgpack_rpc/channel.h",
             "src/nvim/msgpack_rpc/channel_defs.h",
             "src/nvim/msgpack_rpc/helpers.h",
             "src/nvim/msgpack_rpc/unpacker.h",
             "src/nvim/option.h",
-            "src/nvim/os/fileio.h",
             "src/nvim/os/input.h",
             "src/nvim/os/pty_conpty_win.h",
             "src/nvim/os/pty_process_unix.h",
             "src/nvim/os/pty_process_win.h",
-            "src/nvim/path.h",
             "src/nvim/plines.h",
-            "src/nvim/popupmenu.h",
-            "src/nvim/search.h",
-            "src/nvim/spell.h",
-            "src/nvim/syntax.h",
-            "src/nvim/textobject.h",
             "src/nvim/tui/input.h",
-            "src/nvim/tui/tui.h",
             "src/nvim/ui.h",
-            "src/nvim/ui_client.h",
-            "src/nvim/ui_compositor.h",
             "src/nvim/viml/parser/expressions.h",
             "src/nvim/viml/parser/parser.h",
-            "src/nvim/window.h",
                              ]
 
     skip_headers = [
@@ -999,10 +971,27 @@ def CheckIncludes(filename, lines, error):
             if name in skip_headers:
                 continue
             if (not name.endswith('.h.generated.h') and
+                    not name.endswith('/defs.h') and
                     not name.endswith('_defs.h') and
-                    not name.endswith('/defs.h')):
+                    not name.endswith('_defs.generated.h') and
+                    not name.endswith('_enum.generated.h')):
                 error(filename, i, 'build/include_defs', 5,
                       'Headers should not include non-"_defs" headers')
+
+
+def CheckNonSymbols(filename, lines, error):
+    """Checks that a _defs.h header only contains non-symbols.
+
+    Args:
+      filename: The name of the C++ header file.
+      lines: An array of strings, each representing a line of the file.
+      error: The function to call with any errors found.
+    """
+    for i, line in enumerate(lines):
+        # Only a check against extern variables for now.
+        if line.startswith('EXTERN ') or line.startswith('extern '):
+            error(filename, i, 'build/defs_header', 5,
+                  '"_defs" headers should not contain extern variables')
 
 
 def CheckForBadCharacters(filename, lines, error):
@@ -2292,6 +2281,8 @@ def ProcessFileData(filename, file_extension, lines, error,
     if file_extension == 'h':
         CheckForHeaderGuard(filename, lines, error)
         CheckIncludes(filename, lines, error)
+        if filename.endswith('/defs.h') or filename.endswith('_defs.h'):
+            CheckNonSymbols(filename, lines, error)
 
     RemoveMultiLineComments(filename, lines, error)
     clean_lines = CleansedLines(lines, init_lines)
