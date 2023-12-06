@@ -3735,7 +3735,11 @@ static int eval_index_inner(typval_T *rettv, bool is_range, typval_T *var1, typv
     dictitem_T *const item = tv_dict_find(rettv->vval.v_dict, key, keylen);
 
     if (item == NULL && verbose) {
-      semsg(_(e_dictkey), key);
+      if (keylen > 0) {
+        semsg(_(e_dictkey_len), keylen, key);
+      } else {
+        semsg(_(e_dictkey), key);
+      }
     }
     if (item == NULL || tv_is_luafunc(&item->di_tv)) {
       return FAIL;
@@ -4711,7 +4715,7 @@ bool set_ref_in_ht(hashtab_T *ht, int copyID, list_stack_T **list_stack)
 /// @param ht_stack      Used to add hashtabs to be marked. Can be NULL.
 ///
 /// @returns             true if setting references failed somehow.
-bool set_ref_in_list(list_T *l, int copyID, ht_stack_T **ht_stack)
+bool set_ref_in_list_items(list_T *l, int copyID, ht_stack_T **ht_stack)
   FUNC_ATTR_WARN_UNUSED_RESULT
 {
   bool abort = false;
@@ -4788,7 +4792,7 @@ bool set_ref_in_item(typval_T *tv, int copyID, ht_stack_T **ht_stack, list_stack
       // Didn't see this list yet.
       ll->lv_copyID = copyID;
       if (list_stack == NULL) {
-        abort = set_ref_in_list(ll, copyID, ht_stack);
+        abort = set_ref_in_list_items(ll, copyID, ht_stack);
       } else {
         list_stack_T *const newitem = xmalloc(sizeof(list_stack_T));
         newitem->list = ll;

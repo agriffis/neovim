@@ -672,7 +672,7 @@ EXTERN bool must_redraw_pum INIT( = false);  // redraw pum. NB: must_redraw
 
 EXTERN bool need_highlight_changed INIT( = true);
 
-EXTERN FILE *scriptout INIT( = NULL);  ///< Stream to write script to.
+EXTERN FILE *scriptout INIT( = NULL);  ///< Write input to this file ("nvim -w").
 
 // Note that even when handling SIGINT, volatile is not necessary because the
 // callback is not called directly from the signal handlers.
@@ -887,6 +887,7 @@ EXTERN const char e_invalblob[] INIT(= N_("E978: Invalid operation for Blob"));
 EXTERN const char e_toomanyarg[] INIT(= N_("E118: Too many arguments for function: %s"));
 EXTERN const char e_toofewarg[] INIT(= N_("E119: Not enough arguments for function: %s"));
 EXTERN const char e_dictkey[] INIT(= N_("E716: Key not present in Dictionary: \"%s\""));
+EXTERN const char e_dictkey_len[] INIT(= N_("E716: Key not present in Dictionary: \"%.*s\""));
 EXTERN const char e_listreq[] INIT(= N_("E714: List required"));
 EXTERN const char e_listblobreq[] INIT(= N_("E897: List or Blob required"));
 EXTERN const char e_listdictarg[] INIT(= N_("E712: Argument of %s must be a List or Dictionary"));
