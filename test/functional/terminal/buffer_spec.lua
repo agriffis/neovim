@@ -17,7 +17,6 @@ local sleep = helpers.sleep
 local funcs = helpers.funcs
 local is_os = helpers.is_os
 local skip = helpers.skip
-local nvim_prog = helpers.nvim_prog
 
 describe(':terminal buffer', function()
   local screen
@@ -446,10 +445,13 @@ end)
 describe('terminal input', function()
   it('sends various special keys with modifiers', function()
     clear()
-    local screen = thelpers.screen_setup(
-      0,
-      string.format([=[["%s", "-u", "NONE", "-i", "NONE", "--cmd", 'colorscheme vim', "--cmd", "startinsert"]]=], nvim_prog)
-    )
+    local screen = thelpers.setup_child_nvim({
+      '-u', 'NONE',
+      '-i', 'NONE',
+      '--cmd', 'colorscheme vim',
+      '--cmd', 'set notermguicolors',
+      '--cmd', 'startinsert',
+    })
     screen:expect{grid=[[
       {1: }                                                 |
       {4:~                                                 }|
@@ -485,7 +487,7 @@ if is_os('win') then
       clear()
       feed_command('set modifiable swapfile undolevels=20')
       poke_eventloop()
-      local cmd = '["cmd.exe","/K","PROMPT=$g$s"]'
+      local cmd = { "cmd.exe", "/K", "PROMPT=$g$s" }
       screen = thelpers.screen_setup(nil, cmd)
     end)
 
