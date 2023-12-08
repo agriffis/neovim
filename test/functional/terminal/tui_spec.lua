@@ -24,6 +24,7 @@ local funcs = helpers.funcs
 local meths = helpers.meths
 local is_ci = helpers.is_ci
 local is_os = helpers.is_os
+local is_arch = helpers.is_arch
 local new_pipename = helpers.new_pipename
 local spawn_argv = helpers.spawn_argv
 local set_session = helpers.set_session
@@ -1670,11 +1671,12 @@ describe('TUI', function()
     -- Use full screen message so that redrawing afterwards is more deterministic.
     child_session:notify('nvim_command', 'intro')
     screen:expect({any = 'Nvim'})
+    -- Hiding the cursor needs 6 bytes.
     -- Going to top-left corner needs 3 bytes.
     -- Setting underline attribute needs 9 bytes.
-    -- The whole line needs 3 + 9 + 65515 + 3 = 65530 bytes.
+    -- The whole line needs 6 + 3 + 9 + 65513 + 3 = 65534 bytes.
     -- The cursor_address that comes after will overflow the 65535-byte buffer.
-    local line = ('a'):rep(65515) .. '℃'
+    local line = ('a'):rep(65513) .. '℃'
     child_session:notify('nvim_exec_lua', [[
       vim.api.nvim_buf_set_lines(0, 0, -1, true, {...})
       vim.o.cursorline = true
@@ -1684,7 +1686,7 @@ describe('TUI', function()
     screen:expect(
       '{13:a}{12:' .. ('a'):rep(76) .. '}|\n'
       .. ('{12:' .. ('a'):rep(77) .. '}|\n'):rep(849)
-      .. '{12:' .. ('a'):rep(65) .. '℃' .. (' '):rep(11) .. '}|\n' .. dedent([[
+      .. '{12:' .. ('a'):rep(63) .. '℃' .. (' '):rep(13) .. '}|\n' .. dedent([[
       b                                                                            |
       {5:[No Name] [+]                                                                }|
                                                                                    |
@@ -1829,8 +1831,18 @@ describe('TUI', function()
       [5] = {bold = true, reverse = true},
     })
     screen:attach()
+    funcs.termopen({
+      nvim_prog,
+      '--clean',
+      '--cmd', 'colorscheme vim',
+      '--cmd', 'set notermguicolors',
+      '--cmd', 'let start = reltime() | while v:true | if reltimefloat(reltime(start)) > 2 | break | endif | endwhile',
+    }, {
+      env = {
+        VIMRUNTIME = os.getenv('VIMRUNTIME'),
+      },
+    })
     exec([[
-      call termopen([v:progpath, '--clean', '--cmd', 'set notermguicolors', '--cmd', 'colorscheme vim', '--cmd', 'let start = reltime() | while v:true | if reltimefloat(reltime(start)) > 2 | break | endif | endwhile'])
       sleep 500m
       vs new
     ]])
@@ -1849,6 +1861,9 @@ describe('TUI', function()
   end)
 
   it('argv[0] can be overridden #23953', function()
+    if is_arch('aarch64') then
+      pending('execl does not work on aarch64')
+    end
     if not exec_lua('return pcall(require, "ffi")') then
       pending('missing LuaJIT FFI')
     end
@@ -1887,8 +1902,9 @@ describe('TUI', function()
     finally(function()
       os.remove('testF')
     end)
-    local screen = thelpers.screen_setup(0, nvim_prog
-      ..' -u NONE -i NONE --cmd \'set noswapfile noshowcmd noruler\' --cmd \'normal iabc\' > /dev/null 2>&1 && cat testF && rm testF')
+    local screen = thelpers.screen_setup(0,
+      ('"%s" -u NONE -i NONE --cmd "set noswapfile noshowcmd noruler" --cmd "normal iabc" > /dev/null 2>&1 && cat testF && rm testF'):format(nvim_prog),
+      nil, { VIMRUNTIME = os.getenv('VIMRUNTIME') })
     feed_data(':w testF\n:q\n')
     screen:expect([[
       :w testF                                          |
@@ -2213,8 +2229,6 @@ describe("TUI 't_Co' (terminal colors)", function()
 
   local function assert_term_colors(term, colorterm, maxcolors)
     clear({env={TERM=term}, args={}})
-    -- Allow overriding $COLORTERM in :terminal
-    command('set notermguicolors')
     screen = thelpers.setup_child_nvim({
       '-u', 'NONE',
       '-i', 'NONE',

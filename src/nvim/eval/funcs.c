@@ -355,10 +355,7 @@ static void api_wrapper(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     goto end;
   }
 
-  if (!object_to_vim(result, rettv, &err)) {
-    assert(ERROR_SET(&err));
-    semsg(_("Error converting the call result: %s"), err.msg);
-  }
+  object_to_vim(result, rettv, &err);
 
 end:
   api_free_array(args);
@@ -428,7 +425,7 @@ static void f_and(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 static void f_api_info(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 {
   Dictionary metadata = api_metadata();
-  (void)object_to_vim(DICTIONARY_OBJ(metadata), rettv, NULL);
+  object_to_vim(DICTIONARY_OBJ(metadata), rettv, NULL);
 }
 
 /// "atan2()" function
@@ -1023,7 +1020,7 @@ static void f_ctxget(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 
   Dictionary ctx_dict = ctx_to_dict(ctx);
   Error err = ERROR_INIT;
-  (void)object_to_vim(DICTIONARY_OBJ(ctx_dict), rettv, &err);
+  object_to_vim(DICTIONARY_OBJ(ctx_dict), rettv, &err);
   api_free_dictionary(ctx_dict);
   api_clear_error(&err);
 }
@@ -3898,13 +3895,16 @@ static void f_jobresize(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   rettv->vval.v_number = 1;
 }
 
-static const char *ignored_env_vars[] = {
+static const char *pty_ignored_env_vars[] = {
 #ifndef MSWIN
   "COLUMNS",
   "LINES",
   "TERMCAP",
   "COLORFGBG",
+  "COLORTERM",
 #endif
+  "VIM",
+  "VIMRUNTIME",
   NULL
 };
 
@@ -3943,9 +3943,9 @@ static dict_T *create_environment(const dictitem_T *job_env, const bool clear_en
       // child process.  We're removing them here so the user can still decide
       // they want to explicitly set them.
       for (size_t i = 0;
-           i < ARRAY_SIZE(ignored_env_vars) && ignored_env_vars[i];
+           i < ARRAY_SIZE(pty_ignored_env_vars) && pty_ignored_env_vars[i];
            i++) {
-        dictitem_T *dv = tv_dict_find(env, ignored_env_vars[i], -1);
+        dictitem_T *dv = tv_dict_find(env, pty_ignored_env_vars[i], -1);
         if (dv) {
           tv_dict_item_remove(env, dv);
         }
@@ -3953,10 +3953,6 @@ static dict_T *create_environment(const dictitem_T *job_env, const bool clear_en
 #ifndef MSWIN
       // Set COLORTERM to "truecolor" if termguicolors is set
       if (p_tgc) {
-        dictitem_T *dv = tv_dict_find(env, S_LEN("COLORTERM"));
-        if (dv) {
-          tv_dict_item_remove(env, dv);
-        }
         tv_dict_add_str(env, S_LEN("COLORTERM"), "truecolor");
       }
 #endif
@@ -6754,10 +6750,7 @@ static void f_rpcrequest(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     goto end;
   }
 
-  if (!object_to_vim(result, rettv, &err)) {
-    assert(ERROR_SET(&err));
-    semsg(_("Error converting the call result: %s"), err.msg);
-  }
+  object_to_vim(result, rettv, &err);
 
 end:
   arena_mem_free(res_mem);
