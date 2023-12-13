@@ -3351,5 +3351,23 @@ describe('vim.keymap', function()
 
     eq(1, exec_lua[[return GlobalCount]])
   end)
+end)
 
+describe('Vimscript function exists()', function()
+  it('can check a lua function', function()
+    eq(1, exec_lua[[
+      _G.test = function() print("hello") end
+      return vim.fn.exists('v:lua.test')
+    ]])
+
+    eq(1, funcs.exists('v:lua.require("mpack").decode'))
+    eq(1, funcs.exists("v:lua.require('mpack').decode"))
+    eq(1, funcs.exists('v:lua.require"mpack".decode'))
+    eq(1, funcs.exists("v:lua.require'mpack'.decode"))
+    eq(1, funcs.exists("v:lua.require('vim.lsp').start"))
+    eq(1, funcs.exists('v:lua.require"vim.lsp".start'))
+    eq(1, funcs.exists("v:lua.require'vim.lsp'.start"))
+    eq(0, funcs.exists("v:lua.require'vim.lsp'.unknown"))
+    eq(0, funcs.exists('v:lua.?'))
+  end)
 end)
