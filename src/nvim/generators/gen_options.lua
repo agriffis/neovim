@@ -1,5 +1,4 @@
 local options_file = arg[1]
-local options_enum_file = arg[2]
 
 local opt_fd = assert(io.open(options_file, 'w'))
 
@@ -15,12 +14,6 @@ end
 local options = require('options')
 
 local cstr = options.cstr
-
-local type_flags = {
-  bool = 'P_BOOL',
-  number = 'P_NUM',
-  string = 'P_STRING',
-}
 
 local redraw_flags = {
   ui_option = 'P_UI_OPTION',
@@ -51,11 +44,14 @@ end
 --- @param o vim.option_meta
 --- @return string
 local function get_flags(o)
-  --- @type string[]
-  local ret = { type_flags[o.type] }
+  --- @type string
+  local flags = '0'
+
+  --- @param f string
   local add_flag = function(f)
-    ret[1] = ret[1] .. '|' .. f
+    flags = flags .. '|' .. f
   end
+
   if o.list then
     add_flag(list_flags[o.list])
   end
@@ -91,7 +87,22 @@ local function get_flags(o)
       add_flag(def_name)
     end
   end
-  return ret[1]
+  return flags
+end
+
+--- @param o vim.option_meta
+--- @return string
+local function get_type_flags(o)
+  local opt_types = (type(o.type) == 'table') and o.type or { o.type }
+  local type_flags = '0'
+  assert(type(opt_types) == 'table')
+
+  for _, opt_type in ipairs(opt_types) do
+    assert(type(opt_type) == 'string')
+    type_flags = ('%s | (1 << kOptValType%s)'):format(type_flags, lowercase_to_titlecase(opt_type))
+  end
+
+  return type_flags
 end
 
 --- @param c string|string[]
@@ -153,12 +164,13 @@ local function dump_option(i, o)
     w('    .shortname=' .. cstr(o.abbreviation))
   end
   w('    .flags=' .. get_flags(o))
+  w('    .type_flags=' .. get_type_flags(o))
   if o.enable_if then
     w(get_cond(o.enable_if))
   end
   if o.varname then
     w('    .var=&' .. o.varname)
-  -- Immutable options should directly point to the default value
+  -- Immutable options can directly point to the default value.
   elseif o.immutable then
     w(('    .var=&options[%u].def_val'):format(i - 1))
   elseif #o.scope == 1 and o.scope[1] == 'window' then
@@ -235,19 +247,3 @@ w('')
 for _, v in ipairs(defines) do
   w('#define ' .. v[1] .. ' ' .. v[2])
 end
-
--- Generate options enum file
-opt_fd = assert(io.open(options_enum_file, 'w'))
-
-w('typedef enum {')
-w('  kOptInvalid = -1,')
-
-for i, o in ipairs(options.options) do
-  w(('  kOpt%s = %u,'):format(lowercase_to_titlecase(o.full_name), i - 1))
-end
-
-w('  // Option count, used when iterating through options')
-w('#define kOptIndexCount ' .. tostring(#options.options))
-w('} OptIndex;')
-
-opt_fd:close()

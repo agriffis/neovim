@@ -7,10 +7,6 @@ function(BuildLuajit)
     "TARGET"
     "CONFIGURE_COMMAND;BUILD_COMMAND;INSTALL_COMMAND;DEPENDS"
     ${ARGN})
-  if(NOT _luajit_CONFIGURE_COMMAND AND NOT _luajit_BUILD_COMMAND
-        AND NOT _luajit_INSTALL_COMMAND)
-    message(FATAL_ERROR "Must pass at least one of CONFIGURE_COMMAND, BUILD_COMMAND, INSTALL_COMMAND")
-  endif()
   if(NOT _luajit_TARGET)
     set(_luajit_TARGET "luajit")
   endif()
@@ -18,7 +14,7 @@ function(BuildLuajit)
   ExternalProject_Add(${_luajit_TARGET}
     URL ${LUAJIT_URL}
     URL_HASH SHA256=${LUAJIT_SHA256}
-    DOWNLOAD_DIR ${DEPS_DOWNLOAD_DIR}/luajit
+    DOWNLOAD_DIR ${DEPS_DOWNLOAD_DIR}/${_luajit_TARGET}
     CONFIGURE_COMMAND "${_luajit_CONFIGURE_COMMAND}"
     BUILD_IN_SOURCE 1
     BUILD_COMMAND "${_luajit_BUILD_COMMAND}"

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.13)
 # Can be removed once minimum version is at least 3.15
 if(POLICY CMP0092)
   cmake_policy(SET CMP0092 NEW)
@@ -6,7 +6,6 @@ endif()
 project(${PARSERLANG} C)
 
 add_compile_options(-w)
-set(CMAKE_C_STANDARD 99)
 
 add_library(markdown MODULE
 tree-sitter-markdown/src/parser.c
