@@ -900,7 +900,6 @@ def CheckIncludes(filename, lines, error):
     # These should be synced with the ignored headers in the `iwyu` target in
     # the Makefile.
     check_includes_ignore = [
-            "src/nvim/api/private/helpers.h",
             "src/nvim/api/private/validate.h",
             "src/nvim/assert_defs.h",
             "src/nvim/buffer.h",
@@ -913,10 +912,8 @@ def CheckIncludes(filename, lines, error):
             "src/nvim/eval/typval.h",
             "src/nvim/eval/typval_defs.h",
             "src/nvim/eval/userfunc.h",
-            "src/nvim/eval/window.h",
             "src/nvim/event/libuv_process.h",
             "src/nvim/event/loop.h",
-            "src/nvim/event/multiqueue.h",
             "src/nvim/event/process.h",
             "src/nvim/event/rstream.h",
             "src/nvim/event/signal.h",
@@ -932,8 +929,6 @@ def CheckIncludes(filename, lines, error):
             "src/nvim/keycodes.h",
             "src/nvim/lua/executor.h",
             "src/nvim/main.h",
-            "src/nvim/mark.h",
-            "src/nvim/msgpack_rpc/channel.h",
             "src/nvim/msgpack_rpc/channel_defs.h",
             "src/nvim/msgpack_rpc/helpers.h",
             "src/nvim/msgpack_rpc/unpacker.h",
@@ -949,10 +944,10 @@ def CheckIncludes(filename, lines, error):
                              ]
 
     skip_headers = [
-            "klib/kvec.h",
-            "klib/klist.h",
             "auto/config.h",
-            "nvim/func_attr.h"
+            "klib/klist.h",
+            "klib/kvec.h",
+            "nvim/func_attr.h",
             ]
 
     for i in check_includes_ignore:

@@ -142,7 +142,6 @@ iwyu: build/.ran-cmake
 	cmake --preset iwyu
 	cmake --build build > build/iwyu.log
 	iwyu-fix-includes --only_re="src/nvim" --ignore_re="(src/nvim/eval/encode.c|src/nvim/auto/|src/nvim/os/lang.c|src/nvim/map.c\
-	|src/nvim/api/private/helpers.h\
 	|src/nvim/api/private/validate.h\
 	|src/nvim/assert_defs.h\
 	|src/nvim/buffer.h\
@@ -155,10 +154,8 @@ iwyu: build/.ran-cmake
 	|src/nvim/eval/typval.h\
 	|src/nvim/eval/typval_defs.h\
 	|src/nvim/eval/userfunc.h\
-	|src/nvim/eval/window.h\
 	|src/nvim/event/libuv_process.h\
 	|src/nvim/event/loop.h\
-	|src/nvim/event/multiqueue.h\
 	|src/nvim/event/process.h\
 	|src/nvim/event/rstream.h\
 	|src/nvim/event/signal.h\
@@ -174,8 +171,6 @@ iwyu: build/.ran-cmake
 	|src/nvim/keycodes.h\
 	|src/nvim/lua/executor.h\
 	|src/nvim/main.h\
-	|src/nvim/mark.h\
-	|src/nvim/msgpack_rpc/channel.h\
 	|src/nvim/msgpack_rpc/channel_defs.h\
 	|src/nvim/msgpack_rpc/helpers.h\
 	|src/nvim/msgpack_rpc/unpacker.h\

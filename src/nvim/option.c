@@ -84,7 +84,6 @@
 #include "nvim/regexp.h"
 #include "nvim/runtime.h"
 #include "nvim/search.h"
-#include "nvim/sign_defs.h"
 #include "nvim/spell.h"
 #include "nvim/spellfile.h"
 #include "nvim/spellsuggest.h"
@@ -2797,7 +2796,8 @@ static const char *check_num_option_bounds(OptInt *pp, OptInt old_value, char *e
     }
   }
 
-  if ((curwin->w_p_scr <= 0 || (curwin->w_p_scr > curwin->w_height && curwin->w_height > 0))
+  if ((curwin->w_p_scr <= 0
+       || (curwin->w_p_scr > curwin->w_height_inner && curwin->w_height_inner > 0))
       && full_screen) {
     if (pp == &(curwin->w_p_scr)) {
       if (curwin->w_p_scr != 0) {
@@ -2807,8 +2807,8 @@ static const char *check_num_option_bounds(OptInt *pp, OptInt old_value, char *e
     } else if (curwin->w_p_scr <= 0) {
       // If 'scroll' became invalid because of a side effect silently adjust it.
       curwin->w_p_scr = 1;
-    } else {  // curwin->w_p_scr > curwin->w_height
-      curwin->w_p_scr = curwin->w_height;
+    } else {  // curwin->w_p_scr > curwin->w_height_inner
+      curwin->w_p_scr = curwin->w_height_inner;
     }
   }
   if ((p_sj < -100 || p_sj >= Rows) && full_screen) {
