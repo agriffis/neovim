@@ -311,7 +311,8 @@ static uint8_t check_multiclick(int code, int grid, int row, int col)
   }
 
   // For click events the number of clicks is updated.
-  if (code == KE_LEFTMOUSE || code == KE_RIGHTMOUSE || code == KE_MIDDLEMOUSE) {
+  if (code == KE_LEFTMOUSE || code == KE_RIGHTMOUSE || code == KE_MIDDLEMOUSE
+      || code == KE_X1MOUSE || code == KE_X2MOUSE) {
     uint64_t mouse_time = os_hrtime();    // time of current mouse click (ns)
     // compute the time elapsed since the previous mouse click and
     // convert p_mouse from ms to ns
@@ -415,7 +416,8 @@ static unsigned handle_mouse_event(const char **ptr, uint8_t *buf, unsigned bufs
 size_t input_enqueue_mouse(int code, uint8_t modifier, int grid, int row, int col)
 {
   modifier |= check_multiclick(code, grid, row, col);
-  uint8_t buf[7], *p = buf;
+  uint8_t buf[7];
+  uint8_t *p = buf;
   if (modifier) {
     p[0] = K_SPECIAL;
     p[1] = KS_MODIFIER;
