@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>  // IWYU pragma: keep
+#include <string.h>  // IWYU pragma: keep
 #include <time.h>  // IWYU pragma: keep
 
 #include "auto/config.h"
