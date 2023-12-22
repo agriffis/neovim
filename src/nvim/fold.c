@@ -11,7 +11,6 @@
 
 #include "klib/kvec.h"
 #include "nvim/api/extmark.h"
-#include "nvim/api/private/defs.h"
 #include "nvim/api/private/helpers.h"
 #include "nvim/ascii_defs.h"
 #include "nvim/buffer_defs.h"
@@ -39,6 +38,7 @@
 #include "nvim/message.h"
 #include "nvim/move.h"
 #include "nvim/ops.h"
+#include "nvim/option_defs.h"
 #include "nvim/option_vars.h"
 #include "nvim/os/input.h"
 #include "nvim/plines.h"

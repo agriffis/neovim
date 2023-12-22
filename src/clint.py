@@ -897,13 +897,10 @@ def CheckIncludes(filename, lines, error):
     }):
         return
 
-    # These should be synced with the ignored headers in the `iwyu` target in
-    # the Makefile.
     check_includes_ignore = [
             "src/nvim/api/private/validate.h",
             "src/nvim/assert_defs.h",
             "src/nvim/buffer.h",
-            "src/nvim/buffer_defs.h",
             "src/nvim/channel.h",
             "src/nvim/charset.h",
             "src/nvim/eval.h",
@@ -912,32 +909,22 @@ def CheckIncludes(filename, lines, error):
             "src/nvim/eval/typval_defs.h",
             "src/nvim/eval/userfunc.h",
             "src/nvim/event/libuv_process.h",
-            "src/nvim/event/loop.h",
-            "src/nvim/event/process.h",
-            "src/nvim/event/rstream.h",
-            "src/nvim/event/signal.h",
-            "src/nvim/event/socket.h",
-            "src/nvim/event/stream.h",
-            "src/nvim/event/time.h",
-            "src/nvim/event/wstream.h",
+            "src/nvim/event/multiqueue.h",
             "src/nvim/garray.h",
             "src/nvim/globals.h",
             "src/nvim/grid.h",
             "src/nvim/highlight.h",
-            "src/nvim/input.h",
             "src/nvim/keycodes.h",
             "src/nvim/lua/executor.h",
             "src/nvim/main.h",
+            "src/nvim/mark.h",
             "src/nvim/msgpack_rpc/channel_defs.h",
-            "src/nvim/msgpack_rpc/helpers.h",
             "src/nvim/msgpack_rpc/unpacker.h",
             "src/nvim/option.h",
-            "src/nvim/os/input.h",
             "src/nvim/os/pty_conpty_win.h",
             "src/nvim/os/pty_process_unix.h",
             "src/nvim/os/pty_process_win.h",
             "src/nvim/tui/input.h",
-            "src/nvim/ui.h",
             "src/nvim/viml/parser/expressions.h",
             "src/nvim/viml/parser/parser.h",
                              ]
