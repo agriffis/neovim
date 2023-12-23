@@ -867,7 +867,7 @@ void draw_tabline(void)
 /// the v:lnum and v:relnum variables don't have to be updated.
 ///
 /// @return  The width of the built status column string for line "lnum"
-int build_statuscol_str(win_T *wp, linenr_T lnum, linenr_T relnum, statuscol_T *stcp)
+int build_statuscol_str(win_T *wp, linenr_T lnum, linenr_T relnum, char *buf, statuscol_T *stcp)
 {
   // Only update click definitions once per window per redraw.
   // Don't update when current width is 0, since it will be redrawn again if not empty.
@@ -880,7 +880,7 @@ int build_statuscol_str(win_T *wp, linenr_T lnum, linenr_T relnum, statuscol_T *
 
   StlClickRecord *clickrec;
   char *stc = xstrdup(wp->w_p_stc);
-  int width = build_stl_str_hl(wp, stcp->text, MAXPATHL, stc, kOptStatuscolumn, OPT_LOCAL, ' ',
+  int width = build_stl_str_hl(wp, buf, MAXPATHL, stc, kOptStatuscolumn, OPT_LOCAL, ' ',
                                stcp->width, &stcp->hlrec, fillclick ? &clickrec : NULL, stcp);
   xfree(stc);
 
@@ -888,7 +888,7 @@ int build_statuscol_str(win_T *wp, linenr_T lnum, linenr_T relnum, statuscol_T *
     stl_clear_click_defs(wp->w_statuscol_click_defs, wp->w_statuscol_click_defs_size);
     wp->w_statuscol_click_defs = stl_alloc_click_defs(wp->w_statuscol_click_defs, stcp->width,
                                                       &wp->w_statuscol_click_defs_size);
-    stl_fill_click_defs(wp->w_statuscol_click_defs, clickrec, stcp->text, stcp->width, false);
+    stl_fill_click_defs(wp->w_statuscol_click_defs, clickrec, buf, stcp->width, false);
   }
 
   return width;
@@ -1640,20 +1640,32 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, OptIndex op
 
       char *p = NULL;
       if (fold) {
-        size_t n = fill_foldcolumn(out_p, wp, stcp->foldinfo,
-                                   (linenr_T)get_vim_var_nr(VV_LNUM), NULL);
+        schar_T fold_buf[10];
+        size_t n = fill_foldcolumn(NULL, wp, stcp->foldinfo,
+                                   (linenr_T)get_vim_var_nr(VV_LNUM), 0, fold_buf);
         stl_items[curitem].minwid = -((stcp->use_cul ? HLF_CLF : HLF_FC) + 1);
+        size_t buflen = 0;
+        // TODO(bfredl): this is very backwards. we must support schar_T
+        // being used directly in 'statuscol'
+        for (size_t i = 0; i < n; i++) {
+          schar_get(out_p + buflen, fold_buf[i]);
+          buflen += strlen(out_p + buflen);
+        }
         p = out_p;
-        p[n] = NUL;
       }
 
+      char buf[SIGN_WIDTH * MAX_SCHAR_SIZE];
       size_t buflen = 0;
       varnumber_T virtnum = get_vim_var_nr(VV_VIRTNUM);
       for (int i = 0; i < width; i++) {
         if (!fold) {
           SignTextAttrs *sattr = virtnum ? NULL : &stcp->sattrs[i];
-          p = sattr && sattr->text ? sattr->text : "  ";
-          stl_items[curitem].minwid = -(sattr && sattr->text
+          p = "  ";
+          if (sattr && sattr->text[0]) {
+            describe_sign_text(buf, sattr->text);
+            p = buf;
+          }
+          stl_items[curitem].minwid = -(sattr && sattr->text[0]
                                         ? (stcp->sign_cul_id ? stcp->sign_cul_id : sattr->hl_id)
                                         : (stcp->use_cul ? HLF_CLS : HLF_SC) + 1);
         }
