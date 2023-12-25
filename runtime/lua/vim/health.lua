@@ -266,16 +266,22 @@ M._complete = function()
   return vim.tbl_keys(unique)
 end
 
--- Runs the specified healthchecks.
--- Runs all discovered healthchecks if plugin_names is empty.
-function M._check(plugin_names)
+--- Runs the specified healthchecks.
+--- Runs all discovered healthchecks if plugin_names is empty.
+---
+--- @param mods string command modifiers that affect splitting a window.
+function M._check(mods, plugin_names)
   local healthchecks = plugin_names == '' and get_healthcheck('*') or get_healthcheck(plugin_names)
 
-  -- Create buffer and open in a tab, unless this is the default buffer when Nvim starts.
   local emptybuf = vim.fn.bufnr('$') == 1 and vim.fn.getline(1) == '' and 1 == vim.fn.line('$')
-  local mod = emptybuf and 'buffer' or 'tab sbuffer'
+
+  -- When no command modifiers are used:
+  -- - If the current buffer is empty, open healthcheck directly.
+  -- - If not specified otherwise open healthcheck in a tab.
+  local buf_cmd = #mods > 0 and (mods .. ' sbuffer') or emptybuf and 'buffer' or 'tab sbuffer'
+
   local bufnr = vim.api.nvim_create_buf(true, true)
-  vim.cmd(mod .. ' ' .. bufnr)
+  vim.cmd(buf_cmd .. ' ' .. bufnr)
 
   if vim.fn.bufexists('health://') == 1 then
     vim.cmd.bwipe('health://')
