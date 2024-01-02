@@ -275,6 +275,11 @@ The following new APIs and features were added.
 • |v_Q-default| and |v_@-default| repeat a register for each line of a visual
   selection.
 
+• |vim.diagnostic.count()| returns the number of diagnostics for a given
+  buffer and/or namespace, by severity. This is a faster alternative to
+  |vim.diagnostic.get()| when only the number of diagnostics is needed, but
+  not the diagnostics themselves.
+
 ==============================================================================
 CHANGED FEATURES                                                 *news-changed*
 
@@ -300,6 +305,7 @@ The following changes to existing APIs or features add new behavior.
 <
   • Enabled treesitter highlighting for treesitter query files.
   • Enabled treesitter highlighting for help files.
+  • Enabled treesitter highlighting for Lua files.
 
 • The `workspace/didChangeWatchedFiles` LSP client capability is now enabled
   by default.
