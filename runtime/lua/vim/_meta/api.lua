@@ -73,6 +73,9 @@ function vim.api.nvim__id_dictionary(dct) end
 function vim.api.nvim__id_float(flt) end
 
 --- @private
+--- NB: if your UI doesn't use hlstate, this will not return hlstate first
+--- time.
+---
 --- @param grid integer
 --- @param row integer
 --- @param col integer
@@ -1761,9 +1764,7 @@ function vim.api.nvim_set_current_win(window) end
 ---              • on_buf: called for each buffer being redrawn (before window
 ---                callbacks) ["buf", bufnr, tick]
 ---              • on_win: called when starting to redraw a specific window.
----                botline_guess is an approximation that does not exceed the
----                last line number. ["win", winid, bufnr, topline,
----                botline_guess]
+---                ["win", winid, bufnr, topline, botline]
 ---              • on_line: called for each buffer line being redrawn. (The
 ---                interaction with fold lines is subject to change) ["win",
 ---                winid, bufnr, row]
