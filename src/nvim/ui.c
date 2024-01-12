@@ -12,11 +12,12 @@
 #include "nvim/ascii_defs.h"
 #include "nvim/autocmd.h"
 #include "nvim/buffer.h"
+#include "nvim/buffer_defs.h"
 #include "nvim/cursor_shape.h"
 #include "nvim/drawscreen.h"
 #include "nvim/event/multiqueue.h"
 #include "nvim/ex_getln.h"
-#include "nvim/gettext.h"
+#include "nvim/gettext_defs.h"
 #include "nvim/globals.h"
 #include "nvim/grid.h"
 #include "nvim/highlight.h"
@@ -25,8 +26,10 @@
 #include "nvim/lua/executor.h"
 #include "nvim/map_defs.h"
 #include "nvim/memory.h"
+#include "nvim/memory_defs.h"
 #include "nvim/message.h"
 #include "nvim/option.h"
+#include "nvim/option_defs.h"
 #include "nvim/option_vars.h"
 #include "nvim/os/time.h"
 #include "nvim/state_defs.h"
@@ -448,13 +451,12 @@ void ui_set_ext_option(UI *ui, UIExtension ext, bool active)
   }
 }
 
-void ui_line(ScreenGrid *grid, int row, int startcol, int endcol, int clearcol, int clearattr,
-             bool wrap)
+void ui_line(ScreenGrid *grid, int row, bool invalid_row, int startcol, int endcol, int clearcol,
+             int clearattr, bool wrap)
 {
   assert(0 <= row && row < grid->rows);
   LineFlags flags = wrap ? kLineFlagWrap : 0;
-  if (startcol == -1) {
-    startcol = 0;
+  if (startcol == 0 && invalid_row) {
     flags |= kLineFlagInvalid;
   }
 
