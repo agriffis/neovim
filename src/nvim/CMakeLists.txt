@@ -117,6 +117,10 @@ elseif(MINGW)
   # Enable wmain
   target_link_libraries(nvim PRIVATE -municode)
 elseif(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+  if(CMAKE_C_COMPILER_VERSION VERSION_LESS 10)
+    target_compile_options(main_lib INTERFACE -Wno-conversion)
+  endif()
+
   target_compile_options(main_lib INTERFACE -fno-common
     $<$<CONFIG:Release>:-Wno-unused-result>
     $<$<CONFIG:RelWithDebInfo>:-Wno-unused-result>
@@ -912,6 +916,7 @@ file(GLOB API_SOURCES CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/src/nvim/api/*.c)
 
 file(GLOB LUA_SOURCES CONFIGURE_DEPENDS
   ${NVIM_RUNTIME_DIR}/lua/vim/*.lua
+  ${NVIM_RUNTIME_DIR}/lua/vim/_meta/*.lua
   ${NVIM_RUNTIME_DIR}/lua/vim/filetype/*.lua
   ${NVIM_RUNTIME_DIR}/lua/vim/lsp/*.lua
   ${NVIM_RUNTIME_DIR}/lua/vim/treesitter/*.lua
