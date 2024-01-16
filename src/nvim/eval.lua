@@ -2923,10 +2923,51 @@ M.funcs = {
     returns = 'string',
     signature = 'foldtextresult({lnum})',
   },
+  foreach = {
+    args = 2,
+    base = 1,
+    desc = [=[
+      {expr1} must be a |List|, |String|, |Blob| or |Dictionary|.
+      For each item in {expr1} execute {expr2}. {expr1} is not
+      modified; its values may be, as with |:lockvar| 1. |E741|
+      See |map()| and |filter()| to modify {expr1}.
+
+      {expr2} must be a |string| or |Funcref|.
+
+      If {expr2} is a |string|, inside {expr2} |v:val| has the value
+      of the current item.  For a |Dictionary| |v:key| has the key
+      of the current item and for a |List| |v:key| has the index of
+      the current item.  For a |Blob| |v:key| has the index of the
+      current byte. For a |String| |v:key| has the index of the
+      current character.
+      Examples: >vim
+      	call foreach(mylist, 'let used[v:val] = v:true')
+      <This records the items that are in the {expr1} list.
+
+      Note that {expr2} is the result of expression and is then used
+      as a command.  Often it is good to use a |literal-string| to
+      avoid having to double backslashes.
+
+      If {expr2} is a |Funcref| it must take two arguments:
+      	1. the key or the index of the current item.
+      	2. the value of the current item.
+      With a lambda you don't get an error if it only accepts one
+      argument.
+      If the function returns a value, it is ignored.
+
+      Returns {expr1} in all cases.
+      When an error is encountered while executing {expr2} no
+      further items in {expr1} are processed.
+      When {expr2} is a Funcref errors inside a function are ignored,
+      unless it was defined with the "abort" flag.
+    ]=],
+    name = 'foreach',
+    params = { { 'expr1', 'any' }, { 'expr2', 'any' } },
+    signature = 'foreach({expr1}, {expr2})',
+  },
   foreground = {
     args = 0,
     params = {},
-    signature = '',
     lua = false,
   },
   fullcommand = {
@@ -6615,6 +6656,60 @@ M.funcs = {
     params = { { 'nr', 'integer' } },
     signature = 'matcharg({nr})',
   },
+  matchbufline = {
+    args = { 4, 5 },
+    base = 1,
+    desc = [=[
+      Returns the |List| of matches in lines from {lnum} to {end} in
+      buffer {buf} where {pat} matches.
+
+      {lnum} and {end} can either be a line number or the string "$"
+      to refer to the last line in {buf}.
+
+      The {dict} argument supports following items:
+          submatches	include submatch information (|/\(|)
+
+      For each match, a |Dict| with the following items is returned:
+          byteidx	starting byte index of the match
+          lnum	line number where there is a match
+          text	matched string
+      Note that there can be multiple matches in a single line.
+
+      This function works only for loaded buffers. First call
+      |bufload()| if needed.
+
+      When {buf} is not a valid buffer, the buffer is not loaded or
+      {lnum} or {end} is not valid then an error is given and an
+      empty |List| is returned.
+
+      Examples: >vim
+          " Assuming line 3 in buffer 5 contains "a"
+          :echo matchbufline(5, '\<\k\+\>', 3, 3)
+          [{'lnum': 3, 'byteidx': 0, 'text': 'a'}]
+          " Assuming line 4 in buffer 10 contains "tik tok"
+          :echo matchbufline(10, '\<\k\+\>', 1, 4)
+          [{'lnum': 4, 'byteidx': 0, 'text': 'tik'}, {'lnum': 4, 'byteidx': 4, 'text': 'tok'}]
+      <
+      If {submatch} is present and is v:true, then submatches like
+      "\1", "\2", etc. are also returned.  Example: >vim
+          " Assuming line 2 in buffer 2 contains "acd"
+          :echo matchbufline(2, '\(a\)\?\(b\)\?\(c\)\?\(.*\)', 2, 2
+      				\ {'submatches': v:true})
+          [{'lnum': 2, 'byteidx': 0, 'text': 'acd', 'submatches': ['a', '', 'c', 'd', '', '', '', '', '']}]
+      <The "submatches" List always contains 9 items.  If a submatch
+      is not found, then an empty string is returned for that
+      submatch.
+    ]=],
+    name = 'matchbufline',
+    params = {
+      { 'buf', 'string|integer' },
+      { 'pat', 'string' },
+      { 'lnum', 'string|integer' },
+      { 'end', 'string|integer' },
+      { 'dict', 'table' },
+    },
+    signature = 'matchbufline({buf}, {pat}, {lnum}, {end}, [, {dict}])',
+  },
   matchdelete = {
     args = { 1, 2 },
     base = 1,
@@ -6799,6 +6894,43 @@ M.funcs = {
     params = { { 'expr', 'any' }, { 'pat', 'any' }, { 'start', 'any' }, { 'count', 'any' } },
     signature = 'matchstr({expr}, {pat} [, {start} [, {count}]])',
   },
+  matchstrlist = {
+    args = { 2, 3 },
+    base = 1,
+    desc = [=[
+      Returns the |List| of matches in {list} where {pat} matches.
+      {list} is a |List| of strings.  {pat} is matched against each
+      string in {list}.
+
+      The {dict} argument supports following items:
+          submatches	include submatch information (|/\(|)
+
+      For each match, a |Dict| with the following items is returned:
+          byteidx	starting byte index of the match.
+          idx		index in {list} of the match.
+          text	matched string
+          submatches	a List of submatches.  Present only if
+      		"submatches" is set to v:true in {dict}.
+
+      Example: >vim
+          :echo matchstrlist(['tik tok'], '\<\k\+\>')
+          [{'idx': 0, 'byteidx': 0, 'text': 'tik'}, {'idx': 0, 'byteidx': 4, 'text': 'tok'}]
+          :echo matchstrlist(['a', 'b'], '\<\k\+\>')
+          [{'idx': 0, 'byteidx': 0, 'text': 'a'}, {'idx': 1, 'byteidx': 0, 'text': 'b'}]
+      <
+      If "submatches" is present and is v:true, then submatches like
+      "\1", "\2", etc. are also returned.  Example: >vim
+          :echo matchstrlist(['acd'], '\(a\)\?\(b\)\?\(c\)\?\(.*\)',
+      				\ #{submatches: v:true})
+          [{'idx': 0, 'byteidx': 0, 'text': 'acd', 'submatches': ['a', '', 'c', 'd', '', '', '', '', '']}]
+      <The "submatches" List always contains 9 items.  If a submatch
+      is not found, then an empty string is returned for that
+      submatch.
+    ]=],
+    name = 'matchstrlist',
+    params = { { 'list', 'string[]' }, { 'pat', 'string' }, { 'dict', 'table' } },
+    signature = 'matchstrlist({list}, {pat} [, {dict}])',
+  },
   matchstrpos = {
     args = { 2, 4 },
     base = 1,
@@ -6836,7 +6968,7 @@ M.funcs = {
       it returns the maximum of all values in the Dictionary.
       If {expr} is neither a List nor a Dictionary, or one of the
       items in {expr} cannot be used as a Number this results in
-                      an error.  An empty |List| or |Dictionary| results in zero.
+      an error.  An empty |List| or |Dictionary| results in zero.
 
     ]=],
     name = 'max',
@@ -11754,7 +11886,6 @@ M.funcs = {
   test_write_list_log = {
     args = 1,
     params = { { 'fname', 'string' } },
-    signature = '',
     lua = false,
   },
   timer_info = {
