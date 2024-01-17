@@ -6362,7 +6362,7 @@ vim.go.sol = vim.go.startofline
 --- The 'statuscolumn' width follows that of the default columns and
 --- adapts to the `'numberwidth'`, `'signcolumn'` and `'foldcolumn'` option
 --- values (regardless of whether the sign and fold items are present).
---- Aditionally, the 'statuscolumn' grows with the size of the evaluated
+--- Additionally, the 'statuscolumn' grows with the size of the evaluated
 --- format string, up to a point (following the maximum size of the default
 --- fold, sign and number columns). Shrinking only happens when the number
 --- of lines in a buffer changes, or the 'statuscolumn' option is set.
@@ -6372,6 +6372,9 @@ vim.go.sol = vim.go.startofline
 --- The `v:virtnum` variable is negative when drawing virtual lines, zero
 --- 	      when drawing the actual buffer line, and positive when
 --- 	      drawing the wrapped part of a buffer line.
+---
+--- When using `v:relnum`, keep in mind that cursor movement by itself will
+--- not cause the 'statuscolumn' to update unless `'relativenumber'` is set.
 ---
 --- NOTE: The %@ click execute function item is supported as well but the
 --- specified function will be the same for each row in the same column.
