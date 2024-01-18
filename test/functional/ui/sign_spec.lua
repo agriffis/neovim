@@ -539,4 +539,30 @@ describe('Signs', function()
                                                            |
     ]])
   end)
+
+  it('no negative b_signcols.count with undo after initializing', function()
+    exec([[
+      set signcolumn=auto:2
+      call setline(1, 'a')
+      call nvim_buf_set_extmark(0, nvim_create_namespace(''), 0, 0, {'sign_text':'S1'})
+      delete | redraw | undo
+    ]])
+  end)
+
+  it('sign not shown on line it was previously on after undo', function()
+    exec([[
+      call setline(1, range(1, 4))
+      call nvim_buf_set_extmark(0, nvim_create_namespace(''), 1, 0, {'sign_text':'S1'})
+    ]])
+    exec('norm 2Gdd')
+    exec('silent undo')
+    screen:expect([[
+      {2:  }1                                                  |
+      S1^2                                                  |
+      {2:  }3                                                  |
+      {2:  }4                                                  |
+      {0:~                                                    }|*9
+                                                           |
+    ]])
+  end)
 end)
