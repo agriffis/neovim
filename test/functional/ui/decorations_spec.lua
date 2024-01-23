@@ -4548,6 +4548,7 @@ describe('decorations: signs', function()
       [1] = {foreground = Screen.colors.Blue4, background = Screen.colors.Grey};
       [2] = {foreground = Screen.colors.Blue1, bold = true};
       [3] = {background = Screen.colors.Yellow1, foreground = Screen.colors.Blue1};
+      [4] = {foreground = Screen.colors.Gray100, background = Screen.colors.Red};
     }
 
     ns = api.nvim_create_namespace 'test'
@@ -4995,6 +4996,44 @@ l5
       S1l                 |
       S2^1                 |
       {1:  }l2                |
+                          |
+    ]]}
+  end)
+
+  it('correct width after wiping a buffer', function()
+    screen:try_resize(20, 4)
+    insert(example_test3)
+    feed('gg')
+    local buf = api.nvim_get_current_buf()
+    api.nvim_buf_set_extmark(buf, ns, 0, 0, { sign_text = 'h' })
+    screen:expect{grid=[[
+      h ^l1                |
+      {1:  }l2                |
+      {1:  }l3                |
+                          |
+    ]]}
+    api.nvim_win_set_buf(0, api.nvim_create_buf(false, true))
+    api.nvim_buf_delete(buf, {unload=true, force=true})
+    api.nvim_buf_set_lines(buf, 0, -1, false, {''})
+    api.nvim_win_set_buf(0, buf)
+    screen:expect{grid=[[
+      ^                    |
+      {2:~                   }|*2
+                          |
+    ]]}
+  end)
+
+  it('no crash with sign after many marks #27137', function()
+    screen:try_resize(20, 4)
+    insert('a')
+    for _ = 0, 104 do
+      api.nvim_buf_set_extmark(0, ns, 0, 0, {hl_group = 'Error', end_col = 1})
+    end
+    api.nvim_buf_set_extmark(0, ns, 0, 0, {sign_text = 'S1'})
+
+    screen:expect{grid=[[
+      S1{4:^a}                 |
+      {2:~                   }|*2
                           |
     ]]}
   end)

@@ -2473,6 +2473,9 @@ vim.go.fdo = vim.go.foldopen
 --- It is not allowed to change text or jump to another window while
 --- evaluating 'foldtext' `textlock`.
 ---
+--- When set to an empty string, foldtext is disabled, and the line
+--- is displayed normally with highlighting and no line wrapping.
+---
 --- @type string
 vim.o.foldtext = "foldtext()"
 vim.o.fdt = vim.o.foldtext
@@ -7429,15 +7432,15 @@ vim.bo.vts = vim.bo.vartabstop
 
 --- Sets the verbosity level.  Also set by `-V` and `:verbose`.
 ---
---- Tracing of options in Lua scripts is activated at level 1; Lua scripts
---- are not traced with verbose=0, for performance.
+--- Tracing of assignments to options, mappings, etc. in Lua scripts is
+--- enabled at level 1; Lua scripts are not traced when 'verbose' is 0,
+--- for performance.
 ---
 --- If greater than or equal to a given level, Nvim produces the following
 --- messages:
 ---
 --- Level   Messages ~
 --- ----------------------------------------------------------------------
---- 1	Lua assignments to options, mappings, etc.
 --- 2	When a file is ":source"'ed, or `shada` file is read or written.
 --- 3	UI info, terminal capabilities.
 --- 4	Shell commands.

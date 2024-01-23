@@ -225,7 +225,7 @@ ExtmarkInfoArray extmark_get(buf_T *buf, uint32_t ns_id, int l_row, colnr_T l_co
   } else {
     // Find all the marks beginning with the start position
     marktree_itr_get_ext(buf->b_marktree, MTPos(l_row, l_col),
-                         itr, reverse, false, NULL);
+                         itr, reverse, false, NULL, NULL);
   }
 
   int order = reverse ? -1 : 1;
@@ -308,6 +308,9 @@ void extmark_free_all(buf_T *buf)
   }
 
   marktree_clear(buf->b_marktree);
+
+  buf->b_signcols.max = 0;
+  CLEAR_FIELD(buf->b_signcols.count);
 
   map_destroy(uint32_t, buf->b_extmark_ns);
   *buf->b_extmark_ns = (Map(uint32_t, uint32_t)) MAP_INIT;
