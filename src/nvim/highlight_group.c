@@ -302,17 +302,10 @@ static const char *highlight_init_both[] = {
   "@markup.strikethrough  gui=strikethrough, cterm=strikethrough",
   "@markup.underline      gui=underline,     cterm=underline",
 
-  "default link @markup.heading  Title",
-
-  "default link @markup.raw          Comment",
-  "default link @markup.quote        Comment",
-  "default link @markup.math         Comment",
-  "default link @markup.environment  Comment",
-
-  "default link @markup.link        Underlined",
-  "default link @markup.link.label  Identifier",
-
-  "default link @markup.list            Special",
+  "default link @markup                 Special",  // fallback for subgroups; never used itself
+  "default link @markup.heading         Title",
+  "default link @markup.environment     Structure",
+  "default link @markup.link            Underlined",
   "default link @markup.list.checked    DiagnosticOk",
   "default link @markup.list.unchecked  DiagnosticWarn",
 
@@ -324,22 +317,22 @@ static const char *highlight_init_both[] = {
   "default link @tag.delimiter  Delimiter",
 
   // LSP semantic tokens
-  "default link @lsp.type.class         Structure",
-  "default link @lsp.type.comment       Comment",
-  "default link @lsp.type.decorator     Function",
-  "default link @lsp.type.enum          Structure",
-  "default link @lsp.type.enumMember    Constant",
-  "default link @lsp.type.function      Function",
-  "default link @lsp.type.interface     Structure",
-  "default link @lsp.type.macro         Macro",
-  "default link @lsp.type.method        Function",
-  "default link @lsp.type.namespace     Structure",
-  "default link @lsp.type.parameter     Identifier",
-  "default link @lsp.type.property      Identifier",
-  "default link @lsp.type.struct        Structure",
-  "default link @lsp.type.type          Type",
-  "default link @lsp.type.typeParameter TypeDef",
-  "default link @lsp.type.variable      NONE",  // don't highlight to reduce visual overload
+  "default link @lsp.type.class         @type",
+  "default link @lsp.type.comment       @comment",
+  "default link @lsp.type.decorator     @attribute",
+  "default link @lsp.type.enum          @type",
+  "default link @lsp.type.enumMember    @constant",
+  "default link @lsp.type.function      @function",
+  "default link @lsp.type.interface     @type",
+  "default link @lsp.type.macro         @constant.macro",
+  "default link @lsp.type.method        @function.method",
+  "default link @lsp.type.namespace     @module",
+  "default link @lsp.type.parameter     @variable.parameter",
+  "default link @lsp.type.property      @property",
+  "default link @lsp.type.struct        @type",
+  "default link @lsp.type.type          @type",
+  "default link @lsp.type.typeParameter @type.definition",
+  "default link @lsp.type.variable      @variable",
 
   NULL
 };
