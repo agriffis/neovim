@@ -18,7 +18,6 @@
 #include "nvim/grid_defs.h"
 #include "nvim/highlight.h"
 #include "nvim/highlight_group.h"
-#include "nvim/map_defs.h"
 #include "nvim/marktree.h"
 #include "nvim/memory.h"
 #include "nvim/move.h"
@@ -118,7 +117,7 @@ void decor_redraw(buf_T *buf, int row1, int row2, DecorInline decor)
 
 void decor_redraw_sh(buf_T *buf, int row1, int row2, DecorSignHighlight sh)
 {
-  if (sh.hl_id || (sh.flags & (kSHIsSign|kSHSpellOn|kSHSpellOff))) {
+  if (sh.hl_id || (sh.url != NULL) || (sh.flags & (kSHIsSign|kSHSpellOn|kSHSpellOff))) {
     if (row2 >= row1) {
       redraw_buf_range_later(buf, row1 + 1, row2 + 1);
     }
@@ -253,7 +252,7 @@ void decor_free(DecorInline decor)
   }
 }
 
-void decor_free_inner(DecorVirtText *vt, uint32_t first_idx)
+static void decor_free_inner(DecorVirtText *vt, uint32_t first_idx)
 {
   while (vt) {
     if (vt->flags & kVTIsLines) {
@@ -273,6 +272,9 @@ void decor_free_inner(DecorVirtText *vt, uint32_t first_idx)
       xfree(sh->sign_name);
     }
     sh->flags = 0;
+    if (sh->url != NULL) {
+      XFREE_CLEAR(sh->url);
+    }
     if (sh->next == DECOR_ID_INVALID) {
       sh->next = decor_freelist;
       decor_freelist = first_idx;
@@ -509,7 +511,8 @@ void decor_range_add_sh(DecorState *state, int start_row, int start_col, int end
     .draw_col = -10,
   };
 
-  if (sh->hl_id || (sh->flags & (kSHConceal | kSHSpellOn | kSHSpellOff))) {
+  if (sh->hl_id || (sh->url != NULL)
+      || (sh->flags & (kSHConceal | kSHSpellOn | kSHSpellOff))) {
     if (sh->hl_id) {
       range.attr_id = syn_id2attr(sh->hl_id);
     }
@@ -627,15 +630,22 @@ next_mark:
         spell = kFalse;
       }
     }
+    if (active && item.data.sh.url != NULL) {
+      attr = hl_add_url(attr, item.data.sh.url);
+    }
     if (item.start_row == state->row && item.start_col <= col
         && decor_virt_pos(&item) && item.draw_col == -10) {
       decor_init_draw_col(win_col, hidden, &item);
     }
     if (keep) {
       kv_A(state->active, j++) = item;
-    } else if (item.owned && item.kind == kDecorKindVirtText) {
-      clear_virttext(&item.data.vt->data.virt_text);
-      xfree(item.data.vt);
+    } else if (item.owned) {
+      if (item.kind == kDecorKindVirtText) {
+        clear_virttext(&item.data.vt->data.virt_text);
+        xfree(item.data.vt);
+      } else if (item.kind == kDecorKindHighlight) {
+        xfree((void *)item.data.sh.url);
+      }
     }
   }
   kv_size(state->active) = j;
@@ -662,8 +672,8 @@ int sign_item_cmp(const void *p1, const void *p2)
          ? n : (s2->sh->sign_add_id - s1->sh->sign_add_id);
 }
 
-const uint32_t sign_filter[4] = {[kMTMetaSignText] = kMTFilterSelect,
-                                 [kMTMetaSignHL] = kMTFilterSelect };
+static const uint32_t sign_filter[4] = {[kMTMetaSignText] = kMTFilterSelect,
+                                        [kMTMetaSignHL] = kMTFilterSelect };
 
 /// Return the sign attributes on the currently refreshed row.
 ///
@@ -750,7 +760,7 @@ DecorSignHighlight *decor_find_sign(DecorInline decor)
   }
 }
 
-const uint32_t signtext_filter[4] = {[kMTMetaSignText] = kMTFilterSelect };
+static const uint32_t signtext_filter[4] = {[kMTMetaSignText] = kMTFilterSelect };
 
 /// Count the number of signs in a range after adding/removing a sign, or to
 /// (re-)initialize a range in "b_signcols.count".
@@ -850,7 +860,7 @@ bool decor_redraw_eol(win_T *wp, DecorState *state, int *eol_attr, int eol_col)
   return has_virt_pos;
 }
 
-uint32_t lines_filter[4] = {[kMTMetaLines] = kMTFilterSelect };
+static const uint32_t lines_filter[4] = {[kMTMetaLines] = kMTFilterSelect };
 
 /// @param has_fold  whether line "lnum" has a fold, or kNone when not calculated yet
 int decor_virt_lines(win_T *wp, linenr_T lnum, VirtLines *lines, TriState has_fold)
@@ -960,6 +970,10 @@ void decor_to_dict_legacy(Dictionary *dict, DecorInline decor, bool hl_name)
 
   if (sh_hl.flags & kSHUIWatched) {
     PUT(*dict, "ui_watched", BOOLEAN_OBJ(true));
+  }
+
+  if (sh_hl.url != NULL) {
+    PUT(*dict, "url", STRING_OBJ(cstr_to_string(sh_hl.url)));
   }
 
   if (virt_text) {
