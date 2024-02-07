@@ -50,8 +50,13 @@ function git_version {
 function git_revision {
     cached git_revision && return
 
-    # count commits not on master
-    output "$(git log --oneline origin/master.. | wc -l)"
+    # find last merge
+    declare last_merge rest
+    read last_merge rest <<<"$(git log --merges --oneline -n1)"
+    [[ -n $last_merge ]] || die "failed to find last merge"
+
+    # count commits since last merge
+    output "$(git log --oneline $last_merge.. | wc -l)"
 }
 
 function git_changelog_date {
