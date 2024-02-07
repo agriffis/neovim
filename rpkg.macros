@@ -56,7 +56,7 @@ function git_revision {
     [[ -n $last_merge ]] || die "failed to find last merge"
 
     # count commits since last merge
-    output "$(git log --oneline $last_merge.. | wc -l)"
+    output "$(git log --oneline "$last_merge^.." | wc -l)"
 }
 
 function git_changelog_date {
