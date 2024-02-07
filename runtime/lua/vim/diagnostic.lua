@@ -11,7 +11,7 @@ local M = {}
 --- @field severity? vim.diagnostic.Severity
 --- @field message string
 --- @field source? string
---- @field code? string
+--- @field code? string|integer
 --- @field _tags? { deprecated: boolean, unnecessary: boolean}
 --- @field user_data? any arbitrary data plugins can add
 --- @field namespace? integer
@@ -1023,7 +1023,7 @@ end
 
 --- @class vim.diagnostic.GotoOpts : vim.diagnostic.GetOpts
 --- @field cursor_position? {[1]:integer,[2]:integer}
---- @field wrap? integer
+--- @field wrap? boolean
 --- @field float? boolean|vim.diagnostic.Opts.Float
 --- @field win_id? integer
 

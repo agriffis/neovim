@@ -159,8 +159,8 @@ void conceal_check_cursor_line(void)
 /// There may be some time between setting Rows and Columns and (re)allocating
 /// default_grid arrays.  This happens when starting up and when
 /// (manually) changing the screen size.  Always use default_grid.rows and
-/// default_grid.Columns to access items in default_grid.chars[].  Use Rows
-/// and Columns for positioning text etc. where the final size of the screen is
+/// default_grid.cols to access items in default_grid.chars[].  Use Rows and
+/// Columns for positioning text etc. where the final size of the screen is
 /// needed.
 ///
 /// @return  whether resizing has been done
@@ -2346,6 +2346,7 @@ static void win_update(win_T *wp)
 
     // 'statuscolumn' width has changed or errored, start from the top.
     if (wp->w_redr_statuscol) {
+redr_statuscol:
       wp->w_redr_statuscol = false;
       idx = 0;
       row = 0;
@@ -2429,6 +2430,10 @@ static void win_update(win_T *wp)
         spellvars_T zero_spv = { 0 };
         foldinfo_T zero_foldinfo = { 0 };
         row = win_line(wp, wp->w_botline, row, wp->w_grid.rows, 0, &zero_spv, zero_foldinfo);
+        if (wp->w_redr_statuscol) {
+          eof = false;
+          goto redr_statuscol;
+        }
       }
     } else if (dollar_vcol == -1) {
       wp->w_botline = lnum;
@@ -2863,16 +2868,4 @@ bool win_cursorline_standout(const win_T *wp)
   FUNC_ATTR_NONNULL_ALL
 {
   return wp->w_p_cul || (wp->w_p_cole > 0 && !conceal_cursor_line(wp));
-}
-
-/// Redraw when w_cline_row changes and 'relativenumber' or 'cursorline' is set.
-/// Also when concealing is on and 'concealcursor' is not active.
-void redraw_for_cursorline(win_T *wp)
-  FUNC_ATTR_NONNULL_ALL
-{
-  if ((wp->w_valid & VALID_CROW) == 0 && !pum_visible()
-      && (wp->w_p_rnu || win_cursorline_standout(wp))) {
-    // win_line() will redraw the number column and cursorline only.
-    redraw_later(wp, UPD_VALID);
-  }
 }
