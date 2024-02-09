@@ -411,7 +411,7 @@ static void win_redr_custom(win_T *wp, bool draw_winbar, bool draw_ruler)
   // might change the option value and free the memory.
   stl = xstrdup(stl);
   build_stl_str_hl(ewp, buf, sizeof(buf), stl, opt_idx, opt_scope,
-                   fillchar, maxwidth, &hltab, &tabtab, NULL);
+                   fillchar, maxwidth, &hltab, NULL, &tabtab, NULL);
 
   xfree(stl);
   ewp->w_p_crb = p_crb_save;
@@ -665,7 +665,7 @@ static void ui_ext_tabline_update(void)
 
     win_T *cwp = (tp == curtab) ? curwin : tp->tp_curwin;
     get_trans_bufname(cwp->w_buffer);
-    PUT_C(tab_info, "name", STRING_OBJ(arena_string(&arena, cstr_as_string(NameBuff))));
+    PUT_C(tab_info, "name", CSTR_TO_ARENA_OBJ(&arena, NameBuff));
 
     ADD_C(tabs, DICTIONARY_OBJ(tab_info));
   }
@@ -686,7 +686,7 @@ static void ui_ext_tabline_update(void)
     PUT_C(buffer_info, "buffer", BUFFER_OBJ(buf->handle));
 
     get_trans_bufname(buf);
-    PUT_C(buffer_info, "name", STRING_OBJ(arena_string(&arena, cstr_as_string(NameBuff))));
+    PUT_C(buffer_info, "name", CSTR_TO_ARENA_OBJ(&arena, NameBuff));
 
     ADD_C(buffers, DICTIONARY_OBJ(buffer_info));
   }
@@ -880,7 +880,7 @@ int build_statuscol_str(win_T *wp, linenr_T lnum, linenr_T relnum, char *buf, st
   StlClickRecord *clickrec;
   char *stc = xstrdup(wp->w_p_stc);
   int width = build_stl_str_hl(wp, buf, MAXPATHL, stc, kOptStatuscolumn, OPT_LOCAL, 0,
-                               stcp->width, &stcp->hlrec, fillclick ? &clickrec : NULL, stcp);
+                               stcp->width, &stcp->hlrec, NULL, fillclick ? &clickrec : NULL, stcp);
   xfree(stc);
 
   if (fillclick) {
@@ -922,7 +922,7 @@ int build_statuscol_str(win_T *wp, linenr_T lnum, linenr_T relnum, char *buf, st
 /// @return  The final width of the statusline
 int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, OptIndex opt_idx,
                      int opt_scope, schar_T fillchar, int maxwidth, stl_hlrec_t **hltab,
-                     StlClickRecord **tabtab, statuscol_T *stcp)
+                     size_t *hltab_len, StlClickRecord **tabtab, statuscol_T *stcp)
 {
   static size_t stl_items_len = 20;  // Initial value, grows as needed.
   static stl_item_t *stl_items = NULL;
@@ -2131,6 +2131,9 @@ int build_stl_str_hl(win_T *wp, char *out, size_t outlen, char *fmt, OptIndex op
     }
     sp->start = NULL;
     sp->userhl = 0;
+  }
+  if (hltab_len) {
+    *hltab_len = (size_t)itemcnt;
   }
 
   // Store the info about tab pages labels.

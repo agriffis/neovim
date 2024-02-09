@@ -1,18 +1,48 @@
 local api = vim.api
 local language = require('vim.treesitter.language')
 
----@class Query
----@field captures string[] List of captures used in query
----@field info TSQueryInfo Contains used queries, predicates, directives
----@field query userdata Parsed query
+local M = {}
+
+---Parsed query, see |vim.treesitter.query.parse()|
+---
+---@class vim.treesitter.Query
+---@field lang string name of the language for this parser
+---@field captures string[] list of (unique) capture names defined in query
+---@field info vim.treesitter.QueryInfo contains information used in the query (e.g. captures, predicates, directives)
+---@field query TSQuery userdata query object
 local Query = {}
 Query.__index = Query
 
----@class TSQueryInfo
----@field captures table
----@field patterns table<string,any[][]>
+---@package
+---@see vim.treesitter.query.parse
+---@param lang string
+---@param ts_query TSQuery
+---@return vim.treesitter.Query
+function Query.new(lang, ts_query)
+  local self = setmetatable({}, Query)
+  local query_info = ts_query:inspect() ---@type TSQueryInfo
+  self.query = ts_query
+  self.lang = lang
+  self.info = {
+    captures = query_info.captures,
+    patterns = query_info.patterns,
+  }
+  self.captures = self.info.captures
+  return self
+end
 
-local M = {}
+---Information for Query, see |vim.treesitter.query.parse()|
+---@class vim.treesitter.QueryInfo
+---
+---List of (unique) capture names defined in query.
+---@field captures string[]
+---
+---Contains information about predicates and directives.
+---Key is pattern id, and value is list of predicates or directives defined in the pattern.
+---A predicate or directive is a list of (integer|string); integer represents `capture_id`, and
+---string represents (literal) arguments to predicate/directive. See |treesitter-predicates|
+---and |treesitter-directives| for more details.
+---@field patterns table<integer, (integer|string)[][]>
 
 ---@param files string[]
 ---@return string[]
@@ -162,7 +192,7 @@ local function read_query_files(filenames)
 end
 
 -- The explicitly set queries from |vim.treesitter.query.set()|
----@type table<string,table<string,Query>>
+---@type table<string,table<string,vim.treesitter.Query>>
 local explicit_queries = setmetatable({}, {
   __index = function(t, k)
     local lang_queries = {}
@@ -201,7 +231,7 @@ end
 ---@param lang string Language to use for the query
 ---@param query_name string Name of the query (e.g. "highlights")
 ---
----@return Query|nil Parsed query
+---@return vim.treesitter.Query|nil -- Parsed query. `nil` if no query files are found.
 M.get = vim.func._memoize('concat-2', function(lang, query_name)
   if explicit_queries[lang][query_name] then
     return explicit_queries[lang][query_name]
@@ -228,26 +258,24 @@ end
 ---
 --- Returns a `Query` (see |lua-treesitter-query|) object which can be used to
 --- search nodes in the syntax tree for the patterns defined in {query}
---- using `iter_*` methods below.
+--- using the `iter_captures` and `iter_matches` methods.
 ---
 --- Exposes `info` and `captures` with additional context about {query}.
----   - `captures` contains the list of unique capture names defined in
----     {query}.
----   -` info.captures` also points to `captures`.
+---   - `captures` contains the list of unique capture names defined in {query}.
+---   - `info.captures` also points to `captures`.
 ---   - `info.patterns` contains information about predicates.
 ---
 ---@param lang string Language to use for the query
 ---@param query string Query in s-expr syntax
 ---
----@return Query Parsed query
+---@return vim.treesitter.Query Parsed query
+---
+---@see |vim.treesitter.query.get()|
 M.parse = vim.func._memoize('concat-2', function(lang, query)
   language.add(lang)
 
-  local self = setmetatable({}, Query)
-  self.query = vim._ts_parse_query(lang, query)
-  self.info = self.query:inspect()
-  self.captures = self.info.captures
-  return self
+  local ts_query = vim._ts_parse_query(lang, query)
+  return Query.new(lang, ts_query)
 end)
 
 ---@deprecated
@@ -644,14 +672,16 @@ end
 --- Returns the start and stop value if set else the node's range.
 -- When the node's range is used, the stop is incremented by 1
 -- to make the search inclusive.
----@param start integer
----@param stop integer
+---@param start integer|nil
+---@param stop integer|nil
 ---@param node TSNode
 ---@return integer, integer
 local function value_or_node_range(start, stop, node)
-  if start == nil and stop == nil then
-    local node_start, _, node_stop, _ = node:range()
-    return node_start, node_stop + 1 -- Make stop inclusive
+  if start == nil then
+    start = node:start()
+  end
+  if stop == nil then
+    stop = node:end_() + 1 -- Make stop inclusive
   end
 
   return start, stop
@@ -682,8 +712,8 @@ end
 ---
 ---@param node TSNode under which the search will occur
 ---@param source (integer|string) Source buffer or string to extract text from
----@param start integer Starting line for the search
----@param stop integer Stopping line for the search (end-exclusive)
+---@param start? integer Starting line for the search. Defaults to `node:start()`.
+---@param stop? integer Stopping line for the search (end-exclusive). Defaults to `node:end_()`.
 ---
 ---@return (fun(end_line: integer|nil): integer, TSNode, TSMetadata):
 ---        capture id, capture node, metadata
@@ -741,12 +771,11 @@ end
 ---
 ---@param node TSNode under which the search will occur
 ---@param source (integer|string) Source buffer or string to search
----@param start integer Starting line for the search
----@param stop integer Stopping line for the search (end-exclusive)
----@param opts table|nil Options:
+---@param start? integer Starting line for the search. Defaults to `node:start()`.
+---@param stop? integer Stopping line for the search (end-exclusive). Defaults to `node:end_()`.
+---@param opts? table Optional keyword arguments:
 ---   - max_start_depth (integer) if non-zero, sets the maximum start depth
 ---     for each match. This is used to prevent traversing too deep into a tree.
----     Requires treesitter >= 0.20.9.
 ---
 ---@return (fun(): integer, table<integer,TSNode>, table): pattern id, match, metadata
 function Query:iter_matches(node, source, start, stop, opts)
