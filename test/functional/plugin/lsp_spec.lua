@@ -139,30 +139,6 @@ describe('LSP', function()
       end)
     end)
   end)
-
-  describe('lsp._cmd_parts test', function()
-    local function _cmd_parts(input)
-      return exec_lua(
-        [[
-        lsp = require('vim.lsp')
-        return lsp._cmd_parts(...)
-      ]],
-        input
-      )
-    end
-    it('should valid cmd argument', function()
-      eq(true, pcall(_cmd_parts, { 'nvim' }))
-      eq(true, pcall(_cmd_parts, { 'nvim', '--head' }))
-    end)
-
-    it('should invalid cmd argument', function()
-      eq('.../lsp.lua:0: cmd: expected list, got nvim', pcall_err(_cmd_parts, 'nvim'))
-      eq(
-        '.../lsp.lua:0: cmd argument: expected string, got number',
-        pcall_err(_cmd_parts, { 'nvim', 1 })
-      )
-    end)
-  end)
 end)
 
 describe('LSP', function()
@@ -547,7 +523,7 @@ describe('LSP', function()
           if ctx.method == 'start' then
             exec_lua([=[
               local client = vim.lsp.get_client_by_id(TEST_RPC_CLIENT_ID)
-              client.config.settings = {
+              client.settings = {
                 testSetting1 = true;
                 testSetting2 = false;
                 test = {Setting3 = 'nested' };
@@ -2441,6 +2417,68 @@ describe('LSP', function()
         new
       )
       eq(0, lines)
+      os.remove(new)
+    end)
+    it('new buffer remains unlisted and unloaded if the old was not in window before', function()
+      local old = tmpname()
+      write_file(old, 'Test content')
+      local new = tmpname()
+      os.remove(new) -- only reserve the name, file must not exist for the test scenario
+      local actual = exec_lua(
+        [[
+        local old = select(1, ...)
+        local oldbufnr = vim.fn.bufadd(old)
+        local new = select(2, ...)
+        local newbufnr = vim.fn.bufadd(new)
+        vim.lsp.util.rename(old, new)
+        return {
+          buflisted = vim.bo[newbufnr].buflisted,
+          bufloaded = vim.api.nvim_buf_is_loaded(newbufnr)
+        }
+      ]],
+        old,
+        new
+      )
+
+      local expected = {
+        buflisted = false,
+        bufloaded = false,
+      }
+
+      eq(expected, actual)
+
+      os.remove(new)
+    end)
+    it('new buffer is listed and loaded if the old was in window before', function()
+      local old = tmpname()
+      write_file(old, 'Test content')
+      local new = tmpname()
+      os.remove(new) -- only reserve the name, file must not exist for the test scenario
+      local actual = exec_lua(
+        [[
+        local win =  vim.api.nvim_get_current_win()
+        local old = select(1, ...)
+        local oldbufnr = vim.fn.bufadd(old)
+        vim.api.nvim_win_set_buf(win, oldbufnr)
+        local new = select(2, ...)
+        vim.lsp.util.rename(old, new)
+        local newbufnr = vim.fn.bufadd(new)
+        return {
+          buflisted = vim.bo[newbufnr].buflisted,
+          bufloaded = vim.api.nvim_buf_is_loaded(newbufnr)
+        }
+      ]],
+        old,
+        new
+      )
+
+      local expected = {
+        buflisted = true,
+        bufloaded = true,
+      }
+
+      eq(expected, actual)
+
       os.remove(new)
     end)
     it('Can rename a directory', function()

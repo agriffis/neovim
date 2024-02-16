@@ -247,10 +247,9 @@ void nvim_ui_attach(uint64_t channel_id, Integer width, Integer height, Dictiona
 void ui_attach(uint64_t channel_id, Integer width, Integer height, Boolean enable_rgb, Error *err)
   FUNC_API_DEPRECATED_SINCE(1)
 {
-  Dictionary opts = ARRAY_DICT_INIT;
-  PUT(opts, "rgb", BOOLEAN_OBJ(enable_rgb));
+  MAXSIZE_TEMP_DICT(opts, 1);
+  PUT_C(opts, "rgb", BOOLEAN_OBJ(enable_rgb));
   nvim_ui_attach(channel_id, width, height, opts, err);
-  api_free_dictionary(opts);
 }
 
 /// Tells the nvim server if focus was gained or lost by the GUI
@@ -585,7 +584,6 @@ static inline int write_cb(void *vdata, const char *buf, size_t len)
 
   data->pack_totlen += len;
   if (!data->temp_buf && UI_BUF_SIZE - BUF_POS(data) < len) {
-    data->buf_overflow = true;
     return 0;
   }
 
@@ -595,12 +593,40 @@ static inline int write_cb(void *vdata, const char *buf, size_t len)
   return 0;
 }
 
-static bool prepare_call(UI *ui, const char *name)
+static inline int size_cb(void *vdata, const char *buf, size_t len)
+{
+  UIData *data = (UIData *)vdata;
+  if (!buf) {
+    return 0;
+  }
+
+  data->pack_totlen += len;
+  return 0;
+}
+
+static void prepare_call(UI *ui, const char *name, size_t size_needed)
 {
   UIData *data = ui->data;
+  size_t name_len = strlen(name);
+  const size_t overhead = name_len + 20;
+  bool oversized_message = size_needed + overhead > UI_BUF_SIZE;
 
-  if (BUF_POS(data) > UI_BUF_SIZE - EVENT_BUF_SIZE) {
+  if (oversized_message || BUF_POS(data) > UI_BUF_SIZE - size_needed - overhead) {
     remote_ui_flush_buf(ui);
+  }
+
+  if (oversized_message) {
+    // TODO(bfredl): manually testable by setting UI_BUF_SIZE to 1024 (mode_info_set)
+    data->temp_buf = xmalloc(20 + name_len + size_needed);
+    data->buf_wptr = data->temp_buf;
+    char **buf = &data->buf_wptr;
+    mpack_array(buf, 3);
+    mpack_uint(buf, 2);
+    mpack_str(buf, S_LEN("redraw"));
+    mpack_array(buf, 1);
+    mpack_array(buf, 2);
+    mpack_str(buf, name, name_len);
+    return;
   }
 
   // To optimize data transfer(especially for "grid_line"), we bundle adjacent
@@ -615,64 +641,42 @@ static bool prepare_call(UI *ui, const char *name)
     mpack_str(buf, name, strlen(name));
     data->nevents++;
     data->ncalls = 1;
-    return true;
+    return;
   }
+}
 
-  return false;
+static void send_oversized_message(UIData *data)
+{
+  if (data->temp_buf) {
+    size_t size = (size_t)(data->buf_wptr - data->temp_buf);
+    WBuffer *buf = wstream_new_buffer(data->temp_buf, size, 1, xfree);
+    rpc_write_raw(data->channel_id, buf);
+    data->temp_buf = NULL;
+    data->buf_wptr = data->buf;
+    data->nevents_pos = NULL;
+  }
 }
 
 /// Pushes data into UI.UIData, to be consumed later by remote_ui_flush().
 static void push_call(UI *ui, const char *name, Array args)
 {
   UIData *data = ui->data;
-  bool pending = data->nevents_pos;
-  char *buf_pos_save = data->buf_wptr;
-
-  bool new_event = prepare_call(ui, name);
 
   msgpack_packer pac;
   data->pack_totlen = 0;
-  data->buf_overflow = false;
+  // First determine the needed size
+  msgpack_packer_init(&pac, data, size_cb);
+  msgpack_rpc_from_array(args, &pac);
+  // Then send the actual message
+  prepare_call(ui, name, data->pack_totlen);
   msgpack_packer_init(&pac, data, write_cb);
   msgpack_rpc_from_array(args, &pac);
-  if (data->buf_overflow) {
-    data->buf_wptr = buf_pos_save;
-    if (new_event) {
-      data->cur_event = NULL;
-      data->nevents--;
-    }
-    if (pending) {
-      remote_ui_flush_buf(ui);
-    }
 
-    size_t name_len = strlen(name);
-    if (data->pack_totlen > UI_BUF_SIZE - name_len - 20) {
-      // TODO(bfredl): manually testable by setting UI_BUF_SIZE to 1024 (mode_info_set)
-      data->temp_buf = xmalloc(20 + name_len + data->pack_totlen);
-      data->buf_wptr = data->temp_buf;
-      char **buf = &data->buf_wptr;
-      mpack_array(buf, 3);
-      mpack_uint(buf, 2);
-      mpack_str(buf, S_LEN("redraw"));
-      mpack_array(buf, 1);
-      mpack_array(buf, 2);
-      mpack_str(buf, name, name_len);
-    } else {
-      prepare_call(ui, name);
-    }
-    data->pack_totlen = 0;
-    data->buf_overflow = false;
-    msgpack_rpc_from_array(args, &pac);
-
-    if (data->temp_buf) {
-      size_t size = (size_t)(data->buf_wptr - data->temp_buf);
-      WBuffer *buf = wstream_new_buffer(data->temp_buf, size, 1, xfree);
-      rpc_write_raw(data->channel_id, buf);
-      data->temp_buf = NULL;
-      data->buf_wptr = data->buf;
-      data->nevents_pos = NULL;
-    }
+  // Oversized messages need to be sent immediately
+  if (data->temp_buf) {
+    send_oversized_message(data);
   }
+
   data->ncalls++;
 }
 
@@ -789,7 +793,7 @@ void remote_ui_hl_attr_define(UI *ui, Integer id, HlAttrs rgb_attrs, HlAttrs cte
   // system. So we add them here.
   if (rgb_attrs.url >= 0) {
     const char *url = hl_get_url((uint32_t)rgb_attrs.url);
-    PUT_C(rgb, "url", STRING_OBJ(cstr_as_string((char *)url)));
+    PUT_C(rgb, "url", CSTR_AS_OBJ(url));
   }
 
   ADD_C(args, DICTIONARY_OBJ(rgb));
@@ -857,7 +861,7 @@ void remote_ui_put(UI *ui, const char *cell)
   UIData *data = ui->data;
   data->client_col++;
   Array args = data->call_buf;
-  ADD_C(args, CSTR_AS_OBJ((char *)cell));
+  ADD_C(args, CSTR_AS_OBJ(cell));
   push_call(ui, "put", args);
 }
 
@@ -867,7 +871,7 @@ void remote_ui_raw_line(UI *ui, Integer grid, Integer row, Integer startcol, Int
 {
   UIData *data = ui->data;
   if (ui->ui_ext[kUILinegrid]) {
-    prepare_call(ui, "grid_line");
+    prepare_call(ui, "grid_line", EVENT_BUF_SIZE);
     data->ncalls++;
 
     char **buf = &data->buf_wptr;
@@ -896,7 +900,7 @@ void remote_ui_raw_line(UI *ui, Integer grid, Integer row, Integer startcol, Int
           mpack_bool(buf, false);
           remote_ui_flush_buf(ui);
 
-          prepare_call(ui, "grid_line");
+          prepare_call(ui, "grid_line", EVENT_BUF_SIZE);
           data->ncalls++;
           mpack_array(buf, 5);
           mpack_uint(buf, (uint32_t)grid);
@@ -1025,12 +1029,12 @@ static Array translate_contents(UI *ui, Array contents, Arena *arena)
     if (attr) {
       Dictionary rgb_attrs = arena_dict(arena, HLATTRS_DICT_SIZE);
       hlattrs2dict(&rgb_attrs, NULL, syn_attr2entry(attr), ui->rgb, false);
-      ADD(new_item, DICTIONARY_OBJ(rgb_attrs));
+      ADD_C(new_item, DICTIONARY_OBJ(rgb_attrs));
     } else {
-      ADD(new_item, DICTIONARY_OBJ((Dictionary)ARRAY_DICT_INIT));
+      ADD_C(new_item, DICTIONARY_OBJ((Dictionary)ARRAY_DICT_INIT));
     }
-    ADD(new_item, item.items[1]);
-    ADD(new_contents, ARRAY_OBJ(new_item));
+    ADD_C(new_item, item.items[1]);
+    ADD_C(new_contents, ARRAY_OBJ(new_item));
   }
   return new_contents;
 }
@@ -1112,10 +1116,4 @@ void remote_ui_event(UI *ui, char *name, Array args)
 
 free_ret:
   arena_mem_free(arena_finish(&arena));
-}
-
-void remote_ui_inspect(UI *ui, Dictionary *info)
-{
-  UIData *data = ui->data;
-  PUT(*info, "chan", INTEGER_OBJ((Integer)data->channel_id));
 }

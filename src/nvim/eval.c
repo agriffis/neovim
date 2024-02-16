@@ -1355,7 +1355,7 @@ Object eval_foldtext(win_T *wp)
     retval = STRING_OBJ(NULL_STRING);
   } else {
     if (tv.v_type == VAR_LIST) {
-      retval = vim_to_object(&tv);
+      retval = vim_to_object(&tv, NULL, false);
     } else {
       retval = STRING_OBJ(cstr_to_string(tv_get_string(&tv)));
     }
@@ -6143,8 +6143,8 @@ bool callback_call(Callback *const callback, const int argcount_in, typval_T *co
     break;
 
   case kCallbackLua:
-    rv = nlua_call_ref(callback->data.luaref, NULL, args, false, NULL);
-    return (rv.type == kObjectTypeBoolean && rv.data.boolean == true);
+    rv = nlua_call_ref(callback->data.luaref, NULL, args, kRetNilBool, NULL, NULL);
+    return LUARET_TRUTHY(rv);
 
   case kCallbackNone:
     return false;

@@ -10,6 +10,7 @@
 #include "nvim/ascii_defs.h"
 #include "nvim/buffer.h"
 #include "nvim/buffer_defs.h"
+#include "nvim/change.h"
 #include "nvim/decoration.h"
 #include "nvim/drawscreen.h"
 #include "nvim/extmark.h"
@@ -91,15 +92,18 @@ void bufhl_add_hl_pos_offset(buf_T *buf, int src_id, int hl_id, lpos_T pos_start
   }
 }
 
-void decor_redraw(buf_T *buf, int row1, int row2, DecorInline decor)
+void decor_redraw(buf_T *buf, int row1, int row2, int col1, DecorInline decor)
 {
   if (decor.ext) {
     DecorVirtText *vt = decor.data.ext.vt;
     while (vt) {
       bool below = (vt->flags & kVTIsLines) && !(vt->flags & kVTLinesAbove);
-      redraw_buf_line_later(buf, row1 + 1 + below, true);
+      linenr_T vt_lnum = row1 + 1 + below;
+      redraw_buf_line_later(buf, vt_lnum, true);
       if (vt->flags & kVTIsLines || vt->pos == kVPosInline) {
-        changed_line_display_buf(buf);
+        // changed_lines_redraw_buf(buf, vt_lnum, vt_lnum + 1, 0);
+        colnr_T vt_col = vt->flags & kVTIsLines ? 0 : col1;
+        changed_lines_invalidate_buf(buf, vt_lnum, vt_col, vt_lnum + 1, 0);
       }
       vt = vt->next;
     }
@@ -117,7 +121,8 @@ void decor_redraw(buf_T *buf, int row1, int row2, DecorInline decor)
 
 void decor_redraw_sh(buf_T *buf, int row1, int row2, DecorSignHighlight sh)
 {
-  if (sh.hl_id || (sh.url != NULL) || (sh.flags & (kSHIsSign|kSHSpellOn|kSHSpellOff))) {
+  if (sh.hl_id || (sh.url != NULL)
+      || (sh.flags & (kSHIsSign | kSHSpellOn | kSHSpellOff | kSHConceal))) {
     if (row2 >= row1) {
       redraw_buf_range_later(buf, row1 + 1, row2 + 1);
     }
@@ -190,9 +195,9 @@ void buf_put_decor_sh(buf_T *buf, DecorSignHighlight *sh, int row1, int row2)
   }
 }
 
-void buf_decor_remove(buf_T *buf, int row1, int row2, DecorInline decor, bool free)
+void buf_decor_remove(buf_T *buf, int row1, int row2, int col1, DecorInline decor, bool free)
 {
-  decor_redraw(buf, row1, row2, decor);
+  decor_redraw(buf, row1, row2, col1, decor);
   if (decor.ext) {
     uint32_t idx = decor.data.ext.sh_idx;
     while (idx != DECOR_ID_INVALID) {
@@ -664,19 +669,24 @@ next_mark:
   return attr;
 }
 
-typedef struct {
-  DecorSignHighlight *sh;
-  uint32_t id;
-} SignItem;
-
 int sign_item_cmp(const void *p1, const void *p2)
 {
   const SignItem *s1 = (SignItem *)p1;
   const SignItem *s2 = (SignItem *)p2;
-  int n = s2->sh->priority - s1->sh->priority;
 
-  return n ? n : (n = (int)(s2->id - s1->id))
-         ? n : (s2->sh->sign_add_id - s1->sh->sign_add_id);
+  if (s1->sh->priority != s2->sh->priority) {
+    return s1->sh->priority < s2->sh->priority ? 1 : -1;
+  }
+
+  if (s1->id != s2->id) {
+    return s1->id < s2->id ? 1 : -1;
+  }
+
+  if (s1->sh->sign_add_id != s2->sh->sign_add_id) {
+    return s1->sh->sign_add_id < s2->sh->sign_add_id ? 1 : -1;
+  }
+
+  return 0;
 }
 
 static const uint32_t sign_filter[4] = {[kMTMetaSignText] = kMTFilterSelect,
@@ -977,12 +987,12 @@ void decor_to_dict_legacy(Dictionary *dict, DecorInline decor, bool hl_name, Are
   }
 
   if (sh_hl.url != NULL) {
-    PUT_C(*dict, "url", STRING_OBJ(cstr_as_string((char *)sh_hl.url)));
+    PUT_C(*dict, "url", STRING_OBJ(cstr_as_string(sh_hl.url)));
   }
 
   if (virt_text) {
     if (virt_text->hl_mode) {
-      PUT_C(*dict, "hl_mode", CSTR_AS_OBJ((char *)hl_mode_str[virt_text->hl_mode]));
+      PUT_C(*dict, "hl_mode", CSTR_AS_OBJ(hl_mode_str[virt_text->hl_mode]));
     }
 
     Array chunks = virt_text_to_array(virt_text->data.virt_text, hl_name, arena);
@@ -992,7 +1002,7 @@ void decor_to_dict_legacy(Dictionary *dict, DecorInline decor, bool hl_name, Are
     if (virt_text->pos == kVPosWinCol) {
       PUT_C(*dict, "virt_text_win_col", INTEGER_OBJ(virt_text->col));
     }
-    PUT_C(*dict, "virt_text_pos", CSTR_AS_OBJ((char *)virt_text_pos_str[virt_text->pos]));
+    PUT_C(*dict, "virt_text_pos", CSTR_AS_OBJ(virt_text_pos_str[virt_text->pos]));
     priority = virt_text->priority;
   }
 

@@ -175,7 +175,7 @@ bool try_end(Error *err)
 /// @param dict The vimscript dict
 /// @param key The key
 /// @param[out] err Details of an error that may have occurred
-Object dict_get_value(dict_T *dict, String key, Error *err)
+Object dict_get_value(dict_T *dict, String key, Arena *arena, Error *err)
 {
   dictitem_T *const di = tv_dict_find(dict, key.data, (ptrdiff_t)key.size);
 
@@ -184,7 +184,7 @@ Object dict_get_value(dict_T *dict, String key, Error *err)
     return (Object)OBJECT_INIT;
   }
 
-  return vim_to_object(&di->di_tv);
+  return vim_to_object(&di->di_tv, arena, true);
 }
 
 dictitem_T *dict_check_writable(dict_T *dict, String key, bool del, Error *err)
@@ -221,7 +221,8 @@ dictitem_T *dict_check_writable(dict_T *dict, String key, bool del, Error *err)
 /// @param retval If true the old value will be converted and returned.
 /// @param[out] err Details of an error that may have occurred
 /// @return The old value if `retval` is true and the key was present, else NIL
-Object dict_set_var(dict_T *dict, String key, Object value, bool del, bool retval, Error *err)
+Object dict_set_var(dict_T *dict, String key, Object value, bool del, bool retval, Arena *arena,
+                    Error *err)
 {
   Object rv = OBJECT_INIT;
   dictitem_T *di = dict_check_writable(dict, key, del, err);
@@ -244,7 +245,7 @@ Object dict_set_var(dict_T *dict, String key, Object value, bool del, bool retva
       }
       // Return the old value
       if (retval) {
-        rv = vim_to_object(&di->di_tv);
+        rv = vim_to_object(&di->di_tv, arena, false);
       }
       // Delete the entry
       tv_dict_item_remove(dict, di);
@@ -265,7 +266,7 @@ Object dict_set_var(dict_T *dict, String key, Object value, bool del, bool retva
     } else {
       // Return the old value
       if (retval) {
-        rv = vim_to_object(&di->di_tv);
+        rv = vim_to_object(&di->di_tv, arena, false);
       }
       bool type_error = false;
       if (dict == &vimvardict
@@ -425,12 +426,12 @@ String cstrn_as_string(char *str, size_t maxsize)
 /// @param str the C string to use
 /// @return The resulting String, or an empty String if
 ///           str was NULL
-String cstr_as_string(char *str) FUNC_ATTR_PURE
+String cstr_as_string(const char *str) FUNC_ATTR_PURE
 {
   if (str == NULL) {
     return (String)STRING_INIT;
   }
-  return (String){ .data = str, .size = strlen(str) };
+  return (String){ .data = (char *)str, .size = strlen(str) };
 }
 
 /// Return the owned memory of a ga as a String
@@ -576,7 +577,7 @@ String arena_string(Arena *arena, String str)
   if (str.size) {
     return cbuf_as_string(arena_memdupz(arena, str.data, str.size), str.size);
   } else {
-    return (String)STRING_INIT;
+    return (String){ .data = arena ? "" : xstrdup(""), .size = 0 };
   }
 }
 
@@ -1062,21 +1063,53 @@ Dictionary api_keydict_to_dict(void *value, KeySetLink *table, size_t max_size, 
   return rv;
 }
 
-void api_free_keydict(void *dict, KeySetLink *table)
+void api_luarefs_free_object(Object value)
+{
+  // TODO(bfredl): this is more complicated than it needs to be.
+  // we should be able to lock down more specifically where luarefs can be
+  switch (value.type) {
+  case kObjectTypeLuaRef:
+    api_free_luaref(value.data.luaref);
+    break;
+
+  case kObjectTypeArray:
+    api_luarefs_free_array(value.data.array);
+    break;
+
+  case kObjectTypeDictionary:
+    api_luarefs_free_dict(value.data.dictionary);
+    break;
+
+  default:
+    break;
+  }
+}
+
+void api_luarefs_free_keydict(void *dict, KeySetLink *table)
 {
   for (size_t i = 0; table[i].str; i++) {
     char *mem = ((char *)dict + table[i].ptr_off);
     if (table[i].type == kObjectTypeNil) {
-      api_free_object(*(Object *)mem);
-    } else if (table[i].type == kObjectTypeString) {
-      api_free_string(*(String *)mem);
-    } else if (table[i].type == kObjectTypeArray) {
-      api_free_array(*(Array *)mem);
-    } else if (table[i].type == kObjectTypeDictionary) {
-      api_free_dictionary(*(Dictionary *)mem);
+      api_luarefs_free_object(*(Object *)mem);
     } else if (table[i].type == kObjectTypeLuaRef) {
       api_free_luaref(*(LuaRef *)mem);
+    } else if (table[i].type == kObjectTypeDictionary) {
+      api_luarefs_free_dict(*(Dictionary *)mem);
     }
+  }
+}
+
+void api_luarefs_free_array(Array value)
+{
+  for (size_t i = 0; i < value.size; i++) {
+    api_luarefs_free_object(value.items[i]);
+  }
+}
+
+void api_luarefs_free_dict(Dictionary value)
+{
+  for (size_t i = 0; i < value.size; i++) {
+    api_luarefs_free_object(value.items[i].value);
   }
 }
 

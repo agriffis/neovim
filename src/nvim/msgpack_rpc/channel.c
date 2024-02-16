@@ -192,7 +192,6 @@ Object rpc_send_call(uint64_t id, const char *method_name, Array args, ArenaMem 
 
   if (!(channel = find_rpc_channel(id))) {
     api_set_error(err, kErrorTypeException, "Invalid channel: %" PRIu64, id);
-    api_free_array(args);
     return NIL;
   }
 
@@ -201,7 +200,6 @@ Object rpc_send_call(uint64_t id, const char *method_name, Array args, ArenaMem 
   uint32_t request_id = rpc->next_request_id++;
   // Send the msgpack-rpc request
   send_request(channel, request_id, method_name, args);
-  api_free_array(args);
 
   // Push the frame
   ChannelCallFrame frame = { request_id, false, false, NIL, NULL };
@@ -451,7 +449,7 @@ static void request_event(void **argv)
                                               e->type,
                                               e->request_id,
                                               &error,
-                                              result,
+                                              &result,
                                               &out_buffer));
   }
   if (!handler.arena_return) {
@@ -540,14 +538,14 @@ static void send_error(Channel *chan, MsgpackRpcRequestHandler handler, MessageT
                                          type,
                                          id,
                                          &e,
-                                         NIL,
+                                         &NIL,
                                          &out_buffer));
   api_clear_error(&e);
 }
 
 static void send_request(Channel *channel, uint32_t id, const char *name, Array args)
 {
-  const String method = cstr_as_string((char *)name);
+  const String method = cstr_as_string(name);
   channel_write(channel, serialize_request(channel->id,
                                            id,
                                            method,
@@ -558,7 +556,7 @@ static void send_request(Channel *channel, uint32_t id, const char *name, Array 
 
 static void send_event(Channel *channel, const char *name, Array args)
 {
-  const String method = cstr_as_string((char *)name);
+  const String method = cstr_as_string(name);
   channel_write(channel, serialize_request(channel->id,
                                            0,
                                            method,
@@ -583,7 +581,7 @@ static void broadcast_event(const char *name, Array args)
     goto end;
   }
 
-  const String method = cstr_as_string((char *)name);
+  const String method = cstr_as_string(name);
   WBuffer *buffer = serialize_request(0,
                                       0,
                                       method,
@@ -671,7 +669,7 @@ static WBuffer *serialize_request(uint64_t channel_id, uint32_t request_id, cons
 }
 
 static WBuffer *serialize_response(uint64_t channel_id, MsgpackRpcRequestHandler handler,
-                                   MessageType type, uint32_t response_id, Error *err, Object arg,
+                                   MessageType type, uint32_t response_id, Error *err, Object *arg,
                                    msgpack_sbuffer *sbuffer)
 {
   msgpack_packer pac;

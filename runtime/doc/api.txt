@@ -2099,8 +2099,9 @@ nvim_buf_attach({buffer}, {send_buffer}, {*opts})          *nvim_buf_attach()*
                        will be `nvim_buf_changedtick_event`. Not for Lua
                        callbacks.
       • {opts}         Optional parameters.
-                       • on_lines: Lua callback invoked on change. Return `true` to
-                         detach. Args:
+                       • on_lines: Lua callback invoked on change. Return a
+                         truthy value (not `false` or `nil`)
+                         to detach. Args:
                          • the string "lines"
                          • buffer handle
                          • b:changedtick
@@ -2113,7 +2114,8 @@ nvim_buf_attach({buffer}, {send_buffer}, {*opts})          *nvim_buf_attach()*
 
                        • on_bytes: Lua callback invoked on change. This
                          callback receives more granular information about the
-                         change compared to on_lines. Return `true` to
+                         change compared to on_lines. Return a truthy value
+                         (not `false` or `nil`) to
                          detach. Args:
                          • the string "bytes"
                          • buffer handle
@@ -2183,8 +2185,7 @@ nvim_buf_call({buffer}, {fun})                               *nvim_buf_call()*
                   only)
 
     Return: ~
-        Return value of function. NB: will deepcopy Lua values currently, use
-        upvalues to send Lua references in and out.
+        Return value of function.
 
 nvim_buf_del_keymap({buffer}, {mode}, {lhs})           *nvim_buf_del_keymap()*
     Unmaps a buffer-local |mapping| for the given mode.
@@ -2879,8 +2880,7 @@ nvim_win_call({window}, {fun})                               *nvim_win_call()*
                   only)
 
     Return: ~
-        Return value of function. NB: will deepcopy Lua values currently, use
-        upvalues to send Lua references in and out.
+        Return value of function.
 
     See also: ~
       • |win_execute()|
@@ -3459,9 +3459,9 @@ nvim_create_autocmd({event}, {*opts})                  *nvim_create_autocmd()*
                    troubleshooting).
                  • callback (function|string) optional: Lua function (or
                    Vimscript function name, if string) called when the
-                   event(s) is triggered. Lua callback can return true to
-                   delete the autocommand, and receives a table argument with
-                   these keys:
+                   event(s) is triggered. Lua callback can return a truthy
+                   value (not `false` or `nil`) to delete the
+                   autocommand. Receives a table argument with these keys:
                    • id: (number) autocommand id
                    • event: (string) name of the triggered event
                      |autocmd-events|
