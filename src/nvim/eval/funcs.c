@@ -374,7 +374,7 @@ static void api_wrapper(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     goto end;
   }
 
-  object_to_vim(result, rettv, &err);
+  object_to_vim_take_luaref(&result, rettv, true, &err);
 
 end:
   if (!handler.arena_return) {
@@ -1726,7 +1726,7 @@ static void f_exists(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
       n = false;  // Trailing garbage.
     }
   } else if (*p == '*') {  // Internal or user defined function.
-    n = strncmp(p, "*v:lua.", 7) == 0 ? nlua_func_exists(p + 7) : function_exists(p + 1, false);
+    n = strnequal(p, "*v:lua.", 7) ? nlua_func_exists(p + 7) : function_exists(p + 1, false);
   } else if (*p == ':') {
     n = cmd_exists(p + 1);
   } else if (*p == '#') {
