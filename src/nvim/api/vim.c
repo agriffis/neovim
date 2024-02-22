@@ -141,9 +141,9 @@ Dictionary nvim_get_hl(Integer ns_id, Dict(get_highlight) *opts, Arena *arena, E
 ///              |nvim_set_hl_ns()| or |nvim_win_set_hl_ns()| to activate them.
 /// @param name  Highlight group name, e.g. "ErrorMsg"
 /// @param val   Highlight definition map, accepts the following keys:
-///                - fg (or foreground): color name or "#RRGGBB", see note.
-///                - bg (or background): color name or "#RRGGBB", see note.
-///                - sp (or special): color name or "#RRGGBB"
+///                - fg: color name or "#RRGGBB", see note.
+///                - bg: color name or "#RRGGBB", see note.
+///                - sp: color name or "#RRGGBB"
 ///                - blend: integer between 0 and 100
 ///                - bold: boolean
 ///                - standout: boolean
@@ -461,7 +461,7 @@ error:
 /// @see replace_termcodes
 /// @see cpoptions
 String nvim_replace_termcodes(String str, Boolean from_part, Boolean do_lt, Boolean special)
-  FUNC_API_SINCE(1)
+  FUNC_API_SINCE(1) FUNC_API_RET_ALLOC
 {
   if (str.size == 0) {
     // Empty string
@@ -601,6 +601,7 @@ static bool find_runtime_cb(int num_fnames, char **fnames, bool all, void *c)
 }
 
 String nvim__get_lib_dir(void)
+  FUNC_API_RET_ALLOC
 {
   return cstr_as_string(get_lib_dir());
 }
@@ -1726,7 +1727,7 @@ Array nvim_call_atomic(uint64_t channel_id, Array calls, Arena *arena, Error *er
     // directly here. But `result` might become invalid when next api function
     // is called in the loop.
     ADD_C(results, copy_object(result, arena));
-    if (!handler.arena_return) {
+    if (handler.ret_alloc) {
       api_free_object(result);
     }
   }
@@ -1806,9 +1807,9 @@ static void write_msg(String message, bool to_err, bool writeln)
 /// @param[in]  obj  Object to return.
 ///
 /// @return its argument.
-Object nvim__id(Object obj)
+Object nvim__id(Object obj, Arena *arena)
 {
-  return copy_object(obj, NULL);
+  return copy_object(obj, arena);
 }
 
 /// Returns array given as argument.
@@ -1819,9 +1820,9 @@ Object nvim__id(Object obj)
 /// @param[in]  arr  Array to return.
 ///
 /// @return its argument.
-Array nvim__id_array(Array arr)
+Array nvim__id_array(Array arr, Arena *arena)
 {
-  return copy_array(arr, NULL);
+  return copy_array(arr, arena);
 }
 
 /// Returns dictionary given as argument.
@@ -1832,9 +1833,9 @@ Array nvim__id_array(Array arr)
 /// @param[in]  dct  Dictionary to return.
 ///
 /// @return its argument.
-Dictionary nvim__id_dictionary(Dictionary dct)
+Dictionary nvim__id_dictionary(Dictionary dct, Arena *arena)
 {
-  return copy_dictionary(dct, NULL);
+  return copy_dictionary(dct, arena);
 }
 
 /// Returns floating-point value given as argument.
