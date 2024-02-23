@@ -4,27 +4,9 @@ do
   ---
   --- See |v_star-default| and |v_#-default|
   do
-    local function region_chunks(region)
-      local chunks = {}
-      local maxcol = vim.v.maxcol
-      for line, cols in vim.spairs(region) do
-        local endcol = cols[2] == maxcol and -1 or cols[2]
-        local chunk = vim.api.nvim_buf_get_text(0, line, cols[1], line, endcol, {})[1]
-        table.insert(chunks, chunk)
-      end
-      return chunks
-    end
-
     local function _visual_search(cmd)
       assert(cmd == '/' or cmd == '?')
-      local region = vim.region(
-        0,
-        '.',
-        'v',
-        vim.api.nvim_get_mode().mode:sub(1, 1),
-        vim.o.selection == 'inclusive'
-      )
-      local chunks = region_chunks(region)
+      local chunks = vim.fn.getregion('.', 'v', vim.fn.mode())
       local esc_chunks = vim
         .iter(chunks)
         :map(function(v)
@@ -143,14 +125,16 @@ do
 
   vim.api.nvim_create_autocmd({ 'TermClose' }, {
     group = nvim_terminal_augroup,
+    nested = true,
     desc = 'Automatically close terminal buffers when started with no arguments and exiting without an error',
     callback = function(args)
-      if vim.v.event.status == 0 then
-        local info = vim.api.nvim_get_chan_info(vim.bo[args.buf].channel)
-        local argv = info.argv or {}
-        if #argv == 1 and argv[1] == vim.o.shell then
-          vim.cmd({ cmd = 'bdelete', args = { args.buf }, bang = true })
-        end
+      if vim.v.event.status ~= 0 then
+        return
+      end
+      local info = vim.api.nvim_get_chan_info(vim.bo[args.buf].channel)
+      local argv = info.argv or {}
+      if #argv == 1 and argv[1] == vim.o.shell then
+        vim.api.nvim_buf_delete(args.buf, { force = true })
       end
     end,
   })
@@ -343,17 +327,7 @@ if tty then
       end,
     })
 
-    local query = '\027]11;?\007'
-
-    -- tmux 3.3a and earlier do not query the parent terminal for background color. As of the
-    -- writing of this comment, 3.3a is the latest release, so a passthrough sequence is necessary.
-    -- The passthrough should be removed as soon as a tmux version later than 3.3a is released.
-    -- See: https://github.com/neovim/neovim/pull/26557
-    if os.getenv('TMUX') then
-      query = string.format('\027Ptmux;%s\027\\', query:gsub('\027', '\027\027'))
-    end
-
-    io.stdout:write(query)
+    io.stdout:write('\027]11;?\007')
 
     timer:start(1000, 0, function()
       -- Delete the autocommand if no response was received
