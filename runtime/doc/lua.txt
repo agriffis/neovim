@@ -922,7 +922,7 @@ vim.in_fast_event()                                      *vim.in_fast_event()*
     When this is `false` most API functions are callable (but may be subject
     to other restrictions such as |textlock|).
 
-vim.rpcnotify({channel}, {method}, {args}, {...})            *vim.rpcnotify()*
+vim.rpcnotify({channel}, {method}, {...})                    *vim.rpcnotify()*
     Sends {event} to {channel} via |RPC| and returns immediately. If {channel}
     is 0, the event is broadcast to all channels.
 
@@ -931,10 +931,9 @@ vim.rpcnotify({channel}, {method}, {args}, {...})            *vim.rpcnotify()*
     Parameters: ~
       • {channel}  (`integer`)
       • {method}   (`string`)
-      • {args}     (`any[]?`)
       • {...}      (`any?`)
 
-vim.rpcrequest({channel}, {method}, {args}, {...})          *vim.rpcrequest()*
+vim.rpcrequest({channel}, {method}, {...})                  *vim.rpcrequest()*
     Sends a request to {channel} to invoke {method} via |RPC| and blocks until
     a response is received.
 
@@ -944,7 +943,6 @@ vim.rpcrequest({channel}, {method}, {args}, {...})          *vim.rpcrequest()*
     Parameters: ~
       • {channel}  (`integer`)
       • {method}   (`string`)
-      • {args}     (`any[]?`)
       • {...}      (`any?`)
 
 vim.schedule({fn})                                            *vim.schedule()*
@@ -2148,18 +2146,6 @@ vim.startswith({s}, {prefix})                               *vim.startswith()*
 
     Return: ~
         (`boolean`) `true` if `prefix` is a prefix of `s`
-
-vim.tbl_add_reverse_lookup({o})                 *vim.tbl_add_reverse_lookup()*
-    Add the reverse lookup values to an existing table. For example:
-    `tbl_add_reverse_lookup { A = 1 } == { [1] = 'A', A = 1 }`
-
-    Note that this modifies the input.
-
-    Parameters: ~
-      • {o}  (`table`) Table to add the reverse to
-
-    Return: ~
-        (`table`) o
 
 vim.tbl_contains({t}, {value}, {opts})                    *vim.tbl_contains()*
     Checks if a table contains a given value, specified either directly or via
