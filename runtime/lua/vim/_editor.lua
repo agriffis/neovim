@@ -502,7 +502,7 @@ end
 ---@param bufnr integer Buffer number, or 0 for current buffer
 ---@param pos1 integer[]|string Start of region as a (line, column) tuple or |getpos()|-compatible string
 ---@param pos2 integer[]|string End of region as a (line, column) tuple or |getpos()|-compatible string
----@param regtype string \|setreg()|-style selection type
+---@param regtype string [setreg()]-style selection type
 ---@param inclusive boolean Controls whether the ending column is inclusive (see also 'selection').
 ---@return table region Dict of the form `{linenr = {startcol,endcol}}`. `endcol` is exclusive, and
 ---whole lines are returned as `{startcol,endcol} = {0,-1}`.
@@ -906,12 +906,6 @@ do
       return matches
     end
   end
-end
-
----@private
-function vim.pretty_print(...)
-  vim.deprecate('vim.pretty_print()', 'vim.print()', '0.10')
-  return vim.print(...)
 end
 
 --- "Pretty prints" the given arguments and returns them unmodified.
