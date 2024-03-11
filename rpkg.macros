@@ -3,78 +3,78 @@
 # backward compat since cached function went away
 # https://pagure.io/rpkg-util/c/bb62554c62fd52224709e861c2353a5c15b50220?branch=master
 function cached {
-    declare v=${OUTPUT[$1]}
-    [[ -n $v ]] && echo -n "$v"
+  declare v=${OUTPUT[$1]}
+  [[ -n $v ]] && echo -n "$v"
 }
 
 function get_cmake_var {
-    declare v
-    v=$(grep -m1 "^set($1\\s" < CMakeLists.txt)
-    v=$(sed -E 's/^\S+\s+"?//; s/[")].*//' <<<"$v")
-    [[ -n $v ]] && echo "$v" || abort "can't get $1"
+  declare v
+  v=$(grep -m1 "^set($1\\s" <CMakeLists.txt)
+  v=$(sed -E 's/^\S+\s+"?//; s/[")].*//' <<<"$v")
+  [[ -n $v ]] && echo "$v" || abort "can't get $1"
 }
 
 function neovim_dev_version {
-    cached neovim_dev_version && return
+  cached neovim_dev_version && return
 
-    declare major minor patch pre
-    major=$(get_cmake_var NVIM_VERSION_MAJOR) || exit
-    minor=$(get_cmake_var NVIM_VERSION_MINOR) || exit
-    patch=$(get_cmake_var NVIM_VERSION_PATCH) || exit
-    pre=$(get_cmake_var NVIM_VERSION_PRERELEASE) || exit
+  declare major minor patch pre
+  major=$(get_cmake_var NVIM_VERSION_MAJOR) || exit
+  minor=$(get_cmake_var NVIM_VERSION_MINOR) || exit
+  patch=$(get_cmake_var NVIM_VERSION_PATCH) || exit
+  pre=$(get_cmake_var NVIM_VERSION_PRERELEASE) || exit
 
-    # git describe --first-parent origin/master
-    # v0.4.0-1080-g971e0ca90
-    declare describe tag commits hash
-    describe=$(git describe --first-parent --long origin/master)
-    read tag commits hash <<<"${describe//-/ }"
-    [[ $tag == v* && $commits =~ ^[0-9]+$ && -n $hash ]] || abort "failed git describe"
+  # git describe --first-parent origin/master
+  # v0.4.0-1080-g971e0ca90
+  declare describe tag commits hash
+  describe=$(git describe --first-parent --long origin/master)
+  read tag commits hash <<<"${describe//-/ }"
+  [[ $tag == v* && $commits =~ ^[0-9]+$ && -n $hash ]] || abort "failed git describe"
 
-    output "v$major.$minor.$patch$pre+$commits-$hash"
+  output "v$major.$minor.$patch$pre+$commits-$hash"
 }
 
 function git_version {
-    cached git_version && return
+  cached git_version && return
 
-    neovim_dev_version &>/dev/null # preload cache w/o command subst
+  neovim_dev_version &>/dev/null # preload cache w/o command subst
 
-    declare v
-    v=$(neovim_dev_version) # v0.5.0-dev+1080-g971e0ca90
-    v=${v#v}                # 0.5.0-dev+1080-g971e0ca90
-    v=${v/-/\~}             # 0.5.0~dev+1080-g971e0ca90
-    v=${v//[+-]/.}          # 0.5.0~dev.1080.g971e0ca90
+  declare v
+  v=$(neovim_dev_version) # v0.5.0-dev+1080-g971e0ca90
+  v=${v#v}                # 0.5.0-dev+1080-g971e0ca90
+  v=${v/-/\~}             # 0.5.0~dev+1080-g971e0ca90
+  v=${v//[+-]/.}          # 0.5.0~dev.1080.g971e0ca90
 
-    output "$v"
+  output "$v"
 }
 
 function git_revision {
-    cached git_revision && return
+  cached git_revision && return
 
-    # find last merge
-    declare last_merge rest
-    read last_merge rest <<<"$(git log --merges --oneline -n1)"
-    [[ -n $last_merge ]] || abort "failed to find last merge"
+  # find last merge
+  declare last_merge rest
+  read last_merge rest <<<"$(git log --merges --oneline -n1)"
+  [[ -n $last_merge ]] || abort "failed to find last merge"
 
-    # count commits since last merge, might be zero
-    declare count
-    count=$(git log --oneline HEAD "^$last_merge" | wc -l)
+  # count commits since last merge, might be zero
+  declare count
+  count=$(git log --oneline HEAD "^$last_merge" | wc -l)
 
-    output "$((count + 1))"
+  output "$((count + 1))"
 }
 
 function git_changelog_date {
-    cached git_changelog_date && return
-    output "$(date +'%a %b %d %Y')"
+  cached git_changelog_date && return
+  output "$(date +'%a %b %d %Y')"
 }
 
 function git_changelog_version {
-    cached git_changelog_version && return
-    git_version &>/dev/null # cache
-    git_revision &>/dev/null # cache
-    output "$(git_version)-$(git_revision)"
+  cached git_changelog_version && return
+  git_version &>/dev/null  # cache
+  git_revision &>/dev/null # cache
+  output "$(git_version)-$(git_revision)"
 }
 
 function abort {
-    echo "ABORT: $*" >&2
-    exit 1
+  echo "ABORT: $*" >&2
+  exit 1
 }
