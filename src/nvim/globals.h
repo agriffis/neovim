@@ -958,6 +958,7 @@ EXTERN const char e_highlight_group_name_invalid_char[] INIT(= N_("E5248: Invali
 
 EXTERN const char e_highlight_group_name_too_long[] INIT(= N_("E1249: Highlight group name too long"));
 
+EXTERN const char e_invalid_column_number_nr[] INIT( = N_("E964: Invalid column number: %ld"));
 EXTERN const char e_invalid_line_number_nr[] INIT(= N_("E966: Invalid line number: %ld"));
 
 EXTERN const char e_stray_closing_curly_str[]
@@ -969,6 +970,9 @@ EXTERN const char e_val_too_large[] INIT(= N_("E1510: Value too large: %s"));
 
 EXTERN const char e_undobang_cannot_redo_or_move_branch[]
 INIT(= N_("E5767: Cannot use :undo! to redo or move to a different undo branch"));
+
+EXTERN const char e_winfixbuf_cannot_go_to_buffer[]
+INIT(= N_("E1513: Cannot edit buffer. 'winfixbuf' is enabled"));
 
 EXTERN const char e_trustfile[] INIT(= N_("E5570: Cannot update trust file: %s"));
 
