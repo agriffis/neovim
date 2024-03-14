@@ -57,6 +57,7 @@ end
 ---@field next_row integer
 ---@field iter vim.treesitter.highlighter.Iter?
 ---@field highlighter_query vim.treesitter.highlighter.Query
+---@field level integer Injection level
 
 ---@nodoc
 ---@class vim.treesitter.highlighter
@@ -192,12 +193,20 @@ function TSHighlighter:prepare_highlight_states(srow, erow)
       return
     end
 
+    local level = 0
+    local t = tree
+    while t do
+      t = t:parent()
+      level = level + 1
+    end
+
     -- _highlight_states should be a list so that the highlights are added in the same order as
     -- for_each_tree traversal. This ensures that parents' highlight don't override children's.
     table.insert(self._highlight_states, {
       tstree = tstree,
       next_row = 0,
       iter = nil,
+      level = level,
       highlighter_query = highlighter_query,
     })
   end)
@@ -243,19 +252,53 @@ function TSHighlighter:get_query(lang)
   return self._queries[lang]
 end
 
+--- @param match table<integer,TSNode[]>
+--- @param bufnr integer
+--- @param capture integer
+--- @param metadata vim.treesitter.query.TSMetadata
+--- @return string?
+local function get_url(match, bufnr, capture, metadata)
+  ---@type string|number|nil
+  local url = metadata[capture] and metadata[capture].url
+
+  if not url or type(url) == 'string' then
+    return url
+  end
+
+  if not match or not match[url] then
+    return
+  end
+
+  -- Assume there is only one matching node. If there is more than one, take the URL
+  -- from the first.
+  local other_node = match[url][1]
+
+  return vim.treesitter.get_node_text(other_node, bufnr, {
+    metadata = metadata[url],
+  })
+end
+
+--- @param capture_name string
+--- @return boolean?, integer
+local function get_spell(capture_name)
+  if capture_name == 'spell' then
+    return true, 0
+  elseif capture_name == 'nospell' then
+    -- Give nospell a higher priority so it always overrides spell captures.
+    return false, 1
+  end
+  return nil, 0
+end
+
 ---@param self vim.treesitter.highlighter
 ---@param buf integer
 ---@param line integer
 ---@param is_spell_nav boolean
 local function on_line_impl(self, buf, line, is_spell_nav)
-  -- Track the maximum pattern index encountered in each tree. For subsequent
-  -- trees, the subpriority passed to nvim_buf_set_extmark is offset by the
-  -- largest pattern index from the prior tree. This ensures that extmarks
-  -- from subsequent trees always appear "on top of" extmarks from previous
-  -- trees (e.g. injections should always appear over base highlights).
-  local pattern_offset = 0
-
   self:for_each_highlight_state(function(state)
+    -- Use the injection level to offset the subpriority passed to nvim_buf_set_extmark
+    -- so injections always appear over base highlights.
+    local pattern_offset = state.level * 1000
     local root_node = state.tstree:root()
     local root_start_row, _, root_end_row, _ = root_node:range()
 
@@ -270,13 +313,8 @@ local function on_line_impl(self, buf, line, is_spell_nav)
         :iter_matches(root_node, self.bufnr, line, root_end_row + 1, { all = true })
     end
 
-    local max_pattern_index = 0
     while line >= state.next_row do
       local pattern, match, metadata = state.iter()
-
-      if pattern and pattern > max_pattern_index then
-        max_pattern_index = pattern
-      end
 
       if not match then
         state.next_row = root_end_row + 1
@@ -284,17 +322,9 @@ local function on_line_impl(self, buf, line, is_spell_nav)
 
       for capture, nodes in pairs(match or {}) do
         local capture_name = state.highlighter_query:query().captures[capture]
-        local spell = nil ---@type boolean?
-        if capture_name == 'spell' then
-          spell = true
-        elseif capture_name == 'nospell' then
-          spell = false
-        end
+        local spell, spell_pri_offset = get_spell(capture_name)
 
         local hl = state.highlighter_query:get_hl_from_capture(capture)
-
-        -- Give nospell a higher priority so it always overrides spell captures.
-        local spell_pri_offset = capture_name == 'nospell' and 1 or 0
 
         -- The "priority" attribute can be set at the pattern level or on a particular capture
         local priority = (
@@ -302,19 +332,7 @@ local function on_line_impl(self, buf, line, is_spell_nav)
           or vim.highlight.priorities.treesitter
         ) + spell_pri_offset
 
-        local url = metadata[capture] and metadata[capture].url ---@type string|number|nil
-        if type(url) == 'number' then
-          if match and match[url] then
-            -- Assume there is only one matching node. If there is more than one, take the URL
-            -- from the first.
-            local other_node = match[url][1]
-            url = vim.treesitter.get_node_text(other_node, buf, {
-              metadata = metadata[url],
-            })
-          else
-            url = nil
-          end
-        end
+        local url = get_url(match, buf, capture, metadata)
 
         -- The "conceal" attribute can be set at the pattern level or on a particular capture
         local conceal = metadata.conceal or metadata[capture] and metadata[capture].conceal
@@ -343,8 +361,6 @@ local function on_line_impl(self, buf, line, is_spell_nav)
         end
       end
     end
-
-    pattern_offset = pattern_offset + max_pattern_index
   end)
 end
 

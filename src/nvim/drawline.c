@@ -850,43 +850,6 @@ static void handle_inline_virtual_text(win_T *wp, winlinevars_T *wlv, ptrdiff_t 
   }
 }
 
-static colnr_T get_trailcol(win_T *wp, const char *ptr, const char *line)
-{
-  colnr_T trailcol = MAXCOL;
-  // find start of trailing whitespace
-  if (wp->w_p_lcs_chars.trail) {
-    trailcol = (colnr_T)strlen(ptr);
-    while (trailcol > 0 && ascii_iswhite(ptr[trailcol - 1])) {
-      trailcol--;
-    }
-    trailcol += (colnr_T)(ptr - line);
-  }
-
-  return trailcol;
-}
-
-static colnr_T get_leadcol(win_T *wp, const char *ptr, const char *line)
-{
-  colnr_T leadcol = 0;
-
-  // find end of leading whitespace
-  if (wp->w_p_lcs_chars.lead || wp->w_p_lcs_chars.leadmultispace != NULL) {
-    leadcol = 0;
-    while (ascii_iswhite(ptr[leadcol])) {
-      leadcol++;
-    }
-    if (ptr[leadcol] == NUL) {
-      // in a line full of spaces all of them are treated as trailing
-      leadcol = 0;
-    } else {
-      // keep track of the first column not filled with spaces
-      leadcol += (colnr_T)(ptr - line + 1);
-    }
-  }
-
-  return leadcol;
-}
-
 /// Start a screen line at column zero.
 static void win_line_start(win_T *wp, winlinevars_T *wlv)
 {
@@ -1298,17 +1261,17 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, int col_rows, s
       nextlinecol = MAXCOL;
       nextline_idx = 0;
     } else {
-      const size_t line_len = strlen(line);
+      const colnr_T line_len = ml_get_buf_len(wp->w_buffer, lnum);
       if (line_len < SPWORDLEN) {
         // Short line, use it completely and append the start of the
         // next line.
         nextlinecol = 0;
-        memmove(nextline, line, line_len);
+        memmove(nextline, line, (size_t)line_len);
         STRMOVE(nextline + line_len, nextline + SPWORDLEN);
-        nextline_idx = (int)line_len + 1;
+        nextline_idx = line_len + 1;
       } else {
         // Long line, use only the last SPWORDLEN bytes.
-        nextlinecol = (int)line_len - SPWORDLEN;
+        nextlinecol = line_len - SPWORDLEN;
         memmove(nextline, line + nextlinecol, SPWORDLEN);
         nextline_idx = SPWORDLEN + 1;
       }
@@ -1336,8 +1299,28 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, int col_rows, s
         || wp->w_p_lcs_chars.nbsp) {
       extra_check = true;
     }
-    trailcol = get_trailcol(wp, ptr, line);
-    leadcol = get_leadcol(wp, ptr, line);
+    // find start of trailing whitespace
+    if (wp->w_p_lcs_chars.trail) {
+      trailcol = ml_get_buf_len(wp->w_buffer, lnum);
+      while (trailcol > 0 && ascii_iswhite(ptr[trailcol - 1])) {
+        trailcol--;
+      }
+      trailcol += (colnr_T)(ptr - line);
+    }
+    // find end of leading whitespace
+    if (wp->w_p_lcs_chars.lead || wp->w_p_lcs_chars.leadmultispace != NULL) {
+      leadcol = 0;
+      while (ascii_iswhite(ptr[leadcol])) {
+        leadcol++;
+      }
+      if (ptr[leadcol] == NUL) {
+        // in a line full of spaces all of them are treated as trailing
+        leadcol = 0;
+      } else {
+        // keep track of the first column not filled with spaces
+        leadcol += (colnr_T)(ptr - line + 1);
+      }
+    }
   }
 
   // 'nowrap' or 'wrap' and a single line that doesn't fit: Advance to the
@@ -2451,11 +2434,17 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, int col_rows, s
 
     // In the cursor line and we may be concealing characters: correct
     // the cursor column when we reach its position.
+    // With 'virtualedit' we may never reach cursor position, but we still
+    // need to correct the cursor column, so do that at end of line.
     if (!did_wcol
         && wp == curwin && lnum == wp->w_cursor.lnum
         && conceal_cursor_line(wp)
-        && (int)wp->w_virtcol <= wlv.vcol + wlv.skip_cells) {
+        && (wlv.vcol + wlv.skip_cells >= wp->w_virtcol || mb_schar == NUL)) {
       wp->w_wcol = wlv.col - wlv.boguscols;
+      if (wlv.vcol + wlv.skip_cells < wp->w_virtcol) {
+        // Cursor beyond end of the line with 'virtualedit'.
+        wp->w_wcol += wp->w_virtcol - wlv.vcol - wlv.skip_cells;
+      }
       wp->w_wrow = wlv.row;
       did_wcol = true;
       wp->w_valid |= VALID_WCOL|VALID_WROW|VALID_VIRTCOL;
@@ -2851,6 +2840,19 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, int col_rows, s
                         && !wp->w_p_rl;               // Not right-to-left.
 
       int draw_col = wlv.col - wlv.boguscols;
+
+      // Apply 'cursorline' highlight.
+      if (wlv.boguscols != 0 && (wlv.line_attr_lowprio != 0 || wlv.line_attr != 0)) {
+        int attr = hl_combine_attr(wlv.line_attr_lowprio, wlv.line_attr);
+        while (draw_col < grid->cols) {
+          linebuf_char[wlv.off] = schar_from_char(' ');
+          linebuf_attr[wlv.off] = attr;
+          linebuf_vcol[wlv.off] = MAXCOL;  // TODO(zeertzjq): this is wrong
+          wlv.off++;
+          draw_col++;
+        }
+      }
+
       if (virt_line_offset >= 0) {
         draw_virt_text_item(buf, virt_line_offset, kv_A(virt_lines, virt_line_index).line,
                             kHlModeReplace, grid->cols, 0);
