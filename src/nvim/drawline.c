@@ -300,7 +300,6 @@ static void draw_virt_text(win_T *wp, buf_T *buf, int col_off, int *end_col, int
       if (vt->pos == kVPosEndOfLine && do_eol) {
         state->eol_col = col + 1;
       }
-      // TODO(zeertzjq): set values in linebuf_vcol[]
       *end_col = MAX(*end_col, col);
     }
     if (!vt || !(vt->flags & kVTRepeatLinebreak)) {
@@ -2571,12 +2570,16 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, int col_rows, s
         decor_redraw_eol(wp, &decor_state, &wlv.line_attr, wlv.col + eol_skip);
       }
 
+      for (int i = wlv.col; i < grid->cols; i++) {
+        linebuf_vcol[wlv.off + (i - wlv.col)] = wlv.vcol + (i - wlv.col);
+      }
+
       if (((wp->w_p_cuc
             && wp->w_virtcol >= vcol_hlc(wlv) - eol_hl_off
             && wp->w_virtcol < grid->cols * (ptrdiff_t)(wlv.row - startrow + 1) + start_col
             && lnum != wp->w_cursor.lnum)
            || wlv.color_cols || wlv.line_attr_lowprio || wlv.line_attr
-           || wlv.diff_hlf != 0)) {
+           || wlv.diff_hlf != 0 || wp->w_buffer->terminal)) {
         int rightmost_vcol = get_rightmost_vcol(wp, wlv.color_cols);
         const int cuc_attr = win_hl_attr(wp, HLF_CUC);
         const int mc_attr = win_hl_attr(wp, HLF_MC);
@@ -2590,14 +2593,13 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, int col_rows, s
                               : 0;
 
         const int base_attr = hl_combine_attr(wlv.line_attr_lowprio, diff_attr);
-        if (base_attr || wlv.line_attr) {
+        if (base_attr || wlv.line_attr || wp->w_buffer->terminal) {
           rightmost_vcol = INT_MAX;
         }
 
         while (wlv.col < grid->cols) {
           linebuf_char[wlv.off] = schar_from_ascii(' ');
-          linebuf_vcol[wlv.off] = wlv.vcol;
-          wlv.col++;
+
           advance_color_col(&wlv, vcol_hlc(wlv));
 
           int col_attr = base_attr;
@@ -2609,29 +2611,21 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, int col_rows, s
             col_attr = hl_combine_attr(col_attr, mc_attr);
           }
 
+          if (wp->w_buffer->terminal && wlv.vcol < TERM_ATTRS_MAX) {
+            col_attr = hl_combine_attr(col_attr, term_attrs[wlv.vcol]);
+          }
+
           col_attr = hl_combine_attr(col_attr, wlv.line_attr);
 
           linebuf_attr[wlv.off] = col_attr;
+          // linebuf_vcol[] already filled by the for loop above
           wlv.off++;
+          wlv.col++;
+          wlv.vcol++;
 
-          if (vcol_hlc(wlv) >= rightmost_vcol) {
+          if (vcol_hlc(wlv) > rightmost_vcol) {
             break;
           }
-
-          wlv.vcol++;
-        }
-      }
-
-      // TODO(bfredl): integrate with the common beyond-the-end-loop
-      if (wp->w_buffer->terminal) {
-        // terminal buffers may need to highlight beyond the end of the logical line
-        while (wlv.col >= 0 && wlv.col < grid->cols) {
-          linebuf_char[wlv.off] = schar_from_ascii(' ');
-          linebuf_attr[wlv.off] = wlv.vcol >= TERM_ATTRS_MAX ? 0 : term_attrs[wlv.vcol];
-          linebuf_vcol[wlv.off] = wlv.vcol;
-          wlv.off++;
-          wlv.vcol++;
-          wlv.col++;
         }
       }
 
@@ -2866,13 +2860,17 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, int col_rows, s
 
       int draw_col = wlv.col - wlv.boguscols;
 
+      for (int i = draw_col; i < grid->cols; i++) {
+        linebuf_vcol[wlv.off + (i - draw_col)] = wlv.vcol - 1;
+      }
+
       // Apply 'cursorline' highlight.
       if (wlv.boguscols != 0 && (wlv.line_attr_lowprio != 0 || wlv.line_attr != 0)) {
         int attr = hl_combine_attr(wlv.line_attr_lowprio, wlv.line_attr);
         while (draw_col < grid->cols) {
           linebuf_char[wlv.off] = schar_from_char(' ');
           linebuf_attr[wlv.off] = attr;
-          linebuf_vcol[wlv.off] = wlv.vcol - 1;
+          // linebuf_vcol[] already filled by the for loop above
           wlv.off++;
           draw_col++;
         }
