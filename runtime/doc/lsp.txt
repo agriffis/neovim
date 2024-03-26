@@ -907,8 +907,8 @@ stop_client({client_id}, {force})                      *vim.lsp.stop_client()*
     for this client, then force-shutdown is attempted.
 
     Parameters: ~
-      • {client_id}  (`integer|vim.lsp.Client`) id or |vim.lsp.Client| object,
-                     or list thereof
+      • {client_id}  (`integer|integer[]|vim.lsp.Client[]`) id, list of id's,
+                     or list of |vim.lsp.Client| objects
       • {force}      (`boolean?`) shutdown forcefully
 
 tagfunc({pattern}, {flags})                                *vim.lsp.tagfunc()*
@@ -1016,7 +1016,7 @@ Lua module: vim.lsp.client                                        *lsp-client*
       • {capabilities}          (`lsp.ClientCapabilities`) The capabilities
                                 provided by the client (editor or tool)
       • {dynamic_capabilities}  (`lsp.DynamicCapabilities`)
-      • {request}               (`fun(method: string, params: table?, handler: lsp.Handler?, bufnr: integer): boolean, integer?`)
+      • {request}               (`fun(method: string, params: table?, handler: lsp.Handler?, bufnr: integer?): boolean, integer?`)
                                 Sends a request to the server. This is a thin
                                 wrapper around {client.rpc.request} with some
                                 additional checking. If {handler} is not

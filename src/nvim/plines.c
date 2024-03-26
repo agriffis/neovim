@@ -44,6 +44,8 @@
 /// @param col
 ///
 /// @return Number of cells.
+///
+/// @see charsize_nowrap()
 int win_chartabsize(win_T *wp, char *p, colnr_T col)
 {
   buf_T *buf = wp->w_buffer;
@@ -373,6 +375,20 @@ CharSize charsize_fast(CharsizeArg *csarg, colnr_T const vcol, int32_t const cur
   FUNC_ATTR_PURE
 {
   return charsize_fast_impl(csarg->win, csarg->use_tabstop, vcol, cur_char);
+}
+
+/// Get the number of cells taken up on the screen at given virtual column.
+///
+/// @see win_chartabsize()
+int charsize_nowrap(buf_T *buf, bool use_tabstop, colnr_T vcol, int32_t cur_char)
+{
+  if (cur_char == TAB && use_tabstop) {
+    return tabstop_padding(vcol, buf->b_p_ts, buf->b_p_vts_array);
+  } else if (cur_char < 0) {
+    return kInvalidByteCells;
+  } else {
+    return char2cells(cur_char);
+  }
 }
 
 /// Check that virtual column "vcol" is in the rightmost column of window "wp".
