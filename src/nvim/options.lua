@@ -91,6 +91,7 @@ return {
     {
       abbreviation = 'al',
       defaults = { if_true = 224 },
+      enable_if = false,
       full_name = 'aleph',
       scope = { 'global' },
       short_desc = N_('ASCII code of the letter Aleph (Hebrew)'),
@@ -1341,7 +1342,7 @@ return {
       scope = { 'global' },
       short_desc = N_('No description'),
       type = 'boolean',
-      hidden = true,
+      immutable = true,
     },
     {
       abbreviation = 'cpt',
@@ -2300,7 +2301,7 @@ return {
       scope = { 'global' },
       short_desc = N_('No description'),
       type = 'boolean',
-      hidden = true,
+      immutable = true,
     },
     {
       abbreviation = 'emo',
@@ -3889,7 +3890,7 @@ return {
       scope = { 'global' },
       short_desc = N_('No description'),
       type = 'boolean',
-      hidden = true,
+      immutable = true,
     },
     {
       abbreviation = 'hkp',
@@ -3898,7 +3899,7 @@ return {
       scope = { 'global' },
       short_desc = N_('No description'),
       type = 'boolean',
-      hidden = true,
+      immutable = true,
     },
     {
       abbreviation = 'hls',
@@ -4296,7 +4297,7 @@ return {
       scope = { 'global' },
       short_desc = N_('No description'),
       type = 'boolean',
-      hidden = true,
+      immutable = true,
     },
     {
       abbreviation = 'isf',
@@ -5147,7 +5148,7 @@ return {
       scope = { 'global' },
       short_desc = N_('maximum nr of combining characters displayed'),
       type = 'number',
-      immutable = true,
+      hidden = true,
     },
     {
       abbreviation = 'mfd',
@@ -5459,7 +5460,6 @@ return {
         When on, the mouse pointer is hidden when characters are typed.
         The mouse pointer is restored when the mouse is moved.
       ]=],
-      enable_if = false,
       full_name = 'mousehide',
       redraw = { 'ui_option' },
       scope = { 'global' },
@@ -5875,6 +5875,7 @@ return {
     {
       abbreviation = 'pt',
       defaults = { if_true = '' },
+      enable_if = false,
       full_name = 'pastetoggle',
       scope = { 'global' },
       short_desc = N_('No description'),
@@ -6048,7 +6049,7 @@ return {
       scope = { 'global' },
       short_desc = N_('enable prompt in Ex mode'),
       type = 'boolean',
-      hidden = true,
+      immutable = true,
     },
     {
       abbreviation = 'pb',
@@ -6305,7 +6306,7 @@ return {
       scope = { 'global' },
       short_desc = N_('No description'),
       type = 'boolean',
-      hidden = true,
+      immutable = true,
     },
     {
       defaults = { if_true = 2 },
@@ -8767,6 +8768,7 @@ return {
     {
       abbreviation = 'tenc',
       defaults = { if_true = '' },
+      enable_if = false,
       full_name = 'termencoding',
       scope = { 'global' },
       short_desc = N_('Terminal encoding'),
@@ -8844,7 +8846,7 @@ return {
       scope = { 'global' },
       short_desc = N_('No description'),
       type = 'boolean',
-      hidden = true,
+      immutable = true,
     },
     {
       abbreviation = 'tw',
@@ -9089,7 +9091,7 @@ return {
       scope = { 'global' },
       short_desc = N_('No description'),
       type = 'boolean',
-      hidden = true,
+      immutable = true,
     },
     {
       abbreviation = 'udir',
