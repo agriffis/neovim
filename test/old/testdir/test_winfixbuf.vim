@@ -1,6 +1,7 @@
 " Test 'winfixbuf'
 
 source check.vim
+source shared.vim
 
 " Find the number of open windows in the current tab
 func s:get_windows_count()
@@ -1251,11 +1252,12 @@ endfunc
 
 " Allow :e selecting the current buffer as a full path
 func Test_edit_same_buffer_on_disk_absolute_path()
-  " This fails on CI (Windows builds), why?
-  " CheckNotMSWindows
   call s:reset_all_buffers()
 
   let file = tempname()
+  " file must exist for expansion of 8.3 paths to succeed
+  call writefile([], file, 'D')
+  let file = fnamemodify(file, ':p')
   let current = bufnr()
   execute "edit " . file
   write!
@@ -1265,7 +1267,6 @@ func Test_edit_same_buffer_on_disk_absolute_path()
   execute "edit " file
   call assert_equal(current, bufnr())
 
-  call delete(file)
   set nowinfixbuf
 endfunc
 
@@ -3425,6 +3426,17 @@ func Test_bufdo_cnext_splitwin_fails()
   " Ensure the entry didn't change.
   call assert_equal(1, getqflist(#{idx: 0}).idx)
   set winminheight&vim winheight&vim
+endfunc
+
+" Test that exiting with 'winfixbuf' and EXITFREE doesn't cause an error.
+func Test_exitfree_no_error()
+  let lines =<< trim END
+    set winfixbuf
+    qall!
+  END
+  call writefile(lines, 'Xwfb_exitfree', 'D')
+  call assert_notmatch('E1513:',
+        \ system(GetVimCommandClean() .. ' -X -S Xwfb_exitfree'))
 endfunc
 
 " vim: shiftwidth=2 sts=2 expandtab

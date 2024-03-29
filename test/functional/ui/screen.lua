@@ -204,6 +204,7 @@ function Screen.new(width, height)
     wildmenu_selected = nil,
     win_position = {},
     win_viewport = {},
+    win_viewport_margins = {},
     float_pos = {},
     msg_grid = nil,
     msg_grid_pos = nil,
@@ -337,6 +338,7 @@ local ext_keys = {
   'ruler',
   'float_pos',
   'win_viewport',
+  'win_viewport_margins',
 }
 
 local expect_keys = {
@@ -620,6 +622,9 @@ screen:redraw_debug() to show all intermediate screen states.]]
     end
     if expected.win_viewport == nil then
       extstate.win_viewport = nil
+    end
+    if expected.win_viewport_margins == nil then
+      extstate.win_viewport_margins = nil
     end
 
     if expected.float_pos then
@@ -993,6 +998,7 @@ function Screen:_handle_grid_destroy(grid)
   if self._options.ext_multigrid then
     self.win_position[grid] = nil
     self.win_viewport[grid] = nil
+    self.win_viewport_margins[grid] = nil
   end
 end
 
@@ -1045,6 +1051,16 @@ function Screen:_handle_win_viewport(
     curcol = curcol,
     linecount = linecount,
     sum_scroll_delta = scroll_delta + last_scroll_delta,
+  }
+end
+
+function Screen:_handle_win_viewport_margins(grid, win, top, bottom, left, right)
+  self.win_viewport_margins[grid] = {
+    win = win,
+    top = top,
+    bottom = bottom,
+    left = left,
+    right = right,
   }
 end
 
@@ -1466,6 +1482,8 @@ function Screen:_extstate_repr(attr_state)
   end
 
   local win_viewport = (next(self.win_viewport) and self.win_viewport) or nil
+  local win_viewport_margins = (next(self.win_viewport_margins) and self.win_viewport_margins)
+    or nil
 
   return {
     popupmenu = self.popupmenu,
@@ -1480,6 +1498,7 @@ function Screen:_extstate_repr(attr_state)
     msg_history = msg_history,
     float_pos = self.float_pos,
     win_viewport = win_viewport,
+    win_viewport_margins = win_viewport_margins,
   }
 end
 
@@ -1686,23 +1705,26 @@ function Screen:_print_snapshot(attrs, ignore)
       if self._options.ext_linegrid then
         dict = self:_pprint_hlitem(a)
       else
-        dict = '{' .. self:_pprint_attrs(a) .. '}'
+        dict = '{ ' .. self:_pprint_attrs(a) .. ' }'
       end
       local keyval = (type(i) == 'number') and '[' .. tostring(i) .. ']' or i
-      table.insert(attrstrs, '  ' .. keyval .. ' = ' .. dict .. ';')
+      table.insert(attrstrs, '  ' .. keyval .. ' = ' .. dict .. ',')
     end
-    attrstr = (', attr_ids={\n' .. table.concat(attrstrs, '\n') .. '\n}')
+    attrstr = (',\n  attr_ids = {\n  ' .. table.concat(attrstrs, '\n  ') .. '\n  },')
   elseif isempty(attrs) then
-    attrstr = ', attr_ids={}'
+    attrstr = ',\n  attr_ids = {},'
   end
 
-  local result = 'screen:expect{grid=[[\n' .. kwargs.grid .. '\n]]' .. attrstr
+  local result = ('screen:expect({\n  grid = [[\n  %s\n  ]]%s'):format(
+    kwargs.grid:gsub('\n', '\n  '),
+    attrstr
+  )
   for _, k in ipairs(ext_keys) do
     if ext_state[k] ~= nil and not (k == 'win_viewport' and not self.options.ext_multigrid) then
       result = result .. ', ' .. k .. '=' .. fmt_ext_state(k, ext_state[k])
     end
   end
-  result = result .. '}'
+  result = result .. '\n})'
 
   return result
 end
@@ -1808,20 +1830,20 @@ function Screen:_pprint_hlitem(item)
   -- print(inspect(item))
   local multi = self._rgb_cterm or self._options.ext_hlstate
   local cterm = (not self._rgb_cterm and not self._options.rgb)
-  local attrdict = '{' .. self:_pprint_attrs(multi and item[1] or item, cterm) .. '}'
+  local attrdict = '{ ' .. self:_pprint_attrs(multi and item[1] or item, cterm) .. ' }'
   local attrdict2, hlinfo
   local descdict = ''
   if self._rgb_cterm then
-    attrdict2 = ', {' .. self:_pprint_attrs(item[2], true) .. '}'
+    attrdict2 = ', { ' .. self:_pprint_attrs(item[2], true) .. ' }'
     hlinfo = item[3]
   else
     attrdict2 = ''
     hlinfo = item[2]
   end
   if self._options.ext_hlstate then
-    descdict = ', {' .. self:_pprint_hlinfo(hlinfo) .. '}'
+    descdict = ', { ' .. self:_pprint_hlinfo(hlinfo) .. ' }'
   end
-  return (multi and '{' or '') .. attrdict .. attrdict2 .. descdict .. (multi and '}' or '')
+  return (multi and '{ ' or '') .. attrdict .. attrdict2 .. descdict .. (multi and ' }' or '')
 end
 
 function Screen:_pprint_hlinfo(states)
