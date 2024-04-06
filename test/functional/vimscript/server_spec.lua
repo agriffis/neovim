@@ -5,7 +5,9 @@ local clear, fn, api = helpers.clear, helpers.fn, helpers.api
 local ok = helpers.ok
 local matches = helpers.matches
 local pcall_err = helpers.pcall_err
+local check_close = helpers.check_close
 local mkdir = helpers.mkdir
+local rmdir = helpers.rmdir
 local is_os = helpers.is_os
 
 local testlog = 'Xtest-server-log'
@@ -18,12 +20,16 @@ end
 
 describe('server', function()
   after_each(function()
+    check_close()
     os.remove(testlog)
   end)
 
   it('serverstart() stores sockets in $XDG_RUNTIME_DIR', function()
     local dir = 'Xtest_xdg_run'
     mkdir(dir)
+    finally(function()
+      rmdir(dir)
+    end)
     clear({ env = { XDG_RUNTIME_DIR = dir } })
     matches(dir, fn.stdpath('run'))
     if not is_os('win') then

@@ -1,3 +1,31 @@
+--- Default user commands
+do
+  vim.api.nvim_create_user_command('Inspect', function(cmd)
+    if cmd.bang then
+      vim.print(vim.inspect_pos())
+    else
+      vim.show_pos()
+    end
+  end, { desc = 'Inspect highlights and extmarks at the cursor', bang = true })
+
+  vim.api.nvim_create_user_command('InspectTree', function(cmd)
+    if cmd.mods ~= '' or cmd.count ~= 0 then
+      local count = cmd.count ~= 0 and cmd.count or ''
+      local new = cmd.mods ~= '' and 'new' or 'vnew'
+
+      vim.treesitter.inspect_tree({
+        command = ('%s %s%s'):format(cmd.mods, count, new),
+      })
+    else
+      vim.treesitter.inspect_tree()
+    end
+  end, { desc = 'Inspect treesitter language tree for buffer', count = true })
+
+  vim.api.nvim_create_user_command('EditQuery', function(cmd)
+    vim.treesitter.query.edit(cmd.fargs[1])
+  end, { desc = 'Edit treesitter query', nargs = '?' })
+end
+
 --- Default mappings
 do
   --- Default maps for * and # in visual mode.
@@ -86,6 +114,24 @@ do
       do_open(table.concat(vim.iter(lines):map(vim.trim):totable()))
     end, { desc = gx_desc })
   end
+
+  --- Default maps for built-in commenting
+  do
+    local operator_rhs = function()
+      return require('vim._comment').operator()
+    end
+    vim.keymap.set({ 'n', 'x' }, 'gc', operator_rhs, { expr = true, desc = 'Toggle comment' })
+
+    local line_rhs = function()
+      return require('vim._comment').operator() .. '_'
+    end
+    vim.keymap.set('n', 'gcc', line_rhs, { expr = true, desc = 'Toggle comment line' })
+
+    local textobject_rhs = function()
+      require('vim._comment').textobject()
+    end
+    vim.keymap.set({ 'o' }, 'gc', textobject_rhs, { desc = 'Comment textobject' })
+  end
 end
 
 --- Default menus
@@ -93,7 +139,6 @@ do
   --- Right click popup menu
   -- TODO VimScript, no l10n
   vim.cmd([[
-    aunmenu *
     vnoremenu PopUp.Cut                     "+x
     vnoremenu PopUp.Copy                    "+y
     anoremenu PopUp.Paste                   "+gP
@@ -102,6 +147,7 @@ do
     nnoremenu PopUp.Select\ All             ggVG
     vnoremenu PopUp.Select\ All             gg0oG$
     inoremenu PopUp.Select\ All             <C-Home><C-O>VG
+    anoremenu PopUp.Inspect                 <Cmd>Inspect<CR>
     anoremenu PopUp.-1-                     <Nop>
     anoremenu PopUp.How-to\ disable\ mouse  <Cmd>help disable-mouse<CR>
   ]])

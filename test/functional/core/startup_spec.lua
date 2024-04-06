@@ -32,6 +32,7 @@ local dedent = helpers.dedent
 local tbl_map = vim.tbl_map
 local tbl_filter = vim.tbl_filter
 local endswith = vim.endswith
+local check_close = helpers.check_close
 
 local testlog = 'Xtest-startupspec-log'
 
@@ -101,15 +102,7 @@ describe('startup', function()
         VIMRUNTIME = os.getenv('VIMRUNTIME'),
       },
     })
-    screen:expect([[
-      ^                                                            |
-                                                                  |
-      Entering Debug mode.  Type "cont" to continue.              |
-      nvim_exec2()                                                |
-      cmd: aunmenu *                                              |
-      >                                                           |
-                                                                  |
-    ]])
+    screen:expect({ any = pesc('Entering Debug mode.  Type "cont" to continue.') })
     fn.chansend(id, 'cont\n')
     screen:expect([[
       ^                                                            |
@@ -124,6 +117,7 @@ describe('startup', function()
   before_each(clear)
 
   after_each(function()
+    check_close()
     os.remove(testlog)
   end)
 
