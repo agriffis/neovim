@@ -57,6 +57,8 @@ typedef int (*ex_unletlock_callback)(lval_T *, char *, exarg_T *, int);
 #define DICT_MAXNEST 100        // maximum nesting of lists and dicts
 
 static const char *e_letunexp = N_("E18: Unexpected characters in :let");
+static const char e_double_semicolon_in_list_of_variables[]
+  = N_("E452: Double ; in list of variables");
 static const char *e_lock_unlock = N_("E940: Cannot lock or unlock variable %s");
 static const char e_setting_v_str_to_value_with_wrong_type[]
   = N_("E963: Setting v:%s to value with wrong type");
@@ -341,7 +343,7 @@ void ex_let(exarg_T *eap)
   const char *argend;
   int first = true;
 
-  argend = skip_var_list(arg, &var_count, &semicolon);
+  argend = skip_var_list(arg, &var_count, &semicolon, false);
   if (argend == NULL) {
     return;
   }
@@ -515,10 +517,11 @@ int ex_let_vars(char *arg_start, typval_T *tv, int copy, int semicolon, int var_
 /// Skip over assignable variable "var" or list of variables "[var, var]".
 /// Used for ":let varvar = expr" and ":for varvar in expr".
 /// For "[var, var]" increment "*var_count" for each variable.
-/// for "[var, var; var]" set "semicolon".
+/// for "[var, var; var]" set "semicolon" to 1.
+/// If "silent" is true do not give an "invalid argument" error message.
 ///
 /// @return  NULL for an error.
-const char *skip_var_list(const char *arg, int *var_count, int *semicolon)
+const char *skip_var_list(const char *arg, int *var_count, int *semicolon, bool silent)
 {
   if (*arg == '[') {
     const char *s;
@@ -528,7 +531,9 @@ const char *skip_var_list(const char *arg, int *var_count, int *semicolon)
       p = skipwhite(p + 1);             // skip whites after '[', ';' or ','
       s = skip_var_one(p);
       if (s == p) {
-        semsg(_(e_invarg2), p);
+        if (!silent) {
+          semsg(_(e_invarg2), p);
+        }
         return NULL;
       }
       (*var_count)++;
@@ -538,12 +543,16 @@ const char *skip_var_list(const char *arg, int *var_count, int *semicolon)
         break;
       } else if (*p == ';') {
         if (*semicolon == 1) {
-          emsg(_("E452: Double ; in list of variables"));
+          if (!silent) {
+            emsg(_(e_double_semicolon_in_list_of_variables));
+          }
           return NULL;
         }
         *semicolon = 1;
       } else if (*p != ',') {
-        semsg(_(e_invarg2), p);
+        if (!silent) {
+          semsg(_(e_invarg2), p);
+        }
         return NULL;
       }
     }
