@@ -1,4 +1,4 @@
-local t = require('test.functional.testutil')(after_each)
+local t = require('test.functional.testutil')()
 
 local clear = t.clear
 local eq = t.eq
@@ -115,6 +115,20 @@ describe('treesitter language API', function()
     exec_lua([[
       langtree = vim.treesitter.get_parser(0, "c")
       tree = langtree:tree_for_range({1, 3, 1, 3})
+    ]])
+
+    eq('<node translation_unit>', exec_lua('return tostring(tree:root())'))
+  end)
+
+  it('retrieve the tree given a range when range is out of bounds relative to buffer', function()
+    insert([[
+      int main() {
+        int x = 3;
+      }]])
+
+    exec_lua([[
+      langtree = vim.treesitter.get_parser(0, "c")
+      tree = langtree:tree_for_range({10, 10, 10, 10})
     ]])
 
     eq('<node translation_unit>', exec_lua('return tostring(tree:root())'))

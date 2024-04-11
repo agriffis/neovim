@@ -1,5 +1,5 @@
 local Screen = require('test.functional.ui.screen')
-local t = require('test.functional.testutil')(after_each)
+local t = require('test.functional.testutil')()
 local tt = require('test.functional.terminal.testutil')
 
 local assert_alive = t.assert_alive
@@ -81,7 +81,7 @@ describe('shell command :!', function()
       {3:-- TERMINAL --}                                    |
     ]],
       {
-        -- test/functional/t.lua defaults to background=light.
+        -- test/functional/testutil.lua defaults to background=light.
         [1] = { reverse = true },
         [3] = { bold = true },
         [10] = { foreground = 2 },

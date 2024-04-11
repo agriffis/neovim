@@ -1,4 +1,4 @@
-local t = require('test.functional.testutil')(after_each)
+local t = require('test.functional.testutil')()
 local eval, command = t.eval, t.command
 local eq, run, stop = t.eq, t.run, t.stop
 local clear = t.clear
@@ -28,7 +28,7 @@ local function runx(sync, handler, on_setup)
   local function setup_cb(...)
     on_setup(...)
     -- need to stop on setup callback because there's two session:request
-    -- calls in `request/t.lua`. The second call will always return
+    -- calls in `request/testutil.lua`. The second call will always return
     -- after pending notification/request callbacks are processed
     stop()
   end
