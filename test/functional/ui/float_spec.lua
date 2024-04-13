@@ -325,6 +325,27 @@ describe('float window', function()
     eq(12, pos[2])
   end)
 
+  it('error message when reconfig missing relative field', function()
+    local bufnr = api.nvim_create_buf(false, true)
+    local opts = {
+      width = 10,
+      height = 10,
+      col = 5,
+      row = 5,
+      relative = 'editor',
+      style = 'minimal',
+    }
+    local win_id = api.nvim_open_win(bufnr, true, opts)
+    eq(
+    "Missing 'relative' field when reconfiguring floating window 1001",
+    pcall_err(api.nvim_win_set_config, win_id, {
+      width = 3,
+      height = 3,
+      row = 10,
+      col = 10,
+    }))
+  end)
+
   it('is not operated on by windo when non-focusable #15374', function()
     command([[
       let winids = []
@@ -9226,6 +9247,14 @@ describe('float window', function()
       eq(layout, fn.winlayout())
       eq(restcmd, fn.winrestcmd())
       eq(config, api.nvim_win_get_config(0))
+    end)
+
+    it("error when relative to itself", function()
+      local buf = api.nvim_create_buf(false, true)
+      local config = { relative='win', width=5, height=2, row=3, col=3 }
+      local winid = api.nvim_open_win(buf, false, config)
+      api.nvim_set_current_win(winid)
+      eq("floating window cannot be relative to itself", pcall_err(api.nvim_win_set_config, winid, config))
     end)
   end
 
