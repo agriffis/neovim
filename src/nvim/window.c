@@ -753,7 +753,19 @@ void win_set_buf(win_T *win, buf_T *buf, Error *err)
   }
 
   try_start();
+
+  const int save_acd = p_acd;
+  if (!switchwin.sw_same_win) {
+    // Temporarily disable 'autochdir' when setting buffer in another window.
+    p_acd = false;
+  }
+
   int result = do_buffer(DOBUF_GOTO, DOBUF_FIRST, FORWARD, buf->b_fnum, 0);
+
+  if (!switchwin.sw_same_win) {
+    p_acd = save_acd;
+  }
+
   if (!try_end(err) && result == FAIL) {
     api_set_error(err,
                   kErrorTypeException,

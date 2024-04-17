@@ -50,7 +50,7 @@ local function check_config()
 
   local init_lua = vim.fn.stdpath('config') .. '/init.lua'
   local init_vim = vim.fn.stdpath('config') .. '/init.vim'
-  local vimrc = vim.env.MYVIMRC or init_lua
+  local vimrc = vim.env.MYVIMRC and vim.fn.expand(vim.env.MYVIMRC) or init_lua
 
   if vim.fn.filereadable(vimrc) == 0 and vim.fn.filereadable(init_vim) == 0 then
     ok = false
@@ -383,6 +383,19 @@ local function check_terminal()
   end
 end
 
+local function check_external_tools()
+  health.start('External Tools')
+
+  if vim.fn.executable('rg') == 1 then
+    local rg = vim.fn.exepath('rg')
+    local cmd = 'rg -V'
+    local out = vim.fn.system(vim.fn.split(cmd))
+    health.ok(('%s (%s)'):format(vim.trim(out), rg))
+  else
+    health.warn('ripgrep not available')
+  end
+end
+
 function M.check()
   check_config()
   check_runtime()
@@ -390,6 +403,7 @@ function M.check()
   check_rplugin_manifest()
   check_terminal()
   check_tmux()
+  check_external_tools()
 end
 
 return M
