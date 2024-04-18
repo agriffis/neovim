@@ -893,8 +893,8 @@ static bool normal_get_command_count(NormalState *s)
   // Handle a count before a command and compute ca.count0.
   // Note that '0' is a command and not the start of a count, but it's
   // part of a count after other digits.
-  while ((s->c >= '1' && s->c <= '9') || (s->ca.count0 != 0
-                                          && (s->c == K_DEL || s->c == K_KDEL || s->c == '0'))) {
+  while ((s->c >= '1' && s->c <= '9')
+         || (s->ca.count0 != 0 && (s->c == K_DEL || s->c == K_KDEL || s->c == '0'))) {
     if (s->c == K_DEL || s->c == K_KDEL) {
       s->ca.count0 /= 10;
       del_from_showcmd(4);            // delete the digit and ~@%
@@ -1968,9 +1968,16 @@ bool add_to_showcmd(int c)
     }
   }
 
-  char *p = transchar(c);
-  if (*p == ' ') {
-    STRCPY(p, "<20>");
+  char *p;
+  char mbyte_buf[MB_MAXCHAR + 1];
+  if (c <= 0x7f || !vim_isprintc(c)) {
+    p = transchar(c);
+    if (*p == ' ') {
+      STRCPY(p, "<20>");
+    }
+  } else {
+    mbyte_buf[utf_char2bytes(c, mbyte_buf)] = NUL;
+    p = mbyte_buf;
   }
   size_t old_len = strlen(showcmd_buf);
   size_t extra_len = strlen(p);
@@ -2036,7 +2043,7 @@ void pop_showcmd(void)
 
 static void display_showcmd(void)
 {
-  int len = (int)strlen(showcmd_buf);
+  int len = vim_strsize(showcmd_buf);
   showcmd_is_clear = (len == 0);
 
   if (*p_sloc == 's') {
@@ -2058,9 +2065,6 @@ static void display_showcmd(void)
     return;
   }
   // 'showcmdloc' is "last" or empty
-  if (p_ch == 0 && !ui_has(kUIMessages)) {
-    return;
-  }
 
   if (ui_has(kUIMessages)) {
     MAXSIZE_TEMP_ARRAY(content, 1);
@@ -2072,6 +2076,9 @@ static void display_showcmd(void)
       ADD_C(content, ARRAY_OBJ(chunk));
     }
     ui_call_msg_showcmd(content);
+    return;
+  }
+  if (p_ch == 0) {
     return;
   }
 
