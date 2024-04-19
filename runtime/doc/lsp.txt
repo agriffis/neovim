@@ -1588,19 +1588,21 @@ save({lenses}, {bufnr}, {client_id})                 *vim.lsp.codelens.save()*
 ==============================================================================
 Lua module: vim.lsp.inlay_hint                                *lsp-inlay_hint*
 
-enable({bufnr}, {enable})                        *vim.lsp.inlay_hint.enable()*
+enable({enable}, {filter})                       *vim.lsp.inlay_hint.enable()*
     Enables or disables inlay hints for a buffer.
 
     To "toggle", pass the inverse of `is_enabled()`: >lua
-        vim.lsp.inlay_hint.enable(0, not vim.lsp.inlay_hint.is_enabled())
+        vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())
 <
 
     Note: ~
       • This API is pre-release (unstable).
 
     Parameters: ~
-      • {bufnr}   (`integer?`) Buffer handle, or 0 or nil for current
       • {enable}  (`boolean?`) true/nil to enable, false to disable
+      • {filter}  (`table?`) Optional filters |kwargs|, or `nil` for all.
+                  • {bufnr} (`integer?`) Buffer number, or 0/nil for current
+                    buffer.
 
 get({filter})                                       *vim.lsp.inlay_hint.get()*
     Get the list of inlay hints, (optionally) restricted by buffer or range.
@@ -1639,7 +1641,7 @@ is_enabled({bufnr})                          *vim.lsp.inlay_hint.is_enabled()*
       • This API is pre-release (unstable).
 
     Parameters: ~
-      • {bufnr}  (`integer?`) Buffer handle, or 0 or nil for current
+      • {bufnr}  (`integer?`) Buffer handle, or 0 for current
 
     Return: ~
         (`boolean`)
@@ -2229,32 +2231,20 @@ Lua module: vim.lsp.rpc                                              *lsp-rpc*
       • {terminate}   (`fun()`)
 
 
-connect({host}, {port})                                *vim.lsp.rpc.connect()*
-    Create a LSP RPC client factory that connects via TCP to the given host
-    and port.
+connect({host_or_path}, {port})                        *vim.lsp.rpc.connect()*
+    Create a LSP RPC client factory that connects to either:
+    • a named pipe (windows)
+    • a domain socket (unix)
+    • a host and port via TCP
 
     Return a function that can be passed to the `cmd` field for
     |vim.lsp.start_client()| or |vim.lsp.start()|.
 
     Parameters: ~
-      • {host}  (`string`) host to connect to
-      • {port}  (`integer`) port to connect to
-
-    Return: ~
-        (`fun(dispatchers: vim.lsp.rpc.Dispatchers): vim.lsp.rpc.PublicClient`)
-
-                                         *vim.lsp.rpc.domain_socket_connect()*
-domain_socket_connect({pipe_path})
-    Create a LSP RPC client factory that connects via named pipes (Windows) or
-    unix domain sockets (Unix) to the given pipe_path (file path on Unix and
-    name on Windows).
-
-    Return a function that can be passed to the `cmd` field for
-    |vim.lsp.start_client()| or |vim.lsp.start()|.
-
-    Parameters: ~
-      • {pipe_path}  (`string`) file path of the domain socket (Unix) or name
-                     of the named pipe (Windows) to connect to
+      • {host_or_path}  (`string`) host to connect to or path to a pipe/domain
+                        socket
+      • {port}          (`integer?`) TCP port to connect to. If absent the
+                        first argument must be a pipe
 
     Return: ~
         (`fun(dispatchers: vim.lsp.rpc.Dispatchers): vim.lsp.rpc.PublicClient`)

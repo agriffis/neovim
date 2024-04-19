@@ -149,6 +149,10 @@ unreleased features on Nvim HEAD.
 • Removed `vim.treesitter.foldtext` as transparent foldtext is now supported
   https://github.com/neovim/neovim/pull/20750
 
+• Changed the signature of `vim.lsp.inlay_hint.enable()`.
+
+• Changed the signature of `vim.diagnostic.enable()`.
+
 ==============================================================================
 NEW FEATURES                                                    *news-features*
 
@@ -225,7 +229,7 @@ The following new APIs and features were added.
   • |vim.lsp.util.locations_to_items()| sets the `user_data` of each item to
     the original LSP `Location` or `LocationLink`.
   • Added support for connecting to servers using named pipes (Windows) or
-    unix domain sockets (Unix) via |vim.lsp.rpc.domain_socket_connect()|.
+    unix domain sockets (Unix) via |vim.lsp.rpc.connect()|.
   • Added support for `completionList.itemDefaults`, reducing overhead when
     computing completion items where properties often share the same value
     (e.g. `commitCharacters`). Note that this might affect plugins and
@@ -529,6 +533,7 @@ release.
 • vim.diagnostic functions:
   - |vim.diagnostic.disable()|
   - |vim.diagnostic.is_disabled()|
+  - Legacy signature: `vim.diagnostic.enable(buf:number, namespace:number)`
 
 • vim.lsp functions:
   - |vim.lsp.util.get_progress_messages()|	Use |vim.lsp.status()| instead.
