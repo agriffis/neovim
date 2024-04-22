@@ -12,7 +12,7 @@ local M = {}
 --- Writes to error buffer.
 ---@param ... string Will be concatenated before being written
 local function err_message(...)
-  vim.notify(table.concat(vim.tbl_flatten({ ... })), vim.log.levels.ERROR)
+  vim.notify(table.concat(vim.iter({ ... }):flatten():totable()), vim.log.levels.ERROR)
   api.nvim_command('redraw')
 end
 
@@ -428,7 +428,7 @@ local function location_handler(_, result, ctx, config)
 
   -- textDocument/definition can return Location or Location[]
   -- https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_definition
-  if not vim.tbl_islist(result) then
+  if not vim.islist(result) then
     result = { result }
   end
 
