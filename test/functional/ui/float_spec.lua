@@ -434,6 +434,25 @@ describe('float window', function()
     eq(winid, eval('win_getid()'))
   end)
 
+  it('is not active after closing window when non-focusable #28454', function()
+    command('copen')
+    local winid = exec_lua([[
+      local bufnr = vim.api.nvim_create_buf(false, true)
+      local opts = {
+        relative = 'editor',
+        focusable = false,
+        height = 5,
+        width = 5,
+        col = 5,
+        row = 5,
+      }
+      return vim.api.nvim_open_win(bufnr, false, opts)
+    ]])
+    command('wincmd t')
+    command('wincmd q')
+    neq(winid, curwin())
+  end)
+
   it('supports windo with focusable and non-focusable floats', function()
     local winids = exec_lua([[
       local result = {vim.api.nvim_get_current_win()}
@@ -9255,6 +9274,43 @@ describe('float window', function()
       local winid = api.nvim_open_win(buf, false, config)
       api.nvim_set_current_win(winid)
       eq("floating window cannot be relative to itself", pcall_err(api.nvim_win_set_config, winid, config))
+    end)
+
+    it("bufpos out of range", function()
+      local buf = api.nvim_create_buf(false, true)
+      api.nvim_buf_set_lines(0, 0, -1, false, {})
+      local config = { relative='win', width=5, height=2, row=0, col=0, bufpos = { 3, 3 } }
+      api.nvim_open_win(buf, false, config)
+      if multigrid then
+        screen:expect({
+          grid = [[
+          ## grid 1
+            [2:----------------------------------------]|*6
+            [3:----------------------------------------]|
+          ## grid 2
+            ^                                        |
+            {0:~                                       }|*5
+          ## grid 3
+                                                    |
+          ## grid 4
+            {1:     }|
+            {2:~    }|
+          ]], float_pos={
+          [4] = {1001, "NW", 2, 0, 0, true, 50};
+        }, win_viewport={
+          [2] = {win = 1000, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1, sum_scroll_delta = 0};
+          [4] = {win = 1001, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1, sum_scroll_delta = 0};
+        }})
+      else
+        screen:expect({
+          grid = [[
+            {1:^     }                                   |
+            {2:~    }{0:                                   }|
+            {0:~                                       }|*4
+                                                    |
+          ]]
+        })
+      end
     end)
   end
 
