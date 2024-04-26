@@ -157,6 +157,8 @@ unreleased features on Nvim HEAD.
 
 • Renamed vim.tbl_isarray() to vim.isarray().
 
+• Changed |vim.ui.open()| return-signature to match pcall() convention.
+
 ==============================================================================
 NEW FEATURES                                                    *news-features*
 
@@ -384,6 +386,11 @@ The following changes to existing APIs or features add new behavior.
 
 • |vim.diagnostic.config()| now accepts a function for the virtual_text.prefix
   option, which allows for rendering e.g., diagnostic severities differently.
+
+• |vim.diagnostic.goto_next()| and |vim.diagnostic.goto_prev()| jump to the
+  diagnostic with the highest severity when the "severity" option is
+  unspecified. To use the old behavior, use: >lua
+    vim.diagnostic.goto_next({ severity = { min = vim.diagnostic.severity.HINT } })
 
 • Defaults:
   • On Windows 'isfname' does not include ":". Drive letters are handled
