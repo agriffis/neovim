@@ -61,47 +61,41 @@ options are not restored when the LSP client is stopped or detached.
 - |K| is mapped to |vim.lsp.buf.hover()| unless |'keywordprg'| is customized or
   a custom keymap for `K` exists.
 
+                                                  *crr* *v_crr* *crn* *i_CTRL-S*
+Some keymaps are created unconditionally when Nvim starts:
+- "crn" is mapped in Normal mode to |vim.lsp.buf.rename()|
+- "crr" is mapped in Normal and Visual mode to |vim.lsp.buf.code_action()|
+- "gr" is mapped in Normal mode to |vim.lsp.buf.references()| |gr-default|
+- CTRL-S is mapped in Insert mode to |vim.lsp.buf.signature_help()|
+
+If not wanted, these keymaps can be removed at any time using
+|vim.keymap.del()| or |:unmap|.
+
                                                         *lsp-defaults-disable*
 To override the above defaults, set or unset the options on |LspAttach|: >lua
+
     vim.api.nvim_create_autocmd('LspAttach', {
       callback = function(ev)
         vim.bo[ev.buf].formatexpr = nil
         vim.bo[ev.buf].omnifunc = nil
-        vim.keymap.del("n", "K", { buffer = ev.buf })
+        vim.keymap.del('n', 'K', { buffer = ev.buf })
       end,
     })
 
-To use other LSP features like hover, rename, etc. you can set other keymaps
-on |LspAttach|. Example: >lua
-    vim.api.nvim_create_autocmd('LspAttach', {
-      callback = function(args)
-        vim.keymap.set('n', 'K', vim.lsp.buf.hover, { buffer = args.buf })
-      end,
-    })
+To use other LSP features, set keymaps on |LspAttach|. Not all language
+servers provide the same capabilities. To ensure you only set keymaps if the
+language server supports a feature, guard keymaps behind capability checks.
+Example: >lua
 
-The most common functions are:
-
-- |vim.lsp.buf.hover()|
-- |vim.lsp.buf.format()|
-- |vim.lsp.buf.references()|
-- |vim.lsp.buf.implementation()|
-- |vim.lsp.buf.code_action()|
-
-
-Not all language servers provide the same capabilities. To ensure you only set
-keymaps if the language server supports a feature, you can guard the keymap
-calls behind capability checks:
->lua
     vim.api.nvim_create_autocmd('LspAttach', {
       callback = function(args)
         local client = vim.lsp.get_client_by_id(args.data.client_id)
-        if client.server_capabilities.hoverProvider then
-          vim.keymap.set('n', 'K', vim.lsp.buf.hover, { buffer = args.buf })
+        if client.supports_method('textDocument/implementation') then
+          vim.keymap.set('n', 'g<C-I>', vim.lsp.buf.implementation, { buffer = args.buf })
         end
       end,
     })
 <
-
 To learn what capabilities are available you can run the following command in
 a buffer with a started LSP client: >vim
 
@@ -869,12 +863,14 @@ start({config}, {opts})                                      *vim.lsp.start()*
                   |vim.lsp.ClientConfig|.
       • {opts}    (`table?`) Optional keyword arguments
                   • {reuse_client}
-                    (`fun(client: vim.lsp.Client, config: table): boolean`)
+                    (`fun(client: vim.lsp.Client, config: vim.lsp.ClientConfig): boolean`)
                     Predicate used to decide if a client should be re-used.
                     Used on all running clients. The default implementation
                     re-uses a client if name and root_dir matches.
                   • {bufnr} (`integer`) Buffer handle to attach to if starting
                     or re-using a client (0 for current).
+                  • {silent}? (`boolean`) Suppress error reporting if the LSP
+                    server fails to start (default false).
 
     Return: ~
         (`integer?`) client_id
@@ -886,10 +882,11 @@ start_client({config})                                *vim.lsp.start_client()*
       • {config}  (`vim.lsp.ClientConfig`) Configuration for the server. See
                   |vim.lsp.ClientConfig|.
 
-    Return: ~
+    Return (multiple): ~
         (`integer?`) client_id |vim.lsp.get_client_by_id()| Note: client may
         not be fully initialized. Use `on_init` to do any actions once the
         client has been initialized.
+        (`string?`) Error message, if any
 
 status()                                                    *vim.lsp.status()*
     Consumes the latest progress messages from all clients and formats them as
@@ -1073,7 +1070,7 @@ Lua module: vim.lsp.client                                        *lsp-client*
 *vim.lsp.ClientConfig*
 
     Fields: ~
-      • {cmd}                 (`string[]|fun(dispatchers: vim.lsp.rpc.Dispatchers): vim.lsp.rpc.PublicClient?`)
+      • {cmd}                 (`string[]|fun(dispatchers: vim.lsp.rpc.Dispatchers): vim.lsp.rpc.PublicClient`)
                               command string[] that launches the language
                               server (treated as in |jobstart()|, must be
                               absolute or on `$PATH`, shell constructs like
@@ -2340,7 +2337,7 @@ start({cmd}, {dispatchers}, {extra_spawn_params})        *vim.lsp.rpc.start()*
                                 See |vim.system()|
 
     Return: ~
-        (`vim.lsp.rpc.PublicClient?`) Client RPC object, with these methods:
+        (`vim.lsp.rpc.PublicClient`) Client RPC object, with these methods:
         • `notify()` |vim.lsp.rpc.notify()|
         • `request()` |vim.lsp.rpc.request()|
         • `is_closing()` returns a boolean indicating if the RPC is closing.
