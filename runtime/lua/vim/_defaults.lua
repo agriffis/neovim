@@ -159,9 +159,14 @@ do
       vim.lsp.buf.rename()
     end, { desc = 'vim.lsp.buf.rename()' })
 
-    vim.keymap.set({ 'n', 'v' }, 'crr', function()
-      vim.lsp.buf.code_action()
-    end, { desc = 'vim.lsp.buf.code_action()' })
+    local function map_codeaction(mode, lhs)
+      vim.keymap.set(mode, lhs, function()
+        vim.lsp.buf.code_action()
+      end, { desc = 'vim.lsp.buf.code_action()' })
+    end
+    map_codeaction('n', 'crr')
+    map_codeaction('x', '<C-R>r')
+    map_codeaction('x', '<C-R><C-R>')
 
     vim.keymap.set('n', 'gr', function()
       vim.lsp.buf.references()
@@ -190,7 +195,7 @@ do
     })
 
     vim.keymap.set('n', '<C-W>d', function()
-      vim.diagnostic.open_float({ border = 'rounded' })
+      vim.diagnostic.open_float()
     end, {
       desc = 'Open a floating window showing diagnostics under the cursor',
     })
@@ -560,9 +565,8 @@ end
 do
   --- Default 'grepprg' to ripgrep if available.
   if vim.fn.executable('rg') == 1 then
-    -- Match :grep default, otherwise rg searches cwd by default
-    -- Use -uuu to make ripgrep not do its default filtering
-    vim.o.grepprg = 'rg --vimgrep -uuu $* ' .. (vim.fn.has('unix') == 1 and '/dev/null' or 'nul')
+    -- Use -uu to make ripgrep not check ignore files/skip dot-files
+    vim.o.grepprg = 'rg --vimgrep -uu '
     vim.o.grepformat = '%f:%l:%c:%m'
   end
 end
