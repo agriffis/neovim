@@ -178,6 +178,8 @@ cycle (Nvim HEAD, the "master" branch).
 
 • Renamed vim.snippet.exit() to  vim.snippet.stop().
 
+• Changed |event-data| table for |LspProgress|: renamed `result` to `params`.
+
 ==============================================================================
 NEW FEATURES                                                    *news-features*
 
@@ -266,6 +268,9 @@ The following new APIs and features were added.
     respective capability can be unset.
   • |vim.lsp.start()| accepts a "silent" option for suppressing messages
     if an LSP server failed to start.
+  • |vim.lsp.buf.definition()|, |vim.lsp.buf.declaration()|,
+    |vim.lsp.buf.type_definition()|, and |vim.lsp.buf.implementation()| now
+    support the `loclist` field of |vim.lsp.ListOpts|.
 
 • Treesitter
   • Bundled parsers and queries (highlight, folds) for Markdown, Python, and
