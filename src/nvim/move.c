@@ -1974,11 +1974,13 @@ void scroll_cursor_bot(win_T *wp, int min_scroll, bool set_topbot)
       // need to scroll the additional clipped lines to scroll past the
       // top line before we can move on to the other lines.
       int top_plines = plines_win_nofill(wp, wp->w_topline, false);
-      int skip_lines = 0;
       int width1 = wp->w_width_inner - win_col_off(wp);
+
       if (width1 > 0) {
         int width2 = width1 + win_col_off2(wp);
-        // similar formula is used in curs_columns()
+        int skip_lines = 0;
+
+        // A similar formula is used in curs_columns().
         if (wp->w_skipcol > width1) {
           skip_lines += (wp->w_skipcol - width1) / width2 + 1;
         } else if (wp->w_skipcol > 0) {
@@ -2410,8 +2412,10 @@ static int get_scroll_overlap(Direction dir)
   }
 }
 
-/// Scroll "count" lines with 'smoothscroll' in direction "dir".
-static bool scroll_with_sms(Direction dir, int count)
+/// Scroll "count" lines with 'smoothscroll' in direction "dir". Return true
+/// when scrolling happened. Adjust "curscount" for scrolling different amount
+/// of lines when 'smoothscroll' is disabled.
+static bool scroll_with_sms(Direction dir, int count, int *curscount)
 {
   int prev_sms = curwin->w_p_sms;
   colnr_T prev_skipcol = curwin->w_skipcol;
@@ -2433,6 +2437,7 @@ static bool scroll_with_sms(Direction dir, int count)
     while (curwin->w_skipcol > 0
            && curwin->w_topline < curbuf->b_ml.ml_line_count) {
       scroll_redraw(fixdir == FORWARD, 1);
+      *curscount += (fixdir == dir ? 1 : -1);
     }
   }
   curwin->w_p_sms = prev_sms;
@@ -2480,7 +2485,7 @@ int pagescroll(Direction dir, int count, bool half)
 
     // (Try to) scroll the window unless already at the end of the buffer.
     if (count > 0) {
-      nochange = scroll_with_sms(dir, count);
+      nochange = scroll_with_sms(dir, count, &curscount);
       curwin->w_cursor.lnum = prev_lnum;
       curwin->w_cursor.col = prev_col;
       curwin->w_curswant = prev_curswant;
@@ -2498,7 +2503,7 @@ int pagescroll(Direction dir, int count, bool half)
     // Scroll [count] times 'window' or current window height lines.
     count *= ((ONE_WINDOW && p_window > 0 && p_window < Rows - 1)
               ? MAX(1, (int)p_window - 2) : get_scroll_overlap(dir));
-    nochange = scroll_with_sms(dir, count);
+    nochange = scroll_with_sms(dir, count, &count);
 
     // Place cursor at top or bottom of window.
     validate_botline(curwin);
