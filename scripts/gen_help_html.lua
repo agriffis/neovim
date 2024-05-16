@@ -63,10 +63,15 @@ local new_layout = {
   ['channel.txt'] = true,
   ['deprecated.txt'] = true,
   ['develop.txt'] = true,
+  ['dev_style.txt'] = true,
+  ['dev_theme.txt'] = true,
+  ['dev_tools.txt'] = true,
+  ['dev_vimpatch.txt'] = true,
   ['lua.txt'] = true,
   ['luaref.txt'] = true,
   ['news.txt'] = true,
   ['news-0.9.txt'] = true,
+  ['news-0.10.txt'] = true,
   ['nvim.txt'] = true,
   ['pi_health.txt'] = true,
   ['provider.txt'] = true,
@@ -1088,14 +1093,19 @@ local function gen_css(fname)
       padding-bottom: 10px;
       /* Tabs are used for alignment in old docs, so we must match Vim's 8-char expectation. */
       tab-size: 8;
-      white-space: normal;
+      white-space: pre-wrap;
       font-size: 16px;
       font-family: ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,Liberation Mono,monospace;
       word-wrap: break-word;
     }
-    .old-help-para pre {
+    .old-help-para pre, .old-help-para pre:hover {
       /* Text following <pre> is already visually separated by the linebreak. */
       margin-bottom: 0;
+      /* Long lines that exceed the textwidth should not be wrapped (no "pre-wrap").
+         Since text may overflow horizontally, we make the contents to be scrollable
+         (only if necessary) to prevent overlapping with the navigation bar at the right. */
+      white-space: pre;
+      overflow-x: auto;
     }
 
     /* TODO: should this rule be deleted? help tags are rendered as <code> or <span>, not <a> */
