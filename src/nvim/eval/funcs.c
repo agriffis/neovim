@@ -6479,7 +6479,7 @@ static void f_resolve(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   char *v = os_resolve_shortcut(fname);
   if (v == NULL) {
     if (os_is_reparse_point_include(fname)) {
-      v = os_realpath(fname, v);
+      v = os_realpath(fname, NULL, MAXPATHL + 1);
     }
   }
   rettv->vval.v_string = (v == NULL ? xstrdup(fname) : v);
@@ -6631,7 +6631,7 @@ static void f_resolve(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     xfree(buf);
   }
 # else
-  char *v = os_realpath(fname, NULL);
+  char *v = os_realpath(fname, NULL, MAXPATHL + 1);
   rettv->vval.v_string = v == NULL ? xstrdup(fname) : v;
 # endif
 #endif
@@ -8308,7 +8308,7 @@ static void f_spellbadword(typval_T *argvars, typval_T *rettv, EvalFuncData fptr
   size_t len = 0;
   if (argvars[0].v_type == VAR_UNKNOWN) {
     // Find the start and length of the badly spelled word.
-    len = spell_move_to(curwin, FORWARD, true, true, &attr);
+    len = spell_move_to(curwin, FORWARD, SMT_ALL, true, &attr);
     if (len != 0) {
       word = get_cursor_pos_ptr();
       curwin->w_set_curswant = true;
