@@ -64,6 +64,8 @@ lsp._request_name_to_capability = {
   [ms.textDocument_inlayHint] = { 'inlayHintProvider' },
   [ms.textDocument_diagnostic] = { 'diagnosticProvider' },
   [ms.inlayHint_resolve] = { 'inlayHintProvider', 'resolveProvider' },
+  [ms.textDocument_documentLink] = { 'documentLinkProvider' },
+  [ms.documentLink_resolve] = { 'documentLinkProvider', 'resolveProvider' },
 }
 
 -- TODO improve handling of scratch buffers with LSP attached.
@@ -554,12 +556,15 @@ local function buf_attach(bufnr)
     end,
 
     on_reload = function()
+      local clients = lsp.get_clients({ bufnr = bufnr })
       local params = { textDocument = { uri = uri } }
-      for _, client in ipairs(lsp.get_clients({ bufnr = bufnr })) do
+      for _, client in ipairs(clients) do
         changetracking.reset_buf(client, bufnr)
         if vim.tbl_get(client.server_capabilities, 'textDocumentSync', 'openClose') then
           client.notify(ms.textDocument_didClose, params)
         end
+      end
+      for _, client in ipairs(clients) do
         client:_text_document_did_open_handler(bufnr)
       end
     end,
