@@ -2913,24 +2913,13 @@ static int getregionpos(typval_T *argvars, typval_T *rettv, pos_T *p1, pos_T *p2
   }
 
   if (*region_type == kMTCharWise) {
-    // handle 'selection' == "exclusive"
+    // Handle 'selection' == "exclusive".
     if (is_select_exclusive && !equalpos(*p1, *p2)) {
-      if (p2->coladd > 0) {
-        p2->coladd--;
-      } else if (p2->col > 0) {
-        p2->col--;
-        mark_mb_adjustpos(curbuf, p2);
-      } else if (p2->lnum > 1) {
-        p2->lnum--;
-        p2->col = ml_get_len(p2->lnum);
-        if (p2->col > 0) {
-          p2->col--;
-          mark_mb_adjustpos(curbuf, p2);
-        }
-      }
+      // When backing up to previous line, inclusive becomes false.
+      *inclusive = !unadjust_for_sel_inner(p2);
     }
-    // if fp2 is on NUL (empty line) inclusive becomes false
-    if (*ml_get_pos(p2) == NUL && !virtual_op) {
+    // If p2 is on NUL (end of line), inclusive becomes false.
+    if (*inclusive && !virtual_op && *ml_get_pos(p2) == NUL) {
       *inclusive = false;
     }
   } else if (*region_type == kMTBlockWise) {
@@ -3041,7 +3030,6 @@ static void f_getregionpos(typval_T *argvars, typval_T *rettv, EvalFuncData fptr
   }
 
   for (linenr_T lnum = p1.lnum; lnum <= p2.lnum; lnum++) {
-    struct block_def bd;
     pos_T ret_p1, ret_p2;
 
     if (region_type == kMTLineWise) {
@@ -3050,19 +3038,34 @@ static void f_getregionpos(typval_T *argvars, typval_T *rettv, EvalFuncData fptr
       ret_p2.col = MAXCOL;
       ret_p2.coladd = 0;
     } else {
+      struct block_def bd;
+
       if (region_type == kMTBlockWise) {
         block_prep(&oa, &bd, lnum, false);
       } else {
         charwise_block_prep(p1, p2, &bd, lnum, inclusive);
       }
-      if (bd.startspaces > 0) {
+
+      if (bd.is_oneChar) {  // selection entirely inside one char
+        if (region_type == kMTBlockWise) {
+          ret_p1.col = bd.textcol;
+          ret_p1.coladd = bd.start_char_vcols - (bd.start_vcol - oa.start_vcol);
+        } else {
+          ret_p1.col = p1.col + 1;
+          ret_p1.coladd = p1.coladd;
+        }
+      } else if (bd.startspaces > 0) {
         ret_p1.col = bd.textcol;
         ret_p1.coladd = bd.start_char_vcols - bd.startspaces;
       } else {
         ret_p1.col = bd.textcol + 1;
         ret_p1.coladd = 0;
       }
-      if (bd.endspaces > 0) {
+
+      if (bd.is_oneChar) {  // selection entirely inside one char
+        ret_p2.col = ret_p1.col;
+        ret_p2.coladd = ret_p1.coladd + bd.startspaces;
+      } else if (bd.endspaces > 0) {
         ret_p2.col = bd.textcol + bd.textlen + 1;
         ret_p2.coladd = bd.endspaces;
       } else {
