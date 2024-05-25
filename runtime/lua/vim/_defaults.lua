@@ -107,22 +107,25 @@ do
           vim.inspect(cmd.cmd)
         )
       end
-
-      if err then
-        vim.notify(err, vim.log.levels.ERROR)
-      end
+      return err
     end
 
     local gx_desc =
       'Opens filepath or URI under cursor with the system handler (file explorer, web browser, …)'
     vim.keymap.set({ 'n' }, 'gx', function()
-      do_open(vim.fn.expand('<cfile>'))
+      local err = do_open(require('vim.ui')._get_url())
+      if err then
+        vim.notify(err, vim.log.levels.ERROR)
+      end
     end, { desc = gx_desc })
     vim.keymap.set({ 'x' }, 'gx', function()
       local lines =
         vim.fn.getregion(vim.fn.getpos('.'), vim.fn.getpos('v'), { type = vim.fn.mode() })
       -- Trim whitespace on each line and concatenate.
-      do_open(table.concat(vim.iter(lines):map(vim.trim):totable()))
+      local err = do_open(table.concat(vim.iter(lines):map(vim.trim):totable()))
+      if err then
+        vim.notify(err, vim.log.levels.ERROR)
+      end
     end, { desc = gx_desc })
   end
 
@@ -144,6 +147,31 @@ do
       require('vim._comment').textobject()
     end
     vim.keymap.set({ 'o' }, 'gc', textobject_rhs, { desc = 'Comment textobject' })
+  end
+
+  --- Default maps for LSP functions.
+  ---
+  --- These are mapped unconditionally to avoid different behavior depending on whether an LSP
+  --- client is attached. If no client is attached, or if a server does not support a capability, an
+  --- error message is displayed rather than exhibiting different behavior.
+  ---
+  --- See |grr|, |grn|, |gra|, |i_CTRL-S|.
+  do
+    vim.keymap.set('n', 'grn', function()
+      vim.lsp.buf.rename()
+    end, { desc = 'vim.lsp.buf.rename()' })
+
+    vim.keymap.set({ 'n', 'x' }, 'gra', function()
+      vim.lsp.buf.code_action()
+    end, { desc = 'vim.lsp.buf.code_action()' })
+
+    vim.keymap.set('n', 'grr', function()
+      vim.lsp.buf.references()
+    end, { desc = 'vim.lsp.buf.references()' })
+
+    vim.keymap.set('i', '<C-S>', function()
+      vim.lsp.buf.signature_help()
+    end, { desc = 'vim.lsp.buf.signature_help()' })
   end
 
   --- Map [d and ]d to move to the previous/next diagnostic. Map <C-W>d to open a floating window
@@ -266,7 +294,10 @@ do
         return
       end
       vim.v.swapchoice = 'e' -- Choose "(E)dit".
-      vim.notify(('W325: Ignoring swapfile from Nvim process %d'):format(info.pid))
+      vim.notify(
+        ('W325: Ignoring swapfile from Nvim process %d'):format(info.pid),
+        vim.log.levels.WARN
+      )
     end,
   })
 
