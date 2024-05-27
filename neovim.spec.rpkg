@@ -128,8 +128,6 @@ USERNAME=koji
 %install
 %cmake_install
 
-find %{buildroot}
-
 install -p -m 644 %SOURCE1 %{buildroot}%{_datadir}/nvim/sysinit.vim
 install -p -m 644 %SOURCE2 %{buildroot}%{_datadir}/nvim/template.spec
 
