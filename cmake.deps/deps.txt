@@ -4,8 +4,8 @@ LIBUV_SHA256 8c253adb0f800926a6cbd1c6576abae0bc8eb86a4f891049b72f9e5b7dc58f33
 MSGPACK_URL https://github.com/msgpack/msgpack-c/archive/c-6.0.1.tar.gz
 MSGPACK_SHA256 58d5fe49d0ee2b374d60a61aabf8028b2c92004e6f11bff04e74b639fc8ad541
 
-LUAJIT_URL https://github.com/LuaJIT/LuaJIT/archive/75e92777988017fe47c5eb290998021bbf972d1f.tar.gz
-LUAJIT_SHA256 0f69288190024d732c67645e40ed5b137d67aa950fedf0f44a9ad0f3dba6d5d2
+LUAJIT_URL https://github.com/LuaJIT/LuaJIT/archive/93e87998b24021b94de8d1c8db244444c46fb6e9.tar.gz
+LUAJIT_SHA256 026eb4531cddff20acc72ec97378ccfc30326173c491d6c01834b48b42a80518
 
 LUA_URL https://www.lua.org/ftp/lua-5.1.5.tar.gz
 LUA_SHA256 2640fc56a795f29d28ef15e13c34a47e223960b0240e8cb0a82d9b0738695333
@@ -41,16 +41,16 @@ GETTEXT_SHA256 66415634c6e8c3fa8b71362879ec7575e27da43da562c798a8a2f223e6e47f5c
 LIBICONV_URL https://github.com/neovim/deps/raw/b9bf36eb31f27e8136d907da38fa23518927737e/opt/libiconv-1.17.tar.gz
 LIBICONV_SHA256 8f74213b56238c85a50a5329f77e06198771e70dd9a739779f4c02f65d971313
 
-TREESITTER_C_URL https://github.com/tree-sitter/tree-sitter-c/archive/v0.21.0.tar.gz
-TREESITTER_C_SHA256 6f0f5d1b71cf8ffd8a37fb638c6022fa1245bd630150b538547d52128ce0ea7e
+TREESITTER_C_URL https://github.com/tree-sitter/tree-sitter-c/archive/v0.21.3.tar.gz
+TREESITTER_C_SHA256 75a3780df6114cd37496761c4a7c9fd900c78bee3a2707f590d78c0ca3a24368
 TREESITTER_LUA_URL https://github.com/tree-sitter-grammars/tree-sitter-lua/archive/v0.1.0.tar.gz
 TREESITTER_LUA_SHA256 230cfcbfa74ed1f7b8149e9a1f34c2efc4c589a71fe0f5dc8560622f8020d722
 TREESITTER_VIM_URL https://github.com/neovim/tree-sitter-vim/archive/v0.4.0.tar.gz
 TREESITTER_VIM_SHA256 9f856f8b4a10ab43348550fa2d3cb2846ae3d8e60f45887200549c051c66f9d5
 TREESITTER_VIMDOC_URL https://github.com/neovim/tree-sitter-vimdoc/archive/v2.5.1.tar.gz
 TREESITTER_VIMDOC_SHA256 063645096504b21603585507c41c6d8718ff3c11b2150c5bfc31e8f3ee9afea3
-TREESITTER_QUERY_URL https://github.com/tree-sitter-grammars/tree-sitter-query/archive/v0.3.0.tar.gz
-TREESITTER_QUERY_SHA256 f878ff37abcb83250e31a6569e997546f3dbab74dcb26683cb2d613f7568cfc0
+TREESITTER_QUERY_URL https://github.com/tree-sitter-grammars/tree-sitter-query/archive/v0.4.0.tar.gz
+TREESITTER_QUERY_SHA256 d3a423ab66dc62b2969625e280116678a8a22582b5ff087795222108db2f6a6e
 TREESITTER_PYTHON_URL https://github.com/tree-sitter/tree-sitter-python/archive/v0.21.0.tar.gz
 TREESITTER_PYTHON_SHA256 720304a603271fa89e4430a14d6a81a023d6d7d1171b1533e49c0ab44f1e1c13
 TREESITTER_BASH_URL https://github.com/tree-sitter/tree-sitter-bash/archive/v0.21.0.tar.gz
