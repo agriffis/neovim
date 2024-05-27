@@ -1,3 +1,5 @@
+# vim:ft=spec:
+
 %if 0%{?el8}
 # see https://fedoraproject.org/wiki/Changes/CMake_to_do_out-of-source_builds
 # EPEL 8's %%cmake defaults to in-source build, which neovim does not support
@@ -125,6 +127,8 @@ USERNAME=koji
 
 %install
 %cmake_install
+
+find %{buildroot}
 
 install -p -m 644 %SOURCE1 %{buildroot}%{_datadir}/nvim/sysinit.vim
 install -p -m 644 %SOURCE2 %{buildroot}%{_datadir}/nvim/template.spec
