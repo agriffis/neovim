@@ -34,11 +34,19 @@ API
 
 DEFAULTS
 
-• TODO
+• |]d-default| and |[d-default| accept a count.
+• |[D-default| and |]D-default| jump to the first and last diagnostic in the
+  current buffer, respectively.
+
+DIAGNOSTICS
+
+• |vim.diagnostic.config()| accepts a "jump" table to specify defaults for
+  |vim.diagnostic.jump()|.
 
 EDITOR
 
-• The order in which signs are placed was changed. Higher priority signs will now appear left of lower priority signs.
+• The order in which signs are placed was changed. Higher priority signs will
+  now appear left of lower priority signs.
 
 EVENTS
 
@@ -85,6 +93,12 @@ DEFAULTS
   - |gra| in Normal and Visual mode maps to |vim.lsp.buf.code_action()|
   - CTRL-S in Insert mode maps to |vim.lsp.buf.signature_help()|
 
+• Snippet:
+  - `<Tab>` in Insert and Select mode maps to |vim.snippet.jump({ direction = 1 })|
+    when a snippet is active and jumpable forwards.
+  - `<S-Tab>` in Insert and Select mode maps to |vim.snippet.jump({ direction = -1 })|
+    when a snippet is active and jumpable backwards.
+
 EDITOR
 
 * On Windows, filename arguments on the command-line prefixed with "~\" or
@@ -97,7 +111,8 @@ EVENTS
 
 LSP
 
-• TODO
+• Completion side effects (including snippet expansion, execution of commands
+  and application of additional text edits) is now built-in.
 
 LUA
 
