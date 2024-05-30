@@ -129,18 +129,33 @@ end
 --- @param item lsp.CompletionItem
 --- @return string
 local function get_completion_word(item)
-  if item.textEdit ~= nil and item.textEdit.newText ~= nil and item.textEdit.newText ~= '' then
-    if item.insertTextFormat == protocol.InsertTextFormat.PlainText then
-      return item.textEdit.newText
-    else
-      return parse_snippet(item.textEdit.newText)
-    end
-  elseif item.insertText ~= nil and item.insertText ~= '' then
-    if item.insertTextFormat == protocol.InsertTextFormat.PlainText then
-      return item.insertText
-    else
+  if item.insertTextFormat == protocol.InsertTextFormat.Snippet then
+    if item.textEdit then
+      -- Use label instead of text if text has different starting characters.
+      -- label is used as abbr (=displayed), but word is used for filtering
+      -- This is required for things like postfix completion.
+      -- E.g. in lua:
+      --
+      --    local f = {}
+      --    f@|
+      --      ▲
+      --      └─ cursor
+      --
+      --    item.textEdit.newText: table.insert(f, $0)
+      --    label: insert
+      --
+      -- Typing `i` would remove the candidate because newText starts with `t`.
+      local text = item.insertText or item.textEdit.newText
+      return #text < #item.label and text or item.label
+    elseif item.insertText and item.insertText ~= '' then
       return parse_snippet(item.insertText)
+    else
+      return item.label
     end
+  elseif item.textEdit then
+    return item.textEdit.newText
+  elseif item.insertText and item.insertText ~= '' then
+    return item.insertText
   end
   return item.label
 end
@@ -201,11 +216,17 @@ function M._lsp_to_complete_items(result, prefix, client_id)
     return {}
   end
 
-  local function matches_prefix(item)
-    return vim.startswith(get_completion_word(item), prefix)
-  end
+  if prefix ~= '' then
+    ---@param item lsp.CompletionItem
+    local function match_prefix(item)
+      if item.filterText then
+        return next(vim.fn.matchfuzzy({ item.filterText }, prefix))
+      end
+      return true
+    end
 
-  items = vim.tbl_filter(matches_prefix, items) --[[@as lsp.CompletionItem[]|]]
+    items = vim.tbl_filter(match_prefix, items) --[[@as lsp.CompletionItem[]|]]
+  end
   table.sort(items, function(a, b)
     return (a.sortText or a.label) < (b.sortText or b.label)
   end)
