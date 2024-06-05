@@ -108,7 +108,7 @@ local M = {}
 --- If {scope} is "line" or "cursor", use this position rather than the cursor
 --- position. If a number, interpreted as a line number; otherwise, a
 --- (row, col) tuple.
---- @field pos? integer|{[1]:integer,[2]:integer}
+--- @field pos? integer|[integer,integer]
 ---
 --- Sort diagnostics by severity.
 --- Overrides the setting from |vim.diagnostic.config()|.
@@ -122,7 +122,7 @@ local M = {}
 --- String to use as the header for the floating window. If a table, it is
 --- interpreted as a `[text, hl_group]` tuple.
 --- Overrides the setting from |vim.diagnostic.config()|.
---- @field header? string|{[1]:string,[2]:any}
+--- @field header? string|[string,any]
 ---
 --- Include the diagnostic source in the message.
 --- Use "if_many" to only show sources if there is more than one source of
@@ -203,7 +203,7 @@ local M = {}
 --- @field hl_mode? 'replace'|'combine'|'blend'
 ---
 --- See |nvim_buf_set_extmark()|.
---- @field virt_text? {[1]:string,[2]:any}[]
+--- @field virt_text? [string,any][]
 ---
 --- See |nvim_buf_set_extmark()|.
 --- @field virt_text_pos? 'eol'|'overlay'|'right_align'|'inline'
@@ -1252,7 +1252,7 @@ end
 --- Cursor position as a `(row, col)` tuple. See |nvim_win_get_cursor()|. Used
 --- to find the nearest diagnostic when {count} is used. Only used when {count}
 --- is non-nil. Default is the current cursor position.
---- @field pos? {[1]:integer,[2]:integer}
+--- @field pos? [integer,integer]
 ---
 --- Whether to loop around file or not. Similar to 'wrapscan'.
 --- (default: `true`)
@@ -1857,16 +1857,19 @@ function M.open_float(opts, ...)
   if scope == 'line' then
     --- @param d vim.Diagnostic
     diagnostics = vim.tbl_filter(function(d)
-      return lnum >= d.lnum and lnum <= d.end_lnum
+      return lnum >= d.lnum
+        and lnum <= d.end_lnum
+        and (d.lnum == d.end_lnum or lnum ~= d.end_lnum or d.end_col ~= 0)
     end, diagnostics)
   elseif scope == 'cursor' then
-    -- LSP servers can send diagnostics with `end_col` past the length of the line
+    -- If `col` is past the end of the line, show if the cursor is on the last char in the line
     local line_length = #api.nvim_buf_get_lines(bufnr, lnum, lnum + 1, true)[1]
     --- @param d vim.Diagnostic
     diagnostics = vim.tbl_filter(function(d)
-      return d.lnum == lnum
-        and math.min(d.col, line_length - 1) <= col
-        and (d.end_col >= col or d.end_lnum > lnum)
+      return lnum >= d.lnum
+        and lnum <= d.end_lnum
+        and (lnum ~= d.lnum or col >= math.min(d.col, line_length - 1))
+        and ((d.lnum == d.end_lnum and d.col == d.end_col) or lnum ~= d.end_lnum or col < d.end_col)
     end, diagnostics)
   end
 

@@ -1324,8 +1324,8 @@ return {
       defaults = { if_true = '' },
       desc = [=[
         A template for a comment.  The "%s" in the value is replaced with the
-        comment text. For example, C uses "/*%s*/". Used for |commenting| and to
-        add markers for folding, see |fold-marker|.
+        comment text, and should be padded with a space when possible.
+        Used for |commenting| and to add markers for folding, see |fold-marker|.
       ]=],
       full_name = 'commentstring',
       redraw = { 'curswant' },
@@ -1443,6 +1443,10 @@ return {
         	    completion in the preview window.  Only works in
         	    combination with "menu" or "menuone".
 
+           popup    Show extra information about the currently selected
+        	    completion in a popup window.  Only works in combination
+        	    with "menu" or "menuone".  Overrides "preview".
+
            noinsert Do not insert any text for a match until the user selects
         	    a match from the menu. Only works in combination with
         	    "menu" or "menuone". No effect if "longest" is present.
@@ -1451,9 +1455,13 @@ return {
         	    select one from the menu. Only works in combination with
         	    "menu" or "menuone".
 
-           popup    Show extra information about the currently selected
-        	    completion in a popup window.  Only works in combination
-        	    with "menu" or "menuone".  Overrides "preview".
+           fuzzy    Enable |fuzzy-matching| for completion candidates. This
+        	    allows for more flexible and intuitive matching, where
+        	    characters can be skipped and matches can be found even
+        	    if the exact sequence is not typed.  Only makes a
+        	    difference how completion candidates are reduced from the
+        	    list of alternatives, but not how the candidates are
+        	    collected (using different completion types).
       ]=],
       expand_cb = 'expand_set_completeopt',
       full_name = 'completeopt',

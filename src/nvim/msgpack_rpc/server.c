@@ -4,6 +4,7 @@
 #include <string.h>
 #include <uv.h>
 
+#include "nvim/ascii_defs.h"
 #include "nvim/channel.h"
 #include "nvim/eval.h"
 #include "nvim/event/defs.h"
@@ -131,7 +132,7 @@ bool server_owns_pipe_address(const char *path)
 /// @returns 0: success, 1: validation error, 2: already listening, -errno: failed to bind/listen.
 int server_start(const char *addr)
 {
-  if (addr == NULL || addr[0] == '\0') {
+  if (addr == NULL || addr[0] == NUL) {
     WLOG("Empty or NULL address");
     return 1;
   }
