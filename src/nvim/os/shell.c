@@ -40,8 +40,6 @@
 #include "nvim/path.h"
 #include "nvim/pos_defs.h"
 #include "nvim/profile.h"
-#include "nvim/rbuffer.h"
-#include "nvim/rbuffer_defs.h"
 #include "nvim/state_defs.h"
 #include "nvim/strings.h"
 #include "nvim/tag.h"
@@ -49,16 +47,10 @@
 #include "nvim/ui.h"
 #include "nvim/vim_defs.h"
 
-#define DYNAMIC_BUFFER_INIT { NULL, 0, 0 }
 #define NS_1_SECOND         1000000000U     // 1 second, in nanoseconds
 #define OUT_DATA_THRESHOLD  1024 * 10U      // 10KB, "a few screenfuls" of data.
 
 #define SHELL_SPECIAL "\t \"&'$;<>()\\|"
-
-typedef struct {
-  char *data;
-  size_t cap, len;
-} DynamicBuffer;
 
 #ifdef INCLUDE_GENERATED_DECLARATIONS
 # include "os/shell.c.generated.h"
@@ -669,7 +661,7 @@ char *shell_argv_to_str(char **const argv)
 /// @return shell command exit code
 int os_call_shell(char *cmd, ShellOpts opts, char *extra_args)
 {
-  DynamicBuffer input = DYNAMIC_BUFFER_INIT;
+  StringBuilder input = KV_INITIAL_VALUE;
   char *output = NULL;
   char **output_ptr = NULL;
   int current_state = State;
@@ -698,9 +690,9 @@ int os_call_shell(char *cmd, ShellOpts opts, char *extra_args)
 
   size_t nread;
   int exitcode = do_os_system(shell_build_argv(cmd, extra_args),
-                              input.data, input.len, output_ptr, &nread,
+                              input.items, input.size, output_ptr, &nread,
                               emsg_silent, forward_output);
-  xfree(input.data);
+  kv_destroy(input);
 
   if (output) {
     write_output(output, nread, true);
@@ -864,7 +856,7 @@ static int do_os_system(char **argv, const char *input, size_t len, char **outpu
   bool has_input = (input != NULL && input[0] != NUL);
 
   // the output buffer
-  DynamicBuffer buf = DYNAMIC_BUFFER_INIT;
+  StringBuilder buf = KV_INITIAL_VALUE;
   stream_read_cb data_cb = system_data_cb;
   if (nread) {
     *nread = 0;
@@ -907,9 +899,9 @@ static int do_os_system(char **argv, const char *input, size_t len, char **outpu
   if (has_input) {
     wstream_init(&proc->in, 0);
   }
-  rstream_init(&proc->out, 0);
+  rstream_init(&proc->out);
   rstream_start(&proc->out, data_cb, &buf);
-  rstream_init(&proc->err, 0);
+  rstream_init(&proc->err);
   rstream_start(&proc->err, data_cb, &buf);
 
   // write the input, if any
@@ -952,18 +944,17 @@ static int do_os_system(char **argv, const char *input, size_t len, char **outpu
 
   // prepare the out parameters if requested
   if (output) {
-    if (buf.len == 0) {
+    assert(nread);
+    if (buf.size == 0) {
       // no data received from the process, return NULL
       *output = NULL;
-      xfree(buf.data);
+      *nread = 0;
+      kv_destroy(buf);
     } else {
+      *nread = buf.size;
       // NUL-terminate to make the output directly usable as a C string
-      buf.data[buf.len] = NUL;
-      *output = buf.data;
-    }
-
-    if (nread) {
-      *nread = buf.len;
+      kv_push(buf, NUL);
+      *output = buf.items;
     }
   }
 
@@ -973,29 +964,11 @@ static int do_os_system(char **argv, const char *input, size_t len, char **outpu
   return exitcode;
 }
 
-///  - ensures at least `desired` bytes in buffer
-///
-/// TODO(aktau): fold with kvec/garray
-static void dynamic_buffer_ensure(DynamicBuffer *buf, size_t desired)
+static size_t system_data_cb(RStream *stream, const char *buf, size_t count, void *data, bool eof)
 {
-  if (buf->cap >= desired) {
-    assert(buf->data);
-    return;
-  }
-
-  buf->cap = desired;
-  kv_roundup32(buf->cap);
-  buf->data = xrealloc(buf->data, buf->cap);
-}
-
-static void system_data_cb(RStream *stream, RBuffer *buf, size_t count, void *data, bool eof)
-{
-  DynamicBuffer *dbuf = data;
-
-  size_t nread = buf->size;
-  dynamic_buffer_ensure(dbuf, dbuf->len + nread + 1);
-  rbuffer_read(buf, dbuf->data + dbuf->len, nread);
-  dbuf->len += nread;
+  StringBuilder *dbuf = data;
+  kv_concat_len(*dbuf, buf, count);
+  return count;
 }
 
 /// Tracks output received for the current executing shell command, and displays
@@ -1078,7 +1051,7 @@ static bool out_data_decide_throttle(size_t size)
 ///
 /// @param  output  Data to save, or NULL to invoke a special mode.
 /// @param  size    Length of `output`.
-static void out_data_ring(char *output, size_t size)
+static void out_data_ring(const char *output, size_t size)
 {
 #define MAX_CHUNK_SIZE (OUT_DATA_THRESHOLD / 2)
   static char last_skipped[MAX_CHUNK_SIZE];  // Saved output.
@@ -1120,11 +1093,11 @@ static void out_data_ring(char *output, size_t size)
 /// @param output       Data to append to screen lines.
 /// @param count        Size of data.
 /// @param eof          If true, there will be no more data output.
-static void out_data_append_to_screen(char *output, size_t *count, bool eof)
+static void out_data_append_to_screen(const char *output, size_t *count, bool eof)
   FUNC_ATTR_NONNULL_ALL
 {
-  char *p = output;
-  char *end = output + *count;
+  const char *p = output;
+  const char *end = output + *count;
   while (p < end) {
     if (*p == '\n' || *p == '\r' || *p == TAB || *p == BELL) {
       msg_putchar_attr((uint8_t)(*p), 0);
@@ -1152,25 +1125,16 @@ end:
   ui_flush();
 }
 
-static void out_data_cb(RStream *stream, RBuffer *buf, size_t count, void *data, bool eof)
+static size_t out_data_cb(RStream *stream, const char *ptr, size_t count, void *data, bool eof)
 {
-  size_t cnt;
-  char *ptr = rbuffer_read_ptr(buf, &cnt);
-
-  if (ptr != NULL && cnt > 0
-      && out_data_decide_throttle(cnt)) {  // Skip output above a threshold.
+  if (count > 0 && out_data_decide_throttle(count)) {  // Skip output above a threshold.
     // Save the skipped output. If it is the final chunk, we display it later.
-    out_data_ring(ptr, cnt);
-  } else if (ptr != NULL) {
-    out_data_append_to_screen(ptr, &cnt, eof);
+    out_data_ring(ptr, count);
+  } else if (count > 0) {
+    out_data_append_to_screen(ptr, &count, eof);
   }
 
-  if (cnt) {
-    rbuffer_consumed(buf, cnt);
-  }
-
-  // Move remaining data to start of buffer, so the buffer can never wrap around.
-  rbuffer_reset(buf);
+  return count;
 }
 
 /// Parses a command string into a sequence of words, taking quotes into
@@ -1234,7 +1198,7 @@ static size_t word_length(const char *str)
 /// event loop starts. If we don't (by writing in chunks returned by `ml_get`)
 /// the buffer being modified might get modified by reading from the process
 /// before we finish writing.
-static void read_input(DynamicBuffer *buf)
+static void read_input(StringBuilder *buf)
 {
   size_t written = 0;
   size_t len = 0;
@@ -1248,14 +1212,11 @@ static void read_input(DynamicBuffer *buf)
     } else if (lp[written] == NL) {
       // NL -> NUL translation
       len = 1;
-      dynamic_buffer_ensure(buf, buf->len + len);
-      buf->data[buf->len++] = NUL;
+      kv_push(*buf, NUL);
     } else {
       char *s = vim_strchr(lp + written, NL);
       len = s == NULL ? l : (size_t)(s - (lp + written));
-      dynamic_buffer_ensure(buf, buf->len + len);
-      memcpy(buf->data + buf->len, lp + written, len);
-      buf->len += len;
+      kv_concat_len(*buf, lp + written, len);
     }
 
     if (len == l) {
@@ -1264,8 +1225,7 @@ static void read_input(DynamicBuffer *buf)
           || (!curbuf->b_p_bin && curbuf->b_p_fixeol)
           || (lnum != curbuf->b_no_eol_lnum
               && (lnum != curbuf->b_ml.ml_line_count || curbuf->b_p_eol))) {
-        dynamic_buffer_ensure(buf, buf->len + 1);
-        buf->data[buf->len++] = NL;
+        kv_push(*buf, NL);
       }
       lnum++;
       if (lnum > curbuf->b_op_end.lnum) {
