@@ -970,13 +970,13 @@ void do_bang(int addr_count, exarg_T *eap, bool forceit, bool do_in, bool do_out
     char *t = xmalloc(len);
     *t = NUL;
     if (newcmd != NULL) {
-      STRCAT(t, newcmd);
+      strcat(t, newcmd);
     }
     if (ins_prevcmd) {
-      STRCAT(t, prevcmd);
+      strcat(t, prevcmd);
     }
     char *p = t + strlen(t);
-    STRCAT(t, trailarg);
+    strcat(t, trailarg);
     xfree(newcmd);
     newcmd = t;
 
@@ -1029,8 +1029,8 @@ void do_bang(int addr_count, exarg_T *eap, bool forceit, bool do_in, bool do_out
     }
     newcmd = xmalloc(strlen(prevcmd) + 2 * strlen(p_shq) + 1);
     STRCPY(newcmd, p_shq);
-    STRCAT(newcmd, prevcmd);
-    STRCAT(newcmd, p_shq);
+    strcat(newcmd, prevcmd);
+    strcat(newcmd, p_shq);
     free_newcmd = true;
   }
   if (addr_count == 0) {                // :!
@@ -1360,11 +1360,11 @@ char *make_filter_cmd(char *cmd, char *itmp, char *otmp)
 {
   bool is_fish_shell =
 #if defined(UNIX)
-    strncmp(invocation_path_tail(p_sh, NULL), "fish", 4) == 0;
+    strncmp(invocation_path_tail(p_sh, NULL), S_LEN("fish")) == 0;
 #else
     false;
 #endif
-  bool is_pwsh = strncmp(invocation_path_tail(p_sh, NULL), "pwsh", 4) == 0
+  bool is_pwsh = strncmp(invocation_path_tail(p_sh, NULL), S_LEN("pwsh")) == 0
                  || strncmp(invocation_path_tail(p_sh, NULL), "powershell",
                             10) == 0;
 
@@ -4108,7 +4108,7 @@ skip:
             // the line as reference, because the substitute may
             // have changed the number of characters.  Same for
             // "prev_matchcol".
-            STRCAT(new_start, sub_firstline + copycol);
+            strcat(new_start, sub_firstline + copycol);
             matchcol = (colnr_T)strlen(sub_firstline) - matchcol;
             prev_matchcol = (colnr_T)strlen(sub_firstline)
                             - prev_matchcol;

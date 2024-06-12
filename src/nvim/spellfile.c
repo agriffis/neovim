@@ -2140,11 +2140,11 @@ static afffile_T *spell_read_aff(spellinfo_T *spin, char *fname)
                     + strlen(items[1]) + 3, false);
         if (spin->si_info != NULL) {
           STRCPY(p, spin->si_info);
-          STRCAT(p, "\n");
+          strcat(p, "\n");
         }
-        STRCAT(p, items[0]);
-        STRCAT(p, " ");
-        STRCAT(p, items[1]);
+        strcat(p, items[0]);
+        strcat(p, " ");
+        strcat(p, items[1]);
         spin->si_info = p;
       } else if (is_aff_rule(items, itemcnt, "MIDWORD", 2) && midword == NULL) {
         midword = getroom_save(spin, items[1]);
@@ -2200,7 +2200,7 @@ static afffile_T *spell_read_aff(spellinfo_T *spin, char *fname)
         // "Na" into "Na+", "1234" into "1234+".
         p = getroom(spin, strlen(items[1]) + 2, false);
         STRCPY(p, items[1]);
-        STRCAT(p, "+");
+        strcat(p, "+");
         compflags = p;
       } else if (is_aff_rule(items, itemcnt, "COMPOUNDRULES", 2)) {
         // We don't use the count, but do check that it's a number and
@@ -2221,9 +2221,9 @@ static afffile_T *spell_read_aff(spellinfo_T *spin, char *fname)
           p = getroom(spin, (size_t)l, false);
           if (compflags != NULL) {
             STRCPY(p, compflags);
-            STRCAT(p, "/");
+            strcat(p, "/");
           }
-          STRCAT(p, items[1]);
+          strcat(p, items[1]);
           compflags = p;
         }
       } else if (is_aff_rule(items, itemcnt, "COMPOUNDWORDMAX", 2)
@@ -2844,7 +2844,7 @@ static void process_compflags(spellinfo_T *spin, afffile_T *aff, char *compflags
   char *p = getroom(spin, (size_t)len, false);
   if (spin->si_compflags != NULL) {
     STRCPY(p, spin->si_compflags);
-    STRCAT(p, "/");
+    strcat(p, "/");
   }
   spin->si_compflags = p;
   uint8_t *tp = (uint8_t *)p + strlen(p);
@@ -3386,7 +3386,7 @@ static int store_aff_word(spellinfo_T *spin, char *word, char *afflist, afffile_
                   MB_PTR_ADV(p);
                 }
               }
-              STRCAT(newword, p);
+              strcat(newword, p);
             } else {
               // suffix: chop/add at the end of the word
               xstrlcpy(newword, word, MAXWLEN);
@@ -3400,7 +3400,7 @@ static int store_aff_word(spellinfo_T *spin, char *word, char *afflist, afffile_
                 *p = NUL;
               }
               if (ae->ae_add != NULL) {
-                STRCAT(newword, ae->ae_add);
+                strcat(newword, ae->ae_add);
               }
             }
 
@@ -3615,7 +3615,7 @@ static int spell_read_wordfile(spellinfo_T *spin, char *fname)
 
     if (*line == '/') {
       line++;
-      if (strncmp(line, "encoding=", 9) == 0) {
+      if (strncmp(line, S_LEN("encoding=")) == 0) {
         if (spin->si_conv.vc_type != CONV_NONE) {
           smsg(0, _("Duplicate /encoding= line ignored in %s line %" PRIdLINENR ": %s"),
                fname, lnum, line - 1);
@@ -3637,7 +3637,7 @@ static int spell_read_wordfile(spellinfo_T *spin, char *fname)
         continue;
       }
 
-      if (strncmp(line, "regions=", 8) == 0) {
+      if (strncmp(line, S_LEN("regions=")) == 0) {
         if (spin->si_region_count > 1) {
           smsg(0, _("Duplicate /regions= line ignored in %s line %" PRIdLINENR ": %s"),
                fname, lnum, line);
@@ -4766,7 +4766,7 @@ void ex_mkspell(exarg_T *eap)
   char *arg = eap->arg;
   bool ascii = false;
 
-  if (strncmp(arg, "-ascii", 6) == 0) {
+  if (strncmp(arg, S_LEN("-ascii")) == 0) {
     ascii = true;
     arg = skipwhite(arg + 6);
   }

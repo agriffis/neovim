@@ -254,7 +254,7 @@ bool cause_errthrow(const char *mesg, bool multiline, bool severe, bool *ignore)
       if (plist == msg_list || severe) {
         // Skip the extra "Vim " prefix for message "E458".
         char *tmsg = elem->msg;
-        if (strncmp(tmsg, "Vim E", 5) == 0
+        if (strncmp(tmsg, S_LEN("Vim E")) == 0
             && ascii_isdigit(tmsg[5])
             && ascii_isdigit(tmsg[6])
             && ascii_isdigit(tmsg[7])
@@ -406,7 +406,7 @@ char *get_exception_string(void *value, except_type_T type, char *cmdname, bool 
                           || (ascii_isdigit(p[3])
                               && p[4] == ':')))))) {
         if (*p == NUL || p == mesg) {
-          STRCAT(val, mesg);  // 'E123' missing or at beginning
+          strcat(val, mesg);  // 'E123' missing or at beginning
         } else {
           // '"filename" E123: message text'
           if (mesg[0] != '"' || p - 2 < &mesg[1]
@@ -415,7 +415,7 @@ char *get_exception_string(void *value, except_type_T type, char *cmdname, bool 
             continue;
           }
 
-          STRCAT(val, p);
+          strcat(val, p);
           p[-2] = NUL;
           snprintf(val + strlen(p), strlen(" (%s)"), " (%s)", &mesg[1]);
           p[-2] = '"';
@@ -443,7 +443,7 @@ static int throw_exception(void *value, except_type_T type, char *cmdname)
   // would be treated differently from real interrupt or error exceptions
   // when no active try block is found, see do_cmdline().
   if (type == ET_USER) {
-    if (strncmp(value, "Vim", 3) == 0
+    if (strncmp(value, S_LEN("Vim")) == 0
         && (((char *)value)[3] == NUL || ((char *)value)[3] == ':'
             || ((char *)value)[3] == '(')) {
       emsg(_("E608: Cannot :throw exceptions with 'Vim' prefix"));

@@ -3448,7 +3448,7 @@ M.funcs = {
       <
     ]=],
     name = 'getchar',
-    params = {},
+    params = { { 'expr', '0|1' } },
     returns = 'integer',
     signature = 'getchar([{expr}])',
   },
@@ -3537,7 +3537,7 @@ M.funcs = {
       result is converted to a string.
     ]=],
     name = 'getcharstr',
-    params = {},
+    params = { { 'expr', '0|1' } },
     returns = 'string',
     signature = 'getcharstr([{expr}])',
   },
@@ -4047,8 +4047,9 @@ M.funcs = {
 
     ]=],
     name = 'getmarklist',
-    params = { { 'buf', 'any' } },
+    params = { { 'buf', 'integer?' } },
     signature = 'getmarklist([{buf}])',
+    returns = 'vim.fn.getmarklist.ret.item[]',
   },
   getmatches = {
     args = { 0, 1 },
@@ -6080,10 +6081,21 @@ M.funcs = {
       	    display isn't updated, e.g. in silent Ex mode)
           w$	    last line visible in current window (this is one
       	    less than "w0" if no lines are visible)
-          v	    In Visual mode: the start of the Visual area (the
-      	    cursor is the end).  When not in Visual mode
-      	    returns the cursor position.  Differs from |'<| in
-      	    that it's updated right away.
+          v	    When not in Visual mode, returns the cursor
+      	    position.  In Visual mode, returns the other end
+      	    of the Visual area.  A good way to think about
+      	    this is that in Visual mode "v" and "." complement
+      	    each other.  While "." refers to the cursor
+      	    position, "v" refers to where |v_o| would move the
+      	    cursor.  As a result, you can use "v" and "."
+      	    together to work on all of a selection in
+      	    characterwise visual mode.  If the cursor is at
+      	    the end of a characterwise visual area, "v" refers
+      	    to the start of the same visual area.  And if the
+      	    cursor is at the start of a characterwise visual
+      	    area, "v" refers to the end of the same visual
+      	    area.  "v" differs from |'<| and |'>| in that it's
+      	    updated right away.
       Note that a mark in another file can be used.  The line number
       then applies to another buffer.
       To get the column number use |col()|.  To get both use
@@ -6481,7 +6493,8 @@ M.funcs = {
       	echo printf("Operator-pending mode bit: 0x%x", op_bit)
     ]],
     name = 'maplist',
-    params = {},
+    params = { { 'abbr', '0|1' } },
+    returns = 'table[]',
     signature = 'maplist([{abbr}])',
   },
   mapnew = {
@@ -9142,7 +9155,16 @@ M.funcs = {
       <
     ]=],
     name = 'searchpair',
-    params = {},
+    params = {
+      { 'start', 'any' },
+      { 'middle', 'any' },
+      { 'end', 'any' },
+      { 'flags', 'string' },
+      { 'skip', 'any' },
+      { 'stopline', 'any' },
+      { 'timeout', 'integer' },
+    },
+    returns = 'integer',
     signature = 'searchpair({start}, {middle}, {end} [, {flags} [, {skip} [, {stopline} [, {timeout}]]]])',
   },
   searchpairpos = {
@@ -9159,7 +9181,16 @@ M.funcs = {
       See |match-parens| for a bigger and more useful example.
     ]=],
     name = 'searchpairpos',
-    params = {},
+    params = {
+      { 'start', 'any' },
+      { 'middle', 'any' },
+      { 'end', 'any' },
+      { 'flags', 'string' },
+      { 'skip', 'any' },
+      { 'stopline', 'any' },
+      { 'timeout', 'integer' },
+    },
+    returns = '[integer, integer]',
     signature = 'searchpairpos({start}, {middle}, {end} [, {flags} [, {skip} [, {stopline} [, {timeout}]]]])',
   },
   searchpos = {
