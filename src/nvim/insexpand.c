@@ -1144,11 +1144,13 @@ static void trigger_complete_changed_event(int cur)
 }
 
 /// pumitem qsort compare func
-static int ins_compl_fuzzy_sort(const void *a, const void *b)
+static int ins_compl_fuzzy_cmp(const void *a, const void *b)
 {
   const int sa = (*(pumitem_T *)a).pum_score;
   const int sb = (*(pumitem_T *)b).pum_score;
-  return sa == sb ? 0 : sa < sb ? 1 : -1;
+  const int ia = (*(pumitem_T *)a).pum_idx;
+  const int ib = (*(pumitem_T *)b).pum_idx;
+  return sa == sb ? (ia == ib ? 0 : (ia < ib ? -1 : 1)) : (sa < sb ? 1 : -1);
 }
 
 /// Build a popup menu to show the completion matches.
@@ -1160,6 +1162,7 @@ static int ins_compl_build_pum(void)
   // Need to build the popup menu list.
   compl_match_arraysize = 0;
   compl_T *comp = compl_first_match;
+  compl_T *after_first_compl = NULL;
 
   // If it's user complete function and refresh_always,
   // do not use "compl_leader" as prefix filter.
@@ -1228,6 +1231,9 @@ static int ins_compl_build_pum(void)
         }
         cur = i;
       } else if (compl_fuzzy_match) {
+        if (i == 0) {
+          after_first_compl = comp;
+        }
         // Update the maximum fuzzy score and the shown match
         // if the current item's score is higher
         if (comp->cp_score > max_fuzzy_score) {
@@ -1246,6 +1252,9 @@ static int ins_compl_build_pum(void)
                 || (compl_leader == NULL || lead_len == 0))) {
           shown_match_ok = true;
           cur = 0;
+          if (match_at_original_text(compl_shown_match)) {
+            compl_shown_match = after_first_compl;
+          }
         }
       }
 
@@ -1284,9 +1293,12 @@ static int ins_compl_build_pum(void)
   } while (comp != NULL && !is_first_match(comp));
 
   if (compl_fuzzy_match && compl_leader != NULL && lead_len > 0) {
+    for (i = 0; i < compl_match_arraysize; i++) {
+      compl_match_array[i].pum_idx = i;
+    }
     // sort by the largest score of fuzzy match
     qsort(compl_match_array, (size_t)compl_match_arraysize, sizeof(pumitem_T),
-          ins_compl_fuzzy_sort);
+          ins_compl_fuzzy_cmp);
   }
 
   if (!shown_match_ok) {  // no displayed match at all
@@ -1382,6 +1394,12 @@ bool compl_match_curr_select(int selected)
 
 #define DICT_FIRST      (1)     ///< use just first element in "dict"
 #define DICT_EXACT      (2)     ///< "dict" is the exact name of a file
+
+/// Get current completion leader
+char *ins_compl_leader(void)
+{
+  return compl_leader;
+}
 
 /// Add any identifiers that match the given pattern "pat" in the list of
 /// dictionary files "dict_start" to the list of completions.
