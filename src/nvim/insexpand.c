@@ -1162,7 +1162,6 @@ static int ins_compl_build_pum(void)
   // Need to build the popup menu list.
   compl_match_arraysize = 0;
   compl_T *comp = compl_first_match;
-  compl_T *after_first_compl = NULL;
 
   // If it's user complete function and refresh_always,
   // do not use "compl_leader" as prefix filter.
@@ -1232,7 +1231,7 @@ static int ins_compl_build_pum(void)
         cur = i;
       } else if (compl_fuzzy_match) {
         if (i == 0) {
-          after_first_compl = comp;
+          shown_compl = comp;
         }
         // Update the maximum fuzzy score and the shown match
         // if the current item's score is higher
@@ -1253,7 +1252,7 @@ static int ins_compl_build_pum(void)
           shown_match_ok = true;
           cur = 0;
           if (match_at_original_text(compl_shown_match)) {
-            compl_shown_match = after_first_compl;
+            compl_shown_match = shown_compl;
           }
         }
       }
@@ -3699,16 +3698,16 @@ static int find_next_completion_match(bool allow_get_expansion, int todo, bool a
 
   while (--todo >= 0) {
     if (compl_shows_dir_forward() && compl_shown_match->cp_next != NULL) {
-      compl_shown_match = !compl_fuzzy_match ? compl_shown_match->cp_next
-                                             : find_comp_when_fuzzy();
+      compl_shown_match = compl_fuzzy_match && compl_match_array != NULL
+                          ? find_comp_when_fuzzy() : compl_shown_match->cp_next;
       found_end = (compl_first_match != NULL
                    && (is_first_match(compl_shown_match->cp_next)
                        || is_first_match(compl_shown_match)));
     } else if (compl_shows_dir_backward()
                && compl_shown_match->cp_prev != NULL) {
       found_end = is_first_match(compl_shown_match);
-      compl_shown_match = !compl_fuzzy_match ? compl_shown_match->cp_prev
-                                             : find_comp_when_fuzzy();
+      compl_shown_match = compl_fuzzy_match && compl_match_array != NULL
+                          ? find_comp_when_fuzzy() : compl_shown_match->cp_prev;
       found_end |= is_first_match(compl_shown_match);
     } else {
       if (!allow_get_expansion) {
