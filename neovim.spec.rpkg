@@ -56,6 +56,8 @@ BuildRequires:  fdupes
 BuildRequires:  gettext
 BuildRequires:  gperf
 BuildRequires:  gcc
+Requires:       utf8proc
+BuildRequires:  utf8proc-devel
 BuildRequires:  libluv-devel >= %{luv_min_ver}
 %if %{with luajit}
 # luajit implements version 5.1 of the lua language spec, so it needs the
