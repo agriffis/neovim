@@ -9,7 +9,8 @@ main() {
   ninja -C .deps ${targets}
   rm -rf vendor
   mkdir -p vendor/build
-  cp -a --reflink=always .deps/build/downloads vendor/build
+  mv .deps/build/downloads vendor/build
+  rm -rf .deps
   exit # https://arongriffis.com/2023-11-18-bash-main
 }
 
