@@ -595,11 +595,7 @@ int decor_redraw_col(win_T *wp, int col, int win_col, bool hidden, DecorState *s
       break;
     }
 
-    if (!ns_in_win(mark.ns, wp)) {
-      goto next_mark;
-    }
-
-    if (mt_invalid(mark) || mt_end(mark) || !mt_decor_any(mark)) {
+    if (mt_invalid(mark) || mt_end(mark) || !mt_decor_any(mark) || !ns_in_win(mark.ns, wp)) {
       goto next_mark;
     }
 
@@ -743,8 +739,7 @@ void decor_redraw_signs(win_T *wp, buf_T *buf, int row, SignTextAttrs sattrs[], 
     if (mark.pos.row != row) {
       break;
     }
-    if (!mt_end(mark) && !mt_invalid(mark) && mt_decor_sign(mark)
-        && ns_in_win(mark.ns, wp)) {
+    if (!mt_invalid(mark) && !mt_end(mark) && mt_decor_sign(mark) && ns_in_win(mark.ns, wp)) {
       DecorSignHighlight *sh = decor_find_sign(mt_decor(mark));
       num_text += (sh->text[0] != NUL);
       kv_push(signs, ((SignItem){ sh, mark.id }));
@@ -924,7 +919,7 @@ int decor_virt_lines(win_T *wp, linenr_T lnum, VirtLines *lines, TriState has_fo
   while (true) {
     MTKey mark = marktree_itr_current(itr);
     DecorVirtText *vt = mt_decor_virt(mark);
-    if (ns_in_win(mark.ns, wp)) {
+    if (!mt_invalid(mark) && ns_in_win(mark.ns, wp)) {
       while (vt) {
         if (vt->flags & kVTIsLines) {
           bool above = vt->flags & kVTLinesAbove;
