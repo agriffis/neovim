@@ -773,6 +773,8 @@ get_node({opts})                                   *vim.treesitter.get_node()*
                   filetype)
                 • {ignore_injections} (`boolean?`) Ignore injected languages
                   (default true)
+                • {include_anonymous} (`boolean?`) Include anonymous nodes
+                  (default false)
 
     Return: ~
         (`TSNode?`) Node at the given position
@@ -1365,6 +1367,19 @@ LanguageTree:language_for_range({range})
                                          *LanguageTree:named_node_for_range()*
 LanguageTree:named_node_for_range({range}, {opts})
     Gets the smallest named node that contains {range}.
+
+    Parameters: ~
+      • {range}  (`Range4`) `{ start_line, start_col, end_line, end_col }`
+      • {opts}   (`table?`) A table with the following fields:
+                 • {ignore_injections}? (`boolean`, default: `true`) Ignore
+                   injected languages
+
+    Return: ~
+        (`TSNode?`)
+
+                                               *LanguageTree:node_for_range()*
+LanguageTree:node_for_range({range}, {opts})
+    Gets the smallest node that contains {range}.
 
     Parameters: ~
       • {range}  (`Range4`) `{ start_line, start_col, end_line, end_col }`
