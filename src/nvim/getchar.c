@@ -268,17 +268,12 @@ static void add_buff(buffheader_T *const buf, const char *const s, ptrdiff_t sle
   }
   buf->bh_index = 0;
 
-  size_t len;
   if (buf->bh_space >= (size_t)slen) {
-    len = strlen(buf->bh_curr->b_str);
+    size_t len = strlen(buf->bh_curr->b_str);
     xmemcpyz(buf->bh_curr->b_str + len, s, (size_t)slen);
     buf->bh_space -= (size_t)slen;
   } else {
-    if (slen < MINIMAL_SIZE) {
-      len = MINIMAL_SIZE;
-    } else {
-      len = (size_t)slen;
-    }
+    size_t len = MAX(MINIMAL_SIZE, (size_t)slen);
     buffblock_T *p = xmalloc(offsetof(buffblock_T, b_str) + len + 1);
     buf->bh_space = len - (size_t)slen;
     xmemcpyz(p->b_str, s, (size_t)slen);
@@ -2238,9 +2233,7 @@ static int handle_mapping(int *keylenp, const bool *timedout, int *mapdepth)
           }
         } else {
           // No match; may have to check for termcode at next character.
-          if (max_mlen < mlen) {
-            max_mlen = mlen;
-          }
+          max_mlen = MAX(max_mlen, mlen);
         }
       }
     }
@@ -2342,6 +2335,7 @@ static int handle_mapping(int *keylenp, const bool *timedout, int *mapdepth)
     const bool save_m_silent = mp->m_silent;
     char *save_m_keys = NULL;  // only saved when needed
     char *save_alt_m_keys = NULL;  // only saved when needed
+    const int save_alt_m_keylen = mp->m_alt != NULL ? mp->m_alt->m_keylen : 0;
 
     // Handle ":map <expr>": evaluate the {rhs} as an
     // expression.  Also save and restore the command line
@@ -2354,8 +2348,10 @@ static int handle_mapping(int *keylenp, const bool *timedout, int *mapdepth)
       vgetc_busy = 0;
       may_garbage_collect = false;
 
-      save_m_keys = xstrdup(mp->m_keys);
-      save_alt_m_keys = mp->m_alt != NULL ? xstrdup(mp->m_alt->m_keys) : NULL;
+      save_m_keys = xmemdupz(mp->m_keys, (size_t)mp->m_keylen);
+      save_alt_m_keys = mp->m_alt != NULL
+                        ? xmemdupz(mp->m_alt->m_keys, (size_t)save_alt_m_keylen)
+                        : NULL;
       map_str = eval_map_expr(mp, NUL);
 
       if ((map_str == NULL || *map_str == NUL)) {
@@ -2372,9 +2368,7 @@ static int handle_mapping(int *keylenp, const bool *timedout, int *mapdepth)
           if (State & MODE_CMDLINE) {
             // redraw the command below the error
             msg_didout = true;
-            if (msg_row < cmdline_row) {
-              msg_row = cmdline_row;
-            }
+            msg_row = MAX(msg_row, cmdline_row);
             redrawcmd();
           }
         } else if (State & (MODE_NORMAL | MODE_INSERT)) {
@@ -2410,11 +2404,11 @@ static int handle_mapping(int *keylenp, const bool *timedout, int *mapdepth)
                  ? strncmp(map_str, save_m_keys, (size_t)keylen) == 0
                  || (save_alt_m_keys != NULL
                      && strncmp(map_str, save_alt_m_keys,
-                                strlen(save_alt_m_keys)) == 0)
+                                (size_t)save_alt_m_keylen) == 0)
                  : strncmp(map_str, mp->m_keys, (size_t)keylen) == 0
                  || (mp->m_alt != NULL
                      && strncmp(map_str, mp->m_alt->m_keys,
-                                strlen(mp->m_alt->m_keys)) == 0)) {
+                                (size_t)mp->m_alt->m_keylen) == 0)) {
         noremap = REMAP_SKIP;
       } else {
         noremap = REMAP_YES;
@@ -2738,11 +2732,7 @@ static int vgetorpeek(bool advance)
           // For the cmdline window: Alternate between ESC and
           // CTRL-C: ESC for most situations and CTRL-C to close the
           // cmdline window.
-          if ((State & MODE_CMDLINE) || (cmdwin_type > 0 && tc == ESC)) {
-            c = Ctrl_C;
-          } else {
-            c = ESC;
-          }
+          c = ((State & MODE_CMDLINE) || (cmdwin_type > 0 && tc == ESC)) ? Ctrl_C : ESC;
           tc = c;
 
           // set a flag to indicate this wasn't a normal char
