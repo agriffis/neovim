@@ -2347,9 +2347,9 @@ int do_ecmd(int fnum, char *ffname, char *sfname, exarg_T *eap, linenr_T newlnum
         win_T *the_curwin = curwin;
         buf_T *was_curbuf = curbuf;
 
-        // Set w_closing to avoid that autocommands close the window.
+        // Set w_locked to avoid that autocommands close the window.
         // Set b_locked for the same reason.
-        the_curwin->w_closing = true;
+        the_curwin->w_locked = true;
         buf->b_locked++;
 
         if (curbuf == old_curbuf.br_buf) {
@@ -2365,7 +2365,7 @@ int do_ecmd(int fnum, char *ffname, char *sfname, exarg_T *eap, linenr_T newlnum
 
         // Autocommands may have closed the window.
         if (win_valid(the_curwin)) {
-          the_curwin->w_closing = false;
+          the_curwin->w_locked = false;
         }
         buf->b_locked--;
 
@@ -3085,7 +3085,7 @@ void sub_set_replacement(SubReplacementString sub)
 ///
 /// @returns true if :substitute can be replaced with a join command
 static bool sub_joining_lines(exarg_T *eap, char *pat, size_t patlen, const char *sub,
-                              const char *cmd, bool save)
+                              const char *cmd, bool save, bool keeppatterns)
   FUNC_ATTR_NONNULL_ARG(1, 4, 5)
 {
   // TODO(vim): find a generic solution to make line-joining operations more
@@ -3123,7 +3123,7 @@ static bool sub_joining_lines(exarg_T *eap, char *pat, size_t patlen, const char
     }
 
     if (save) {
-      if ((cmdmod.cmod_flags & CMOD_KEEPPATTERNS) == 0) {
+      if (!keeppatterns) {
         save_re_pat(RE_SUBST, pat, patlen, magic_isset());
       }
       // put pattern in history
@@ -3331,6 +3331,7 @@ static int do_sub(exarg_T *eap, const proftime_T timeout, const int cmdpreview_n
   linenr_T old_line_count = curbuf->b_ml.ml_line_count;
   char *sub_firstline;    // allocated copy of first sub line
   bool endcolumn = false;   // cursor in last column when done
+  const bool keeppatterns = cmdmod.cmod_flags & CMOD_KEEPPATTERNS;
   PreviewLines preview_lines = { KV_INITIAL_VALUE, 0 };
   static int pre_hl_id = 0;
   pos_T old_cursor = curwin->w_cursor;
@@ -3391,7 +3392,7 @@ static int do_sub(exarg_T *eap, const proftime_T timeout, const int cmdpreview_n
     cmd = skip_substitute(cmd, delimiter);
     sub = xstrdup(p);
 
-    if (!eap->skip && cmdpreview_ns <= 0) {
+    if (!eap->skip && !keeppatterns && cmdpreview_ns <= 0) {
       sub_set_replacement((SubReplacementString) {
         .sub = xstrdup(sub),
         .timestamp = os_time(),
@@ -3412,7 +3413,8 @@ static int do_sub(exarg_T *eap, const proftime_T timeout, const int cmdpreview_n
     endcolumn = (curwin->w_curswant == MAXCOL);
   }
 
-  if (sub != NULL && sub_joining_lines(eap, pat, patlen, sub, cmd, cmdpreview_ns <= 0)) {
+  if (sub != NULL && sub_joining_lines(eap, pat, patlen, sub, cmd, cmdpreview_ns <= 0,
+                                       keeppatterns)) {
     xfree(sub);
     return 0;
   }
