@@ -271,10 +271,11 @@ static int parse_osc8(VTermStringFragment frag, int *attr)
 }
 
 static int on_osc(int command, VTermStringFragment frag, void *user)
+  FUNC_ATTR_NONNULL_ALL
 {
   Terminal *term = user;
 
-  if (frag.str == NULL) {
+  if (frag.str == NULL || frag.len == 0) {
     return 0;
   }
 
@@ -781,6 +782,12 @@ static int terminal_execute(VimState *state, int key)
     FALLTHROUGH;
 
   default:
+    if (key == Ctrl_C) {
+      // terminal_enter() always sets `mapped_ctrl_c` to avoid `got_int`. 8eeda7169aa4
+      // But `got_int` may be set elsewhere, e.g. by interrupt() or an autocommand,
+      // so ensure that it is cleared.
+      got_int = false;
+    }
     if (key == Ctrl_BSL && !s->got_bsl) {
       s->got_bsl = true;
       break;
