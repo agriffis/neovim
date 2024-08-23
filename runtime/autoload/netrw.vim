@@ -21,6 +21,8 @@
 "   2024 Jul 30 by Vim Project: handle mark-copy to same target directory (#12112)
 "   2024 Aug 02 by Vim Project: honor g:netrw_alt{o,v} for :{S,H,V}explore (#15417)
 "   2024 Aug 15 by Vim Project: style changes, prevent E121 (#15501)
+"   2024 Aug 22 by Vim Project: fix mf-selection highlight (#15551)
+"   2024 Aug 22 by Vim Project: adjust echo output of mx command (#15550)
 "   }}}
 " Former Maintainer:	Charles E Campbell
 " GetLatestVimScripts: 1075 1 :AutoInstall: netrw.vim
@@ -6824,11 +6826,7 @@ fun! s:NetrwMarkFile(islocal,fname)
 
   let ykeep   = @@
   let curbufnr= bufnr("%")
-  if a:fname =~ '^\a'
-   let leader= '\<'
-  else
-   let leader= ''
-  endif
+  let leader= '\(^\|\s\)\zs'
   if a:fname =~ '\a$'
    let trailer = '\>[@=|\/\*]\=\ze\%(  \|\t\|$\)'
   else
@@ -7437,7 +7435,13 @@ fun! s:NetrwMarkFileExe(islocal,enbloc)
        NetrwKeepj call netrw#ErrorMsg(s:ERROR,"command<".xcmd."> failed, aborting",54)
        break
       else
-       echo ret
+       if ret !=# ''
+        echo "\n"
+        " skip trailing new line
+        echo ret[0:-2]
+       else
+        echo ret
+       endif
       endif
      endfor
 
