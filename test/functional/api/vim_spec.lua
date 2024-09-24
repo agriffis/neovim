@@ -693,7 +693,7 @@ describe('API', function()
         pcall_err(request, 'nvim_call_dict_function', "{ 'f': '' }", 'f', { 1, 2 })
       )
       eq(
-        'dict argument type must be String or Dictionary',
+        'dict argument type must be String or Dict',
         pcall_err(request, 'nvim_call_dict_function', 42, 'f', { 1, 2 })
       )
       eq(
@@ -1358,9 +1358,72 @@ describe('API', function()
         test_paste_repeat_visual_select(true)
       end)
     end)
-    it('vim.paste() failure', function()
-      api.nvim_exec_lua('vim.paste = (function(lines, phase) error("fake fail") end)', {})
-      eq('fake fail', pcall_err(request, 'nvim_paste', 'line 1\nline 2\nline 3', false, 1))
+    local function test_paste_cancel_error(is_error)
+      before_each(function()
+        exec_lua(([[
+          vim.paste = (function(overridden)
+            return function(lines, phase)
+              for i, line in ipairs(lines) do
+                if line == 'CANCEL' then
+                  %s
+                end
+              end
+              return overridden(lines, phase)
+            end
+          end)(vim.paste)
+        ]]):format(is_error and 'error("fake fail")' or 'return false'))
+      end)
+      local function check_paste_cancel_error(data, crlf, phase)
+        if is_error then
+          eq('fake fail', pcall_err(api.nvim_paste, data, crlf, phase))
+        else
+          eq(false, api.nvim_paste(data, crlf, phase))
+        end
+      end
+      it('in phase -1', function()
+        feed('A')
+        check_paste_cancel_error('CANCEL', true, -1)
+        feed('<Esc>')
+        expect('')
+        feed('.')
+        expect('')
+      end)
+      it('in phase 1', function()
+        feed('A')
+        check_paste_cancel_error('CANCEL', true, 1)
+        feed('<Esc>')
+        expect('')
+        feed('.')
+        expect('')
+      end)
+      it('in phase 2', function()
+        feed('A')
+        eq(true, api.nvim_paste('aaa', true, 1))
+        expect('aaa')
+        check_paste_cancel_error('CANCEL', true, 2)
+        feed('<Esc>')
+        expect('aaa')
+        feed('.')
+        expect('aaaaaa')
+      end)
+      it('in phase 3', function()
+        feed('A')
+        eq(true, api.nvim_paste('aaa', true, 1))
+        expect('aaa')
+        eq(true, api.nvim_paste('bbb', true, 2))
+        expect('aaabbb')
+        check_paste_cancel_error('CANCEL', true, 3)
+        feed('<Esc>')
+        expect('aaabbb')
+        feed('.')
+        expect('aaabbbaaabbb')
+      end)
+    end
+    describe('vim.paste() cancel', function()
+      test_paste_cancel_error(false)
+    end)
+    describe('vim.paste() error', function()
+      test_paste_cancel_error(true)
     end)
   end)
 
@@ -1573,7 +1636,7 @@ describe('API', function()
 
     it('nvim_get_vvar, nvim_set_vvar', function()
       eq('Key is read-only: count', pcall_err(request, 'nvim_set_vvar', 'count', 42))
-      eq('Dictionary is locked', pcall_err(request, 'nvim_set_vvar', 'nosuchvar', 42))
+      eq('Dict is locked', pcall_err(request, 'nvim_set_vvar', 'nosuchvar', 42))
       api.nvim_set_vvar('errmsg', 'set by API')
       eq('set by API', api.nvim_get_vvar('errmsg'))
       api.nvim_set_vvar('completed_item', { word = 'a', user_data = vim.empty_dict() })
@@ -2212,7 +2275,7 @@ describe('API', function()
   end)
 
   describe('nvim_load_context', function()
-    it('sets current editor state to given context dictionary', function()
+    it('sets current editor state to given context dict', function()
       local opts = { types = { 'regs', 'jumps', 'bufs', 'gvars' } }
       eq({}, parse_context(api.nvim_get_context(opts)))
 
@@ -2228,7 +2291,7 @@ describe('API', function()
       eq({ 1, 2, 3 }, eval('[g:one, g:Two, g:THREE]'))
     end)
 
-    it('errors when context dictionary is invalid', function()
+    it('errors when context dict is invalid', function()
       eq(
         'E474: Failed to convert list to msgpack string buffer',
         pcall_err(api.nvim_load_context, { regs = { {} }, jumps = { {} } })

@@ -975,6 +975,7 @@ describe('TUI', function()
       {3:-- TERMINAL --}                                    |
     ]])
     feed_data('\027[201~') -- End paste.
+    screen:expect_unchanged()
     feed_data('\027[27u') -- ESC: go to Normal mode.
     wait_for_mode('n')
     screen:expect([[
@@ -1200,6 +1201,7 @@ describe('TUI', function()
     expect_cmdline('"stuff 1 more"')
     -- End the paste sequence.
     feed_data('\027[201~')
+    expect_cmdline('"stuff 1 more"')
     feed_data(' typed')
     expect_cmdline('"stuff 1 more typed"')
   end)
@@ -1243,6 +1245,7 @@ describe('TUI', function()
     feed_data('line 7\nline 8\n')
     -- Stop paste.
     feed_data('\027[201~')
+    screen:expect_unchanged()
     feed_data('\n') -- <CR> to dismiss hit-enter prompt
     expect_child_buf_lines({ 'foo', '' })
     -- Dot-repeat/redo is not modified by failed paste.
@@ -1290,8 +1293,44 @@ describe('TUI', function()
       {}
     )
     feed_data('\027[200~line A\nline B\n\027[201~')
+    expect_child_buf_lines({ '' })
     feed_data('ifoo\n\027[27u')
     expect_child_buf_lines({ 'foo', '' })
+  end)
+
+  it('paste: vim.paste() cancel (retval=false) with streaming #30462', function()
+    child_session:request(
+      'nvim_exec_lua',
+      [[
+        vim.paste = (function(overridden)
+          return function(lines, phase)
+            for i, line in ipairs(lines) do
+              if line:find('!') then
+                return false
+              end
+            end
+            return overridden(lines, phase)
+          end
+        end)(vim.paste)
+      ]],
+      {}
+    )
+    feed_data('A')
+    wait_for_mode('i')
+    feed_data('\027[200~aaa')
+    expect_child_buf_lines({ 'aaa' })
+    feed_data('bbb')
+    expect_child_buf_lines({ 'aaabbb' })
+    feed_data('ccc!') -- This chunk is cancelled.
+    expect_child_buf_lines({ 'aaabbb' })
+    feed_data('ddd\027[201~') -- This chunk is ignored.
+    expect_child_buf_lines({ 'aaabbb' })
+    feed_data('\027[27u')
+    wait_for_mode('n')
+    feed_data('.') -- Dot-repeat only includes chunks actually pasted.
+    expect_child_buf_lines({ 'aaabbbaaabbb' })
+    feed_data('$\027[200~eee\027[201~') -- A following paste works normally.
+    expect_child_buf_lines({ 'aaabbbaaabbbeee' })
   end)
 
   it("paste: 'nomodifiable' buffer", function()
@@ -1412,7 +1451,6 @@ describe('TUI', function()
     feed_data('\n')
     -- Send the "stop paste" sequence.
     feed_data('\027[201~')
-
     screen:expect([[
                                                         |
       pasted from terminal (1)                          |
