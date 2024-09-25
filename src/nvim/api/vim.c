@@ -344,9 +344,10 @@ void nvim_feedkeys(String keys, String mode, Boolean escape_ks)
   }
 }
 
-/// Queues raw user-input. Unlike |nvim_feedkeys()|, this uses a low-level
-/// input buffer and the call is non-blocking (input is processed
-/// asynchronously by the eventloop).
+/// Queues raw user-input. Unlike |nvim_feedkeys()|, this uses a low-level input buffer and the call
+/// is non-blocking (input is processed asynchronously by the eventloop).
+///
+/// To input blocks of text, |nvim_paste()| is much faster and should be preferred.
 ///
 /// On execution error: does not fail, but updates v:errmsg.
 ///
@@ -1212,17 +1213,30 @@ void nvim_set_current_tabpage(Tabpage tabpage, Error *err)
   }
 }
 
-/// Pastes at cursor, in any mode.
+/// Pastes at cursor (in any mode), and sets "redo" so dot (|.|) will repeat the input. UIs call
+/// this to implement "paste", but it's also intended for use by scripts to input large,
+/// dot-repeatable blocks of text (as opposed to |nvim_input()| which is subject to mappings/events
+/// and is thus much slower).
 ///
-/// Invokes the `vim.paste` handler, which handles each mode appropriately.
-/// Sets redo/undo. Faster than |nvim_input()|. Lines break at LF ("\n").
+/// Invokes the |vim.paste()| handler, which handles each mode appropriately.
 ///
-/// Errors ('nomodifiable', `vim.paste()` failure, …) are reflected in `err`
-/// but do not affect the return value (which is strictly decided by
-/// `vim.paste()`).  On error or cancel, subsequent calls are ignored
-/// ("drained") until the next paste is initiated (phase 1 or -1).
+/// Errors ('nomodifiable', `vim.paste()` failure, …) are reflected in `err` but do not affect the
+/// return value (which is strictly decided by `vim.paste()`).  On error or cancel, subsequent calls
+/// are ignored ("drained") until the next paste is initiated (phase 1 or -1).
 ///
-/// @param data  Multiline input. May be binary (containing NUL bytes).
+/// Useful in mappings and scripts to insert multiline text. Example:
+///
+/// ```vim
+/// vim.keymap.set('n', 'x', function()
+///   vim.api.nvim_paste([[
+///     line1
+///     line2
+///     line3
+///   ]], false, -1)
+/// end, { buffer = true })
+/// ```
+///
+/// @param data  Multiline input. Lines break at LF ("\n"). May be binary (containing NUL bytes).
 /// @param crlf  Also break lines at CR and CRLF.
 /// @param phase  -1: paste in a single call (i.e. without streaming).
 ///               To "stream" a paste, call `nvim_paste` sequentially with
@@ -1234,7 +1248,8 @@ void nvim_set_current_tabpage(Tabpage tabpage, Error *err)
 /// @return
 ///     - true: Client may continue pasting.
 ///     - false: Client should cancel the paste.
-Boolean nvim_paste(String data, Boolean crlf, Integer phase, Arena *arena, Error *err)
+Boolean nvim_paste(uint64_t channel_id, String data, Boolean crlf, Integer phase, Arena *arena,
+                   Error *err)
   FUNC_API_SINCE(6)
   FUNC_API_TEXTLOCK_ALLOW_CMDWIN
 {
@@ -1259,13 +1274,13 @@ Boolean nvim_paste(String data, Boolean crlf, Integer phase, Arena *arena, Error
     cancelled = true;
   }
   if (!cancelled && (phase == -1 || phase == 1)) {
-    paste_store(kFalse, NULL_STRING, crlf);
+    paste_store(channel_id, kFalse, NULL_STRING, crlf);
   }
   if (!cancelled) {
-    paste_store(kNone, data, crlf);
+    paste_store(channel_id, kNone, data, crlf);
   }
   if (phase == 3 || phase == (cancelled ? 2 : -1)) {
-    paste_store(kTrue, NULL_STRING, crlf);
+    paste_store(channel_id, kTrue, NULL_STRING, crlf);
   }
 theend:
   ;
@@ -1276,7 +1291,7 @@ theend:
   return retval;
 }
 
-/// Puts text at cursor, in any mode.
+/// Puts text at cursor, in any mode. For dot-repeatable input, use |nvim_paste()|.
 ///
 /// Compare |:put| and |p| which are always linewise.
 ///
