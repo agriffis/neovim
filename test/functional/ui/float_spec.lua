@@ -2562,6 +2562,37 @@ describe('float window', function()
       end
       eq({{"🦄", ""}, {"BB", {"B0", "B1", ""}}}, api.nvim_win_get_config(win).title)
       eq({{"🦄", ""}, {"BB", {"B0", "B1", ""}}}, api.nvim_win_get_config(win).footer)
+
+      -- making it a split should not leak memory
+      api.nvim_win_set_config(win, { vertical = true })
+      if multigrid then
+        screen:expect{grid=[[
+        ## grid 1
+          [4:--------------------]{5:│}[2:-------------------]|*5
+          {5:[No Name] [+]        }{4:[No Name]          }|
+          [3:----------------------------------------]|
+        ## grid 2
+          ^                   |
+          {0:~                  }|*4
+        ## grid 3
+                                                  |
+        ## grid 4
+           halloj!            |
+           BORDAA             |
+          {0:~                   }|*3
+        ]], win_viewport={
+          [2] = {win = 1000, topline = 0, botline = 2, curline = 0, curcol = 0, linecount = 1, sum_scroll_delta = 0};
+          [4] = {win = 1001, topline = 0, botline = 3, curline = 0, curcol = 0, linecount = 2, sum_scroll_delta = 0};
+        }}
+      else
+        screen:expect{grid=[[
+           halloj!            {5:│}^                   |
+           BORDAA             {5:│}{0:~                  }|
+          {0:~                   }{5:│}{0:~                  }|*3
+          {5:[No Name] [+]        }{4:[No Name]          }|
+                                                  |
+        ]]}
+      end
     end)
 
     it('terminates border on edge of viewport when window extends past viewport', function()
@@ -9068,6 +9099,7 @@ describe('float window', function()
     end)
 
     it('float window with hide option', function()
+      local cwin = api.nvim_get_current_win()
       local buf = api.nvim_create_buf(false,false)
       local win = api.nvim_open_win(buf, false, {relative='editor', width=10, height=2, row=2, col=5, hide = true})
       local expected_pos = {
@@ -9147,6 +9179,22 @@ describe('float window', function()
                                                   |
         ]])
       end
+      -- check window jump with hide
+      feed('<C-W><C-W>')
+      -- should keep on current window
+      eq(cwin, api.nvim_get_current_win())
+      api.nvim_win_set_config(win, {hide=false})
+      api.nvim_set_current_win(win)
+      local win3 = api.nvim_open_win(buf, true, {relative='editor', width=4, height=4, row=2, col=5, hide = false})
+      api.nvim_win_set_config(win, {hide=true})
+      feed('<C-W>w')
+      -- should goto the first window with prev
+      eq(cwin, api.nvim_get_current_win())
+      -- windo
+      command('windo set winheight=6')
+      eq(win3, api.nvim_get_current_win())
+      eq(6, api.nvim_win_get_height(win3))
+      eq(2, api.nvim_win_get_height(win))
     end)
 
     it(':fclose command #9663', function()

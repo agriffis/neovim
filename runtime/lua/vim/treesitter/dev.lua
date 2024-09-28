@@ -76,9 +76,14 @@ end
 ---
 ---@package
 function TSTreeView:new(bufnr, lang)
-  local parser = vim.treesitter._get_parser(bufnr or 0, lang)
+  local parser = vim.treesitter.get_parser(bufnr or 0, lang, { error = false })
   if not parser then
-    return nil, 'No parser available for the given buffer.'
+    return nil,
+      string.format(
+        'Failed to create TSTreeView for buffer %s: no parser for lang "%s"',
+        bufnr,
+        lang
+      )
   end
 
   -- For each child tree (injected language), find the root of the tree and locate the node within
@@ -153,7 +158,7 @@ end
 
 ---@param w integer
 ---@param b integer
-local function set_dev_properties(w, b)
+local function set_dev_options(w, b)
   vim.wo[w].scrolloff = 5
   vim.wo[w].wrap = false
   vim.wo[w].foldmethod = 'expr'
@@ -164,6 +169,7 @@ local function set_dev_properties(w, b)
   vim.bo[b].buftype = 'nofile'
   vim.bo[b].bufhidden = 'wipe'
   vim.bo[b].filetype = 'query'
+  vim.bo[b].swapfile = false
 end
 
 --- Updates the cursor position in the inspector to match the node under the cursor.
@@ -354,7 +360,7 @@ function M.inspect_tree(opts)
   vim.b[buf].dev_inspect = w
   vim.b[b].dev_base = win -- base window handle
   vim.b[b].disable_query_linter = true
-  set_dev_properties(w, b)
+  set_dev_options(w, b)
 
   local title --- @type string?
   local opts_title = opts.title
@@ -538,7 +544,7 @@ local edit_ns = api.nvim_create_namespace('treesitter/dev-edit')
 local function update_editor_highlights(query_win, base_win, lang)
   local base_buf = api.nvim_win_get_buf(base_win)
   local query_buf = api.nvim_win_get_buf(query_win)
-  local parser = assert(vim.treesitter._get_parser(base_buf, lang))
+  local parser = assert(vim.treesitter.get_parser(base_buf, lang, { error = false }))
   api.nvim_buf_clear_namespace(base_buf, edit_ns, 0, -1)
   local query_content = table.concat(api.nvim_buf_get_lines(query_buf, 0, -1, false), '\n')
 
@@ -595,9 +601,10 @@ function M.edit_query(lang)
   end
   vim.cmd(cmd)
 
-  local parser = vim.treesitter._get_parser(buf, lang)
+  local parser = vim.treesitter.get_parser(buf, lang, { error = false })
   if not parser then
-    return nil, 'No parser available for the given buffer'
+    return nil,
+      string.format('Failed to show query editor for buffer %s: no parser for lang "%s"', buf, lang)
   end
   lang = parser:lang()
 
@@ -606,7 +613,7 @@ function M.edit_query(lang)
 
   vim.b[buf].dev_edit = query_win
   vim.bo[query_buf].omnifunc = 'v:lua.vim.treesitter.query.omnifunc'
-  set_dev_properties(query_win, query_buf)
+  set_dev_options(query_win, query_buf)
 
   -- Note that omnifunc guesses the language based on the containing folder,
   -- so we add the parser's language to the buffer's name so that omnifunc
