@@ -350,7 +350,13 @@ describe('mbyte', function()
 
   describe('utf_fold', function()
     itp('does not crash with surrogates #30527', function()
-      eq(0xDDFB, lib.utf_fold(0xDDFB))
+      eq(0xddfb, lib.utf_fold(0xddfb)) -- low surrogate, invalid as a character
+      eq(0xd800, lib.utf_fold(0xd800)) -- high surrogate, invalid as a character
+    end)
+
+    itp("doesn't crash on invalid codepoints", function()
+      eq(9000000, lib.utf_fold(9000000))
+      eq(0, lib.utf_fold(0))
     end)
   end)
 end)

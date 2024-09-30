@@ -95,7 +95,7 @@ function M.get_parser(bufnr, lang, opts)
   end
 
   if not valid_lang(lang) then
-    lang = M.language.get_lang(vim.bo[bufnr].filetype) or vim.bo[bufnr].filetype
+    lang = M.language.get_lang(vim.bo[bufnr].filetype)
   end
 
   if not valid_lang(lang) then
@@ -261,7 +261,7 @@ end
 ---@param row integer Position row
 ---@param col integer Position column
 ---
----@return {capture: string, lang: string, metadata: table}[]
+---@return {capture: string, lang: string, metadata: vim.treesitter.query.TSMetadata}[]
 function M.get_captures_at_pos(bufnr, row, col)
   if bufnr == 0 then
     bufnr = api.nvim_get_current_buf()

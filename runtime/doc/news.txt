@@ -97,6 +97,12 @@ TREESITTER
   capture IDs to a list of nodes that need to be iterated over. For
   backwards compatibility, an option `all=false` (only return the last
   matching node) is provided that will be removed in a future release.
+• |vim.treesitter.language.get_filetypes()| always includes the {language}
+  argument in addition to explicitly registered filetypes.
+• |vim.treesitter.language.get_lang()| falls back to the {filetype} argument
+  if no languages are explicitly registered.
+• |vim.treesitter.language.add()| returns `true` if a parser was loaded
+  successfully and `nil,errmsg` otherwise instead of throwing an error.
 
 TUI
 
@@ -223,7 +229,7 @@ CHANGED FEATURES                                                 *news-changed*
 
 These existing features changed their behavior.
 
-• 'scrollbind' now works properly with buffers that contain virutal lines.
+• 'scrollbind' now works properly with buffers that contain virtual lines.
 
   Scrollbind works by aligning to a target top line of each window in a tab
   page. Previously this was done by calculating the difference between the old
