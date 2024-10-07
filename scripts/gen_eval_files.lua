@@ -199,14 +199,6 @@ local function process_params(params)
   return params
 end
 
---- @class vim.gen_vim_doc_fun
---- @field signature string
---- @field doc string[]
---- @field parameters_doc table<string,string>
---- @field return string[]
---- @field seealso string[]
---- @field annotations string[]
-
 --- @return table<string, vim.EvalFn>
 local function get_api_meta()
   local ret = {} --- @type table<string, vim.EvalFn>
@@ -290,8 +282,19 @@ end
 --- Ensure code blocks have one empty line before the start fence and after the closing fence.
 ---
 --- @param x string
+--- @param special string?
+---                | 'see-api-meta' Normalize `@see` for API meta docstrings.
 --- @return string
-local function norm_text(x)
+local function norm_text(x, special)
+  if special == 'see-api-meta' then
+    -- Try to guess a symbol that actually works in @see.
+    -- "nvim_xx()" => "vim.api.nvim_xx"
+    x = x:gsub([=[%|?(nvim_[^.()| ]+)%(?%)?%|?]=], 'vim.api.%1')
+    -- TODO: Remove backticks when LuaLS resolves: https://github.com/LuaLS/lua-language-server/issues/2889
+    -- "|foo|" => "`:help foo`"
+    x = x:gsub([=[|([^ ]+)|]=], '`:help %1`')
+  end
+
   return (
     x:gsub('|([^ ]+)|', '`%1`')
       :gsub('\n*>lua', '\n\n```lua')
@@ -321,30 +324,18 @@ local function render_api_meta(_f, fun, write)
 
   local desc = fun.desc
   if desc then
-    desc = util.md_to_vimdoc(desc, 0, 0, 74)
-    for _, l in ipairs(split(norm_text(desc))) do
-      write('--- ' .. l)
-    end
+    write(util.prefix_lines('--- ', norm_text(desc)))
   end
 
   -- LuaLS doesn't support @note. Render @note items as a markdown list.
   if fun.notes and #fun.notes > 0 then
     write('--- Note:')
-    for _, note in ipairs(fun.notes) do
-      -- XXX: abuse md_to_vimdoc() to force-fit the markdown list. Need norm_md()?
-      note = util.md_to_vimdoc(' - ' .. note, 0, 0, 74)
-      for _, l in ipairs(split(vim.trim(norm_text(note)))) do
-        write('--- ' .. l:gsub('\n*$', ''))
-      end
-    end
+    write(util.prefix_lines('--- ', table.concat(fun.notes, '\n')))
     write('---')
   end
 
   for _, see in ipairs(fun.see or {}) do
-    see = util.md_to_vimdoc('@see ' .. see, 0, 0, 74)
-    for _, l in ipairs(split(vim.trim(norm_text(see)))) do
-      write('--- ' .. l:gsub([[\s*$]], ''))
-    end
+    write(util.prefix_lines('--- @see ', norm_text(see, 'see-api-meta')))
   end
 
   local param_names = {} --- @type string[]
@@ -354,8 +345,6 @@ local function render_api_meta(_f, fun, write)
     local pdesc = p[3]
     if pdesc then
       local s = '--- @param ' .. p[1] .. ' ' .. p[2] .. ' '
-      local indent = #('@param ' .. p[1] .. ' ')
-      pdesc = util.md_to_vimdoc(pdesc, #s, indent, 74, true)
       local pdesc_a = split(vim.trim(norm_text(pdesc)))
       write(s .. pdesc_a[1])
       for i = 2, #pdesc_a do
@@ -372,7 +361,7 @@ local function render_api_meta(_f, fun, write)
   if fun.returns ~= '' then
     local ret_desc = fun.returns_desc and ' # ' .. fun.returns_desc or ''
     local ret = LUA_API_RETURN_OVERRIDES[fun.name] or fun.returns
-    write(util.prefix('--- ', '@return ' .. ret .. ret_desc))
+    write(util.prefix_lines('--- ', '@return ' .. ret .. ret_desc))
   end
   local param_str = table.concat(param_names, ', ')
 
