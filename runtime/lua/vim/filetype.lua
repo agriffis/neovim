@@ -1611,6 +1611,7 @@ local filename = {
   ['ldaprc'] = 'ldapconf',
   ['.ldaprc'] = 'ldapconf',
   ['ldap.conf'] = 'ldapconf',
+  ['lfrc'] = 'lf',
   ['lftp.conf'] = 'lftp',
   ['.lftprc'] = 'lftp',
   ['/.libao'] = 'libao',
@@ -2263,6 +2264,7 @@ local pattern = {
     ['^%.?neomuttrc'] = detect_neomuttrc,
     ['/%.neomutt/neomuttrc'] = detect_neomuttrc,
     ['^Neomuttrc'] = detect_neomuttrc,
+    ['%.neomuttdebug'] = 'neomuttlog',
   },
   ['^%.'] = {
     ['^%.cshrc'] = detect.csh,
