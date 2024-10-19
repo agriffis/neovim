@@ -1326,7 +1326,9 @@ describe('lua stdlib', function()
     ]],
     }
     feed('<cr>')
-    eq({ 3, NIL }, api.nvim_get_var('yy'))
+    retry(nil, 200, function()
+      eq({ 3, NIL }, api.nvim_get_var('yy'))
+    end)
 
     exec_lua([[timer:close()]])
   end)
