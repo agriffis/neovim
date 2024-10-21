@@ -50,6 +50,79 @@ local function request_with_opts(name, params, opts)
   request(name, params, req_handler)
 end
 
+---@param method string
+---@param opts? vim.lsp.LocationOpts
+local function get_locations(method, opts)
+  opts = opts or {}
+  local bufnr = api.nvim_get_current_buf()
+  local clients = vim.lsp.get_clients({ method = method, bufnr = bufnr })
+  if not next(clients) then
+    vim.notify(vim.lsp._unsupported_method(method), vim.log.levels.WARN)
+    return
+  end
+  local win = api.nvim_get_current_win()
+  local remaining = #clients
+
+  ---@type vim.quickfix.entry[]
+  local all_items = {}
+
+  ---@param result nil|lsp.Location|lsp.Location[]
+  ---@param client vim.lsp.Client
+  local function on_response(_, result, client)
+    local locations = {}
+    if result then
+      locations = vim.islist(result) and result or { result }
+    end
+    local items = util.locations_to_items(locations, client.offset_encoding)
+    vim.list_extend(all_items, items)
+    remaining = remaining - 1
+    if remaining == 0 then
+      if vim.tbl_isempty(all_items) then
+        vim.notify('No locations found', vim.log.levels.INFO)
+        return
+      end
+
+      local title = 'LSP locations'
+      if opts.on_list then
+        assert(vim.is_callable(opts.on_list), 'on_list is not a function')
+        opts.on_list({
+          title = title,
+          items = all_items,
+          context = { bufnr = bufnr, method = method },
+        })
+        return
+      end
+
+      if #all_items == 1 then
+        local item = all_items[1]
+        local b = item.bufnr or vim.fn.bufadd(item.filename)
+        vim.bo[b].buflisted = true
+        local w = opts.reuse_win and vim.fn.win_findbuf(b)[1] or win
+        api.nvim_win_set_buf(w, b)
+        api.nvim_win_set_cursor(w, { item.lnum, item.col - 1 })
+        vim._with({ win = w }, function()
+          -- Open folds under the cursor
+          vim.cmd('normal! zv')
+        end)
+        return
+      end
+      if opts.loclist then
+        vim.fn.setloclist(0, {}, ' ', { title = title, items = all_items })
+        vim.cmd.lopen()
+      else
+        vim.fn.setqflist({}, ' ', { title = title, items = all_items })
+        vim.cmd('botright copen')
+      end
+    end
+  end
+  for _, client in ipairs(clients) do
+    local params = util.make_position_params(win, client.offset_encoding)
+    client.request(method, params, function(_, result)
+      on_response(_, result, client)
+    end)
+  end
+end
+
 --- @class vim.lsp.ListOpts
 ---
 --- list-handler replacing the default handler.
@@ -87,30 +160,26 @@ end
 --- @note Many servers do not implement this method. Generally, see |vim.lsp.buf.definition()| instead.
 --- @param opts? vim.lsp.LocationOpts
 function M.declaration(opts)
-  local params = util.make_position_params()
-  request_with_opts(ms.textDocument_declaration, params, opts)
+  get_locations(ms.textDocument_declaration, opts)
 end
 
 --- Jumps to the definition of the symbol under the cursor.
 --- @param opts? vim.lsp.LocationOpts
 function M.definition(opts)
-  local params = util.make_position_params()
-  request_with_opts(ms.textDocument_definition, params, opts)
+  get_locations(ms.textDocument_definition, opts)
 end
 
 --- Jumps to the definition of the type of the symbol under the cursor.
 --- @param opts? vim.lsp.LocationOpts
 function M.type_definition(opts)
-  local params = util.make_position_params()
-  request_with_opts(ms.textDocument_typeDefinition, params, opts)
+  get_locations(ms.textDocument_typeDefinition, opts)
 end
 
 --- Lists all the implementations for the symbol under the cursor in the
 --- quickfix window.
 --- @param opts? vim.lsp.LocationOpts
 function M.implementation(opts)
-  local params = util.make_position_params()
-  request_with_opts(ms.textDocument_implementation, params, opts)
+  get_locations(ms.textDocument_implementation, opts)
 end
 
 --- Displays signature information about the symbol under the cursor in a
@@ -438,11 +507,59 @@ end
 ---@param opts? vim.lsp.ListOpts
 function M.references(context, opts)
   validate('context', context, 'table', true)
-  local params = util.make_position_params()
-  params.context = context or {
-    includeDeclaration = true,
-  }
-  request_with_opts(ms.textDocument_references, params, opts)
+  local bufnr = api.nvim_get_current_buf()
+  local clients = vim.lsp.get_clients({ method = ms.textDocument_references, bufnr = bufnr })
+  if not next(clients) then
+    return
+  end
+  local win = api.nvim_get_current_win()
+  opts = opts or {}
+
+  local all_items = {}
+  local title = 'References'
+
+  local function on_done()
+    if not next(all_items) then
+      vim.notify('No references found')
+    else
+      local list = {
+        title = title,
+        items = all_items,
+        context = {
+          method = ms.textDocument_references,
+          bufnr = bufnr,
+        },
+      }
+      if opts.loclist then
+        vim.fn.setloclist(0, {}, ' ', list)
+        vim.cmd.lopen()
+      elseif opts.on_list then
+        assert(vim.is_callable(opts.on_list), 'on_list is not a function')
+        opts.on_list(list)
+      else
+        vim.fn.setqflist({}, ' ', list)
+        vim.cmd('botright copen')
+      end
+    end
+  end
+
+  local remaining = #clients
+  for _, client in ipairs(clients) do
+    local params = util.make_position_params(win, client.offset_encoding)
+
+    ---@diagnostic disable-next-line: inject-field
+    params.context = context or {
+      includeDeclaration = true,
+    }
+    client.request(ms.textDocument_references, params, function(_, result)
+      local items = util.locations_to_items(result or {}, client.offset_encoding)
+      vim.list_extend(all_items, items)
+      remaining = remaining - 1
+      if remaining == 0 then
+        on_done()
+      end
+    end)
+  end
 end
 
 --- Lists all symbols in the current buffer in the quickfix window.

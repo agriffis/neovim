@@ -464,7 +464,7 @@ Use |:Inspect| to view the highlights for a specific token. Use |:hi| or
     hi @lsp.mod.deprecated gui=strikethrough  " deprecated is crossed out
     hi @lsp.typemod.function.async guifg=Blue " async functions are blue
 <
-The value |vim.highlight.priorities|`.semantic_tokens` is the priority of the
+The value |vim.hl.priorities|`.semantic_tokens` is the priority of the
 `@lsp.type.*` highlights. The `@lsp.mod.*` and `@lsp.typemod.*` highlights
 have priorities one and two higher, respectively.
 
@@ -1780,8 +1780,8 @@ highlight_token({token}, {bufnr}, {client_id}, {hl_group}, {opts})
       • {hl_group}   (`string`) Highlight group name
       • {opts}       (`table?`) Optional parameters:
                      • {priority}? (`integer`, default:
-                       `vim.highlight.priorities.semantic_tokens + 3`)
-                       Priority for the applied extmark.
+                       `vim.hl.priorities.semantic_tokens + 3`) Priority for
+                       the applied extmark.
 
 start({bufnr}, {client_id}, {opts})          *vim.lsp.semantic_tokens.start()*
     Start the semantic token highlighting engine for the given buffer with the
@@ -2026,19 +2026,6 @@ get_effective_tabstop({bufnr})          *vim.lsp.util.get_effective_tabstop()*
 
     See also: ~
       • 'shiftwidth'
-
-                                             *vim.lsp.util.jump_to_location()*
-jump_to_location({location}, {offset_encoding}, {reuse_win})
-    Jumps to a location.
-
-    Parameters: ~
-      • {location}         (`lsp.Location|lsp.LocationLink`)
-      • {offset_encoding}  (`'utf-8'|'utf-16'|'utf-32'?`)
-      • {reuse_win}        (`boolean?`) Jump to existing window if buffer is
-                           already open.
-
-    Return: ~
-        (`boolean`) `true` if the jump succeeded
 
                                            *vim.lsp.util.locations_to_items()*
 locations_to_items({locations}, {offset_encoding})
