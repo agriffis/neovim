@@ -25,7 +25,7 @@ endwhile
 call extend(global_locals, #{
       \ scrolloff: -1,
       \ sidescrolloff: -1,
-      \ undolevels: -12345,
+      \ undolevels: -123456,
       \})
 
 " Get local-noglobal options.
@@ -63,7 +63,8 @@ let skip_setglobal_reasons = #{
       \ winhighlight:	'TODO(nvim): fix missing error handling for setglobal',
       \}
 
-" The terminal size is restored at the end.
+" Script header.
+" The test values contains multibyte characters.
 let script = [
       \ '" DO NOT EDIT: Generated with gen_opt_test.vim',
       \ '" Used by test_options_all.vim.',
@@ -84,14 +85,19 @@ let test_values = {
       "\ Nvim-only options
       \ 'channel': [[], []],
       \ 'inccommand': [['', 'nosplit', 'split'], ['xxx']],
-      \ 'mousescroll': [['ver:1', 'hor:2', 'ver:1,hor:2', 'hor:1,ver:2'], ['xxx']],
+      \ 'mousescroll': [['ver:1', 'hor:2', 'ver:1,hor:2', 'hor:1,ver:2'],
+      \		['xxx', 'ver:1,xxx', 'hor:2,xxx']],
       \ 'redrawdebug': [[''], ['xxx']],
       \ 'shada': [['', '''50', '"30'], ['xxx']],
-      \ 'termpastefilter': [['BS', 'HT', 'FF', 'ESC', 'DEL', 'C0', 'C1', 'C0,C1'], ['xxx']],
-      \ 'winhighlight': [['', 'Visual:Search'], ['xxx']],
+      \ 'termpastefilter': [['BS', 'HT', 'FF', 'ESC', 'DEL', 'C0', 'C1', 'C0,C1'],
+      \		['xxx', 'C0,C1,xxx']],
+      \ 'winhighlight': [['', 'a:b', 'a:', 'a:b,c:d'],
+      \		['a', ':', ':b', 'a:b:c', 'a:/', '/:b', ',', 'a:b,,', 'a:b,c']],
       \
       "\ Options for which Nvim has different allowed values
-      \ 'backspace': [[2, '', 'eol', 'eol,start', 'indent,eol,nostop'], ['4', 'xxx']],
+      \ 'backspace': [[2, '', 'indent', 'eol', 'start', 'nostop',
+      \		'eol,start', 'indent,eol,nostop'],
+      \		[-1, 4, 'xxx']],
       \ 'buftype': [['', 'nofile', 'nowrite', 'acwrite', 'quickfix', 'help',
       \		'prompt'],
       \		['xxx', 'help,nofile']],
@@ -105,7 +111,7 @@ let test_values = {
       \ 'highlight': [[&highlight], []],
       \ 'iminsert': [[0, 1], [-1, 2, 3, 999]],
       \ 'imsearch': [[-1, 0, 1], [-2, 2, 3, 999]],
-      \ 'signcolumn': [['auto', 'no'], ['xxx', 'no,yes']],
+      \ 'signcolumn': [['auto', 'no', 'yes', 'number'], ['', 'xxx', 'no,yes']],
       \ 'writedelay': [[0, 100], [-1, '']],
       \
       "\ boolean options
@@ -448,8 +454,9 @@ for option in options
       endfor
       " Testing to clear the local value and switch back to the global value.
       if global_locals->has_key(fullname)
-	let swichback_val = global_locals[fullname]
-	call add(script, $'setlocal {opt}={swichback_val}')
+	let switchback_val = global_locals[fullname]
+	call add(script, $'setlocal {opt}={switchback_val}')
+	call add(script, $'call assert_equal(&g:{fullname}, &{fullname})')
       endif
     endfor
 
@@ -511,4 +518,4 @@ endif
 
 qa!
 
-" vim:sw=2:ts=8:noet:nolist:nosta:
+" vim:sw=2:ts=8:noet:nosta:
