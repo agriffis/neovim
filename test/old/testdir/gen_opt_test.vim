@@ -45,22 +45,6 @@ endwhile
 let skip_setglobal_reasons = #{
       \ iminsert: 'The global value is always overwritten by the local value',
       \ imsearch: 'The global value is always overwritten by the local value',
-      \ breakindentopt:	'TODO: fix missing error handling for setglobal',
-      \ colorcolumn:	'TODO: fix missing error handling for setglobal',
-      \ conceallevel:	'TODO: fix missing error handling for setglobal',
-      \ foldcolumn:	'TODO: fix missing error handling for setglobal',
-      \ foldmethod:	'TODO: fix `setglobal fdm=` not given an error',
-      \ iskeyword:	'TODO: fix missing error handling for setglobal',
-      \ numberwidth:	'TODO: fix missing error handling for setglobal',
-      \ scrolloff:	'TODO: fix missing error handling for setglobal',
-      \ shiftwidth:	'TODO: fix missing error handling for setglobal',
-      \ sidescrolloff:	'TODO: fix missing error handling for setglobal',
-      \ signcolumn:	'TODO(nvim): fix missing error handling for setglobal',
-      \ tabstop:	'TODO: fix missing error handling for setglobal',
-      \ termwinkey:	'TODO: fix missing error handling for setglobal',
-      \ termwinsize:	'TODO: fix missing error handling for setglobal',
-      \ textwidth:	'TODO: fix missing error handling for setglobal',
-      \ winhighlight:	'TODO(nvim): fix missing error handling for setglobal',
       \}
 
 " Script header.
@@ -106,12 +90,13 @@ let test_values = {
       \		'noinsert', 'noselect', 'fuzzy', 'menu,longest'],
       \		['xxx', 'menu,,,longest,']],
       \ 'encoding': [['utf8'], []],
-      \ 'foldcolumn': [[0, 1, 4], [-1, 13, 999]],
+      \ 'foldcolumn': [[0, 1, 4, 'auto', 'auto:1', 'auto:9'], [-1, 13, 999]],
       \ 'foldlevel': [[0, 100], [-1, '']],
       \ 'highlight': [[&highlight], []],
       \ 'iminsert': [[0, 1], [-1, 2, 3, 999]],
       \ 'imsearch': [[-1, 0, 1], [-2, 2, 3, 999]],
-      \ 'signcolumn': [['auto', 'no', 'yes', 'number'], ['', 'xxx', 'no,yes']],
+      \ 'signcolumn': [['auto', 'no', 'yes', 'number', 'yes:1', 'auto:1-9'],
+      \		['', 'xxx', 'no,yes', 'auto:0-9', 'auto:9-1', 'auto:1-@']],
       \ 'writedelay': [[0, 100], [-1, '']],
       \
       "\ boolean options
