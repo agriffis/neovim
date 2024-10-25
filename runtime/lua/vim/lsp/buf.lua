@@ -1,4 +1,5 @@
 local api = vim.api
+local lsp = vim.lsp
 local validate = vim.validate
 local util = require('vim.lsp.util')
 local npcall = vim.F.npcall
@@ -6,24 +7,17 @@ local ms = require('vim.lsp.protocol').Methods
 
 local M = {}
 
---- Sends an async request to all active clients attached to the current
---- buffer.
----
----@param method (string) LSP method name
----@param params (table|nil) Parameters to send to the server
----@param handler lsp.Handler? See |lsp-handler|. Follows |lsp-handler-resolution|
----
----@return table<integer, integer> client_request_ids Map of client-id:request-id pairs
----for all successful requests.
----@return function _cancel_all_requests Function which can be used to
----cancel all the requests. You could instead
----iterate all clients and call their `cancel_request()` methods.
----
----@see |vim.lsp.buf_request()|
-local function request(method, params, handler)
-  validate('method', method, 'string')
-  validate('handler', handler, 'function', true)
-  return vim.lsp.buf_request(0, method, params, handler)
+--- @param params? table
+--- @return fun(client: vim.lsp.Client): lsp.TextDocumentPositionParams
+local function client_positional_params(params)
+  local win = api.nvim_get_current_win()
+  return function(client)
+    local ret = util.make_position_params(win, client.offset_encoding)
+    if params then
+      ret = vim.tbl_extend('force', ret, params)
+    end
+    return ret
+  end
 end
 
 --- Displays hover information about the symbol under the cursor in a floating
@@ -34,20 +28,19 @@ end
 --- except that "q" dismisses the window.
 --- You can scroll the contents the same as you would any other buffer.
 function M.hover()
-  local params = util.make_position_params()
-  request(ms.textDocument_hover, params)
+  lsp.buf_request(0, ms.textDocument_hover, client_positional_params())
 end
 
 local function request_with_opts(name, params, opts)
   local req_handler --- @type function?
   if opts then
     req_handler = function(err, result, ctx, config)
-      local client = assert(vim.lsp.get_client_by_id(ctx.client_id))
-      local handler = client.handlers[name] or vim.lsp.handlers[name]
+      local client = assert(lsp.get_client_by_id(ctx.client_id))
+      local handler = client.handlers[name] or lsp.handlers[name]
       handler(err, result, ctx, vim.tbl_extend('force', config or {}, opts))
     end
   end
-  request(name, params, req_handler)
+  lsp.buf_request(0, name, params, req_handler)
 end
 
 ---@param method string
@@ -55,12 +48,15 @@ end
 local function get_locations(method, opts)
   opts = opts or {}
   local bufnr = api.nvim_get_current_buf()
-  local clients = vim.lsp.get_clients({ method = method, bufnr = bufnr })
+  local clients = lsp.get_clients({ method = method, bufnr = bufnr })
   if not next(clients) then
-    vim.notify(vim.lsp._unsupported_method(method), vim.log.levels.WARN)
+    vim.notify(lsp._unsupported_method(method), vim.log.levels.WARN)
     return
   end
   local win = api.nvim_get_current_win()
+  local from = vim.fn.getpos('.')
+  from[1] = bufnr
+  local tagname = vim.fn.expand('<cword>')
   local remaining = #clients
 
   ---@type vim.quickfix.entry[]
@@ -96,6 +92,13 @@ local function get_locations(method, opts)
       if #all_items == 1 then
         local item = all_items[1]
         local b = item.bufnr or vim.fn.bufadd(item.filename)
+
+        -- Save position in jumplist
+        vim.cmd("normal! m'")
+        -- Push a new item into tagstack
+        local tagstack = { { tagname = tagname, from = from } }
+        vim.fn.settagstack(vim.fn.win_getid(win), { items = tagstack }, 't')
+
         vim.bo[b].buflisted = true
         local w = opts.reuse_win and vim.fn.win_findbuf(b)[1] or win
         api.nvim_win_set_buf(w, b)
@@ -185,10 +188,10 @@ end
 --- Displays signature information about the symbol under the cursor in a
 --- floating window.
 function M.signature_help()
-  local params = util.make_position_params()
-  request(ms.textDocument_signatureHelp, params)
+  lsp.buf_request(0, ms.textDocument_signatureHelp, client_positional_params())
 end
 
+--- @deprecated
 --- Retrieves the completion items at the current cursor position. Can only be
 --- called in Insert mode.
 ---
@@ -198,9 +201,14 @@ end
 ---
 ---@see vim.lsp.protocol.CompletionTriggerKind
 function M.completion(context)
-  local params = util.make_position_params()
-  params.context = context
-  return request(ms.textDocument_completion, params)
+  vim.depends('vim.lsp.buf.completion', 'vim.lsp.commpletion.trigger', '0.12')
+  return lsp.buf_request(
+    0,
+    ms.textDocument_completion,
+    client_positional_params({
+      context = context,
+    })
+  )
 end
 
 ---@param bufnr integer
@@ -307,7 +315,7 @@ function M.format(opts)
     method = ms.textDocument_formatting
   end
 
-  local clients = vim.lsp.get_clients({
+  local clients = lsp.get_clients({
     id = opts.id,
     bufnr = bufnr,
     name = opts.name,
@@ -344,7 +352,7 @@ function M.format(opts)
       end
       local params = set_range(client, util.make_formatting_params(opts.formatting_options))
       client.request(method, params, function(...)
-        local handler = client.handlers[method] or vim.lsp.handlers[method]
+        local handler = client.handlers[method] or lsp.handlers[method]
         handler(...)
         do_format(next(clients, idx))
       end, bufnr)
@@ -386,7 +394,7 @@ end
 function M.rename(new_name, opts)
   opts = opts or {}
   local bufnr = opts.bufnr or api.nvim_get_current_buf()
-  local clients = vim.lsp.get_clients({
+  local clients = lsp.get_clients({
     bufnr = bufnr,
     name = opts.name,
     -- Clients must at least support rename, prepareRename is optional
@@ -428,7 +436,7 @@ function M.rename(new_name, opts)
       local params = util.make_position_params(win, client.offset_encoding)
       params.newName = name
       local handler = client.handlers[ms.textDocument_rename]
-        or vim.lsp.handlers[ms.textDocument_rename]
+        or lsp.handlers[ms.textDocument_rename]
       client.request(ms.textDocument_rename, params, function(...)
         handler(...)
         try_use_client(next(clients, idx))
@@ -508,7 +516,7 @@ end
 function M.references(context, opts)
   validate('context', context, 'table', true)
   local bufnr = api.nvim_get_current_buf()
-  local clients = vim.lsp.get_clients({ method = ms.textDocument_references, bufnr = bufnr })
+  local clients = lsp.get_clients({ method = ms.textDocument_references, bufnr = bufnr })
   if not next(clients) then
     return
   end
@@ -575,10 +583,10 @@ end
 --- @param handler? lsp.Handler
 --- @param bufnr? integer
 local function request_with_id(client_id, method, params, handler, bufnr)
-  local client = vim.lsp.get_client_by_id(client_id)
+  local client = lsp.get_client_by_id(client_id)
   if not client then
     vim.notify(
-      string.format('Client with id=%d disappeared during call hierarchy request', client_id),
+      string.format('Client with id=%d disappeared during hierarchy request', client_id),
       vim.log.levels.WARN
     )
     return
@@ -586,95 +594,53 @@ local function request_with_id(client_id, method, params, handler, bufnr)
   client.request(method, params, handler, bufnr)
 end
 
---- @param call_hierarchy_items lsp.CallHierarchyItem[]
---- @return lsp.CallHierarchyItem?
-local function pick_call_hierarchy_item(call_hierarchy_items)
-  if #call_hierarchy_items == 1 then
-    return call_hierarchy_items[1]
-  end
-  local items = {}
-  for i, item in pairs(call_hierarchy_items) do
-    local entry = item.detail or item.name
-    table.insert(items, string.format('%d. %s', i, entry))
-  end
-  local choice = vim.fn.inputlist(items)
-  if choice < 1 or choice > #items then
-    return
-  end
-  return call_hierarchy_items[choice]
-end
-
---- @param method string
-local function call_hierarchy(method)
-  local params = util.make_position_params()
-  --- @param result lsp.CallHierarchyItem[]?
-  request(ms.textDocument_prepareCallHierarchy, params, function(err, result, ctx)
-    if err then
-      vim.notify(err.message, vim.log.levels.WARN)
-      return
-    end
-    if not result or vim.tbl_isempty(result) then
-      vim.notify('No item resolved', vim.log.levels.WARN)
-      return
-    end
-    local item = pick_call_hierarchy_item(result)
-    if not item then
-      return
-    end
-    request_with_id(ctx.client_id, method, { item = item }, nil, ctx.bufnr)
-  end)
-end
-
---- Lists all the call sites of the symbol under the cursor in the
---- |quickfix| window. If the symbol can resolve to multiple
---- items, the user can pick one in the |inputlist()|.
-function M.incoming_calls()
-  call_hierarchy(ms.callHierarchy_incomingCalls)
-end
-
---- Lists all the items that are called by the symbol under the
---- cursor in the |quickfix| window. If the symbol can resolve to
---- multiple items, the user can pick one in the |inputlist()|.
-function M.outgoing_calls()
-  call_hierarchy(ms.callHierarchy_outgoingCalls)
-end
-
---- @param item lsp.TypeHierarchyItem
-local function format_type_hierarchy_item(item)
+--- @param item lsp.TypeHierarchyItem|lsp.CallHierarchyItem
+local function format_hierarchy_item(item)
   if not item.detail or #item.detail == 0 then
     return item.name
   end
   return string.format('%s %s', item.name, item.detail)
 end
 
---- Lists all the subtypes or supertypes of the symbol under the
---- cursor in the |quickfix| window. If the symbol can resolve to
---- multiple items, the user can pick one using |vim.ui.select()|.
----@param kind "subtypes"|"supertypes"
-function M.typehierarchy(kind)
-  local method = kind == 'subtypes' and ms.typeHierarchy_subtypes or ms.typeHierarchy_supertypes
+local hierarchy_methods = {
+  [ms.typeHierarchy_subtypes] = 'type',
+  [ms.typeHierarchy_supertypes] = 'type',
+  [ms.callHierarchy_incomingCalls] = 'call',
+  [ms.callHierarchy_outgoingCalls] = 'call',
+}
+
+--- @param method string
+local function hierarchy(method)
+  local kind = hierarchy_methods[method]
+  if not kind then
+    error('unsupported method ' .. method)
+  end
+
+  local prepare_method = kind == 'type' and ms.textDocument_prepareTypeHierarchy
+    or ms.textDocument_prepareCallHierarchy
+
   local bufnr = api.nvim_get_current_buf()
-  local clients = vim.lsp.get_clients({ bufnr = bufnr, method = method })
+  local clients = lsp.get_clients({ bufnr = bufnr, method = prepare_method })
   if not next(clients) then
-    vim.notify(vim.lsp._unsupported_method(method), vim.log.levels.WARN)
+    vim.notify(lsp._unsupported_method(method), vim.log.levels.WARN)
     return
   end
 
   local win = api.nvim_get_current_win()
 
-  --- @param results [integer, lsp.TypeHierarchyItem][]
+  --- @param results [integer, lsp.TypeHierarchyItem|lsp.CallHierarchyItem][]
   local function on_response(results)
     if #results == 0 then
-      vim.notify('No items resolved', vim.log.levels.INFO)
+      vim.notify('No item resolved', vim.log.levels.WARN)
     elseif #results == 1 then
       local client_id, item = results[1][1], results[1][2]
       request_with_id(client_id, method, { item = item }, nil, bufnr)
     else
       vim.ui.select(results, {
-        prompt = 'Select a type hierarchy item:',
-        kind = 'typehierarchy',
+        prompt = string.format('Select a %s hierarchy item:', kind),
+        kind = kind .. 'hierarchy',
         format_item = function(x)
-          return format_type_hierarchy_item(x[2])
+          return format_hierarchy_item(x[2])
         end,
       }, function(x)
         if x then
@@ -685,18 +651,18 @@ function M.typehierarchy(kind)
     end
   end
 
-  local results = {} --- @type [integer, lsp.TypeHierarchyItem][]
+  local results = {} --- @type [integer, lsp.TypeHierarchyItem|lsp.CallHierarchyItem][]
 
   local remaining = #clients
 
   for _, client in ipairs(clients) do
     local params = util.make_position_params(win, client.offset_encoding)
-    client.request(method, params, function(err, result, ctx)
-      --- @cast result lsp.TypeHierarchyItem[]?
+    --- @param result lsp.CallHierarchyItem[]|lsp.TypeHierarchyItem[]?
+    client.request(prepare_method, params, function(err, result, ctx)
       if err then
         vim.notify(err.message, vim.log.levels.WARN)
       elseif result then
-        for _, item in pairs(result) do
+        for _, item in ipairs(result) do
           results[#results + 1] = { ctx.client_id, item }
         end
       end
@@ -709,11 +675,34 @@ function M.typehierarchy(kind)
   end
 end
 
+--- Lists all the call sites of the symbol under the cursor in the
+--- |quickfix| window. If the symbol can resolve to multiple
+--- items, the user can pick one in the |inputlist()|.
+function M.incoming_calls()
+  hierarchy(ms.callHierarchy_incomingCalls)
+end
+
+--- Lists all the items that are called by the symbol under the
+--- cursor in the |quickfix| window. If the symbol can resolve to
+--- multiple items, the user can pick one in the |inputlist()|.
+function M.outgoing_calls()
+  hierarchy(ms.callHierarchy_outgoingCalls)
+end
+
+--- Lists all the subtypes or supertypes of the symbol under the
+--- cursor in the |quickfix| window. If the symbol can resolve to
+--- multiple items, the user can pick one using |vim.ui.select()|.
+---@param kind "subtypes"|"supertypes"
+function M.typehierarchy(kind)
+  local method = kind == 'subtypes' and ms.typeHierarchy_subtypes or ms.typeHierarchy_supertypes
+  hierarchy(method)
+end
+
 --- List workspace folders.
 ---
 function M.list_workspace_folders()
   local workspace_folders = {}
-  for _, client in pairs(vim.lsp.get_clients({ bufnr = 0 })) do
+  for _, client in pairs(lsp.get_clients({ bufnr = 0 })) do
     for _, folder in pairs(client.workspace_folders or {}) do
       table.insert(workspace_folders, folder.name)
     end
@@ -736,7 +725,7 @@ function M.add_workspace_folder(workspace_folder)
     return
   end
   local bufnr = api.nvim_get_current_buf()
-  for _, client in pairs(vim.lsp.get_clients({ bufnr = bufnr })) do
+  for _, client in pairs(lsp.get_clients({ bufnr = bufnr })) do
     client:_add_workspace_folder(workspace_folder)
   end
 end
@@ -753,7 +742,7 @@ function M.remove_workspace_folder(workspace_folder)
     return
   end
   local bufnr = api.nvim_get_current_buf()
-  for _, client in pairs(vim.lsp.get_clients({ bufnr = bufnr })) do
+  for _, client in pairs(lsp.get_clients({ bufnr = bufnr })) do
     client:_remove_workspace_folder(workspace_folder)
   end
   print(workspace_folder, 'is not currently part of the workspace')
@@ -792,8 +781,7 @@ end
 ---         |hl-LspReferenceRead|
 ---         |hl-LspReferenceWrite|
 function M.document_highlight()
-  local params = util.make_position_params()
-  request(ms.textDocument_documentHighlight, params)
+  lsp.buf_request(0, ms.textDocument_documentHighlight, client_positional_params())
 end
 
 --- Removes document highlights from current buffer.
@@ -895,7 +883,8 @@ local function on_code_action_results(results, opts)
     local a_cmd = action.command
     if a_cmd then
       local command = type(a_cmd) == 'table' and a_cmd or action
-      client:_exec_cmd(command, ctx)
+      --- @cast command lsp.Command
+      client:exec_cmd(command, ctx)
     end
   end
 
@@ -916,7 +905,7 @@ local function on_code_action_results(results, opts)
     --  command: string
     --  arguments?: any[]
     --
-    local client = assert(vim.lsp.get_client_by_id(choice.ctx.client_id))
+    local client = assert(lsp.get_client_by_id(choice.ctx.client_id))
     local action = choice.action
     local bufnr = assert(choice.ctx.bufnr, 'Must have buffer number')
 
@@ -951,14 +940,14 @@ local function on_code_action_results(results, opts)
 
   ---@param item {action: lsp.Command|lsp.CodeAction, ctx: lsp.HandlerContext}
   local function format_item(item)
-    local clients = vim.lsp.get_clients({ bufnr = item.ctx.bufnr })
+    local clients = lsp.get_clients({ bufnr = item.ctx.bufnr })
     local title = item.action.title:gsub('\r\n', '\\r\\n'):gsub('\n', '\\n')
 
     if #clients == 1 then
       return title
     end
 
-    local source = vim.lsp.get_client_by_id(item.ctx.client_id).name
+    local source = lsp.get_client_by_id(item.ctx.client_id).name
     return ('%s [%s]'):format(title, source)
   end
 
@@ -987,16 +976,16 @@ function M.code_action(opts)
   end
   local context = opts.context and vim.deepcopy(opts.context) or {}
   if not context.triggerKind then
-    context.triggerKind = vim.lsp.protocol.CodeActionTriggerKind.Invoked
+    context.triggerKind = lsp.protocol.CodeActionTriggerKind.Invoked
   end
   local mode = api.nvim_get_mode().mode
   local bufnr = api.nvim_get_current_buf()
   local win = api.nvim_get_current_win()
-  local clients = vim.lsp.get_clients({ bufnr = bufnr, method = ms.textDocument_codeAction })
+  local clients = lsp.get_clients({ bufnr = bufnr, method = ms.textDocument_codeAction })
   local remaining = #clients
   if remaining == 0 then
-    if next(vim.lsp.get_clients({ bufnr = bufnr })) then
-      vim.notify(vim.lsp._unsupported_method(ms.textDocument_codeAction), vim.log.levels.WARN)
+    if next(lsp.get_clients({ bufnr = bufnr })) then
+      vim.notify(lsp._unsupported_method(ms.textDocument_codeAction), vim.log.levels.WARN)
     end
     return
   end
@@ -1033,8 +1022,8 @@ function M.code_action(opts)
     if context.diagnostics then
       params.context = context
     else
-      local ns_push = vim.lsp.diagnostic.get_namespace(client.id, false)
-      local ns_pull = vim.lsp.diagnostic.get_namespace(client.id, true)
+      local ns_push = lsp.diagnostic.get_namespace(client.id, false)
+      local ns_pull = lsp.diagnostic.get_namespace(client.id, true)
       local diagnostics = {}
       local lnum = api.nvim_win_get_cursor(0)[1] - 1
       vim.list_extend(diagnostics, vim.diagnostic.get(bufnr, { namespace = ns_pull, lnum = lnum }))
@@ -1051,18 +1040,20 @@ function M.code_action(opts)
   end
 end
 
+--- @deprecated
 --- Executes an LSP server command.
 --- @param command_params lsp.ExecuteCommandParams
 --- @see https://microsoft.github.io/language-server-protocol/specifications/specification-current/#workspace_executeCommand
 function M.execute_command(command_params)
   validate('command', command_params.command, 'string')
   validate('arguments', command_params.arguments, 'table', true)
+  vim.deprecate('execute_command', 'client:exec_cmd', '0.12')
   command_params = {
     command = command_params.command,
     arguments = command_params.arguments,
     workDoneToken = command_params.workDoneToken,
   }
-  request(ms.workspace_executeCommand, command_params)
+  lsp.buf_request(0, ms.workspace_executeCommand, command_params)
 end
 
 return M
