@@ -233,6 +233,7 @@ void check_buf_options(buf_T *buf)
   check_string_option(&buf->b_p_mp);
   check_string_option(&buf->b_p_efm);
   check_string_option(&buf->b_p_ep);
+  check_string_option(&buf->b_p_fexpr);
   check_string_option(&buf->b_p_path);
   check_string_option(&buf->b_p_tags);
   check_string_option(&buf->b_p_tfu);
@@ -419,9 +420,9 @@ const char *check_stl_option(char *s)
 /// often illegal in a file name. Be more permissive if "secure" is off.
 bool check_illegal_path_names(char *val, uint32_t flags)
 {
-  return (((flags & P_NFNAME)
+  return (((flags & kOptFlagNFname)
            && strpbrk(val, (secure ? "/\\*?[|;&<>\r\n" : "/\\*?[<>\r\n")) != NULL)
-          || ((flags & P_NDNAME)
+          || ((flags & kOptFlagNDname)
               && strpbrk(val, "*?[|;&<>\r\n") != NULL));
 }
 
@@ -1377,7 +1378,7 @@ const char *did_set_filetype_or_syntax(optset_T *args)
 
   args->os_value_changed = strcmp(args->os_oldval.string.data, *varp) != 0;
 
-  // Since we check the value, there is no need to set P_INSECURE,
+  // Since we check the value, there is no need to set kOptFlagInsecure,
   // even when the value comes from a modeline.
   args->os_value_checked = true;
 
@@ -1658,7 +1659,7 @@ const char *did_set_keymap(optset_T *args)
 
   secure = secure_save;
 
-  // Since we check the value, there is no need to set P_INSECURE,
+  // Since we check the value, there is no need to set kOptFlagInsecure,
   // even when the value comes from a modeline.
   args->os_value_checked = true;
 
@@ -1885,8 +1886,9 @@ int expand_set_nrformats(optexpand_T *args, int *numMatches, char ***matches)
                                matches);
 }
 
-/// One of the '*expr' options is changed:, 'diffexpr', 'foldexpr', 'foldtext',
-/// 'formatexpr', 'includeexpr', 'indentexpr', 'patchexpr' and 'charconvert'.
+/// One of the '*expr' options is changed:, 'diffexpr', 'findexpr',
+/// 'foldexpr', 'foldtext', 'formatexpr', 'includeexpr', 'indentexpr',
+/// 'patchexpr' and 'charconvert'.
 const char *did_set_optexpr(optset_T *args)
 {
   char **varp = (char **)args->os_varp;

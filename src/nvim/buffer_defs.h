@@ -608,6 +608,7 @@ struct file_buffer {
   char *b_p_mp;                 ///< 'makeprg' local value
   char *b_p_efm;                ///< 'errorformat' local value
   char *b_p_ep;                 ///< 'equalprg' local value
+  char *b_p_fexpr;              ///< 'findexpr' local value
   char *b_p_path;               ///< 'path' local value
   int b_p_ar;                   ///< 'autoread' local value
   char *b_p_tags;               ///< 'tags' local value
@@ -1249,7 +1250,7 @@ struct window_S {
   // transform a pointer to a "onebuf" option into a "allbuf" option
 #define GLOBAL_WO(p)    ((char *)(p) + sizeof(winopt_T))
 
-  // A few options have local flags for P_INSECURE.
+  // A few options have local flags for kOptFlagInsecure.
   uint32_t w_p_stl_flags;           // flags for 'statusline'
   uint32_t w_p_wbr_flags;           // flags for 'winbar'
   uint32_t w_p_fde_flags;           // flags for 'foldexpr'

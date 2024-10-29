@@ -109,6 +109,7 @@ static bool cmdline_fuzzy_completion_supported(const expand_T *const xp)
          && xp->xp_context != EXPAND_FILES
          && xp->xp_context != EXPAND_FILES_IN_PATH
          && xp->xp_context != EXPAND_FILETYPE
+         && xp->xp_context != EXPAND_FINDEXPR
          && xp->xp_context != EXPAND_HELP
          && xp->xp_context != EXPAND_KEYMAP
          && xp->xp_context != EXPAND_LUA
@@ -1228,7 +1229,8 @@ char *addstar(char *fname, size_t len, int context)
 
     // For help tags the translation is done in find_help_tags().
     // For a tag pattern starting with "/" no translation is needed.
-    if (context == EXPAND_HELP
+    if (context == EXPAND_FINDEXPR
+        || context == EXPAND_HELP
         || context == EXPAND_COLORS
         || context == EXPAND_COMPILER
         || context == EXPAND_OWNSYNTAX
@@ -1350,7 +1352,7 @@ char *addstar(char *fname, size_t len, int context)
 ///                          it.
 ///  EXPAND_BUFFERS          Complete file names for :buf and :sbuf commands.
 ///  EXPAND_FILES            After command with EX_XFILE set, or after setting
-///                          with P_EXPAND set.  eg :e ^I, :w>>^I
+///                          with kOptFlagExpand set.  eg :e ^I, :w>>^I
 ///  EXPAND_DIRECTORIES      In some cases this is used instead of the latter
 ///                          when we know only directories are of interest.
 ///                          E.g.  :set dir=^I  and  :cd ^I
@@ -1827,7 +1829,7 @@ static const char *set_context_by_cmdname(const char *cmd, cmdidx_T cmdidx, expa
   case CMD_sfind:
   case CMD_tabfind:
     if (xp->xp_context == EXPAND_FILES) {
-      xp->xp_context = EXPAND_FILES_IN_PATH;
+      xp->xp_context = *get_findexpr() != NUL ? EXPAND_FINDEXPR : EXPAND_FILES_IN_PATH;
     }
     break;
   case CMD_cd:
@@ -2497,21 +2499,25 @@ static int expand_files_and_dirs(expand_T *xp, char *pat, char ***matches, int *
     }
   }
 
-  if (xp->xp_context == EXPAND_FILES) {
-    flags |= EW_FILE;
-  } else if (xp->xp_context == EXPAND_FILES_IN_PATH) {
-    flags |= (EW_FILE | EW_PATH);
-  } else if (xp->xp_context == EXPAND_DIRS_IN_CDPATH) {
-    flags = (flags | EW_DIR | EW_CDPATH) & ~EW_FILE;
+  int ret = FAIL;
+  if (xp->xp_context == EXPAND_FINDEXPR) {
+    ret = expand_findexpr(pat, matches, numMatches);
   } else {
-    flags = (flags | EW_DIR) & ~EW_FILE;
+    if (xp->xp_context == EXPAND_FILES) {
+      flags |= EW_FILE;
+    } else if (xp->xp_context == EXPAND_FILES_IN_PATH) {
+      flags |= (EW_FILE | EW_PATH);
+    } else if (xp->xp_context == EXPAND_DIRS_IN_CDPATH) {
+      flags = (flags | EW_DIR | EW_CDPATH) & ~EW_FILE;
+    } else {
+      flags = (flags | EW_DIR) & ~EW_FILE;
+    }
+    if (options & WILD_ICASE) {
+      flags |= EW_ICASE;
+    }
+    // Expand wildcards, supporting %:h and the like.
+    ret = expand_wildcards_eval(&pat, numMatches, matches, flags);
   }
-  if (options & WILD_ICASE) {
-    flags |= EW_ICASE;
-  }
-
-  // Expand wildcards, supporting %:h and the like.
-  int ret = expand_wildcards_eval(&pat, numMatches, matches, flags);
   if (free_pat) {
     xfree(pat);
   }
@@ -2716,6 +2722,7 @@ static int ExpandFromContext(expand_T *xp, char *pat, char ***matches, int *numM
   if (xp->xp_context == EXPAND_FILES
       || xp->xp_context == EXPAND_DIRECTORIES
       || xp->xp_context == EXPAND_FILES_IN_PATH
+      || xp->xp_context == EXPAND_FINDEXPR
       || xp->xp_context == EXPAND_DIRS_IN_CDPATH) {
     return expand_files_and_dirs(xp, pat, matches, numMatches, flags, options);
   }
