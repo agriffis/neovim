@@ -578,6 +578,7 @@ void free_all_options(void)
   }
   free_operatorfunc_option();
   free_tagfunc_option();
+  free_findfunc_option();
   XFREE_CLEAR(fenc_default);
   XFREE_CLEAR(p_term);
   XFREE_CLEAR(p_ttytype);
@@ -3978,76 +3979,6 @@ int get_option_attrs(OptIndex opt_idx)
   return attrs;
 }
 
-/// Check if option has a value in the requested scope.
-///
-/// @param  opt_idx    Option index in options[] table.
-/// @param  req_scope  Requested option scope. See OptReqScope in option.h.
-///
-/// @return  true if option has a value in the requested scope, false otherwise.
-static bool option_has_scope(OptIndex opt_idx, OptReqScope req_scope)
-{
-  if (opt_idx == kOptInvalid) {
-    return false;
-  }
-
-  vimoption_T *opt = get_option(opt_idx);
-
-  // Hidden option.
-  if (opt->var == NULL) {
-    return false;
-  }
-  // TTY option.
-  if (is_tty_option(opt->fullname)) {
-    return req_scope == kOptReqGlobal;
-  }
-
-  switch (req_scope) {
-  case kOptReqGlobal:
-    return opt->var != VAR_WIN;
-  case kOptReqBuf:
-    return opt->indir & PV_BUF;
-  case kOptReqWin:
-    return opt->indir & PV_WIN;
-  }
-  UNREACHABLE;
-}
-
-/// Get the option value in the requested scope.
-///
-/// @param       opt_idx    Option index in options[] table.
-/// @param       req_scope  Requested option scope. See OptReqScope in option.h.
-/// @param[in]   from       Pointer to buffer or window for local option value.
-/// @param[out]  err        Error message, if any.
-///
-/// @return  Option value in the requested scope. Returns a Nil option value if option is not found,
-/// hidden or if it isn't present in the requested scope. (i.e. has no global, window-local or
-/// buffer-local value depending on opt_scope).
-OptVal get_option_value_strict(OptIndex opt_idx, OptReqScope req_scope, void *from, Error *err)
-{
-  if (opt_idx == kOptInvalid || !option_has_scope(opt_idx, req_scope)) {
-    return NIL_OPTVAL;
-  }
-
-  vimoption_T *opt = get_option(opt_idx);
-  switchwin_T switchwin;
-  aco_save_T aco;
-  void *ctx = req_scope == kOptReqWin ? (void *)&switchwin
-                                      : (req_scope == kOptReqBuf ? (void *)&aco : NULL);
-  bool switched = switch_option_context(ctx, req_scope, from, err);
-  if (ERROR_SET(err)) {
-    return NIL_OPTVAL;
-  }
-
-  char *varp = get_varp_scope(opt, req_scope == kOptReqGlobal ? OPT_GLOBAL : OPT_LOCAL);
-  OptVal retv = optval_from_varp(opt_idx, varp);
-
-  if (switched) {
-    restore_option_context(ctx, req_scope);
-  }
-
-  return retv;
-}
-
 /// Get option value for buffer / window.
 ///
 /// @param       opt_idx    Option index in options[] table.
@@ -4542,8 +4473,8 @@ void *get_varp_scope_from(vimoption_T *p, int scope, buf_T *buf, win_T *win)
     switch ((int)p->indir) {
     case PV_FP:
       return &(buf->b_p_fp);
-    case PV_FEXPR:
-      return &(buf->b_p_fexpr);
+    case PV_FFU:
+      return &(buf->b_p_ffu);
     case PV_EFM:
       return &(buf->b_p_efm);
     case PV_GP:
@@ -4665,8 +4596,8 @@ void *get_varp_from(vimoption_T *p, buf_T *buf, win_T *win)
     return *buf->b_p_tsrfu != NUL ? &(buf->b_p_tsrfu) : p->var;
   case PV_FP:
     return *buf->b_p_fp != NUL ? &(buf->b_p_fp) : p->var;
-  case PV_FEXPR:
-    return *buf->b_p_fexpr != NUL ? &(buf->b_p_fexpr) : p->var;
+  case PV_FFU:
+    return *buf->b_p_ffu != NUL ? &(buf->b_p_ffu) : p->var;
   case PV_EFM:
     return *buf->b_p_efm != NUL ? &(buf->b_p_efm) : p->var;
   case PV_GP:
@@ -4938,13 +4869,13 @@ char *get_equalprg(void)
   return curbuf->b_p_ep;
 }
 
-/// Get the value of 'findexpr', either the buffer-local one or the global one.
-char *get_findexpr(void)
+/// Get the value of 'findfunc', either the buffer-local one or the global one.
+char *get_findfunc(void)
 {
-  if (*curbuf->b_p_fexpr == NUL) {
-    return p_fexpr;
+  if (*curbuf->b_p_ffu == NUL) {
+    return p_ffu;
   }
-  return curbuf->b_p_fexpr;
+  return curbuf->b_p_ffu;
 }
 
 /// Copy options from one window to another.
@@ -5345,8 +5276,7 @@ void buf_copy_options(buf_T *buf, int flags)
       buf->b_p_mp = empty_string_option;
       buf->b_p_efm = empty_string_option;
       buf->b_p_ep = empty_string_option;
-      buf->b_p_fexpr = xstrdup(p_fexpr);
-      COPY_OPT_SCTX(buf, BV_FEXPR);
+      buf->b_p_ffu = empty_string_option;
       buf->b_p_kp = empty_string_option;
       buf->b_p_path = empty_string_option;
       buf->b_p_tags = empty_string_option;
