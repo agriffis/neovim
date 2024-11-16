@@ -237,20 +237,21 @@ describe('vim.ui_attach', function()
     })
   end)
 
-  it('aborts :function on error with ext_messages', function()
+  it('msg_show in fast context', function()
     exec_lua([[
     vim.ui_attach(ns, { ext_messages = true }, function(event, _, content)
       if event == "msg_show" then
-        -- "fast-api" does not prevent aborting :function
         vim.api.nvim_get_runtime_file("foo", false)
         -- non-"fast-api" is not allowed in msg_show callback and should be scheduled
         local _, err = pcall(vim.api.nvim_buf_set_lines, 0, -2, -1, false, { content[1][2] })
+        pcall(vim.api.nvim__redraw, { flush = true })
         vim.schedule(function()
           vim.api.nvim_buf_set_lines(0, -2, -1, false, { content[1][2], err })
         end)
       end
     end)
     ]])
+    -- "fast-api" does not prevent aborting :function
     feed(':func Foo()<cr>bar<cr>endf<cr>:func Foo()<cr>')
     screen:expect({
       grid = [[
@@ -267,6 +268,45 @@ describe('vim.ui_attach', function()
         },
       },
     })
+    -- No fast context for prompt message kinds
+    feed(':%s/Function/Replacement/c<cr>')
+    screen:expect({
+      grid = [[
+        ^E122: {10:Function} Foo already exists, add !|
+         to replace it                          |
+        replace with Replacement (y/n/a/q/l/^E/^|
+        Y)?                                     |
+        {1:~                                       }|
+      ]],
+      messages = {
+        {
+          content = { { 'replace with Replacement (y/n/a/q/l/^E/^Y)?', 6, 19 } },
+          kind = 'confirm_sub',
+        },
+      },
+    })
+  end)
+end)
+
+describe('vim.ui_attach', function()
+  local screen
+  before_each(function()
+    clear({ env = { NVIM_LOG_FILE = testlog } })
+    screen = Screen.new(40, 5)
+  end)
+
+  after_each(function()
+    check_close()
+    os.remove(testlog)
+  end)
+
+  it('error in callback is logged', function()
+    exec_lua([[
+      local ns = vim.api.nvim_create_namespace('testspace')
+      vim.ui_attach(ns, { ext_popupmenu = true }, function() error(42) end)
+    ]])
+    feed('ifoo<CR>foobar<CR>fo<C-X><C-N>')
+    assert_log('Error executing UI event callback: Error executing lua: .*: 42', testlog, 100)
   end)
 
   it('detaches after excessive errors', function()
@@ -296,7 +336,7 @@ describe('vim.ui_attach', function()
         foo                                     |
         {3:                                        }|
         {9:Excessive errors in vim.ui_attach() call}|
-        {9:back from ns: 2.}                        |
+        {9:back from ns: 1.}                        |
         {100:Press ENTER or type command to continue}^ |
       ]],
     })
@@ -342,27 +382,9 @@ describe('vim.ui_attach', function()
         foo                                     |
         {3:                                        }|
         {9:Excessive errors in vim.ui_attach() call}|
-        {9:back from ns: 3.}                        |
+        {9:back from ns: 2.}                        |
         {100:Press ENTER or type command to continue}^ |
       ]],
     })
-  end)
-end)
-
-describe('vim.ui_attach', function()
-  after_each(function()
-    check_close()
-    os.remove(testlog)
-  end)
-
-  it('error in callback is logged', function()
-    clear({ env = { NVIM_LOG_FILE = testlog } })
-    local _ = Screen.new()
-    exec_lua([[
-      local ns = vim.api.nvim_create_namespace('testspace')
-      vim.ui_attach(ns, { ext_popupmenu = true }, function() error(42) end)
-    ]])
-    feed('ifoo<CR>foobar<CR>fo<C-X><C-N>')
-    assert_log('Error executing UI event callback: Error executing lua: .*: 42', testlog, 100)
   end)
 end)
