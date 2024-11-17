@@ -779,8 +779,8 @@ void nvim_set_vvar(String name, Object value, Error *err)
 /// Echo a message.
 ///
 /// @param chunks  A list of `[text, hl_group]` arrays, each representing a
-///                text chunk with specified highlight. `hl_group` element
-///                can be omitted for no highlight.
+///                text chunk with specified highlight group name or ID.
+///                `hl_group` element can be omitted for no highlight.
 /// @param history  if true, add to |message-history|.
 /// @param opts  Optional parameters.
 ///          - verbose: Message is printed as a result of 'verbose' option.
@@ -1004,10 +1004,10 @@ Buffer nvim_create_buf(Boolean listed, Boolean scratch, Error *err)
   buf_copy_options(buf, BCO_ENTER | BCO_NOHELP);
 
   if (scratch) {
-    set_option_direct_for(kOptBufhidden, STATIC_CSTR_AS_OPTVAL("hide"), OPT_LOCAL, 0, kOptReqBuf,
-                          buf);
-    set_option_direct_for(kOptBuftype, STATIC_CSTR_AS_OPTVAL("nofile"), OPT_LOCAL, 0, kOptReqBuf,
-                          buf);
+    set_option_direct_for(kOptBufhidden, STATIC_CSTR_AS_OPTVAL("hide"), OPT_LOCAL, 0,
+                          kOptScopeBuf, buf);
+    set_option_direct_for(kOptBuftype, STATIC_CSTR_AS_OPTVAL("nofile"), OPT_LOCAL, 0,
+                          kOptScopeBuf, buf);
     assert(buf->b_ml.ml_mfp->mf_fd < 0);  // ml_open() should not have opened swapfile already
     buf->b_p_swf = false;
     buf->b_p_ml = false;
