@@ -89,7 +89,6 @@ Defaults                                                    *nvim-defaults*
 - 'undodir' defaults to ~/.local/state/nvim/undo// (|xdg|), auto-created
 - 'viewoptions' includes "unix,slash", excludes "options"
 - 'viminfo' includes "!"
-- 'wildmenu' is enabled
 - 'wildoptions' defaults to "pum,tagfile"
 
 - |editorconfig| plugin is enabled, .editorconfig settings are applied.
@@ -414,7 +413,7 @@ TUI:
 - 'term' reflects the terminal type derived from |$TERM| and other environment
   checks.  For debugging only; not reliable during startup. >vim
           :echo &term
--  "builtin_x" means one of the |builtin-terms| was chosen, because the expected
+- "builtin_x" means one of the |builtin-terms| was chosen, because the expected
   terminfo file was not found on the system.
 - Nvim will use 256-colour capability on Linux virtual terminals.  Vim uses
   only 8 colours plus bright foreground on Linux VTs.
@@ -615,6 +614,11 @@ Autocommands:
   https://github.com/neovim/neovim/issues/23368
 - |TermResponse| is fired for any OSC sequence received from the terminal,
   instead of the Primary Device Attributes response. |v:termresponse|
+
+Options:
+- 'titlestring' uses printf-style '%' items (see: 'statusline') to implement
+  the default behaviour. The implementation is equivalent to setting
+  'titlestring' to `%t%(\ %M%)%(\ \(%{expand(\"%:~:h\")}\)%)%a\ -\ Nvim`.
 
 ==============================================================================
 Missing features                                         *nvim-missing*

@@ -95,6 +95,9 @@ LSP
   Instead use: >lua
     vim.diagnostic.config(config, vim.lsp.diagnostic.get_namespace(client_id))
 <
+• |vim.lsp.util.make_position_params()|, |vim.lsp.util.make_range_params()|
+  and |vim.lsp.util.make_given_range_params()| now require the `offset_encoding`
+  parameter.
 
 LUA
 
@@ -224,7 +227,7 @@ LUA
 
 • |vim.fs.rm()| can delete files and directories.
 • |vim.validate()| now has a new signature which uses less tables,
-  is more peformant and easier to read.
+  is more performant and easier to read.
 • |vim.str_byteindex()| and |vim.str_utfindex()| gained overload signatures
   supporting two new parameters, `encoding` and `strict_indexing`.
 
@@ -320,6 +323,11 @@ These existing features changed their behavior.
 • "q" in man pages now uses |CTRL-W_q| instead of |CTRL-W_c| to close the
   current window, and it no longer throws |E444| when there is only one window
   on the screen. Global variable `vim.g.pager` is removed.
+
+• Default 'titlestring' is now implemented with 'statusline' "%" format items.
+  This means the default, empty value is essentially an alias to:
+  `%t%(\ %M%)%(\ \(%{expand(\"%:~:h\")}\)%)%a\ -\ Nvim`. This is only an
+  implementation simplification, not a behavior change.
 
 ==============================================================================
 REMOVED FEATURES                                                 *news-removed*
