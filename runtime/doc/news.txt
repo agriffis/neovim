@@ -25,6 +25,7 @@ EXPERIMENTS
 OPTIONS
 
 • 'jumpoptions' flag "unload" has been renamed to "clean".
+• The `msghistory` option has been removed in favor of 'messagesopt'.
 
 ==============================================================================
 BREAKING CHANGES                                                *news-breaking*
@@ -58,8 +59,9 @@ DEFAULTS
 • |]d-default| and |[d-default| accept a count.
 • |[D-default| and |]D-default| jump to the first and last diagnostic in the
   current buffer, respectively.
-• 'number', 'relativenumber', and 'signcolumn' are disabled in |terminal|
-  buffers. See |terminal-config| for an example of changing these defaults.
+• 'number', 'relativenumber', 'signcolumn', and 'foldcolumn' are disabled in
+  |terminal| buffers. See |terminal-config| for an example of changing these defaults.
+• |vim.json.encode()| no longer escapes the forward slash symbol by default
 
 DIAGNOSTICS
 
@@ -169,6 +171,7 @@ The following new features were added.
 API
 
 • |nvim__ns_set()| can set properties for a namespace
+• |vim.json.encode()| has an option to enable forward slash escaping
 
 DEFAULTS
 
@@ -246,7 +249,7 @@ LUA
 OPTIONS
 
 • 'completeopt' flag "fuzzy" enables |fuzzy-matching| during |ins-completion|.
-• 'msghistory' controls maximum number of messages to remember.
+• 'messagesopt' configures |:messages| and |hit-enter| prompt.
 • 'tabclose' controls which tab page to focus when closing a tab page.
 
 PERFORMANCE
@@ -280,6 +283,8 @@ TREESITTER
 • |LanguageTree:node_for_range()| gets anonymous and named nodes for a range
 • |vim.treesitter.get_node()| now takes an option `include_anonymous`, default
   false, which allows it to return anonymous nodes as well as named nodes.
+• |treesitter-directive-trim!| can trim all whitespace (not just empty lines)
+  from both sides of a node.
 
 TUI
 
