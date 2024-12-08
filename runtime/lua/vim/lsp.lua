@@ -89,18 +89,6 @@ lsp._request_name_to_capability = {
 
 -- TODO improve handling of scratch buffers with LSP attached.
 
---- Returns the buffer number for the given {bufnr}.
----
----@param bufnr (integer|nil) Buffer number to resolve. Defaults to current buffer
----@return integer bufnr
-local function resolve_bufnr(bufnr)
-  validate('bufnr', bufnr, 'number', true)
-  if bufnr == nil or bufnr == 0 then
-    return api.nvim_get_current_buf()
-  end
-  return bufnr
-end
-
 ---@private
 --- Called by the client when trying to call a method that's not
 --- supported in any of the servers registered for the current buffer.
@@ -112,6 +100,22 @@ function lsp._unsupported_method(method)
   )
   log.warn(msg)
   return msg
+end
+
+---@private
+---@param workspace_folders string|lsp.WorkspaceFolder[]?
+---@return lsp.WorkspaceFolder[]?
+function lsp._get_workspace_folders(workspace_folders)
+  if type(workspace_folders) == 'table' then
+    return workspace_folders
+  elseif type(workspace_folders) == 'string' then
+    return {
+      {
+        uri = vim.uri_from_fname(workspace_folders),
+        name = workspace_folders,
+      },
+    }
+  end
 end
 
 local wait_result_reason = { [-1] = 'timeout', [-2] = 'interrupted', [-3] = 'error' }
@@ -196,19 +200,24 @@ local function reuse_client_default(client, config)
     return false
   end
 
-  if config.root_dir then
-    local root = vim.uri_from_fname(config.root_dir)
-    for _, dir in ipairs(client.workspace_folders or {}) do
-      -- note: do not need to check client.root_dir since that should be client.workspace_folders[1]
-      if root == dir.uri then
-        return true
+  local config_folders = lsp._get_workspace_folders(config.workspace_folders or config.root_dir)
+    or {}
+  local config_folders_included = 0
+
+  if not next(config_folders) then
+    return false
+  end
+
+  for _, config_folder in ipairs(config_folders) do
+    for _, client_folder in ipairs(client.workspace_folders) do
+      if config_folder.uri == client_folder.uri then
+        config_folders_included = config_folders_included + 1
+        break
       end
     end
   end
 
-  -- TODO(lewis6991): also check config.workspace_folders
-
-  return false
+  return config_folders_included == #config_folders
 end
 
 --- Reset defaults set by `set_defaults`.
@@ -311,9 +320,10 @@ end
 --- @inlinedoc
 ---
 --- Predicate used to decide if a client should be re-used. Used on all
---- running clients. The default implementation re-uses a client if name and
---- root_dir matches.
---- @field reuse_client? (fun(client: vim.lsp.Client, config: vim.lsp.ClientConfig): boolean)
+--- running clients. The default implementation re-uses a client if it has the
+--- same name and if the given workspace folders (or root_dir) are all included
+--- in the client's workspace folders.
+--- @field reuse_client? fun(client: vim.lsp.Client, config: vim.lsp.ClientConfig): boolean
 ---
 --- Buffer handle to attach to if starting or re-using a client (0 for current).
 --- @field bufnr? integer
@@ -367,7 +377,7 @@ end
 function lsp.start(config, opts)
   opts = opts or {}
   local reuse_client = opts.reuse_client or reuse_client_default
-  local bufnr = resolve_bufnr(opts.bufnr)
+  local bufnr = vim._resolve_bufnr(opts.bufnr)
 
   for _, client in pairs(all_clients) do
     if reuse_client(client, config) then
@@ -506,7 +516,7 @@ end
 ---Buffer lifecycle handler for textDocument/didSave
 --- @param bufnr integer
 local function text_document_did_save_handler(bufnr)
-  bufnr = resolve_bufnr(bufnr)
+  bufnr = vim._resolve_bufnr(bufnr)
   local uri = vim.uri_from_bufnr(bufnr)
   local text = once(lsp._buf_get_full_text)
   for _, client in ipairs(lsp.get_clients({ bufnr = bufnr })) do
@@ -667,7 +677,7 @@ end
 function lsp.buf_attach_client(bufnr, client_id)
   validate('bufnr', bufnr, 'number', true)
   validate('client_id', client_id, 'number')
-  bufnr = resolve_bufnr(bufnr)
+  bufnr = vim._resolve_bufnr(bufnr)
   if not api.nvim_buf_is_loaded(bufnr) then
     log.warn(string.format('buf_attach_client called on unloaded buffer (id: %d): ', bufnr))
     return false
@@ -704,7 +714,7 @@ end
 function lsp.buf_detach_client(bufnr, client_id)
   validate('bufnr', bufnr, 'number', true)
   validate('client_id', client_id, 'number')
-  bufnr = resolve_bufnr(bufnr)
+  bufnr = vim._resolve_bufnr(bufnr)
 
   local client = all_clients[client_id]
   if not client or not client.attached_buffers[bufnr] then
@@ -810,7 +820,7 @@ function lsp.get_clients(filter)
 
   local clients = {} --- @type vim.lsp.Client[]
 
-  local bufnr = filter.bufnr and resolve_bufnr(filter.bufnr)
+  local bufnr = filter.bufnr and vim._resolve_bufnr(filter.bufnr)
 
   for _, client in pairs(all_clients) do
     if
@@ -906,7 +916,7 @@ function lsp.buf_request(bufnr, method, params, handler, on_unsupported)
   validate('handler', handler, 'function', true)
   validate('on_unsupported', on_unsupported, 'function', true)
 
-  bufnr = resolve_bufnr(bufnr)
+  bufnr = vim._resolve_bufnr(bufnr)
   local method_supported = false
   local clients = lsp.get_clients({ bufnr = bufnr })
   local client_request_ids = {} --- @type table<integer,integer>
@@ -1186,7 +1196,7 @@ end
 function lsp.buf_get_clients(bufnr)
   vim.deprecate('vim.lsp.buf_get_clients()', 'vim.lsp.get_clients()', '0.12')
   local result = {} --- @type table<integer,vim.lsp.Client>
-  for _, client in ipairs(lsp.get_clients({ bufnr = resolve_bufnr(bufnr) })) do
+  for _, client in ipairs(lsp.get_clients({ bufnr = vim._resolve_bufnr(bufnr) })) do
     result[client.id] = client
   end
   return result
@@ -1240,7 +1250,7 @@ function lsp.for_each_buffer_client(bufnr, fn)
     'lsp.get_clients({ bufnr = bufnr }) with regular loop',
     '0.12'
   )
-  bufnr = resolve_bufnr(bufnr)
+  bufnr = vim._resolve_bufnr(bufnr)
 
   for _, client in pairs(lsp.get_clients({ bufnr = bufnr })) do
     fn(client, client.id, bufnr)
@@ -1255,44 +1265,6 @@ function lsp.with(handler, override_config)
   return function(err, result, ctx, config)
     return handler(err, result, ctx, vim.tbl_deep_extend('force', config or {}, override_config))
   end
-end
-
---- Helper function to use when implementing a handler.
---- This will check that all of the keys in the user configuration
---- are valid keys and make sense to include for this handler.
----
---- Will error on invalid keys (i.e. keys that do not exist in the options)
---- @param name string
---- @param options table<string,any>
---- @param user_config table<string,any>
-function lsp._with_extend(name, options, user_config)
-  user_config = user_config or {}
-
-  local resulting_config = {} --- @type table<string,any>
-  for k, v in pairs(user_config) do
-    if options[k] == nil then
-      error(
-        debug.traceback(
-          string.format(
-            'Invalid option for `%s`: %s. Valid options are:\n%s',
-            name,
-            k,
-            vim.inspect(vim.tbl_keys(options))
-          )
-        )
-      )
-    end
-
-    resulting_config[k] = v
-  end
-
-  for k, v in pairs(options) do
-    if resulting_config[k] == nil then
-      resulting_config[k] = v
-    end
-  end
-
-  return resulting_config
 end
 
 --- Registry for client side commands.

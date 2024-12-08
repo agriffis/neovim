@@ -192,9 +192,7 @@ local function get_lines(bufnr, rows)
   rows = type(rows) == 'table' and rows or { rows }
 
   -- This is needed for bufload and bufloaded
-  if bufnr == 0 then
-    bufnr = api.nvim_get_current_buf()
-  end
+  bufnr = vim._resolve_bufnr(bufnr)
 
   local function buf_lines()
     local lines = {} --- @type table<integer,string>
@@ -1976,7 +1974,7 @@ function M.make_given_range_params(start_pos, end_pos, bufnr, position_encoding)
   validate('start_pos', start_pos, 'table', true)
   validate('end_pos', end_pos, 'table', true)
   validate('position_encoding', position_encoding, 'string', true)
-  bufnr = bufnr or api.nvim_get_current_buf()
+  bufnr = vim._resolve_bufnr(bufnr)
   if position_encoding == nil then
     vim.notify_once(
       'position_encoding param is required in vim.lsp.util.make_given_range_params. Defaulting to position encoding of the first client.',
@@ -2143,10 +2141,7 @@ end
 ---@param opts? vim.lsp.util._refresh.Opts Options table
 function M._refresh(method, opts)
   opts = opts or {}
-  local bufnr = opts.bufnr
-  if bufnr == nil or bufnr == 0 then
-    bufnr = api.nvim_get_current_buf()
-  end
+  local bufnr = vim._resolve_bufnr(opts.bufnr)
 
   local clients = vim.lsp.get_clients({ bufnr = bufnr, method = method, id = opts.client_id })
 
@@ -2162,6 +2157,11 @@ function M._refresh(method, opts)
         local first = vim.fn.line('w0', window)
         local last = vim.fn.line('w$', window)
         for _, client in ipairs(clients) do
+          for rid, req in pairs(client.requests) do
+            if req.method == method and req.type == 'pending' and req.bufnr == bufnr then
+              client:cancel_request(rid)
+            end
+          end
           client:request(method, {
             textDocument = textDocument,
             range = make_line_range_params(bufnr, first - 1, last - 1, client.offset_encoding),
