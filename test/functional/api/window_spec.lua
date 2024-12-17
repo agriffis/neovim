@@ -359,6 +359,15 @@ describe('API/win', function()
       eq(2, api.nvim_win_get_height(api.nvim_list_wins()[2]))
     end)
 
+    it('failure modes', function()
+      command('split')
+      eq('Invalid window id: 999999', pcall_err(api.nvim_win_set_height, 999999, 10))
+      eq(
+        'Wrong type for argument 2 when calling nvim_win_set_height, expecting Integer',
+        pcall_err(api.nvim_win_set_height, 0, 0.9)
+      )
+    end)
+
     it('correctly handles height=1', function()
       command('split')
       api.nvim_set_current_win(api.nvim_list_wins()[1])
@@ -407,6 +416,15 @@ describe('API/win', function()
       )
       api.nvim_win_set_width(api.nvim_list_wins()[2], 2)
       eq(2, api.nvim_win_get_width(api.nvim_list_wins()[2]))
+    end)
+
+    it('failure modes', function()
+      command('vsplit')
+      eq('Invalid window id: 999999', pcall_err(api.nvim_win_set_width, 999999, 10))
+      eq(
+        'Wrong type for argument 2 when calling nvim_win_set_width, expecting Integer',
+        pcall_err(api.nvim_win_set_width, 0, 0.9)
+      )
     end)
 
     it('do not cause ml_get errors with foldmethod=expr #19989', function()
@@ -1664,7 +1682,7 @@ describe('API/win', function()
         autocmd BufWinEnter * ++once let fired = v:true
       ]])
       eq(
-        'Failed to set buffer 2',
+        'Vim:E37: No write since last change (add ! to override)',
         pcall_err(api.nvim_open_win, api.nvim_create_buf(true, true), false, { split = 'left' })
       )
       eq(false, eval('fired'))

@@ -746,40 +746,28 @@ void win_set_buf(win_T *win, buf_T *buf, Error *err)
   RedrawingDisabled++;
 
   switchwin_T switchwin;
-  if (switch_win_noblock(&switchwin, win, tab, true) == FAIL) {
-    api_set_error(err,
-                  kErrorTypeException,
-                  "Failed to switch to window %d",
-                  win->handle);
-    goto cleanup;
-  }
 
-  try_start();
+  TRY_WRAP(err, {
+    int win_result = switch_win_noblock(&switchwin, win, tab, true);
+    if (win_result != FAIL) {
+      const int save_acd = p_acd;
+      if (!switchwin.sw_same_win) {
+        // Temporarily disable 'autochdir' when setting buffer in another window.
+        p_acd = false;
+      }
 
-  const int save_acd = p_acd;
-  if (!switchwin.sw_same_win) {
-    // Temporarily disable 'autochdir' when setting buffer in another window.
-    p_acd = false;
-  }
+      do_buffer(DOBUF_GOTO, DOBUF_FIRST, FORWARD, buf->b_fnum, 0);
 
-  int result = do_buffer(DOBUF_GOTO, DOBUF_FIRST, FORWARD, buf->b_fnum, 0);
-
-  if (!switchwin.sw_same_win) {
-    p_acd = save_acd;
-  }
-
-  if (!try_end(err) && result == FAIL) {
-    api_set_error(err,
-                  kErrorTypeException,
-                  "Failed to set buffer %d",
-                  buf->handle);
-  }
+      if (!switchwin.sw_same_win) {
+        p_acd = save_acd;
+      }
+    }
+  });
 
   // If window is not current, state logic will not validate its cursor. So do it now.
   // Still needed if do_buffer returns FAIL (e.g: autocmds abort script after buffer was set).
   validate_cursor(curwin);
 
-cleanup:
   restore_win_noblock(&switchwin, true);
   RedrawingDisabled--;
 }
@@ -5175,8 +5163,8 @@ win_T *win_alloc(win_T *after, bool hidden)
   return new_wp;
 }
 
-// Free one wininfo_T.
-void free_wininfo(wininfo_T *wip, buf_T *bp)
+// Free one WinInfo.
+void free_wininfo(WinInfo *wip, buf_T *bp)
 {
   if (wip->wi_optset) {
     clear_winopt(&wip->wi_opt);
@@ -5241,30 +5229,24 @@ void win_free(win_T *wp, tabpage_T *tp)
   // Remove the window from the b_wininfo lists, it may happen that the
   // freed memory is re-used for another window.
   FOR_ALL_BUFFERS(buf) {
-    for (wininfo_T *wip = buf->b_wininfo; wip != NULL; wip = wip->wi_next) {
+    WinInfo *wip_wp = NULL;
+    size_t pos_null = kv_size(buf->b_wininfo);
+    for (size_t i = 0; i < kv_size(buf->b_wininfo); i++) {
+      WinInfo *wip = kv_A(buf->b_wininfo, i);
       if (wip->wi_win == wp) {
-        wininfo_T *wip2;
+        wip_wp = wip;
+      } else if (wip->wi_win == NULL) {
+        pos_null = i;
+      }
+    }
 
-        // If there already is an entry with "wi_win" set to NULL it
-        // must be removed, it would never be used.
-        // Skip "wip" itself, otherwise Coverity complains.
-        for (wip2 = buf->b_wininfo; wip2 != NULL; wip2 = wip2->wi_next) {
-          // `wip2 != wip` to satisfy Coverity. #14884
-          if (wip2 != wip && wip2->wi_win == NULL) {
-            if (wip2->wi_next != NULL) {
-              wip2->wi_next->wi_prev = wip2->wi_prev;
-            }
-            if (wip2->wi_prev == NULL) {
-              buf->b_wininfo = wip2->wi_next;
-            } else {
-              wip2->wi_prev->wi_next = wip2->wi_next;
-            }
-            free_wininfo(wip2, buf);
-            break;
-          }
-        }
-
-        wip->wi_win = NULL;
+    if (wip_wp) {
+      wip_wp->wi_win = NULL;
+      // If there already is an entry with "wi_win" set to NULL it
+      // must be removed, it would never be used.
+      if (pos_null < kv_size(buf->b_wininfo)) {
+        free_wininfo(kv_A(buf->b_wininfo, pos_null), buf);
+        kv_shift(buf->b_wininfo, pos_null, 1);
       }
     }
   }

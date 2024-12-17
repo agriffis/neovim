@@ -59,12 +59,7 @@ void nvim_win_set_buf(Window window, Buffer buffer, Error *err)
 {
   win_T *win = find_window_by_handle(window, err);
   buf_T *buf = find_buffer_by_handle(buffer, err);
-  if (!win || !buf || win->w_buffer == buf) {
-    return;
-  }
-
-  if (win->w_p_wfb) {
-    api_set_error(err, kErrorTypeException, "%s", e_winfixbuf_cannot_go_to_buffer);
+  if (!win || !buf) {
     return;
   }
 
@@ -187,14 +182,9 @@ void nvim_win_set_height(Window window, Integer height, Error *err)
     return;
   }
 
-  if (height > INT_MAX || height < INT_MIN) {
-    api_set_error(err, kErrorTypeValidation, "Height value outside range");
-    return;
-  }
-
-  try_start();
-  win_setheight_win((int)height, win);
-  try_end(err);
+  TRY_WRAP(err, {
+    win_setheight_win((int)height, win);
+  });
 }
 
 /// Gets the window width
@@ -229,14 +219,9 @@ void nvim_win_set_width(Window window, Integer width, Error *err)
     return;
   }
 
-  if (width > INT_MAX || width < INT_MIN) {
-    api_set_error(err, kErrorTypeValidation, "Width value outside range");
-    return;
-  }
-
-  try_start();
-  win_setwidth_win((int)width, win);
-  try_end(err);
+  TRY_WRAP(err, {
+    win_setwidth_win((int)width, win);
+  });
 }
 
 /// Gets a window-scoped (w:) variable
@@ -441,15 +426,15 @@ Object nvim_win_call(Window window, LuaRef fun, Error *err)
   }
   tabpage_T *tabpage = win_find_tabpage(win);
 
-  try_start();
   Object res = OBJECT_INIT;
-  win_execute_T win_execute_args;
-  if (win_execute_before(&win_execute_args, win, tabpage)) {
-    Array args = ARRAY_DICT_INIT;
-    res = nlua_call_ref(fun, NULL, args, kRetLuaref, NULL, err);
-  }
-  win_execute_after(&win_execute_args);
-  try_end(err);
+  TRY_WRAP(err, {
+    win_execute_T win_execute_args;
+    if (win_execute_before(&win_execute_args, win, tabpage)) {
+      Array args = ARRAY_DICT_INIT;
+      res = nlua_call_ref(fun, NULL, args, kRetLuaref, NULL, err);
+    }
+    win_execute_after(&win_execute_args);
+  });
   return res;
 }
 

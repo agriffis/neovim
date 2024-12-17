@@ -596,6 +596,7 @@ ArrayOf(String) nvim_get_runtime_file(String name, Boolean all, Arena *arena, Er
   int flags = DIP_DIRFILE | (all ? DIP_ALL : 0);
   TryState tstate;
 
+  // XXX: intentionally not using `TRY_WRAP`, to avoid `did_emsg=false` in `try_end`.
   try_enter(&tstate);
   do_in_runtimepath((name.size ? name.data : ""), flags, find_runtime_cb, &cookie);
   vim_ignored = try_leave(&tstate, err);
@@ -668,16 +669,9 @@ void nvim_set_current_dir(String dir, Error *err)
   memcpy(string, dir.data, dir.size);
   string[dir.size] = NUL;
 
-  try_start();
-
-  if (!changedir_func(string, kCdScopeGlobal)) {
-    if (!try_end(err)) {
-      api_set_error(err, kErrorTypeException, "Failed to change directory");
-    }
-    return;
-  }
-
-  try_end(err);
+  TRY_WRAP(err, {
+    changedir_func(string, kCdScopeGlobal);
+  });
 }
 
 /// Gets the current line.
@@ -888,23 +882,13 @@ void nvim_set_current_buf(Buffer buffer, Error *err)
 {
   buf_T *buf = find_buffer_by_handle(buffer, err);
 
-  if (!buf || curwin->w_buffer == buf) {
+  if (!buf) {
     return;
   }
 
-  if (curwin->w_p_wfb) {
-    api_set_error(err, kErrorTypeException, "%s", e_winfixbuf_cannot_go_to_buffer);
-    return;
-  }
-
-  try_start();
-  int result = do_buffer(DOBUF_GOTO, DOBUF_FIRST, FORWARD, buf->b_fnum, 0);
-  if (!try_end(err) && result == FAIL) {
-    api_set_error(err,
-                  kErrorTypeException,
-                  "Failed to switch to buffer %d",
-                  buffer);
-  }
+  TRY_WRAP(err, {
+    do_buffer(DOBUF_GOTO, DOBUF_FIRST, FORWARD, buf->b_fnum, 0);
+  });
 }
 
 /// Gets the current list of window handles.
@@ -951,14 +935,9 @@ void nvim_set_current_win(Window window, Error *err)
     return;
   }
 
-  try_start();
-  goto_tabpage_win(win_find_tabpage(win), win);
-  if (!try_end(err) && win != curwin) {
-    api_set_error(err,
-                  kErrorTypeException,
-                  "Failed to switch to window %d",
-                  window);
-  }
+  TRY_WRAP(err, {
+    goto_tabpage_win(win_find_tabpage(win), win);
+  });
 }
 
 /// Creates a new, empty, unnamed buffer.
@@ -1217,14 +1196,9 @@ void nvim_set_current_tabpage(Tabpage tabpage, Error *err)
     return;
   }
 
-  try_start();
-  goto_tabpage_tp(tp, true, true);
-  if (!try_end(err) && tp != curtab) {
-    api_set_error(err,
-                  kErrorTypeException,
-                  "Failed to switch to tabpage %d",
-                  tabpage);
-  }
+  TRY_WRAP(err, {
+    goto_tabpage_tp(tp, true, true);
+  });
 }
 
 /// Pastes at cursor (in any mode), and sets "redo" so dot (|.|) will repeat the input. UIs call
