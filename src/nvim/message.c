@@ -130,7 +130,7 @@ bool keep_msg_more = false;    // keep_msg was set by msgmore()
 // msg_scrolled     How many lines the screen has been scrolled (because of
 //                  messages).  Used in update_screen() to scroll the screen
 //                  back.  Incremented each time the screen scrolls a line.
-// msg_scrolled_ign  true when msg_scrolled is non-zero and msg_puts_hl_id()
+// msg_scrolled_ign  true when msg_scrolled is non-zero and msg_puts_hl()
 //                  writes something without scrolling should not make
 //                  need_wait_return to be set.  This is a hack to make ":ts"
 //                  work without an extra prompt.
@@ -153,6 +153,7 @@ static sattr_T msg_ext_last_attr = -1;
 static int msg_ext_last_hl_id;
 static size_t msg_ext_cur_len = 0;
 
+static bool msg_ext_history = false;  ///< message was added to history
 static bool msg_ext_overwrite = false;  ///< will overwrite last message
 static int msg_ext_visible = 0;  ///< number of messages currently visible
 
@@ -244,7 +245,7 @@ void msg_grid_validate(void)
 int verb_msg(const char *s)
 {
   verbose_enter();
-  int n = msg_hl_keep(s, 0, false, false);
+  int n = msg_keep(s, 0, false, false);
   verbose_leave();
 
   return n;
@@ -257,7 +258,7 @@ int verb_msg(const char *s)
 bool msg(const char *s, const int hl_id)
   FUNC_ATTR_NONNULL_ARG(1)
 {
-  return msg_hl_keep(s, hl_id, false, false);
+  return msg_keep(s, hl_id, false, false);
 }
 
 /// Similar to msg_outtrans_len, but support newlines and tabs.
@@ -309,7 +310,7 @@ void msg_multihl(HlMessage hl_msg, const char *kind, bool history)
 }
 
 /// @param keep set keep_msg if it doesn't scroll
-bool msg_hl_keep(const char *s, int hl_id, bool keep, bool multiline)
+bool msg_keep(const char *s, int hl_id, bool keep, bool multiline)
   FUNC_ATTR_NONNULL_ALL
 {
   static int entered = 0;
@@ -514,7 +515,7 @@ int smsg(int hl_id, const char *s, ...)
   return msg(IObuff, hl_id);
 }
 
-int smsg_hl_keep(int hl_id, const char *s, ...)
+int smsg_keep(int hl_id, const char *s, ...)
   FUNC_ATTR_PRINTF(2, 3)
 {
   va_list arglist;
@@ -522,7 +523,7 @@ int smsg_hl_keep(int hl_id, const char *s, ...)
   va_start(arglist, s);
   vim_vsnprintf(IObuff, IOSIZE, s, arglist);
   va_end(arglist);
-  return msg_hl_keep(IObuff, hl_id, true, false);
+  return msg_keep(IObuff, hl_id, true, false);
 }
 
 // Remember the last sourcing name/lnum used in an error message, so that it
@@ -767,7 +768,7 @@ bool emsg_multiline(const char *s, bool multiline)
 
   // Display the error message itself.
   msg_nowait = false;  // Wait for this msg.
-  return msg_hl_keep(s, hl_id, false, multiline);
+  return msg_keep(s, hl_id, false, multiline);
 }
 
 /// emsg() - display an error message
@@ -988,7 +989,7 @@ static void add_msg_hist(const char *s, int len, int hl_id, bool multiline)
 static void add_msg_hist_multihl(const char *s, int len, int hl_id, bool multiline,
                                  HlMessage multihl)
 {
-  if (msg_hist_off || msg_silent != 0) {
+  if (msg_hist_off || msg_silent != 0 || (s != NULL && *s == NUL)) {
     hl_msg_free(multihl);
     return;
   }
@@ -999,12 +1000,13 @@ static void add_msg_hist_multihl(const char *s, int len, int hl_id, bool multili
     if (len < 0) {
       len = (int)strlen(s);
     }
+    assert(len > 0);
     // remove leading and trailing newlines
-    while (len > 0 && *s == '\n') {
+    while (*s == '\n') {
       s++;
       len--;
     }
-    while (len > 0 && s[len - 1] == '\n') {
+    while (s[len - 1] == '\n') {
       len--;
     }
     p->msg = xmemdupz(s, (size_t)len);
@@ -1024,6 +1026,7 @@ static void add_msg_hist_multihl(const char *s, int len, int hl_id, bool multili
     first_msg_hist = last_msg_hist;
   }
   msg_hist_len++;
+  msg_ext_history = true;
 
   check_msg_hist();
 }
@@ -1193,7 +1196,7 @@ void ex_messages(exarg_T *eap)
       if (kv_size(p->multihl)) {
         msg_multihl(p->multihl, p->kind, false);
       } else if (p->msg != NULL) {
-        msg_hl_keep(p->msg, p->hl_id, false, p->multiline);
+        msg_keep(p->msg, p->hl_id, false, p->multiline);
       }
     }
     msg_hist_off = false;
@@ -2103,12 +2106,12 @@ void msg_outtrans_long(const char *longstr, int hl_id)
   int len = (int)strlen(longstr);
   int slen = len;
   int room = Columns - msg_col;
-  if (len > room && room >= 20) {
+  if (!ui_has(kUIMessages) && len > room && room >= 20) {
     slen = (room - 3) / 2;
     msg_outtrans_len(longstr, slen, hl_id, false);
     msg_puts_hl("...", HLF_8, false);
   }
-  msg_outtrans_len(longstr + len - slen, slen, hl_id, len);
+  msg_outtrans_len(longstr + len - slen, slen, hl_id, false);
 }
 
 /// Basic function for writing a message with highlight id.
@@ -2176,27 +2179,6 @@ void msg_puts_len(const char *const str, const ptrdiff_t len, int hl_id, bool hi
   }
 
   need_fileinfo = false;
-}
-
-/// Print a formatted message
-///
-/// Message printed is limited by #IOSIZE. Must not be used from inside
-/// msg_puts_hl_id().
-///
-/// @param[in]  hl_id  Highlight id.
-/// @param[in]  fmt  Format string.
-void msg_printf_hl(const int hl_id, const char *const fmt, ...)
-  FUNC_ATTR_NONNULL_ARG(2) FUNC_ATTR_PRINTF(2, 3)
-{
-  static char msgbuf[IOSIZE];
-
-  va_list ap;
-  va_start(ap, fmt);
-  const size_t len = (size_t)vim_vsnprintf(msgbuf, sizeof(msgbuf), fmt, ap);
-  va_end(ap);
-
-  msg_scroll = true;
-  msg_puts_len(msgbuf, (ptrdiff_t)len, hl_id, true);
 }
 
 static void msg_ext_emit_chunk(void)
@@ -3159,13 +3141,14 @@ void msg_ext_ui_flush(void)
   msg_ext_emit_chunk();
   if (msg_ext_chunks->size > 0) {
     Array *tofree = msg_ext_init_chunks();
-    ui_call_msg_show(cstr_as_string(msg_ext_kind), *tofree, msg_ext_overwrite);
+    ui_call_msg_show(cstr_as_string(msg_ext_kind), *tofree, msg_ext_overwrite, msg_ext_history);
     api_free_array(*tofree);
     xfree(tofree);
     if (!msg_ext_overwrite) {
       msg_ext_visible++;
     }
     msg_ext_overwrite = false;
+    msg_ext_history = false;
     msg_ext_kind = NULL;
   }
 }
