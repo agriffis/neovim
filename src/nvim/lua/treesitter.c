@@ -17,10 +17,12 @@
 
 #ifdef HAVE_WASMTIME
 # include <wasm.h>
+
+# include "nvim/os/fs.h"
 #endif
 
-#include "klib/kvec.h"
 #include "nvim/api/private/helpers.h"
+#include "nvim/ascii_defs.h"
 #include "nvim/buffer_defs.h"
 #include "nvim/globals.h"
 #include "nvim/lua/treesitter.h"
@@ -28,7 +30,6 @@
 #include "nvim/map_defs.h"
 #include "nvim/memline.h"
 #include "nvim/memory.h"
-#include "nvim/os/fs.h"
 #include "nvim/pos_defs.h"
 #include "nvim/strings.h"
 #include "nvim/types_defs.h"
