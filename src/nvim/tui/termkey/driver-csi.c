@@ -31,9 +31,18 @@ static TermKeyResult handle_csi_ss3_full(TermKey *tk, TermKeyKey *key, int cmd,
 
   if (nparams > 1 && params[1].param != NULL) {
     int arg = 0;
-    result = termkey_interpret_csi_param(params[1], &arg, NULL, NULL);
+    int subparam = 0;
+    size_t nsubparams = 1;
+    result = termkey_interpret_csi_param(params[1], &arg, &subparam, &nsubparams);
     if (result != TERMKEY_RES_KEY) {
       return result;
+    }
+
+    if (nsubparams > 0) {
+      key->event = parse_key_event(subparam);
+      if (key->event == TERMKEY_EVENT_UNKNOWN) {
+        return TERMKEY_RES_NONE;
+      }
     }
 
     key->modifiers = arg - 1;
@@ -103,9 +112,18 @@ static TermKeyResult handle_csifunc(TermKey *tk, TermKeyKey *key, int cmd, TermK
   int args[3];
 
   if (nparams > 1 && params[1].param != NULL) {
-    result = termkey_interpret_csi_param(params[1], &args[1], NULL, NULL);
+    int subparam = 0;
+    size_t nsubparams = 1;
+    result = termkey_interpret_csi_param(params[1], &args[1], &subparam, &nsubparams);
     if (result != TERMKEY_RES_KEY) {
       return result;
+    }
+
+    if (nsubparams > 0) {
+      key->event = parse_key_event(subparam);
+      if (key->event == TERMKEY_EVENT_UNKNOWN) {
+        return TERMKEY_RES_NONE;
+      }
     }
 
     key->modifiers = args[1] - 1;
@@ -177,9 +195,11 @@ static TermKeyResult handle_csi_u(TermKey *tk, TermKeyKey *key, int cmd, TermKey
         return TERMKEY_RES_ERROR;
       }
 
-      if (nsubparams > 0 && subparam != 1) {
-        // Not a press event. Ignore for now
-        return TERMKEY_RES_NONE;
+      if (nsubparams > 0) {
+        key->event = parse_key_event(subparam);
+        if (key->event == TERMKEY_EVENT_UNKNOWN) {
+          return TERMKEY_RES_NONE;
+        }
       }
 
       key->modifiers = args[1] - 1;
@@ -417,6 +437,20 @@ TermKeyResult termkey_interpret_modereport(TermKey *tk, const TermKeyKey *key, i
 }
 
 #define CHARAT(i) (tk->buffer[tk->buffstart + (i)])
+
+static TermKeyEvent parse_key_event(int n)
+{
+  switch (n) {
+  case 1:
+    return TERMKEY_EVENT_PRESS;
+  case 2:
+    return TERMKEY_EVENT_REPEAT;
+  case 3:
+    return TERMKEY_EVENT_RELEASE;
+  default:
+    return TERMKEY_EVENT_UNKNOWN;
+  }
+}
 
 static TermKeyResult parse_csi(TermKey *tk, size_t introlen, size_t *csi_len,
                                TermKeyCsiParam params[], size_t *nargs, unsigned *commandp)
