@@ -1485,31 +1485,29 @@ describe('cmdheight=0', function()
   it('when substitute text', function()
     command('set cmdheight=0 noruler laststatus=3')
     feed('ifoo<ESC>')
-    screen:expect {
-      grid = [[
+    screen:try_resize(screen._width, 7)
+    screen:expect([[
       fo^o                      |
-      {1:~                        }|*3
+      {1:~                        }|*5
       {3:[No Name] [+]            }|
-    ]],
-    }
+    ]])
 
     feed(':%s/foo/bar/gc<CR>')
-    screen:expect {
-      grid = [[
+    screen:expect([[
       {2:foo}                      |
-      {1:~                        }|*3
-      {6:replace wi...q/l/^E/^Y)?}^ |
-    ]],
-    }
+      {3:                         }|
+                               |*2
+      {6:replace with bar? (y)es/(}|
+      {6:n)o/(a)ll/(q)uit/(l)ast/s}|
+      {6:croll up(^E)/down(^Y)}^    |
+    ]])
 
     feed('y')
-    screen:expect {
-      grid = [[
+    screen:expect([[
       ^bar                      |
-      {1:~                        }|*3
+      {1:~                        }|*5
       {3:[No Name] [+]            }|
-    ]],
-    }
+    ]])
 
     assert_alive()
   end)
