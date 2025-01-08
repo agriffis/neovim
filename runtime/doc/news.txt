@@ -287,6 +287,8 @@ PERFORMANCE
   highlighting.
 • LSP diagnostics and inlay hints are de-duplicated (new requests cancel
   inflight requests). This greatly improves performance with slow LSP servers.
+• 10x speedup for |vim.treesitter.foldexpr()| (when no parser exists for the
+  buffer).
 
 PLUGINS
 
@@ -357,6 +359,8 @@ UI
 • |vim.diagnostic.setqflist()| updates an existing quickfix list with the
   given title if found
 • |ui-messages| content chunks now also contain the highlight group ID.
+• |:checkhealth| can be display in a floating window and controlled by
+  the |g:health| variable.
 
 ==============================================================================
 CHANGED FEATURES                                                 *news-changed*
