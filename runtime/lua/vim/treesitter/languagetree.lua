@@ -123,7 +123,7 @@ function LanguageTree.new(source, lang, opts)
 
   local injections = opts.injections or {}
 
-  --- @type vim.treesitter.LanguageTree
+  --- @class vim.treesitter.LanguageTree
   local self = {
     _source = source,
     _lang = lang,
@@ -190,7 +190,7 @@ end
 
 ---Measure execution time of a function
 ---@generic R1, R2, R3
----@param f fun(): R1, R2, R2
+---@param f fun(): R1, R2, R3
 ---@return number, R1, R2, R3
 local function tcall(f, ...)
   local start = vim.uv.hrtime()
@@ -198,6 +198,7 @@ local function tcall(f, ...)
   local r = { f(...) }
   --- @type number
   local duration = (vim.uv.hrtime() - start) / 1000000
+  --- @diagnostic disable-next-line: redundant-return-value
   return duration, unpack(r)
 end
 
@@ -474,13 +475,18 @@ function LanguageTree:_async_parse(range, on_parse)
     return
   end
 
-  local buf = vim.b[self._source]
+  local source = self._source
+  local buf = vim.b[source]
   local ct = buf.changedtick
   local total_parse_time = 0
   local redrawtime = vim.o.redrawtime
   local timeout = not vim.g._ts_force_sync_parsing and default_parse_timeout_ms or nil
 
   local function step()
+    if type(source) == 'number' and not vim.api.nvim_buf_is_valid(source) then
+      return nil
+    end
+
     -- If buffer was changed in the middle of parsing, reset parse state
     if buf.changedtick ~= ct then
       ct = buf.changedtick
@@ -550,14 +556,14 @@ function LanguageTree:_parse(range, timeout)
   local no_regions_parsed = 0
   local query_time = 0
   local total_parse_time = 0
-  local is_finished --- @type boolean
 
   -- At least 1 region is invalid
   if not self:is_valid(true) then
+    local is_finished
     changes, no_regions_parsed, total_parse_time, is_finished = self:_parse_regions(range, timeout)
     timeout = timeout and math.max(timeout - total_parse_time, 0)
     if not is_finished then
-      return self._trees, is_finished
+      return self._trees, false
     end
     -- Need to run injections when we parsed something
     if no_regions_parsed > 0 then
@@ -740,6 +746,7 @@ function LanguageTree:set_included_regions(new_regions)
       if type(range) == 'table' and #range == 4 then
         region[i] = Range.add_bytes(self._source, range --[[@as Range4]])
       elseif type(range) == 'userdata' then
+        --- @diagnostic disable-next-line: missing-fields LuaLS varargs bug
         region[i] = { range:range(true) }
       end
     end
@@ -951,7 +958,7 @@ end
 --- @private
 --- @return table<string, Range6[][]>
 function LanguageTree:_get_injections()
-  if not self._injection_query then
+  if not self._injection_query or #self._injection_query.captures == 0 then
     return {}
   end
 

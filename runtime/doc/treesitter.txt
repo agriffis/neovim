@@ -572,6 +572,10 @@ associated with patterns:
     • `injection.parent` - indicates that the captured node’s text should
       be parsed with the same language as the node's parent LanguageTree.
 
+Injection queries are currently run over the entire buffer, which can be slow
+for large buffers. To disable injections for, e.g.,  `c`, just place an
+empty `queries/c/injections.scm` file in your 'runtimepath'.
+
 ==============================================================================
 VIM.TREESITTER                                                *lua-treesitter*
 
@@ -832,7 +836,13 @@ TSNode:range({include_bytes})                                 *TSNode:range()*
     • end byte (if {include_bytes} is `true`)
 
     Parameters: ~
-      • {include_bytes}  (`boolean?`)
+      • {include_bytes}  (`false?`)
+
+    Return (multiple): ~
+        (`integer`)
+        (`integer`)
+        (`integer`)
+        (`integer`)
 
 TSNode:sexpr()                                                *TSNode:sexpr()*
     Get an S-expression representing the node as a string.
@@ -942,7 +952,7 @@ get_node_range({node_or_range})              *vim.treesitter.get_node_range()*
     Returns the node's range or an unpacked range table
 
     Parameters: ~
-      • {node_or_range}  (`TSNode|table`) Node or table of positions
+      • {node_or_range}  (`TSNode|Range4`) Node or table of positions
 
     Return (multiple): ~
         (`integer`) start_row
@@ -1181,7 +1191,7 @@ inspect({lang})                            *vim.treesitter.language.inspect()*
       • {lang}  (`string`) Language
 
     Return: ~
-        (`table`)
+        (`TSLangInfo`)
 
 register({lang}, {filetype})              *vim.treesitter.language.register()*
     Register a parser named {lang} to be used for {filetype}(s).
@@ -1339,7 +1349,7 @@ parse({lang}, {query})                          *vim.treesitter.query.parse()*
       `info.captures`).
     • `info.patterns`: information about predicates.
 
-    Example (to try it, use `g==` or select the code then run `:'<,'>lua`): >lua
+    Example: >lua
         local query = vim.treesitter.query.parse('vimdoc', [[
           ; query
           ((h1) @str
@@ -1456,8 +1466,18 @@ Query:iter_matches({node}, {source}, {start}, {stop}, {opts})
 set({lang}, {query_name}, {text})                 *vim.treesitter.query.set()*
     Sets the runtime query named {query_name} for {lang}
 
-    This allows users to override any runtime files and/or configuration set
-    by plugins.
+    This allows users to override or extend any runtime files and/or
+    configuration set by plugins.
+
+    For example, you could enable spellchecking of `C` identifiers with the
+    following code: >lua
+        vim.treesitter.query.set(
+          'c',
+          'highlights',
+          [[;inherits c
+          (identifier) @spell]])
+        ]])
+<
 
     Parameters: ~
       • {lang}        (`string`) Language to use for the query

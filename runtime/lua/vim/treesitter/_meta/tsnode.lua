@@ -68,12 +68,6 @@ function TSNode:named_child_count() end
 --- @return TSNode?
 function TSNode:named_child(index) end
 
---- Get the node's child that contains {descendant}.
---- @param descendant TSNode
---- @return TSNode?
---- @deprecated
-function TSNode:child_containing_descendant(descendant) end
-
 --- Get the node's child that contains {descendant} (includes {descendant}).
 ---
 --- For example, with the following node hierarchy:
@@ -109,17 +103,9 @@ function TSNode:end_() end
 --- - end row
 --- - end column
 --- - end byte (if {include_bytes} is `true`)
---- @param include_bytes boolean?
-function TSNode:range(include_bytes) end
-
---- @nodoc
 --- @param include_bytes false?
 --- @return integer, integer, integer, integer
-function TSNode:range(include_bytes) end
-
---- @nodoc
---- @param include_bytes true
---- @return integer, integer, integer, integer, integer, integer
+--- @overload fun(self: TSNode, include_bytes: true): integer, integer, integer, integer, integer, integer
 function TSNode:range(include_bytes) end
 
 --- Get the node's type as a string.
