@@ -2390,6 +2390,85 @@ func Test_getchar()
   call assert_equal("\<M-F2>", getchar(0))
   call assert_equal(0, getchar(0))
 
+  call feedkeys("\<Tab>", '')
+  call assert_equal(char2nr("\<Tab>"), getchar())
+  call feedkeys("\<Tab>", '')
+  call assert_equal(char2nr("\<Tab>"), getchar(-1))
+  call feedkeys("\<Tab>", '')
+  call assert_equal(char2nr("\<Tab>"), getchar(-1, {}))
+  call feedkeys("\<Tab>", '')
+  call assert_equal(char2nr("\<Tab>"), getchar(-1, #{number: v:true}))
+  call assert_equal(0, getchar(0))
+  call assert_equal(0, getchar(1))
+  call assert_equal(0, getchar(0, #{number: v:true}))
+  call assert_equal(0, getchar(1, #{number: v:true}))
+
+  call feedkeys("\<Tab>", '')
+  call assert_equal("\<Tab>", getcharstr())
+  call feedkeys("\<Tab>", '')
+  call assert_equal("\<Tab>", getcharstr(-1))
+  call feedkeys("\<Tab>", '')
+  call assert_equal("\<Tab>", getcharstr(-1, {}))
+  call feedkeys("\<Tab>", '')
+  call assert_equal("\<Tab>", getchar(-1, #{number: v:false}))
+  call assert_equal('', getcharstr(0))
+  call assert_equal('', getcharstr(1))
+  call assert_equal('', getchar(0, #{number: v:false}))
+  call assert_equal('', getchar(1, #{number: v:false}))
+
+  " Nvim: <M-x> is never simplified
+  " for key in ["C-I", "C-X", "M-x"]
+  for key in ["C-I", "C-X"]
+    let lines =<< eval trim END
+      call feedkeys("\<*{key}>", '')
+      call assert_equal(char2nr("\<{key}>"), getchar())
+      call feedkeys("\<*{key}>", '')
+      call assert_equal(char2nr("\<{key}>"), getchar(-1))
+      call feedkeys("\<*{key}>", '')
+      call assert_equal(char2nr("\<{key}>"), getchar(-1, {{}}))
+      call feedkeys("\<*{key}>", '')
+      call assert_equal(char2nr("\<{key}>"), getchar(-1, {{'number': 1}}))
+      call feedkeys("\<*{key}>", '')
+      call assert_equal(char2nr("\<{key}>"), getchar(-1, {{'simplify': 1}}))
+      call feedkeys("\<*{key}>", '')
+      call assert_equal("\<*{key}>", getchar(-1, {{'simplify': v:false}}))
+      call assert_equal(0, getchar(0))
+      call assert_equal(0, getchar(1))
+    END
+    call CheckLegacyAndVim9Success(lines)
+
+    let lines =<< eval trim END
+      call feedkeys("\<*{key}>", '')
+      call assert_equal("\<{key}>", getcharstr())
+      call feedkeys("\<*{key}>", '')
+      call assert_equal("\<{key}>", getcharstr(-1))
+      call feedkeys("\<*{key}>", '')
+      call assert_equal("\<{key}>", getcharstr(-1, {{}}))
+      call feedkeys("\<*{key}>", '')
+      call assert_equal("\<{key}>", getchar(-1, {{'number': 0}}))
+      call feedkeys("\<*{key}>", '')
+      call assert_equal("\<{key}>", getcharstr(-1, {{'simplify': 1}}))
+      call feedkeys("\<*{key}>", '')
+      call assert_equal("\<*{key}>", getcharstr(-1, {{'simplify': v:false}}))
+      call assert_equal('', getcharstr(0))
+      call assert_equal('', getcharstr(1))
+    END
+    call CheckLegacyAndVim9Success(lines)
+  endfor
+
+  call assert_fails('call getchar(1, 1)', 'E1206:')
+  call assert_fails('call getcharstr(1, 1)', 'E1206:')
+  call assert_fails('call getchar(1, #{cursor: "foo"})', 'E475:')
+  call assert_fails('call getcharstr(1, #{cursor: "foo"})', 'E475:')
+  call assert_fails('call getchar(1, #{cursor: 0z})', 'E976:')
+  call assert_fails('call getcharstr(1, #{cursor: 0z})', 'E976:')
+  call assert_fails('call getchar(1, #{simplify: 0z})', 'E974:')
+  call assert_fails('call getcharstr(1, #{simplify: 0z})', 'E974:')
+  call assert_fails('call getchar(1, #{number: []})', 'E745:')
+  call assert_fails('call getchar(1, #{number: {}})', 'E728:')
+  call assert_fails('call getcharstr(1, #{number: v:true})', 'E475:')
+  call assert_fails('call getcharstr(1, #{number: v:false})', 'E475:')
+
   call setline(1, 'xxxx')
   call Ntest_setmouse(1, 3)
   let v:mouse_win = 9
@@ -2405,10 +2484,59 @@ func Test_getchar()
   enew!
 endfunc
 
+func Test_getchar_cursor_position()
+  CheckRunVimInTerminal
+
+  let lines =<< trim END
+    call setline(1, ['foobar', 'foobar', 'foobar'])
+    call cursor(3, 6)
+    nnoremap <F1> <Cmd>echo 1234<Bar>call getchar()<CR>
+    nnoremap <F2> <Cmd>call getchar()<CR>
+    nnoremap <F3> <Cmd>call getchar(-1, {})<CR>
+    nnoremap <F4> <Cmd>call getchar(-1, #{cursor: 'msg'})<CR>
+    nnoremap <F5> <Cmd>call getchar(-1, #{cursor: 'keep'})<CR>
+    nnoremap <F6> <Cmd>call getchar(-1, #{cursor: 'hide'})<CR>
+  END
+  call writefile(lines, 'XgetcharCursorPos', 'D')
+  let buf = RunVimInTerminal('-S XgetcharCursorPos', {'rows': 6})
+  call WaitForAssert({-> assert_equal([3, 6], term_getcursor(buf)[0:1])})
+
+  call term_sendkeys(buf, "\<F1>")
+  call WaitForAssert({-> assert_equal([6, 5], term_getcursor(buf)[0:1])})
+  call assert_true(term_getcursor(buf)[2].visible)
+  call term_sendkeys(buf, 'a')
+  call WaitForAssert({-> assert_equal([3, 6], term_getcursor(buf)[0:1])})
+  call assert_true(term_getcursor(buf)[2].visible)
+
+  for key in ["\<F2>", "\<F3>", "\<F4>"]
+    call term_sendkeys(buf, key)
+    call WaitForAssert({-> assert_equal([6, 1], term_getcursor(buf)[0:1])})
+    call assert_true(term_getcursor(buf)[2].visible)
+    call term_sendkeys(buf, 'a')
+    call WaitForAssert({-> assert_equal([3, 6], term_getcursor(buf)[0:1])})
+    call assert_true(term_getcursor(buf)[2].visible)
+  endfor
+
+  call term_sendkeys(buf, "\<F5>")
+  call TermWait(buf, 50)
+  call assert_equal([3, 6], term_getcursor(buf)[0:1])
+  call assert_true(term_getcursor(buf)[2].visible)
+  call term_sendkeys(buf, 'a')
+  call TermWait(buf, 50)
+  call assert_equal([3, 6], term_getcursor(buf)[0:1])
+  call assert_true(term_getcursor(buf)[2].visible)
+
+  call term_sendkeys(buf, "\<F6>")
+  call WaitForAssert({-> assert_false(term_getcursor(buf)[2].visible)})
+  call term_sendkeys(buf, 'a')
+  call WaitForAssert({-> assert_true(term_getcursor(buf)[2].visible)})
+  call assert_equal([3, 6], term_getcursor(buf)[0:1])
+
+  call StopVimInTerminal(buf)
+endfunc
+
 func Test_libcall_libcallnr()
-  if !has('libcall')
-    return
-  endif
+  CheckFeature libcall
 
   if has('win32')
     let libc = 'msvcrt.dll'

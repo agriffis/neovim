@@ -150,10 +150,11 @@ end
 --- Overrides the setting from |vim.diagnostic.config()|.
 --- @field source? boolean|'if_many'
 ---
---- A function that takes a diagnostic as input and returns a string.
---- The return value is the text used to display the diagnostic.
+--- A function that takes a diagnostic as input and returns a string or nil.
+--- If the return value is nil, the diagnostic is not displayed by the handler.
+--- Else the output text is used to display the diagnostic.
 --- Overrides the setting from |vim.diagnostic.config()|.
---- @field format? fun(diagnostic:vim.Diagnostic): string
+--- @field format? fun(diagnostic:vim.Diagnostic): string?
 ---
 --- Prefix each diagnostic in the floating window:
 --- - If a `function`, {i} is the index of the diagnostic being evaluated and
@@ -207,7 +208,7 @@ end
 --- This can be used to render an LSP diagnostic error code.
 --- @field suffix? string|(fun(diagnostic:vim.Diagnostic): string)
 ---
---- The return value is the text used to display the diagnostic. Example:
+--- If not nil, the return value is the text used to display the diagnostic. Example:
 --- ```lua
 --- function(diagnostic)
 ---   if diagnostic.severity == vim.diagnostic.severity.ERROR then
@@ -216,7 +217,8 @@ end
 ---   return diagnostic.message
 --- end
 --- ```
---- @field format? fun(diagnostic:vim.Diagnostic): string
+--- If the return value is nil, the diagnostic is not displayed by the handler.
+--- @field format? fun(diagnostic:vim.Diagnostic): string?
 ---
 --- See |nvim_buf_set_extmark()|.
 --- @field hl_mode? 'replace'|'combine'|'blend'
@@ -239,9 +241,10 @@ end
 --- (default: `false`)
 --- @field current_line? boolean
 ---
---- A function that takes a diagnostic as input and returns a string.
---- The return value is the text used to display the diagnostic.
---- @field format? fun(diagnostic:vim.Diagnostic): string
+--- A function that takes a diagnostic as input and returns a string or nil.
+--- If the return value is nil, the diagnostic is not displayed by the handler.
+--- Else the output text is used to display the diagnostic.
+--- @field format? fun(diagnostic:vim.Diagnostic): string?
 
 --- @class vim.diagnostic.Opts.Signs
 ---
@@ -344,7 +347,6 @@ local global_diagnostic_options = {
 --- @class (private) vim.diagnostic.Handler
 --- @field show? fun(namespace: integer, bufnr: integer, diagnostics: vim.Diagnostic[], opts?: vim.diagnostic.OptsResolved)
 --- @field hide? fun(namespace:integer, bufnr:integer)
---- @field _augroup? integer
 
 --- @nodoc
 --- @type table<string,vim.diagnostic.Handler>
@@ -504,15 +506,21 @@ local function prefix_source(diagnostics)
   end, diagnostics)
 end
 
+--- @param format fun(vim.Diagnostic): string?
 --- @param diagnostics vim.Diagnostic[]
 --- @return vim.Diagnostic[]
 local function reformat_diagnostics(format, diagnostics)
   vim.validate('format', format, 'function')
   vim.validate('diagnostics', diagnostics, vim.islist, 'a list of diagnostics')
 
-  local formatted = vim.deepcopy(diagnostics, true)
-  for _, diagnostic in ipairs(formatted) do
-    diagnostic.message = format(diagnostic)
+  local formatted = {}
+  for _, diagnostic in ipairs(diagnostics) do
+    local message = format(diagnostic)
+    if message ~= nil then
+      local formatted_diagnostic = vim.deepcopy(diagnostic, true)
+      formatted_diagnostic.message = message
+      table.insert(formatted, formatted_diagnostic)
+    end
   end
   return formatted
 end
@@ -1806,20 +1814,26 @@ local function render_virtual_lines(namespace, bufnr, diagnostics)
   end
 end
 
---- @param diagnostics vim.Diagnostic[]
+--- @param diagnostics table<integer, vim.Diagnostic[]>
 --- @param namespace integer
 --- @param bufnr integer
 local function render_virtual_lines_at_current_line(diagnostics, namespace, bufnr)
-  local line_diagnostics = {}
   local lnum = api.nvim_win_get_cursor(0)[1] - 1
+  local cursor_diagnostics = {}
 
-  for _, diag in ipairs(diagnostics) do
-    if (lnum == diag.lnum) or (diag.end_lnum and lnum >= diag.lnum and lnum <= diag.end_lnum) then
-      table.insert(line_diagnostics, diag)
+  if diagnostics[lnum] ~= nil then
+    cursor_diagnostics = diagnostics[lnum]
+  else
+    for _, line_diags in pairs(diagnostics) do
+      for _, diag in ipairs(line_diags) do
+        if diag.end_lnum and lnum >= diag.lnum and lnum <= diag.end_lnum then
+          table.insert(cursor_diagnostics, diag)
+        end
+      end
     end
   end
 
-  render_virtual_lines(namespace, bufnr, line_diagnostics)
+  render_virtual_lines(namespace, bufnr, cursor_diagnostics)
 end
 
 M.handlers.virtual_lines = {
@@ -1841,27 +1855,32 @@ M.handlers.virtual_lines = {
       ns.user_data.virt_lines_ns =
         api.nvim_create_namespace(string.format('nvim.%s.diagnostic.virtual_lines', ns.name))
     end
-    if not M.handlers.virtual_lines._augroup then
-      M.handlers.virtual_lines._augroup =
-        api.nvim_create_augroup('nvim.lsp.diagnostic.virt_lines', { clear = true })
+    if not ns.user_data.virt_lines_augroup then
+      ns.user_data.virt_lines_augroup = api.nvim_create_augroup(
+        string.format('nvim.%s.diagnostic.virt_lines', ns.name),
+        { clear = true }
+      )
     end
 
-    api.nvim_clear_autocmds({ group = M.handlers.virtual_lines._augroup })
+    api.nvim_clear_autocmds({ group = ns.user_data.virt_lines_augroup, buffer = bufnr })
 
     if opts.virtual_lines.format then
       diagnostics = reformat_diagnostics(opts.virtual_lines.format, diagnostics)
     end
 
     if opts.virtual_lines.current_line == true then
+      -- Create a mapping from line -> diagnostics so that we can quickly get the
+      -- diagnostics we need when the cursor line doesn't change.
+      local line_diagnostics = diagnostic_lines(diagnostics)
       api.nvim_create_autocmd('CursorMoved', {
         buffer = bufnr,
-        group = M.handlers.virtual_lines._augroup,
+        group = ns.user_data.virt_lines_augroup,
         callback = function()
-          render_virtual_lines_at_current_line(diagnostics, ns.user_data.virt_lines_ns, bufnr)
+          render_virtual_lines_at_current_line(line_diagnostics, ns.user_data.virt_lines_ns, bufnr)
         end,
       })
       -- Also show diagnostics for the current line before the first CursorMoved event.
-      render_virtual_lines_at_current_line(diagnostics, ns.user_data.virt_lines_ns, bufnr)
+      render_virtual_lines_at_current_line(line_diagnostics, ns.user_data.virt_lines_ns, bufnr)
     else
       render_virtual_lines(ns.user_data.virt_lines_ns, bufnr, diagnostics)
     end
@@ -1875,7 +1894,7 @@ M.handlers.virtual_lines = {
       if api.nvim_buf_is_valid(bufnr) then
         api.nvim_buf_clear_namespace(bufnr, ns.user_data.virt_lines_ns, 0, -1)
       end
-      api.nvim_clear_autocmds({ group = M.handlers.virtual_lines._augroup })
+      api.nvim_clear_autocmds({ group = ns.user_data.virt_lines_augroup, buffer = bufnr })
     end
   end,
 }
