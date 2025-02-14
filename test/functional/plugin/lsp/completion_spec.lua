@@ -770,13 +770,14 @@ end)
 
 --- @param name string
 --- @param completion_result lsp.CompletionList
+--- @param trigger_chars? string[]
 --- @return integer
-local function create_server(name, completion_result)
+local function create_server(name, completion_result, trigger_chars)
   return exec_lua(function()
     local server = _G._create_server({
       capabilities = {
         completionProvider = {
-          triggerCharacters = { '.' },
+          triggerCharacters = trigger_chars or { '.' },
         },
       },
       handlers = {
@@ -793,6 +794,7 @@ local function create_server(name, completion_result)
       cmd = server.cmd,
       on_attach = function(client, bufnr0)
         vim.lsp.completion.enable(true, client.id, bufnr0, {
+          autotrigger = trigger_chars ~= nil,
           convert = function(item)
             return { abbr = item.label:gsub('%b()', '') }
           end,
@@ -957,6 +959,39 @@ describe('vim.lsp.completion: protocol', function()
     end)
   end)
 
+  it('insert char triggers clients matching trigger characters', function()
+    local results1 = {
+      isIncomplete = false,
+      items = {
+        {
+          label = 'hello',
+        },
+      },
+    }
+    create_server('dummy1', results1, { 'e' })
+    local results2 = {
+      isIncomplete = false,
+      items = {
+        {
+          label = 'hallo',
+        },
+      },
+    }
+    create_server('dummy2', results2, { 'h' })
+
+    feed('h')
+    exec_lua(function()
+      vim.v.char = 'h'
+      vim.cmd.startinsert()
+      vim.api.nvim_exec_autocmds('InsertCharPre', {})
+    end)
+
+    assert_matches(function(matches)
+      eq(1, #matches)
+      eq('hallo', matches[1].word)
+    end)
+  end)
+
   it('executes commands', function()
     local completion_list = {
       isIncomplete = false,
@@ -1075,6 +1110,44 @@ describe('vim.lsp.completion: integration', function()
       #'hello friends',
       exec_lua(function()
         return vim.api.nvim_win_get_cursor(0)[2]
+      end)
+    )
+  end)
+
+  it('#clear multiple-lines word', function()
+    local completion_list = {
+      isIncomplete = false,
+      items = {
+        {
+          label = 'then...end',
+          sortText = '0001',
+          insertText = 'then\n\t$0\nend',
+          kind = 15,
+          insertTextFormat = 2,
+        },
+      },
+    }
+    exec_lua(function()
+      vim.o.completeopt = 'menuone,noselect'
+    end)
+    create_server('dummy', completion_list)
+    feed('Sif true <C-X><C-O>')
+    retry(nil, nil, function()
+      eq(
+        1,
+        exec_lua(function()
+          return vim.fn.pumvisible()
+        end)
+      )
+    end)
+    feed('<C-n><C-y>')
+    eq(
+      { true, { 'if true then', '\t', 'end' } },
+      exec_lua(function()
+        return {
+          vim.snippet.active({ direction = 1 }),
+          vim.api.nvim_buf_get_lines(0, 0, -1, true),
+        }
       end)
     )
   end)
