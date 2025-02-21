@@ -92,4 +92,28 @@ describe('edit', function()
                                                                   |
     ]])
   end)
+
+  -- oldtest: Test_edit_CAR()
+  it('Enter inserts newline with pum at original text after adding leader', function()
+    local screen = Screen.new(10, 6)
+    command('set cot=menu,menuone,noselect')
+    feed('Shello hero<CR>h<C-X><C-N>e')
+    screen:expect([[
+      hello hero  |
+      he^          |
+      {4:hello       }|
+      {4:hero        }|
+      {1:~           }|
+      {5:--}          |
+    ]])
+
+    feed('<CR>')
+    screen:expect([[
+      hello hero  |
+      he          |
+      ^            |
+      {1:~           }|*2
+      {5:-- INSERT --}|
+    ]])
+  end)
 end)

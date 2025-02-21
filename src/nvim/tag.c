@@ -813,6 +813,7 @@ static void print_tag_list(bool new_tag, bool use_tagstack, int num_matches, cha
   if (msg_col == 0) {
     msg_didout = false;     // overwrite previous message
   }
+  msg_ext_set_kind("confirm");
   msg_start();
   msg_puts_hl(_("  # pri kind tag"), HLF_T, false);
   msg_clr_eos();
@@ -2556,7 +2557,7 @@ int get_tagfname(tagname_T *tnp, int first, char *buf)
       STRMOVE(filename + 1, filename);
       *filename++ = NUL;
 
-      tnp->tn_search_ctx = vim_findfile_init(buf, filename,
+      tnp->tn_search_ctx = vim_findfile_init(buf, filename, strlen(filename),
                                              r_ptr, 100,
                                              false,                   // don't free visited list
                                              FINDFILE_FILE,           // we search for a file

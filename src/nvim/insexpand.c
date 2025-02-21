@@ -1296,7 +1296,7 @@ static int ins_compl_build_pum(void)
             compl_shown_match = comp;
           }
         }
-        if (!shown_match_ok && comp == compl_shown_match && !compl_no_select) {
+        if (!shown_match_ok && comp == compl_shown_match) {
           cur = i;
           shown_match_ok = true;
         }
@@ -1744,6 +1744,7 @@ void ins_compl_clear(void)
   compl_cont_status = 0;
   compl_started = false;
   compl_matches = 0;
+  compl_selected_item = -1;
   compl_ins_end_col = 0;
   API_CLEAR_STRING(compl_pattern);
   API_CLEAR_STRING(compl_leader);
@@ -1912,7 +1913,7 @@ static void ins_compl_new_leader(void)
     compl_restarting = false;
   }
 
-  compl_enter_selects = !compl_used_match;
+  compl_enter_selects = !compl_used_match && compl_selected_item != -1;
 
   // Show the popup menu with a different set of matches.
   ins_compl_show_pum();
