@@ -329,4 +329,42 @@ describe('vim.lsp.util', function()
                                                            |
     ]])
   end)
+
+  it('open_floating_preview height reduced for concealed lines', function()
+    local screen = Screen.new()
+    screen:add_extra_attr_ids({
+      [100] = {
+        background = Screen.colors.LightMagenta,
+        foreground = Screen.colors.Brown,
+        bold = true,
+      },
+      [101] = { background = Screen.colors.LightMagenta, foreground = Screen.colors.Blue },
+      [102] = { background = Screen.colors.LightMagenta, foreground = Screen.colors.DarkCyan },
+    })
+    exec_lua([[
+      vim.g.syntax_on = false
+      vim.lsp.util.open_floating_preview({ '```lua', 'local foo', '```' }, 'markdown', {
+        border = 'single',
+        focus = false,
+      })
+    ]])
+    screen:expect([[
+      ^                                                     |
+      ┌─────────┐{1:                                          }|
+      │{100:local}{101: }{102:foo}│{1:                                          }|
+      └─────────┘{1:                                          }|
+      {1:~                                                    }|*9
+                                                           |
+    ]])
+    -- Entering window keeps lines concealed and doesn't end up below inner window size.
+    feed('<C-w>wG')
+    screen:expect([[
+                                                           |
+      ┌─────────┐{1:                                          }|
+      │{100:^local}{101: }{102:foo}│{1:                                          }|
+      └─────────┘{1:                                          }|
+      {1:~                                                    }|*9
+                                                           |
+    ]])
+  end)
 end)

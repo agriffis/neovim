@@ -229,8 +229,7 @@ char *estack_sfile(estack_arg_T which)
 }
 
 static void stacktrace_push_item(list_T *const l, ufunc_T *const fp, const char *const event,
-                                 const linenr_T lnum, char *const filepath,
-                                 const bool filepath_alloced)
+                                 const linenr_T lnum, char *const filepath)
 {
   dict_T *const d = tv_dict_alloc_lock(VAR_FIXED);
   typval_T tv = {
@@ -246,11 +245,7 @@ static void stacktrace_push_item(list_T *const l, ufunc_T *const fp, const char 
     tv_dict_add_str(d, S_LEN("event"), event);
   }
   tv_dict_add_nr(d, S_LEN("lnum"), lnum);
-  if (filepath_alloced) {
-    tv_dict_add_allocated_str(d, S_LEN("filepath"), filepath);
-  } else {
-    tv_dict_add_str(d, S_LEN("filepath"), filepath);
-  }
+  tv_dict_add_str(d, S_LEN("filepath"), filepath);
 
   tv_list_append_tv(l, &tv);
 }
@@ -265,20 +260,18 @@ list_T *stacktrace_create(void)
     linenr_T lnum = entry->es_lnum;
 
     if (entry->es_type == ETYPE_SCRIPT) {
-      stacktrace_push_item(l, NULL, NULL, lnum, entry->es_name, false);
+      stacktrace_push_item(l, NULL, NULL, lnum, entry->es_name);
     } else if (entry->es_type == ETYPE_UFUNC) {
       ufunc_T *const fp = entry->es_info.ufunc;
       const sctx_T sctx = fp->uf_script_ctx;
-      bool filepath_alloced = false;
-      char *filepath = sctx.sc_sid > 0 ? get_scriptname(sctx, &filepath_alloced) : "";
+      char *filepath = sctx.sc_sid > 0 ? get_scriptname(sctx, NULL) : "";
       lnum += sctx.sc_lnum;
-      stacktrace_push_item(l, fp, NULL, lnum, filepath, filepath_alloced);
+      stacktrace_push_item(l, fp, NULL, lnum, filepath);
     } else if (entry->es_type == ETYPE_AUCMD) {
       const sctx_T sctx = entry->es_info.aucmd->script_ctx;
-      bool filepath_alloced = false;
-      char *filepath = sctx.sc_sid > 0 ? get_scriptname(sctx, &filepath_alloced) : "";
+      char *filepath = sctx.sc_sid > 0 ? get_scriptname(sctx, NULL) : "";
       lnum += sctx.sc_lnum;
-      stacktrace_push_item(l, NULL, entry->es_name, lnum, filepath, filepath_alloced);
+      stacktrace_push_item(l, NULL, entry->es_name, lnum, filepath);
     }
   }
   return l;
@@ -2023,7 +2016,7 @@ static int source_using_linegetter(void *cookie, LineGetter fgetline, const char
   estack_push(ETYPE_SCRIPT, sname, 0);
 
   const sctx_T save_current_sctx = current_sctx;
-  if (current_sctx.sc_sid != SID_LUA) {
+  if (!script_is_lua(current_sctx.sc_sid)) {
     current_sctx.sc_sid = SID_STR;
   }
   current_sctx.sc_seq = 0;
@@ -2241,6 +2234,7 @@ int do_source(char *fname, int check_other, int is_vimrc, int *ret_sid)
   } else {
     // It's new, generate a new SID.
     si = new_script_item(fname_exp, &sid);
+    si->sn_lua = path_with_extension(fname_exp, "lua");
     fname_exp = xstrdup(si->sn_name);  // used for autocmd
     if (ret_sid != NULL) {
       *ret_sid = sid;
@@ -2268,9 +2262,8 @@ int do_source(char *fname, int check_other, int is_vimrc, int *ret_sid)
 
   cookie.conv.vc_type = CONV_NONE;              // no conversion
 
-  if (path_with_extension(fname_exp, "lua")) {
+  if (si->sn_lua) {
     const sctx_T current_sctx_backup = current_sctx;
-    current_sctx.sc_sid = SID_LUA;
     current_sctx.sc_lnum = 0;
     // Source the file as lua
     nlua_exec_file(fname_exp);
@@ -2356,6 +2349,18 @@ theend:
   return retval;
 }
 
+/// Checks if the script with the given script ID is a Lua script.
+bool script_is_lua(scid_T sid)
+{
+  if (sid == SID_LUA) {
+    return true;
+  }
+  if (!SCRIPT_ID_VALID(sid)) {
+    return false;
+  }
+  return SCRIPT_ITEM(sid)->sn_lua;
+}
+
 /// Find an already loaded script "name".
 /// If found returns its script ID.  If not found returns -1.
 int find_script_by_name(char *name)
@@ -2422,9 +2427,14 @@ void scriptnames_slash_adjust(void)
 
 /// Get a pointer to a script name.  Used for ":verbose set".
 /// Message appended to "Last set from "
+///
+/// @param should_free  if non-NULL and the script name is a file path, call
+///                     home_replace_save() on it and set *should_free to true.
 char *get_scriptname(sctx_T script_ctx, bool *should_free)
 {
-  *should_free = false;
+  if (should_free != NULL) {
+    *should_free = false;
+  }
 
   switch (script_ctx.sc_sid) {
   case SID_MODELINE:
@@ -2440,7 +2450,7 @@ char *get_scriptname(sctx_T script_ctx, bool *should_free)
   case SID_WINLAYOUT:
     return _("changed window size");
   case SID_LUA:
-    return _("Lua (run Nvim with -V1 for more details)");
+    return _("Lua");
   case SID_API_CLIENT:
     snprintf(IObuff, IOSIZE, _("API client (channel id %" PRIu64 ")"), script_ctx.sc_chan);
     return IObuff;
@@ -2453,9 +2463,12 @@ char *get_scriptname(sctx_T script_ctx, bool *should_free)
                script_ctx.sc_sid);
       return IObuff;
     }
-
-    *should_free = true;
-    return home_replace_save(NULL, sname);
+    if (should_free != NULL) {
+      *should_free = true;
+      return home_replace_save(NULL, sname);
+    } else {
+      return sname;
+    }
   }
   }
 }
