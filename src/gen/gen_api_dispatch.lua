@@ -7,7 +7,7 @@
 
 local mpack = vim.mpack
 
-local hashy = require 'generators.hashy'
+local hashy = require 'gen.hashy'
 
 local pre_args = 7
 assert(#arg >= pre_args)
@@ -31,7 +31,7 @@ local headers = {}
 -- set of function names, used to detect duplicates
 local function_names = {}
 
-local c_grammar = require('generators.c_grammar')
+local c_grammar = require('gen.c_grammar')
 
 local startswith = vim.startswith
 
@@ -150,7 +150,7 @@ end
 
 -- Export functions under older deprecated names.
 -- These will be removed eventually.
-local deprecated_aliases = require('api.dispatch_deprecated')
+local deprecated_aliases = require('nvim.api.dispatch_deprecated')
 for _, f in ipairs(shallowcopy(functions)) do
   local ismethod = false
   if startswith(f.name, 'nvim_') then
@@ -300,7 +300,7 @@ for i, item in ipairs(types) do
 end
 
 local packed = table.concat(pieces)
-local dump_bin_array = require('generators.dump_bin_array')
+local dump_bin_array = require('gen.dump_bin_array')
 dump_bin_array(api_metadata_output, 'packed_api_metadata', packed)
 api_metadata_output:close()
 
@@ -791,12 +791,12 @@ local function process_function(fn)
     local arg_free_code = ''
     if param[1] == 'Object' then
       extra = 'true, '
-      arg_free_code = 'api_luarefs_free_object(' .. cparam .. ');'
+      arg_free_code = '  api_luarefs_free_object(' .. cparam .. ');'
     elseif param[1] == 'DictOf(LuaRef)' then
       extra = 'true, '
-      arg_free_code = 'api_luarefs_free_dict(' .. cparam .. ');'
+      arg_free_code = '  api_luarefs_free_dict(' .. cparam .. ');'
     elseif param[1] == 'LuaRef' then
-      arg_free_code = 'api_free_luaref(' .. cparam .. ');'
+      arg_free_code = '  api_free_luaref(' .. cparam .. ');'
     end
     local errshift = 0
     local seterr = ''
@@ -813,7 +813,7 @@ local function process_function(fn)
       )
       cparam = '&' .. cparam
       errshift = 1 -- free incomplete dict on error
-      arg_free_code = 'api_luarefs_free_keydict('
+      arg_free_code = '  api_luarefs_free_keydict('
         .. cparam
         .. ', '
         .. string.sub(param_type, 9)
@@ -862,9 +862,9 @@ local function process_function(fn)
     local rev_i = #free_code - i + 1
     local code = free_code[rev_i]
     if i == 1 and not string.match(real_type(fn.parameters[1][1]), '^KeyDict_') then
-      free_at_exit_code = free_at_exit_code .. ('\n  %s'):format(code)
+      free_at_exit_code = free_at_exit_code .. ('\n%s'):format(code)
     else
-      free_at_exit_code = free_at_exit_code .. ('\nexit_%u:\n  %s'):format(rev_i, code)
+      free_at_exit_code = free_at_exit_code .. ('\nexit_%u:\n%s'):format(rev_i, code)
     end
   end
   local err_throw_code = [[
@@ -901,7 +901,7 @@ exit_0:
     local ret_mode = (ret_type == 'Object') and '&' or ''
     if fn.has_lua_imp then
       -- only push onto the Lua stack if we haven't already
-      write_shifted_output(string.format(
+      write_shifted_output(
         [[
     if (lua_gettop(lstate) == 0) {
       nlua_push_%s(lstate, %sret, kNluaPushSpecial | kNluaPushFreeRefs);
@@ -909,10 +909,10 @@ exit_0:
       ]],
         return_type,
         ret_mode
-      ))
+      )
     elseif string.match(ret_type, '^KeyDict_') then
       write_shifted_output(
-        '     nlua_push_keydict(lstate, &ret, %s_table);\n',
+        '    nlua_push_keydict(lstate, &ret, %s_table);\n',
         string.sub(ret_type, 9)
       )
     else
@@ -927,7 +927,6 @@ exit_0:
 
     -- NOTE: we currently assume err_throw needs nothing from arena
     write_shifted_output(
-
       [[
   %s
   %s

@@ -1,24 +1,23 @@
 --- Converts Nvim :help files to HTML.  Validates |tag| links and document syntax (parser errors).
 --
--- USAGE (For CI/local testing purposes): Simply `make lintdoc` or `scripts/lintdoc.lua`, which
--- basically does the following:
+-- USAGE (For CI/local testing purposes): Simply `make lintdoc`, which basically does the following:
 --   1. :helptags ALL
---   2. nvim -V1 -es +"lua require('scripts.gen_help_html').run_validate()" +q
---   3. nvim -V1 -es +"lua require('scripts.gen_help_html').test_gen()" +q
+--   2. nvim -V1 -es +"lua require('src.gen.gen_help_html').run_validate()" +q
+--   3. nvim -V1 -es +"lua require('src.gen.gen_help_html').test_gen()" +q
 --
 -- USAGE (GENERATE HTML):
 --   1. `:helptags ALL` first; this script depends on vim.fn.taglist().
---   2. nvim -V1 -es --clean +"lua require('scripts.gen_help_html').gen('./runtime/doc', 'target/dir/')" +q
+--   2. nvim -V1 -es --clean +"lua require('src.gen.gen_help_html').gen('./runtime/doc', 'target/dir/')" +q
 --      - Read the docstring at gen().
 --   3. cd target/dir/ && jekyll serve --host 0.0.0.0
 --   4. Visit http://localhost:4000/…/help.txt.html
 --
 -- USAGE (VALIDATE):
---   1. nvim -V1 -es +"lua require('scripts.gen_help_html').validate('./runtime/doc')" +q
+--   1. nvim -V1 -es +"lua require('src.gen.gen_help_html').validate('./runtime/doc')" +q
 --      - validate() is 10x faster than gen(), so it is used in CI.
 --
 -- SELF-TEST MODE:
---   1. nvim -V1 -es +"lua require('scripts.gen_help_html')._test()" +q
+--   1. nvim -V1 -es +"lua require('src.gen.gen_help_html')._test()" +q
 --
 -- NOTES:
 --   * This script is used by the automation repo: https://github.com/neovim/doc
@@ -148,10 +147,6 @@ local function url_encode(s)
   )
 end
 
-local function expandtabs(s)
-  return s:gsub('\t', (' '):rep(8)) --[[ @as string ]]
-end
-
 local function to_titlecase(s)
   local text = ''
   for w in vim.gsplit(s, '[ \t]+') do
@@ -275,25 +270,13 @@ end
 ---
 --- Blank lines (empty or whitespace-only) are ignored.
 local function get_indent(s)
-  local min_indent = nil
-  for line in vim.gsplit(s, '\n') do
-    if line and not is_blank(line) then
-      local ws = expandtabs(line:match('^%s+') or '')
-      min_indent = (not min_indent or ws:len() < min_indent) and ws:len() or min_indent
-    end
-  end
-  return min_indent or 0
+  local _, indent = vim.text.indent(0, s, { expandtab = 8 })
+  return indent
 end
 
 --- Removes the common indent level, after expanding tabs to 8 spaces.
 local function trim_indent(s)
-  local indent_size = get_indent(s)
-  local trimmed = ''
-  for line in vim.gsplit(s, '\n') do
-    line = expandtabs(line)
-    trimmed = ('%s%s\n'):format(trimmed, line:sub(indent_size + 1))
-  end
-  return trimmed:sub(1, -2)
+  return (vim.text.indent(0, s, { expandtab = 8 }))
 end
 
 --- Gets raw buffer text in the node's range (+/- an offset), as a newline-delimited string.
@@ -951,7 +934,7 @@ local function gen_one(fname, text, to_fname, old, commit, parser_path)
   <a name="%s" href="#%s"><h1 id="%s">%s</h1></a>
   <p>
     <i>
-    Nvim <code>:help</code> pages, <a href="https://github.com/neovim/neovim/blob/master/scripts/gen_help_html.lua">generated</a>
+    Nvim <code>:help</code> pages, <a href="https://github.com/neovim/neovim/blob/master/src/gen/gen_help_html.lua">generated</a>
     from <a href="https://github.com/neovim/neovim/blob/master/runtime/doc/%s">source</a>
     using the <a href="https://github.com/neovim/tree-sitter-vimdoc">tree-sitter-vimdoc</a> parser.
     </i>
@@ -1465,7 +1448,7 @@ function M.run_validate(help_dir)
   eq(
     {},
     rv.invalid_spelling,
-    'invalid spelling in :help docs (see spell_dict in scripts/gen_help_html.lua)'
+    'invalid spelling in :help docs (see spell_dict in src/gen/gen_help_html.lua)'
   )
 end
 
