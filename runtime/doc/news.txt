@@ -66,7 +66,9 @@ API
 
 BUILD
 
-On Windows, only building with the UCRT runtime is supported.
+• On Windows, only building with the UCRT runtime is supported.
+• Translations are turned off by default. Enable by building Nvim with the
+  CMake flag `ENABLE_TRANSLATIONS=ON`.
 
 DEFAULTS
 
@@ -409,6 +411,8 @@ TREESITTER
 • |:InspectTree| now shows which nodes are missing.
 • Bundled markdown highlight queries use `conceal_lines` metadata to conceal
   code block fence lines vertically.
+• |vim.treesitter.language.inspect()| shows additional information, including
+  parser version for ABI 15 parsers.
 
 TUI
 
