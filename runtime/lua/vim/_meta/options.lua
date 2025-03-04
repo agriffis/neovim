@@ -1083,15 +1083,15 @@ vim.go.cia = vim.go.completeitemalign
 --- 	    match, e.g., what file it comes from.
 ---
 ---    noinsert Do not insert any text for a match until the user selects
---- 	    a match from the menu. Only works in combination with
+--- 	    a match from the menu.  Only works in combination with
 --- 	    "menu" or "menuone". No effect if "longest" is present.
 ---
 ---    noselect Same as "noinsert", except that no menu item is
---- 	    pre-selected. If both "noinsert" and "noselect" are
+--- 	    pre-selected.  If both "noinsert" and "noselect" are
 --- 	    present, "noselect" has precedence.
 ---
 ---    nosort   Disable sorting of completion candidates based on fuzzy
---- 	    scores when "fuzzy" is enabled. Candidates will appear
+--- 	    scores when "fuzzy" is enabled.  Candidates will appear
 --- 	    in their original order.
 ---
 ---    popup    Show extra information about the currently selected
@@ -1102,7 +1102,7 @@ vim.go.cia = vim.go.completeitemalign
 --- 	    Preinsert the portion of the first candidate word that is
 --- 	    not part of the current completion leader and using the
 --- 	    `hl-ComplMatchIns` highlight group.  In order for it to
---- 	    work, "fuzzy" must not bet set and "menuone" must be set.
+--- 	    work, "fuzzy" must not be set and "menuone" must be set.
 ---
 ---    preview  Show extra information about the currently selected
 --- 	    completion in the preview window.  Only works in
@@ -7691,7 +7691,10 @@ vim.go.wmnu = vim.go.wildmenu
 --- "lastused"	When completing buffer names and more than one buffer
 --- 		matches, sort buffers by time last used (other than
 --- 		the current buffer).
---- When there is only a single match, it is fully completed in all cases.
+--- "noselect"	Do not pre-select first menu item and start 'wildmenu'
+--- 		if it is enabled.
+--- When there is only a single match, it is fully completed in all cases
+--- except when "noselect" is present.
 ---
 --- Examples of useful colon-separated values:
 --- "longest:full"	Like "longest", but also start 'wildmenu' if it is
@@ -7729,7 +7732,17 @@ vim.go.wmnu = vim.go.wildmenu
 --- ```vim
 --- 	set wildmode=longest,list
 --- ```
---- Complete longest common string, then list alternatives.
+--- Complete longest common string, then list alternatives
+---
+--- ```vim
+--- 	set wildmode=noselect:full
+--- ```
+--- Display 'wildmenu' without completing, then each full match
+---
+--- ```vim
+--- 	set wildmode=noselect:lastused,full
+--- ```
+--- Same as above, but sort buffers by time last used.
 --- More info here: `cmdline-completion`.
 ---
 --- @type string
