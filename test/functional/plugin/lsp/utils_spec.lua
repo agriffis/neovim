@@ -382,5 +382,47 @@ describe('vim.lsp.util', function()
       {1:~                                                    }|*9
                                                            |
     ]])
+    -- This tests the valid winline code path (why doesn't the above?).
+    exec_lua([[
+      vim.cmd.only()
+      vim.lsp.util.open_floating_preview({ 'foo', '```lua', 'local bar', '```' }, 'markdown', {
+        border = 'single',
+        focus = false,
+      })
+    ]])
+    feed('<C-W>wG')
+    screen:expect([[
+                                                           |
+      ┌─────────┐{1:                                          }|
+      │{4:foo      }│{1:                                          }|
+      │{100:^local}{101: }{102:bar}│{1:                                          }|
+      └─────────┘{1:                                          }|
+      {1:~                                                    }|*8
+                                                           |
+    ]])
+  end)
+
+  it('open_floating_preview height does not exceed max_height', function()
+    local screen = Screen.new()
+    exec_lua([[
+      vim.lsp.util.open_floating_preview(vim.fn.range(1, 10), 'markdown', {
+        border = 'single',
+        width = 5,
+        max_height = 5,
+        focus = false,
+      })
+    ]])
+    screen:expect([[
+      ^                                                     |
+      ┌─────┐{1:                                              }|
+      │{4:1    }│{1:                                              }|
+      │{4:2    }│{1:                                              }|
+      │{4:3    }│{1:                                              }|
+      │{4:4    }│{1:                                              }|
+      │{4:5    }│{1:                                              }|
+      └─────┘{1:                                              }|
+      {1:~                                                    }|*5
+                                                           |
+    ]])
   end)
 end)
