@@ -138,6 +138,7 @@ int input_get(uint8_t *buf, int maxlen, int ms, int tb_change_cnt, MultiQueue *e
   TriState result;  ///< inbuf_poll result.
   if (ms >= 0) {
     if ((result = inbuf_poll(ms, events)) == kFalse) {
+      ctrl_c_interrupts = true;
       return 0;
     }
   } else {
