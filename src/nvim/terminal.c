@@ -842,6 +842,8 @@ static void terminal_check_cursor(void)
   // Don't update topline if it's unchanged to avoid triggering TextChangedT unnecessarily.
   if (topline != curwin->w_topline) {
     set_topline(curwin, topline);
+  } else {
+    curwin->w_valid &= ~VALID_WROW;
   }
   // Nudge cursor when returning to normal-mode.
   int off = is_focused(term) ? 0 : (curwin->w_p_rl ? 1 : -1);

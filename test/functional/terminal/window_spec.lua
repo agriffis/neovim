@@ -527,13 +527,12 @@ describe(':terminal window', function()
       {1:-- TERMINAL --}                                    |
     ]])
     command('tabprevious')
-    -- TODO(seandewar): why is the cursor one line lower? inner height wrong?
     screen:expect([[
       {1: }{5:2}{1: foo }{2: foo }{4:                                     }{2:X}|
       {19:r}ows: 5, cols: 25        │rows: 5, cols: 25       |
       rows: 5, cols: 50        │rows: 5, cols: 50       |
-      {19: }                        │                        |
       {19: }                        │^                        |
+      {19: }                        │                        |
       {18:foo                       }{17:foo                     }|
       {1:-- TERMINAL --}                                    |
     ]])
@@ -542,8 +541,8 @@ describe(':terminal window', function()
       {1: }{5:2}{1: foo }{2: foo }{4:                                     }{2:X}|
       {19:r}ows: 5, cols: 25        │rows: 5, cols: 25       |
       rows: 5, cols: 50        │rows: 5, cols: 50       |
-      {19: }                        │{12:                        }|
-      {19: }                        │^                        |
+      {19: }                        │{12:^                        }|
+      {19: }                        │                        |
       {18:foo                       }{17:foo                     }|
                                                         |
     ]])
@@ -565,8 +564,8 @@ describe(':terminal window', function()
       {1: }{5:2}{1: foo }{2: foo }{4:                                     }{2:X}|
       {19:r}ows: 5, cols: 25        │rows: 5, cols: 25       |
       rows: 5, cols: 50        │rows: 5, cols: 50       |
-      {19: }                        │                        |
       {19: }                        │^                        |
+      {19: }                        │                        |
       {18:foo                       }{17:foo                     }|
       {1:-- TERMINAL --}                                    |
     ]])
