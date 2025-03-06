@@ -140,7 +140,8 @@ USERNAME=koji
        -DLUA_PRG=%{lua_prg} \
        -DENABLE_JEMALLOC=%{?with_jemalloc:ON}%{!?with_jemalloc:OFF} \
        -DLIBLUV_INCLUDE_DIR:PATH=%{luv_include_dir} \
-       -DNVIM_VERSION_MEDIUM="{{{neovim_dev_version}}}"
+       -DNVIM_VERSION_MEDIUM="{{{neovim_dev_version}}}" \
+       -DENABLE_TRANSLATIONS=ON
 
 %cmake_build
 
