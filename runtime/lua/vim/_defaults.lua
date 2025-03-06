@@ -515,8 +515,8 @@ do
       if channel == 0 then
         return
       end
-      local fg_request = args.data == '\027]10;?'
-      local bg_request = args.data == '\027]11;?'
+      local fg_request = args.data.sequence == '\027]10;?'
+      local bg_request = args.data.sequence == '\027]11;?'
       if fg_request or bg_request then
         -- WARN: This does not return the actual foreground/background color,
         -- but rather returns:
@@ -712,7 +712,7 @@ do
         nested = true,
         desc = "Update the value of 'background' automatically based on the terminal emulator's background color",
         callback = function(args)
-          local resp = args.data ---@type string
+          local resp = args.data.sequence ---@type string
           local r, g, b = parseosc11(resp)
           if r and g and b then
             local rr = parsecolor(r)
@@ -788,7 +788,7 @@ do
           group = group,
           nested = true,
           callback = function(args)
-            local resp = args.data ---@type string
+            local resp = args.data.sequence ---@type string
             local decrqss = resp:match('^\027P1%$r([%d;:]+)m$')
 
             if decrqss then
@@ -834,9 +834,7 @@ do
         -- terminal responds to the DECRQSS with the same SGR sequence that we
         -- sent then the terminal supports truecolor.
         local decrqss = '\027P$qm\027\\'
-        if os.getenv('TMUX') then
-          decrqss = string.format('\027Ptmux;%s\027\\', decrqss:gsub('\027', '\027\027'))
-        end
+
         -- Reset attributes first, as other code may have set attributes.
         io.stdout:write(string.format('\027[0m\027[48;2;%d;%d;%dm%s', r, g, b, decrqss))
 
