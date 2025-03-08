@@ -125,12 +125,11 @@ lua_State *get_global_lstate(void)
   return global_lstate;
 }
 
-/// get error on top of stack as a string
+/// Gets the Lua error at top of stack as a string, possibly modifying it in-place (but doesn't
+/// change stack height).
 ///
-/// Might alter the top value on stack in place (but doesn't change stack height)
-///
-/// "error" points to memory on the lua stack, use
-/// or duplicate the string before using "lstate" again
+/// The returned string points to memory on the Lua stack. Use or duplicate it before using
+/// `lstate` again.
 ///
 /// @param[out] len length of error (can be NULL)
 static const char *nlua_get_error(lua_State *lstate, size_t *len)
@@ -147,7 +146,7 @@ static const char *nlua_get_error(lua_State *lstate, size_t *len)
   return lua_tolstring(lstate, -1, len);
 }
 
-/// Convert lua error into a Vim error message
+/// Converts a Lua error into a Vim error message.
 ///
 /// @param  lstate  Lua interpreter state.
 /// @param[in]  msg  Message base, must contain one `%.*s`.
@@ -1668,13 +1667,13 @@ void ex_lua(exarg_T *const eap)
 
   // ":lua {code}", ":={expr}" or ":lua ={expr}"
   //
-  // When "=expr" is used transform it to "vim.print(expr)".
+  // When "=expr" is used transform it to "vim._print(true, expr)".
   if (eap->cmdidx == CMD_equal || code[0] == '=') {
     size_t off = (eap->cmdidx == CMD_equal) ? 0 : 1;
-    len += sizeof("vim.print()") - 1 - off;
+    len += sizeof("vim._print(true, )") - 1 - off;
     // `nlua_typval_exec` doesn't expect NUL-terminated string so `len` must end before NUL byte.
     char *code_buf = xmallocz(len);
-    vim_snprintf(code_buf, len + 1, "vim.print(%s)", code + off);
+    vim_snprintf(code_buf, len + 1, "vim._print(true, %s)", code + off);
     xfree(code);
     code = code_buf;
   }

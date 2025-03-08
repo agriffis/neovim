@@ -16,7 +16,7 @@ local assert_alive = n.assert_alive
 local pcall_err = t.pcall_err
 
 describe('decorations providers', function()
-  local screen
+  local screen ---@type test.functional.ui.screen
   before_each(function()
     clear()
     screen = Screen.new(40, 8)
@@ -52,6 +52,7 @@ describe('decorations providers', function()
     posp = getmark(mark, false);
     restore_buffer(&save_buf); ]]
 
+  --- @return integer
   local function setup_provider(code)
     return exec_lua ([[
       local api = vim.api
@@ -848,7 +849,8 @@ for _,item in ipairs(items) do
 end]]
 
 describe('extmark decorations', function()
-  local screen, ns
+  local screen ---@type test.functional.ui.screen
+  local ns ---@type integer
   before_each( function()
     clear()
     screen = Screen.new(50, 15)
@@ -2232,7 +2234,7 @@ describe('extmark decorations', function()
 
     eq({ { 1, 0, 8, { end_col = 13, end_right_gravity = false, end_row = 0,
                        hl_eol = false, hl_group = "NonText", undo_restore = false,
-                       ns_id = 1, priority = 4096, right_gravity = true } } },
+                       ns_id = ns, priority = 4096, right_gravity = true } } },
        api.nvim_buf_get_extmarks(0, ns, {0,0}, {0, -1}, {details=true}))
   end)
 
@@ -2929,11 +2931,32 @@ describe('extmark decorations', function()
       {1:~                                                 }|*3
                                                         |
     ]])
+    -- Even when virtual line is added as line is concealed #32762
+    feed('5G')
+    api.nvim_buf_clear_namespace(0, ns, 3, 4)
+    feed('j')
+    api.nvim_buf_set_extmark(0, ns, 3, 0, { virt_lines = { { { "virt_below 4" } } } })
+    screen:expect([[
+      {2:  1 }for _,item in ipairs(items) do                |
+      {2:  3 }    if hl_id_cell ~= nil then                 |
+      {2:  4 }        hl_id = hl_id_cell                    |
+      {2:    }virt_below 4                                  |
+      {2:  6 }^    for _ = 1, (count or 1) do                |
+      {2:  7 }        local cell = line[colpos]             |
+      {2:  8 }        cell.text = text                      |
+      {2:  9 }        cell.hl_id = hl_id                    |
+      {2: 10 }        colpos = colpos+1                     |
+      {2: 11 }    end                                       |
+      {2: 12 }end                                           |
+      {1:~                                                 }|*3
+                                                        |
+    ]])
   end)
 end)
 
 describe('decorations: inline virtual text', function()
-  local screen, ns
+  local screen ---@type test.functional.ui.screen
+  local ns ---@type integer
   before_each( function()
     clear()
     screen = Screen.new(50, 3)
@@ -4675,7 +4698,9 @@ describe('decorations: inline virtual text', function()
 end)
 
 describe('decorations: virtual lines', function()
-  local screen, ns
+  local screen ---@type test.functional.ui.screen
+  local ns ---@type integer
+
   before_each(function()
     clear()
     screen = Screen.new(50, 12)
@@ -5732,7 +5757,9 @@ if (h->n_buckets < new_n_buckets) { // expand
 end)
 
 describe('decorations: signs', function()
-  local screen, ns
+  local screen ---@type test.functional.ui.screen
+  local ns ---@type integer
+
   before_each(function()
     clear()
     screen = Screen.new(50, 10)
@@ -6342,7 +6369,7 @@ l5
 end)
 
 describe('decorations: virt_text', function()
-  local screen
+  local screen ---@type test.functional.ui.screen
 
   before_each(function()
     clear()
@@ -6416,7 +6443,10 @@ describe('decorations: virt_text', function()
 end)
 
 describe('decorations: window scoped', function()
-  local screen, ns, win_other
+  local screen ---@type test.functional.ui.screen
+  local ns ---@type integer
+  local win_other ---@type integer
+
   local url = 'https://example.com'
   before_each(function()
     clear()
