@@ -618,36 +618,30 @@ bool is_aucmd_win(win_T *win)
 event_T event_name2nr(const char *start, char **end)
 {
   const char *p;
-  int i;
 
   // the event name ends with end of line, '|', a blank or a comma
   for (p = start; *p && !ascii_iswhite(*p) && *p != ',' && *p != '|'; p++) {}
-  for (i = 0; event_names[i].name != NULL; i++) {
-    int len = (int)event_names[i].len;
-    if (len == p - start && STRNICMP(event_names[i].name, start, len) == 0) {
-      break;
-    }
-  }
+
+  int hash_idx = event_name2nr_hash(start, (size_t)(p - start));
   if (*p == ',') {
     p++;
   }
   *end = (char *)p;
-  if (event_names[i].name == NULL) {
+  if (hash_idx < 0) {
     return NUM_EVENTS;
   }
-  return (event_T)abs(event_names[i].event);
+  return (event_T)abs(event_names[event_hash[hash_idx]].event);
 }
 
 /// Return the event number for event name "str".
 /// Return NUM_EVENTS if the event name was not found.
 event_T event_name2nr_str(String str)
 {
-  for (int i = 0; event_names[i].name != NULL; i++) {
-    if (str.size == event_names[i].len && STRNICMP(str.data, event_names[i].name, str.size) == 0) {
-      return (event_T)abs(event_names[i].event);
-    }
+  int hash_idx = event_name2nr_hash(str.data, str.size);
+  if (hash_idx < 0) {
+    return NUM_EVENTS;
   }
-  return NUM_EVENTS;
+  return (event_T)abs(event_names[event_hash[hash_idx]].event);
 }
 
 /// Return the name for event
@@ -2273,7 +2267,7 @@ char *set_context_in_autocmd(expand_T *xp, char *arg, bool doautocmd)
   return NULL;
 }
 
-// Function given to ExpandGeneric() to obtain the list of event names.
+/// Function given to ExpandGeneric() to obtain the list of event names.
 char *expand_get_event_name(expand_T *xp, int idx)
 {
   (void)xp;  // xp is a required parameter to be used with ExpandGeneric
@@ -2289,14 +2283,23 @@ char *expand_get_event_name(expand_T *xp, int idx)
     return name;
   }
 
+  int i = idx - next_augroup_id;
+  if (i < 0 || i >= NUM_EVENTS) {
+    return NULL;
+  }
+
   // List event names
-  return event_names[idx - next_augroup_id].name;
+  return event_names[i].name;
 }
 
 /// Function given to ExpandGeneric() to obtain the list of event names. Don't
 /// include groups.
 char *get_event_name_no_group(expand_T *xp FUNC_ATTR_UNUSED, int idx, bool win)
 {
+  if (idx < 0 || idx >= NUM_EVENTS) {
+    return NULL;
+  }
+
   if (!win) {
     return event_names[idx].name;
   }
