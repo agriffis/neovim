@@ -29,7 +29,8 @@ LSP
 • `vim.lsp.buf.document_symbol()` uses the |location-list| by default. Use
   `vim.lsp.buf.document_symbol({ loclist = false })` to use the |quickfix|
   list.
-
+• `vim.lsp.completion.trigger()` has been renamed to
+  |vim.lsp.completion.get()|.
 
 OPTIONS
 
@@ -365,6 +366,7 @@ PERFORMANCE
   significantly improving |treesitter-highlight| performance.
 • Treesitter injection query iteration is now asynchronous, making edits in
   large buffers with combined injections much quicker.
+• 10x reduction in blocking time when attaching an LSP to a large buffer.
 
 PLUGINS
 
