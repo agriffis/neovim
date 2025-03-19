@@ -2390,6 +2390,7 @@ static void stop_insert(pos_T *end_insert_pos, int esc, int nomove)
                                       end_insert_pos->lnum))
         && end_insert_pos->lnum <= curbuf->b_ml.ml_line_count) {
       pos_T tpos = curwin->w_cursor;
+      colnr_T prev_col = end_insert_pos->col;
 
       curwin->w_cursor = *end_insert_pos;
       check_cursor_col(curwin);        // make sure it is not past the line
@@ -2407,7 +2408,7 @@ static void stop_insert(pos_T *end_insert_pos, int esc, int nomove)
       }
       if (curwin->w_cursor.lnum != tpos.lnum) {
         curwin->w_cursor = tpos;
-      } else {
+      } else if (curwin->w_cursor.col < prev_col) {
         // reset tpos, could have been invalidated in the loop above
         tpos = curwin->w_cursor;
         tpos.col++;
@@ -2696,8 +2697,8 @@ int stuff_inserted(int c, int count, int no_esc)
 {
   char last = NUL;
 
-  String *insert = get_last_insert();  // text to be inserted
-  if (insert->data == NULL) {
+  String insert = get_last_insert();  // text to be inserted
+  if (insert.data == NULL) {
     emsg(_(e_noinstext));
     return FAIL;
   }
@@ -2707,30 +2708,30 @@ int stuff_inserted(int c, int count, int no_esc)
     stuffcharReadbuff(c);
   }
 
-  if (insert->size > 0) {
+  if (insert.size > 0) {
     // look for the last ESC in 'insert'
-    for (char *p = insert->data + insert->size - 1; p >= insert->data; p--) {
+    for (char *p = insert.data + insert.size - 1; p >= insert.data; p--) {
       if (*p == ESC) {
-        insert->size = (size_t)(p - insert->data);
+        insert.size = (size_t)(p - insert.data);
         break;
       }
     }
   }
 
-  if (insert->size > 0) {
-    char *p = insert->data + insert->size - 1;
+  if (insert.size > 0) {
+    char *p = insert.data + insert.size - 1;
     // when the last char is either "0" or "^" it will be quoted if no ESC
     // comes after it OR if it will inserted more than once and "ptr"
     // starts with ^D.  -- Acevedo
     if ((*p == '0' || *p == '^')
-        && (no_esc || (*insert->data == Ctrl_D && count > 1))) {
+        && (no_esc || (*insert.data == Ctrl_D && count > 1))) {
       last = *p;
-      insert->size--;
+      insert.size--;
     }
   }
 
   do {
-    stuffReadbuffLen(insert->data, (ptrdiff_t)insert->size);
+    stuffReadbuffLen(insert.data, (ptrdiff_t)insert.size);
     // A trailing "0" is inserted as "<C-V>048", "^" as "<C-V>^".
     switch (last) {
     case '0':
@@ -2752,36 +2753,28 @@ int stuff_inserted(int c, int count, int no_esc)
   return OK;
 }
 
-String *get_last_insert(void)
+String get_last_insert(void)
   FUNC_ATTR_PURE
 {
-  static String insert = STRING_INIT;
-
-  insert = last_insert.data == NULL ? NULL_STRING : (String){
-    insert.data = last_insert.data + last_insert_skip,
-    insert.size = last_insert.size - (size_t)last_insert_skip,
+  return last_insert.data == NULL ? NULL_STRING : (String){
+    .data = last_insert.data + last_insert_skip,
+    .size = last_insert.size - (size_t)last_insert_skip,
   };
-
-  return &insert;
 }
 
 // Get last inserted string, and remove trailing <Esc>.
 // Returns pointer to allocated memory (must be freed) or NULL.
 char *get_last_insert_save(void)
 {
-  String *insert = get_last_insert();
+  String insert = get_last_insert();
 
-  if (insert->data == NULL) {
+  if (insert.data == NULL) {
     return NULL;
   }
 
-  char *s = xmemdupz(insert->data, insert->size);
-  if (insert->size > 0) {
-    // remain trailing ESC
-    insert->size--;
-    if (s[insert->size] == ESC) {
-      s[insert->size] = NUL;
-    }
+  char *s = xmemdupz(insert.data, insert.size);
+  if (insert.size > 0 && s[insert.size - 1] == ESC) {  // remain trailing ESC
+    s[insert.size - 1] = NUL;
   }
   return s;
 }

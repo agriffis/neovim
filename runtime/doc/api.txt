@@ -3493,28 +3493,20 @@ nvim_open_win({buffer}, {enter}, {config})                   *nvim_open_win()*
                       `eob` flag of 'fillchars' to a space char, and clearing
                       the |hl-EndOfBuffer| region in 'winhighlight'.
                   • border: Style of (optional) window border. This can either
-                    be a string or an array. The string values are
-                    • "none": No border (default).
-                    • "single": A single line box.
-                    • "double": A double line box.
-                    • "rounded": Like "single", but with rounded corners
-                      ("╭" etc.).
-                    • "solid": Adds padding by a single whitespace cell.
-                    • "shadow": A drop shadow effect by blending with the
-                      background.
-                    • If it is an array, it should have a length of eight or
-                      any divisor of eight. The array will specify the eight
-                      chars building up the border in a clockwise fashion
-                      starting with the top-left corner. As an example, the
-                      double box style could be specified as: >
-                      [ "╔", "═" ,"╗", "║", "╝", "═", "╚", "║" ].
+                    be a string or an array. The string values are the same as
+                    those described in 'winborder'. If it is an array, it
+                    should have a length of eight or any divisor of eight. The
+                    array will specify the eight chars building up the border
+                    in a clockwise fashion starting with the top-left corner.
+                    As an example, the double box style could be specified as: >
+                     [ "╔", "═" ,"╗", "║", "╝", "═", "╚", "║" ].
 <
-                      If the number of chars are less than eight, they will be
-                      repeated. Thus an ASCII border could be specified as >
-                      [ "/", "-", \"\\\\\", "|" ],
+                    If the number of chars are less than eight, they will be
+                    repeated. Thus an ASCII border could be specified as >
+                     [ "/", "-", \"\\\\\", "|" ],
 <
-                      or all chars the same as >
-                      [ "x" ].
+                    or all chars the same as >
+                     [ "x" ].
 <
                     An empty string can be used to turn off a specific border,
                     for instance, >
@@ -3716,7 +3708,7 @@ nvim_create_augroup({name}, {opts})                    *nvim_create_augroup()*
     Create or get an autocommand group |autocmd-groups|.
 
     To get an existing group id, do: >lua
-        local id = vim.api.nvim_create_augroup("MyGroup", {
+        local id = vim.api.nvim_create_augroup('my.lsp.config', {
             clear = false
         })
 <
@@ -3742,8 +3734,8 @@ nvim_create_autocmd({event}, {opts})                   *nvim_create_autocmd()*
     string).
 
     Example using Lua callback: >lua
-        vim.api.nvim_create_autocmd({"BufEnter", "BufWinEnter"}, {
-          pattern = {"*.c", "*.h"},
+        vim.api.nvim_create_autocmd({'BufEnter', 'BufWinEnter'}, {
+          pattern = {'*.c', '*.h'},
           callback = function(ev)
             print(string.format('event fired: %s', vim.inspect(ev)))
           end
@@ -3751,15 +3743,15 @@ nvim_create_autocmd({event}, {opts})                   *nvim_create_autocmd()*
 <
 
     Example using an Ex command as the handler: >lua
-        vim.api.nvim_create_autocmd({"BufEnter", "BufWinEnter"}, {
-          pattern = {"*.c", "*.h"},
+        vim.api.nvim_create_autocmd({'BufEnter', 'BufWinEnter'}, {
+          pattern = {'*.c', '*.h'},
           command = "echo 'Entering a C or C++ file'",
         })
 <
 
     Note: `pattern` is NOT automatically expanded (unlike with |:autocmd|),
     thus names like "$HOME" and "~" must be expanded explicitly: >lua
-        pattern = vim.fn.expand("~") .. "/some/path/*.py"
+        pattern = vim.fn.expand('~') .. '/some/path/*.py'
 <
 
     Attributes: ~
@@ -3881,14 +3873,14 @@ nvim_get_autocmds({opts})                                *nvim_get_autocmds()*
     These examples will get autocommands matching ALL the given criteria: >lua
         -- Matches all criteria
         autocommands = vim.api.nvim_get_autocmds({
-          group = "MyGroup",
-          event = {"BufEnter", "BufWinEnter"},
-          pattern = {"*.c", "*.h"}
+          group = 'MyGroup',
+          event = {'BufEnter', 'BufWinEnter'},
+          pattern = {'*.c', '*.h'}
         })
 
         -- All commands from one group
         autocommands = vim.api.nvim_get_autocmds({
-          group = "MyGroup",
+          group = 'MyGroup',
         })
 <
 
