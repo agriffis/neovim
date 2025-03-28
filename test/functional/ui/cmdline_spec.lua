@@ -858,7 +858,7 @@ local function test_cmdline(linegrid)
       cmdline = {
         {
           content = { { '' } },
-          hl_id = 242,
+          hl_id = 243,
           pos = 0,
           prompt = 'Prompt:',
         },
@@ -1351,6 +1351,12 @@ describe('cmdline height', function()
     -- Available lines changed, so closing cmdwin should skip restoring window sizes, leaving the
     -- cmdheight unchanged.
     eq(1, eval('&cmdheight'))
+  end)
+
+  it('not increased to 0 from 1 with wincmd _', function()
+    command('set cmdheight=0 laststatus=0')
+    command('wincmd _')
+    eq(0, eval('&cmdheight'))
   end)
 end)
 
