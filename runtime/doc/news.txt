@@ -124,7 +124,7 @@ EVENTS
 
 LSP
 
-• todo
+• |vim.lsp.ClientConfig| gained `workspace_required`.
 
 LUA
 
