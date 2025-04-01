@@ -811,6 +811,33 @@ describe('decorations providers', function()
                                               |
     ]])
   end)
+
+  it('inline virt_text does not result in wrong cursor column #33153', function()
+    insert("line1 with a lot of text\nline2 with a lot of text")
+    setup_provider([[
+      _G.do_win = false
+      vim.keymap.set('n', 'f', function()
+        _G.do_win = true
+        vim.cmd('redraw!')
+      end)
+      vim.o.concealcursor = 'n'
+      function on_do(event)
+        if event == 'win' and _G.do_win then
+          vim.api.nvim_buf_set_extmark(0, ns1, 1, 0, {
+            virt_text = { { 'virt_text ' } },
+            virt_text_pos = 'inline'
+          })
+        end
+      end
+    ]])
+    feed('f')
+    screen:expect([[
+      line1 with a lot of text                |
+      virt_text line2 with a lot of tex^t      |
+      {1:~                                       }|*5
+                                              |
+    ]])
+  end)
 end)
 
 describe('decoration_providers', function()
@@ -2978,6 +3005,13 @@ describe('extmark decorations', function()
       {1:~                                                 }|
                                                         |
     ]])
+    -- No asymmetric topline for <C-E><C-Y> #33182
+    feed('4<C-E>')
+    exec('set concealcursor=n')
+    api.nvim_buf_set_extmark(0, ns, 4, 0, { conceal_lines = "" })
+    eq(5, n.fn.line('w0'))
+    feed('<C-E><C-Y>')
+    eq(5, n.fn.line('w0'))
   end)
 end)
 
