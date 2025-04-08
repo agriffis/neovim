@@ -1,11 +1,14 @@
 " Vim filetype plugin file.
+
 " Language:		Lua
 " Maintainer:		Doug Kearns <dougkearns@gmail.com>
 " Previous Maintainer:	Max Ischenko <mfi@ukr.net>
 " Contributor:		Dorai Sitaram <ds26@gte.com>
 "			C.D. MacEachern <craig.daniel.maceachern@gmail.com>
+"			Tyler Miller <tmillr@proton.me>
 "			Phạm Bình An <phambinhanctb2004@gmail.com>
-" Last Change:		2025 Feb 27
+"			@konfekt
+" Last Change:		2025 Apr 04
 
 if exists("b:did_ftplugin")
   finish
