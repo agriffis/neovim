@@ -118,6 +118,7 @@ DIAGNOSTICS
 EDITOR
 
 • |:iput| works like |:put| but adjusts indent.
+• |omnicompletion| in `help` buffer. |ft-help-omni|
 
 EVENTS
 
@@ -129,7 +130,7 @@ LSP
 
 LUA
 
-• todo
+• Lua type annotations for `vim.uv`.
 
 OPTIONS
 
@@ -165,7 +166,7 @@ TUI
 
 UI
 
-• todo
+• |:checkhealth| shows a summary in the header for every healthcheck.
 
 VIMSCRIPT
 
