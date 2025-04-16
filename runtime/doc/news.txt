@@ -79,6 +79,7 @@ LUA
 OPTIONS
 
 • 'chistory' and 'lhistory' set size of the |quickfix-stack|.
+• 'completeopt' flag "nearset" sorts completion results by distance to cursor.
 • 'diffopt' `inline:` configures diff highlighting for changes within a line.
 • 'pummaxwidth' sets maximum width for the completion popup menu.
 • 'shelltemp' defaults to "false".
@@ -174,6 +175,7 @@ TUI
 UI
 
 • |:checkhealth| shows a summary in the header for every healthcheck.
+• |ui-multigrid| provides composition information and absolute coordinates.
 
 VIMSCRIPT
 
