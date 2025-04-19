@@ -1580,8 +1580,10 @@ local options = {
         	    Useful when there is additional information about the
         	    match, e.g., what file it comes from.
 
-           nearest  Matches are presented in order of proximity to the cursor
-        	    position.  This applies only to matches from the current
+           nearest  Matches are listed based on their proximity to the cursor
+        	    position, unlike the default behavior, which only
+        	    considers proximity for matches appearing below the
+        	    cursor.  This applies only to matches from the current
         	    buffer.  No effect if "fuzzy" is present.
 
            noinsert Do not insert any text for a match until the user selects
@@ -8216,7 +8218,7 @@ local options = {
         |zg| and |zw| commands can be used to access each.  This allows using
         a personal word list file and a project word list file.
         When a word is added while this option is empty Nvim will use
-        (and auto-create) `stdpath('data')/spell/`. For the file name the
+        (and auto-create) `stdpath('data')/site/spell/`. For the file name the
         first language name that appears in 'spelllang' is used, ignoring the
         region.
         The resulting ".spl" file will be used for spell checking, it does not
