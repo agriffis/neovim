@@ -7134,6 +7134,12 @@ describe('builtin popupmenu', function()
       end
       screen:expect(screen_replace(no_sel_screen, '{n: baz}', '{s: baz}'))
       if multigrid then
+        api.nvim_input_mouse('right', 'release', '', 6, 1, 15)
+      else
+        feed('<RightRelease><31,4>')
+      end
+      screen:expect(no_sel_screen)
+      if multigrid then
         api.nvim_input_mouse('left', 'press', '', 4, 1, 2)
         screen:expect([[
         ## grid 1
@@ -7243,7 +7249,7 @@ describe('builtin popupmenu', function()
         ## grid 8
           ^popup menu test                 |
         ]],
-          float_pos = { [4] = { -1, 'NW', 1, 1, 14, false, 250, 2, 1, 14 } },
+          float_pos = { [4] = { -1, 'NW', 2, 1, 14, false, 250, 2, 3, 19 } },
         }
       else
         no_sel_screen = {
@@ -7273,7 +7279,7 @@ describe('builtin popupmenu', function()
       if multigrid then
         for i = 1, 7 do
           local _, row, col = unpack(pos[i])
-          pos[i] = { 1, row - 2, col - 5 }
+          pos[i] = { 2, row - 2, col - 5 }
         end
       end
 
@@ -7393,7 +7399,7 @@ describe('builtin popupmenu', function()
         ## grid 8
                            tset unem pupo^p|
         ]],
-          float_pos = { [4] = { -1, 'NW', 1, 1, 12, false, 250, 2, 1, 12 } },
+          float_pos = { [4] = { -1, 'NW', 2, 1, 12, false, 250, 2, 3, 17 } },
         }
       else
         no_sel_screen = {
@@ -7423,7 +7429,7 @@ describe('builtin popupmenu', function()
       if multigrid then
         for i = 1, 7 do
           local _, row, col = unpack(pos[i])
-          pos[i] = { 1, row - 2, col - 5 }
+          pos[i] = { 2, row - 2, col - 5 }
         end
       end
 
