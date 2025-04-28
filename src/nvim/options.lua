@@ -2753,6 +2753,12 @@ local options = {
         - 'exrc' can execute any code; editorconfig only specifies settings.
         - 'exrc' is Nvim-specific; editorconfig works in other editors.
 
+        To achieve project-local LSP configuration:
+        1. Enable 'exrc'.
+        2. Place LSP configs at ".nvim/lsp/*.lua" in your project root.
+        3. Create ".nvim.lua" in your project root directory with this line: >lua
+             vim.cmd[[set runtimepath+=.nvim]]
+        <
         This option cannot be set from a |modeline| or in the |sandbox|, for
         security reasons.
       ]=],
@@ -7296,8 +7302,8 @@ local options = {
         '	Maximum number of previously edited files for which the marks
         	are remembered.  This parameter must always be included when
         	'shada' is non-empty.
-        	Including this item also means that the |jumplist| and the
-        	|changelist| are stored in the shada file.
+        	If non-zero, then the |jumplist| and the |changelist| are also
+        	stored in the shada file.
         						*shada-/*
         /	Maximum number of items in the search pattern history to be
         	saved.  If non-zero, then the previous search and substitute
@@ -8550,8 +8556,7 @@ local options = {
         "%{% &ruler ? ( &rulerformat == '' ? '%-14.(%l,%c%V%) %P' : &rulerformat ) : '' %}",
       }),
       desc = [=[
-        When non-empty, this option determines the content of the status line.
-        Also see |status-line|.
+        Sets the |status-line|.
 
         The option consists of printf style '%' items interspersed with
         normal text.  Each status line item is of the form:

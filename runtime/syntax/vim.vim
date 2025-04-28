@@ -337,7 +337,7 @@ Vim9 syn match 	vimAugroup	"\<aug\%[roup]\>\ze\s*\%([#|]\|$\)"	skipwhite nextgro
 
 " Operators: {{{2
 " =========
-syn cluster	vimOperGroup	contains=@vimContinue,@vimExprList,vim9Comment,vimContinueString
+syn cluster	vimOperGroup	contains=@vimContinue,@vimExprList,vim9Comment,vim9LineComment,vimContinueString
 syn match	vimOper	"\a\@<!!"			skipwhite skipnl nextgroup=@vimOperContinue,@vimExprList,vimSpecFile
 syn match	vimOper	"||\|&&\|[-+*/%.]"		skipwhite skipnl nextgroup=@vimOperContinue,@vimExprList,vimSpecFile
 syn match	vimOper	"?"			skipwhite skipnl nextgroup=@vimOperContinue,@vimExprList,vimContinueString
@@ -1481,7 +1481,7 @@ syn match	vim9SearchDelim	'^\s*\zs:[/?]\|[/?]$'	contained contains=vimCmdSep
 syn region	vimGlobal	matchgroup=Statement start='\<g\%[lobal]!\=/'  skip='\\.' end='/'	skipwhite nextgroup=vimSubst1
 syn region	vimGlobal	matchgroup=Statement start='\<v\%[global]!\=/' skip='\\.' end='/'	skipwhite nextgroup=vimSubst1
 
-" Vim9 Script Regions: {{{2
+" Vim9 script Regions: {{{2
 " ==================
 
 if s:vim9script

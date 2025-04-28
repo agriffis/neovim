@@ -109,7 +109,8 @@ API
 
 DEFAULTS
 
-• todo
+• 'statusline' default is exposed as a statusline expression (previously it
+  was implemented as an internal C routine).
 
 DIAGNOSTICS
 
@@ -159,7 +160,8 @@ PERFORMANCE
 
 PLUGINS
 
-• todo
+• Customize :checkhealth by handling a `FileType checkhealth` event.
+  |health-usage|
 
 STARTUP
 

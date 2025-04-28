@@ -171,7 +171,7 @@ added. But visually, this small bit of sugar gets reasonably close to a
 
                                                                    *lua-regex*
 Lua intentionally does not support regular expressions, instead it has limited
-|lua-patterns| which avoid the performance pitfalls of extended regex. Lua
+|lua-pattern|s which avoid the performance pitfalls of extended regex. Lua
 scripts can also use Vim regex via |vim.regex()|.
 
 Examples: >lua
@@ -2024,7 +2024,7 @@ vim.gsplit({s}, {sep}, {opts})                                  *vim.gsplit()*
     See also: ~
       • |string.gmatch()|
       • |vim.split()|
-      • |lua-patterns|
+      • |lua-pattern|s
       • https://www.lua.org/pil/20.2.html
       • http://lua-users.org/wiki/StringLibraryTutorial
 
@@ -2117,7 +2117,7 @@ vim.list_slice({list}, {start}, {finish})                   *vim.list_slice()*
         (`any[]`) Copy of table sliced from start to finish (inclusive)
 
 vim.pesc({s})                                                     *vim.pesc()*
-    Escapes magic chars in |lua-patterns|.
+    Escapes magic chars in |lua-pattern|s.
 
     Parameters: ~
       • {s}  (`string`) String to escape
@@ -2372,7 +2372,7 @@ vim.trim({s})                                                     *vim.trim()*
         (`string`) String with whitespace removed from its beginning and end
 
     See also: ~
-      • |lua-patterns|
+      • |lua-pattern|s
       • https://www.lua.org/pil/20.2.html
 
                                                               *vim.validate()*
@@ -2672,7 +2672,7 @@ vim.filetype.add({filetypes})                             *vim.filetype.add()*
     Filetype mappings can be added either by extension or by filename (either
     the "tail" or the full file path). The full file path is checked first,
     followed by the file name. If a match is not found using the filename,
-    then the filename is matched against the list of |lua-patterns| (sorted by
+    then the filename is matched against the list of |lua-pattern|s (sorted by
     priority) until a match is found. Lastly, if pattern matching does not
     find a filetype, then the file extension is used.
 
@@ -2900,7 +2900,7 @@ Use |uv.fs_stat()| to check a file's type, and whether it exists.
 
 Example: >lua
   if vim.uv.fs_stat(file) then
-    vim.print("file exists")
+    vim.print('file exists')
   end
 <
 
@@ -2955,7 +2955,8 @@ vim.fs.dir({path}, {opts})                                      *vim.fs.dir()*
         "fifo", "socket", "char", "block", "unknown".
 
 vim.fs.dirname({file})                                      *vim.fs.dirname()*
-    Return the parent directory of the given path
+    Gets the parent directory of the given path (not expanded/resolved, the
+    caller must do that).
 
     Attributes: ~
         Since: 0.8.0
@@ -2980,16 +2981,17 @@ vim.fs.find({names}, {opts})                                   *vim.fs.find()*
     narrow the search to find only that type.
 
     Examples: >lua
-        -- list all test directories under the runtime directory
-        local test_dirs = vim.fs.find(
-          {'test', 'tst', 'testdir'},
-          {limit = math.huge, type = 'directory', path = './runtime/'}
+        -- List all test directories under the runtime directory.
+        local dirs = vim.fs.find(
+          { 'test', 'tst', 'testdir' },
+          { limit = math.huge, type = 'directory', path = './runtime/' }
         )
 
-        -- get all files ending with .cpp or .hpp inside lib/
-        local cpp_hpp = vim.fs.find(function(name, path)
+        -- Get all "lib/*.cpp" and "lib/*.hpp" files, using Lua patterns.
+        -- Or use `vim.glob.to_lpeg(…):match(…)` for glob/wildcard matching.
+        local files = vim.fs.find(function(name, path)
           return name:match('.*%.[ch]pp$') and path:match('[/\\]lib$')
-        end, {limit = math.huge, type = 'file'})
+        end, { limit = math.huge, type = 'file' })
 <
 
     Attributes: ~
@@ -3089,19 +3091,20 @@ vim.fs.normalize({path}, {opts})                          *vim.fs.normalize()*
         (`string`) Normalized path
 
 vim.fs.parents({start})                                     *vim.fs.parents()*
-    Iterate over all the parents of the given path.
+    Iterate over all the parents of the given path (not expanded/resolved, the
+    caller must do that).
 
     Example: >lua
         local root_dir
         for dir in vim.fs.parents(vim.api.nvim_buf_get_name(0)) do
-          if vim.fn.isdirectory(dir .. "/.git") == 1 then
+          if vim.fn.isdirectory(dir .. '/.git') == 1 then
             root_dir = dir
             break
           end
         end
 
         if root_dir then
-          print("Found git repository at", root_dir)
+          print('Found git repository at', root_dir)
         end
 <
 
