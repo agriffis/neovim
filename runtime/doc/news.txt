@@ -70,7 +70,7 @@ HIGHLIGHTS
 
 LSP
 
-• todo
+• `root_markers` in |vim.lsp.Config| can now be ordered by priority.
 
 LUA
 
@@ -106,6 +106,9 @@ API
 • |nvim_win_text_height()| can limit the lines checked when a certain
   `max_height` is reached, and returns the `end_row` and `end_vcol` for which
   `max_height` or the calculated height is reached.
+• |vim.secure.read()| now returns `true` for trusted directories. Previously
+  it would return `nil`, which made it impossible to tell if the directory was
+  actually trusted.
 
 DEFAULTS
 
@@ -169,7 +172,8 @@ STARTUP
 
 TERMINAL
 
-• todo
+• |nvim_open_term()| can be called with a non-empty buffer. The buffer
+  contents are piped to the PTY and displayed as terminal output.
 
 TREESITTER
 
