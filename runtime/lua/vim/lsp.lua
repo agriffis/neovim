@@ -544,6 +544,15 @@ local function lsp_enable_callback(bufnr)
     return
   end
 
+  -- Stop any clients that no longer apply to this buffer.
+  local clients = lsp.get_clients({ bufnr = bufnr, _uninitialized = true })
+  for _, client in ipairs(clients) do
+    if not can_start(bufnr, client.name, lsp.config[client.name]) then
+      lsp.buf_detach_client(bufnr, client.id)
+    end
+  end
+
+  -- Start any clients that apply to this buffer.
   for name in vim.spairs(lsp._enabled_configs) do
     local config = lsp.config[name]
     if config and can_start(bufnr, name, config) then
@@ -633,6 +642,14 @@ function lsp.enable(name, enable)
       end
     end
   end
+end
+
+--- Checks if the given LSP config is enabled (globally, not per-buffer).
+---
+--- @param name string Config name
+--- @return boolean
+function lsp.is_enabled(name)
+  return lsp._enabled_configs[name] ~= nil
 end
 
 --- @class vim.lsp.start.Opts
