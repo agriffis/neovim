@@ -148,7 +148,7 @@ end
 --- @param config vim.lsp.ClientConfig
 --- @return boolean
 local function reuse_client_default(client, config)
-  if client.name ~= config.name then
+  if client.name ~= config.name or client:is_stopped() then
     return false
   end
 
@@ -475,7 +475,8 @@ lsp.config = setmetatable({ _configs = {} }, {
   --- @param cfg vim.lsp.Config
   __newindex = function(self, name, cfg)
     validate_config_name(name)
-    validate('cfg', cfg, 'table')
+    local msg = ('table (hint: to resolve a config, use vim.lsp.config["%s"])'):format(name)
+    validate('cfg', cfg, 'table', msg)
     invalidate_enabled_config(name)
     self._configs[name] = cfg
   end,
@@ -485,7 +486,8 @@ lsp.config = setmetatable({ _configs = {} }, {
   --- @param cfg vim.lsp.Config
   __call = function(self, name, cfg)
     validate_config_name(name)
-    validate('cfg', cfg, 'table')
+    local msg = ('table (hint: to resolve a config, use vim.lsp.config["%s"])'):format(name)
+    validate('cfg', cfg, 'table', msg)
     invalidate_enabled_config(name)
     self[name] = vim.tbl_deep_extend('force', self._configs[name] or {}, cfg)
   end,
@@ -547,7 +549,7 @@ local function lsp_enable_callback(bufnr)
   -- Stop any clients that no longer apply to this buffer.
   local clients = lsp.get_clients({ bufnr = bufnr, _uninitialized = true })
   for _, client in ipairs(clients) do
-    if not can_start(bufnr, client.name, lsp.config[client.name]) then
+    if lsp.config[client.name] and not can_start(bufnr, client.name, lsp.config[client.name]) then
       lsp.buf_detach_client(bufnr, client.id)
     end
   end

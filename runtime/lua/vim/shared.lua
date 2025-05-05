@@ -366,7 +366,7 @@ local function can_merge(v)
 end
 
 --- Recursive worker for tbl_extend
---- @param behavior 'error'|'keep'|'force'|fun(key:any, v:any, prev_value:any): any
+--- @param behavior 'error'|'keep'|'force'|fun(key:any, prev_value:any?, value:any): any
 --- @param deep_extend boolean
 --- @param ... table<any,any>
 local function tbl_extend_rec(behavior, deep_extend, ...)
@@ -382,7 +382,7 @@ local function tbl_extend_rec(behavior, deep_extend, ...)
         if deep_extend and can_merge(v) and can_merge(ret[k]) then
           ret[k] = tbl_extend_rec(behavior, true, ret[k], v)
         elseif type(behavior) == 'function' then
-          ret[k] = behavior(k, v, ret[k])
+          ret[k] = behavior(k, ret[k], v)
         elseif behavior ~= 'force' and ret[k] ~= nil then
           if behavior == 'error' then
             error('key found in more than one map: ' .. k)
@@ -397,7 +397,7 @@ local function tbl_extend_rec(behavior, deep_extend, ...)
   return ret
 end
 
---- @param behavior 'error'|'keep'|'force'|fun(key:any, v:any, prev_value:any): any
+--- @param behavior 'error'|'keep'|'force'|fun(key:any, prev_value:any?, value:any): any
 --- @param deep_extend boolean
 --- @param ... table<any,any>
 local function tbl_extend(behavior, deep_extend, ...)
@@ -427,11 +427,11 @@ end
 ---
 ---@see |extend()|
 ---
----@param behavior 'error'|'keep'|'force'|fun(key:any, v:any, prev_value:any?): any Decides what to do if a key is found in more than one map:
+---@param behavior 'error'|'keep'|'force'|fun(key:any, prev_value:any?, value:any): any Decides what to do if a key is found in more than one map:
 ---      - "error": raise an error
 ---      - "keep":  use value from the leftmost map
 ---      - "force": use value from the rightmost map
----      - If a function, it receives the current key, value, and the previous value in the currently merged table (if present) and should
+---      - If a function, it receives the current key, the previous value in the currently merged table (if present), the current value and should
 ---        return the value for the given key in the merged table.
 ---@param ... table Two or more tables
 ---@return table : Merged table
@@ -450,11 +450,11 @@ end
 ---
 ---@generic T1: table
 ---@generic T2: table
----@param behavior 'error'|'keep'|'force'|fun(key:any, v:any, prev_value:any?): any Decides what to do if a key is found in more than one map:
+---@param behavior 'error'|'keep'|'force'|fun(key:any, prev_value:any?, value:any): any Decides what to do if a key is found in more than one map:
 ---      - "error": raise an error
 ---      - "keep":  use value from the leftmost map
 ---      - "force": use value from the rightmost map
----      - If a function, it receives the current key, value, and the previous value in the currently merged table (if present) and should
+---      - If a function, it receives the current key, the previous value in the currently merged table (if present), the current value and should
 ---        return the value for the given key in the merged table.
 ---@param ... T2 Two or more tables
 ---@return T1|T2 (table) Merged table
@@ -865,7 +865,7 @@ do
   --- @param param_name string
   --- @param val any
   --- @param validator vim.validate.Validator
-  --- @param message? string
+  --- @param message? string "Expected" message
   --- @param allow_alias? boolean Allow short type names: 'n', 's', 't', 'b', 'f', 'c'
   --- @return string?
   local function is_valid(param_name, val, validator, message, allow_alias)
@@ -877,18 +877,18 @@ do
       end
 
       if not is_type(val, expected) then
-        return string.format('%s: expected %s, got %s', param_name, expected, type(val))
+        return ('%s: expected %s, got %s'):format(param_name, message or expected, type(val))
       end
     elseif vim.is_callable(validator) then
       -- Check user-provided validation function
       local valid, opt_msg = validator(val)
       if not valid then
-        local err_msg =
-          string.format('%s: expected %s, got %s', param_name, message or '?', tostring(val))
-
-        if opt_msg then
-          err_msg = string.format('%s. Info: %s', err_msg, opt_msg)
-        end
+        local err_msg = ('%s: expected %s, got %s'):format(
+          param_name,
+          message or '?',
+          tostring(val)
+        )
+        err_msg = opt_msg and ('%s. Info: %s'):format(err_msg, opt_msg) or err_msg
 
         return err_msg
       end

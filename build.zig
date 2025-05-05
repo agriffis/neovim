@@ -153,11 +153,12 @@ pub fn build(b: *std.Build) !void {
         config_str = b.fmt("{s} -Dcross -Dtarget={s} (host: {s})", .{ config_str, try t.linuxTriple(b.allocator), try b.graph.host.result.linuxTriple(b.allocator) });
     }
 
-    const versiondef_step = b.addConfigHeader(.{ .style = .{ .cmake = b.path("src/versiondef.h.in") } }, .{
+    const versiondef_step = b.addConfigHeader(.{ .style = .{ .cmake = b.path("cmake.config/versiondef.h.in") } }, .{
         .NVIM_VERSION_MAJOR = version.major,
         .NVIM_VERSION_MINOR = version.minor,
         .NVIM_VERSION_PATCH = version.patch,
         .NVIM_VERSION_PRERELEASE = version.prerelease,
+        .NVIM_VERSION_MEDIUM = "",
         .VERSION_STRING = "TODO", // TODO(bfredl): not sure what to put here. summary already in "config_str"
         .CONFIG = config_str,
     });
@@ -181,7 +182,7 @@ pub fn build(b: *std.Build) !void {
         .HAVE_FSEEKO = modernUnix,
         .HAVE_LANGINFO_H = modernUnix,
         .HAVE_NL_LANGINFO_CODESET = modernUnix,
-        .HAVE_NL_MSG_CAT_CNTR = isLinux,
+        .HAVE_NL_MSG_CAT_CNTR = t.isGnuLibC(),
         .HAVE_PWD_FUNCS = modernUnix,
         .HAVE_READLINK = modernUnix,
         .HAVE_STRNLEN = modernUnix,
@@ -194,7 +195,7 @@ pub fn build(b: *std.Build) !void {
         .HAVE_SYS_UTSNAME_H = modernUnix,
         .HAVE_SYS_WAIT_H = false, // unused
         .HAVE_TERMIOS_H = modernUnix,
-        .HAVE_WORKING_LIBINTL = isLinux,
+        .HAVE_WORKING_LIBINTL = t.isGnuLibC(),
         .UNIX = modernUnix,
         .CASE_INSENSITIVE_FILENAME = tag.isDarwin() or tag == .windows,
         .HAVE_SYS_UIO_H = modernUnix,
@@ -204,7 +205,7 @@ pub fn build(b: *std.Build) !void {
         .HAVE_BE64TOH = modernUnix and !tag.isDarwin(),
         .ORDER_BIG_ENDIAN = t.cpu.arch.endian() == .big,
         .ENDIAN_INCLUDE_FILE = "endian.h",
-        .HAVE_EXECINFO_BACKTRACE = modernUnix,
+        .HAVE_EXECINFO_BACKTRACE = modernUnix and !t.isMuslLibC(),
         .HAVE_BUILTIN_ADD_OVERFLOW = true,
         .HAVE_WIMPLICIT_FALLTHROUGH_FLAG = true,
         .HAVE_BITSCANFORWARD64 = null,
