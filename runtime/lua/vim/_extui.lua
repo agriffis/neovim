@@ -17,6 +17,19 @@
 ---  },
 ---})
 ---```
+---
+---There are four separate window types used by this interface:
+---- "cmd": The cmdline window; also used for 'showcmd', 'showmode', 'ruler', and
+---  messages if 'cmdheight' > 0.
+---- "box": The message box window; used for messages when 'cmdheight' == 0.
+---- "more": The more-prompt window; used for |:messages| and certain messages
+---   that should be shown in full.
+---- "prompt": The cmdline prompt window; used for prompt messages that expect
+---   user input.
+---
+---These four windows are assigned the "cmdline", "msgbox", "msgmore" and
+---"msgprompt" 'filetype' respectively. Use a |FileType| autocommand to configure
+---any local options for these windows and their respective buffers.
 
 local api = vim.api
 local ext = require('vim._extui.shared')
@@ -82,28 +95,25 @@ function M.enable(opts)
   local function check_opt(name, value)
     if name == 'cmdheight' then
       -- 'cmdheight' set; (un)hide cmdline window and set its height.
-      ext.cmdheight = value
-      ext.cfg.msg.pos = ext.cmdheight == 0 and 'box' or ext.cfg.msg.pos
-      local cfg = { height = math.max(ext.cmdheight, 1), hide = ext.cmdheight == 0 }
+      local cfg = { height = math.max(value, 1), hide = value == 0 }
       api.nvim_win_set_config(ext.wins[ext.tab].cmd, cfg)
-    elseif name == 'termguicolors' then
-      -- 'termguicolors' toggled; add or remove border and set 'winblend' for box windows.
-      for _, tab in ipairs(api.nvim_list_tabpages()) do
-        api.nvim_win_set_config(ext.wins[tab].box, { border = value and 'none' or 'single' })
-        vim.wo[ext.wins[tab].box].winblend = value and 30 or 0
+      -- Change message position when 'cmdheight' was or becomes 0.
+      if value == 0 or ext.cmdheight == 0 then
+        ext.cfg.msg.pos = value == 0 and 'box' or ext.cmdheight == 0 and 'cmd'
+        ext.msg.prev_msg = ''
       end
+      ext.cmdheight = value
     end
   end
 
   if vim.v.vim_did_enter == 1 then
     ext.tab_check_wins()
     check_opt('cmdheight', vim.o.cmdheight)
-    check_opt('termguicolors', vim.o.termguicolors)
   end
 
   api.nvim_create_autocmd('OptionSet', {
     group = ext.augroup,
-    pattern = { 'cmdheight', 'termguicolors' },
+    pattern = { 'cmdheight' },
     callback = function(ev)
       ext.tab_check_wins()
       check_opt(ev.match, vim.v.option_new)
@@ -118,7 +128,6 @@ function M.enable(opts)
       ext.tab_check_wins()
       if ev.event == 'VimEnter' then
         check_opt('cmdheight', vim.o.cmdheight)
-        check_opt('termguicolors', vim.o.termguicolors)
       end
       ext.msg.set_pos()
     end,

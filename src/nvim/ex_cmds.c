@@ -1025,6 +1025,7 @@ void do_bang(int addr_count, exarg_T *eap, bool forceit, bool do_in, bool do_out
   if (addr_count == 0) {                // :!
     // echo the command
     msg_start();
+    msg_ext_set_kind("shell_cmd");
     msg_putchar(':');
     msg_putchar('!');
     msg_outtrans(newcmd, 0, false);
@@ -2741,6 +2742,9 @@ int do_ecmd(int fnum, char *ffname, char *sfname, exarg_T *eap, linenr_T newlnum
 theend:
   if (bufref_valid(&old_curbuf) && old_curbuf.br_buf->terminal != NULL) {
     terminal_check_size(old_curbuf.br_buf->terminal);
+  }
+  if ((!bufref_valid(&old_curbuf) || curbuf != old_curbuf.br_buf) && curbuf->terminal != NULL) {
+    terminal_check_size(curbuf->terminal);
   }
 
   if (did_inc_redrawing_disabled) {
