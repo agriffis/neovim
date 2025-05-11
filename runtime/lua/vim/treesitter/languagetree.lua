@@ -1164,7 +1164,6 @@ function LanguageTree:_edit(
   end
 end
 
----@nodoc
 ---@param bufnr integer
 ---@param changed_tick integer
 ---@param start_row integer
@@ -1236,12 +1235,10 @@ function LanguageTree:_on_bytes(
   )
 end
 
----@nodoc
 function LanguageTree:_on_reload()
   self:invalidate(true)
 end
 
----@nodoc
 function LanguageTree:_on_detach(...)
   self:invalidate(true)
   self:_do_callback('detach', ...)
@@ -1290,12 +1287,13 @@ end
 local function tree_contains(tree, range)
   local tree_ranges = tree:included_ranges(false)
 
-  return Range.contains({
-    tree_ranges[1][1],
-    tree_ranges[1][2],
-    tree_ranges[#tree_ranges][3],
-    tree_ranges[#tree_ranges][4],
-  }, range)
+  for _, tree_range in ipairs(tree_ranges) do
+    if Range.contains(tree_range, range) then
+      return true
+    end
+  end
+
+  return false
 end
 
 --- Determines whether {range} is contained in the |LanguageTree|.
