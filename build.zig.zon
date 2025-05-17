@@ -50,12 +50,12 @@
             .hash = "N-V-__8AAHIQUwAO7lkXegMUhQxMCiIltH69Kgcpo17B0K6z",
         },
         .treesitter_vimdoc = .{
-            .url = "git+https://github.com/neovim/tree-sitter-vimdoc?ref=v3.0.1#2694c3d27e2ca98a0ccde72f33887394300d524e",
-            .hash = "N-V-__8AAMADCgDGXU8mbjxUeAaHS-U5LXULALYNNvUslu9N",
+            .url = "git+https://github.com/neovim/tree-sitter-vimdoc?ref=v4.0.0#9f6191a98702edc1084245abd5523279d4b681fb",
+            .hash = "N-V-__8AAI4YCgD7OqxCEAmz2RqT_ohl6eA4F0fGMtLIe7nb",
         },
         .treesitter_query = .{
-            .url = "git+https://github.com/tree-sitter-grammars/tree-sitter-query?ref=v0.6.0#20806904e7f59003e87f36548b05900c9c8a6b0a",
-            .hash = "N-V-__8AAPxWBACzNy-sLj8ryiwyfZh8_ttOe4aUPc-7sZ8M",
+            .url = "git+https://github.com/tree-sitter-grammars/tree-sitter-query?ref=v0.6.1#892ebd701a79be0412ff1478177030a725d0c7b7",
+            .hash = "N-V-__8AAGhSBABzxHSGplnXv-x-Ax8TRrRe6QaPo0gSplIz",
         },
     },
     .paths = .{
