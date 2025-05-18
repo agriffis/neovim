@@ -14,8 +14,8 @@
             .hash = "122084badadeb91106dd06b2055119a944c340563536caefd8e22d4064182f7cd6e6",
         },
         .luv = .{
-            .url = "git+https://github.com/luvit/luv?ref=1.51.0-0#6cbf6c959a47b6e3ce0679d89ee14d8ed84788b3",
-            .hash = "N-V-__8AAFglDwBDITf14pNH9v1JzRZneQ_aV_8ytBlzhyNx",
+            .url = "git+https://github.com/luvit/luv?ref=1.51.0-1#4c9fbc6cf6f3338bb0e0426710cf885ee557b540",
+            .hash = "N-V-__8AAMlNDwCY07jUoMiq3iORXdZy0uFWKiHsy8MaDBJA",
         },
         .lua_compat53 = .{
             .url = "https://github.com/lunarmodules/lua-compat-5.3/archive/v0.13.tar.gz",
@@ -38,12 +38,12 @@
             .hash = "N-V-__8AAECfSADUxb_Nvy_jsHRlD1-CdzGh4dbf2KCtv7v0",
         },
         .treesitter_markdown = .{
-            .url = "git+https://github.com/tree-sitter-grammars/tree-sitter-markdown?ref=v0.4.1#413285231ce8fa8b11e7074bbe265b48aa7277f9",
-            .hash = "N-V-__8AAMgXUwC4v9_Fveeo7cvY1R3gEK58Pc4vW3gFiEaL",
+            .url = "git+https://github.com/tree-sitter-grammars/tree-sitter-markdown?ref=v0.5.0#afaa4138517363362f54c89330c9d79391e81168",
+            .hash = "N-V-__8AAIIZUwD3CGdyI2DiHu7Suj2jIF_EAVlM6REFGwju",
         },
         .treesitter_lua = .{
-            .url = "git+https://github.com/tree-sitter-grammars/tree-sitter-lua?ref=v0.3.0#db16e76558122e834ee214c8dc755b4a3edc82a9",
-            .hash = "N-V-__8AALBVCABzNpJmVFujBmfpbSS_5V-I8aZS6LaTtWWi",
+            .url = "git+https://github.com/tree-sitter-grammars/tree-sitter-lua?ref=v0.4.0#4569d1c361129e71a205b94a05e158bd71b1709f",
+            .hash = "N-V-__8AAEF5CABqSL9zqc03aQsT6Nni54ZCcL98pnuDL2D3",
         },
         .treesitter_vim = .{
             .url = "git+https://github.com/tree-sitter-grammars/tree-sitter-vim?ref=v0.6.0#2f9e2be0a3af4999f615d69a6261efc699e5985c",
