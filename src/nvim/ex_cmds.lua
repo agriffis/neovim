@@ -734,7 +734,7 @@ M.cmds = {
   },
   {
     command = 'detach',
-    flags = bit.bor(BANG, FILES, CMDARG, ARGOPT, TRLBAR, CMDWIN, LOCK_OK),
+    flags = TRLBAR,
     addr_type = 'ADDR_NONE',
     func = 'ex_detach',
   },
@@ -2245,6 +2245,12 @@ M.cmds = {
     flags = bit.bor(RANGE, TRLBAR, WORD1, CMDWIN, LOCK_OK),
     addr_type = 'ADDR_OTHER',
     func = 'ex_resize',
+  },
+  {
+    command = 'restart',
+    flags = bit.bor(BANG, TRLBAR),
+    addr_type = 'ADDR_NONE',
+    func = 'ex_restart',
   },
   {
     command = 'retab',
