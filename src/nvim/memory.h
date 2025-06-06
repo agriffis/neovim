@@ -40,6 +40,10 @@ extern MemRealloc mem_realloc;
 extern bool entered_free_all_mem;
 #endif
 
+typedef void *(*MergeSortGetFunc)(void *);
+typedef void (*MergeSortSetFunc)(void *, void *);
+typedef int (*MergeSortCompareFunc)(const void *, const void *);
+
 EXTERN size_t arena_alloc_count INIT( = 0);
 
 #define kv_fixsize_arena(a, v, s) \
