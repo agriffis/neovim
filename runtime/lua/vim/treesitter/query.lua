@@ -193,7 +193,7 @@ function M.get_files(lang, query_name, is_included)
       local langlist = modeline:match(MODELINE_FORMAT)
       if langlist then
         ---@diagnostic disable-next-line:param-type-mismatch
-        for _, incllang in ipairs(vim.split(langlist, ',', true)) do
+        for _, incllang in ipairs(vim.split(langlist, ',')) do
           local is_optional = incllang:match('%(.*%)')
 
           if is_optional then
@@ -778,7 +778,7 @@ local directive_handlers = {
 --- Adds a new predicate to be used in queries
 ---
 ---@param name string Name of the predicate, without leading #
----@param handler fun(match: table<integer,TSNode[]>, pattern: integer, source: integer|string, predicate: any[], metadata: vim.treesitter.query.TSMetadata): boolean?
+---@param handler fun(match: table<integer,TSNode[]>, pattern: integer, source: integer|string, predicate: any[], metadata: vim.treesitter.query.TSMetadata): boolean? #
 ---   - see |vim.treesitter.query.add_directive()| for argument meanings
 ---@param opts? vim.treesitter.query.add_predicate.Opts
 function M.add_predicate(name, handler, opts)
@@ -818,7 +818,7 @@ end
 --- metadata table `metadata[capture_id].key = value`
 ---
 ---@param name string Name of the directive, without leading #
----@param handler fun(match: table<integer,TSNode[]>, pattern: integer, source: integer|string, predicate: any[], metadata: vim.treesitter.query.TSMetadata)
+---@param handler fun(match: table<integer,TSNode[]>, pattern: integer, source: integer|string, predicate: any[], metadata: vim.treesitter.query.TSMetadata) #
 ---   - match: A table mapping capture IDs to a list of captured nodes
 ---   - pattern: the index of the matching pattern in the query file
 ---   - predicate: list of strings containing the full directive being called, e.g.
@@ -979,8 +979,7 @@ function Query:iter_captures(node, source, start, stop, opts)
 
   start, stop = value_or_node_range(start, stop, node)
 
-  -- Copy the tree to ensure it is valid during the entire lifetime of the iterator
-  local tree = node:tree():copy()
+  local tree = node:tree()
   local cursor = vim._create_ts_querycursor(node, self.query, start, stop, opts)
 
   -- For faster checks that a match is not in the cache.
@@ -1079,8 +1078,7 @@ function Query:iter_matches(node, source, start, stop, opts)
 
   start, stop = value_or_node_range(start, stop, node)
 
-  -- Copy the tree to ensure it is valid during the entire lifetime of the iterator
-  local tree = node:tree():copy()
+  local tree = node:tree()
   local cursor = vim._create_ts_querycursor(node, self.query, start, stop, opts)
 
   local function iter()
