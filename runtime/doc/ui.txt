@@ -226,8 +226,7 @@ the editor.
 	sent from Nvim, like for |ui-cmdline|.
 
 ["chdir", path] ~
-	The |current-directory| of the embedded Nvim process changed to
-	`path`.
+	The |current-directory| changed to `path`.
 
 ["mode_change", mode, mode_idx] ~
 	Editor mode changed.  The `mode` parameter is a string representing
@@ -248,6 +247,14 @@ the editor.
 ["busy_stop"] ~
 	Indicates to the UI that it must stop rendering the cursor. This event
 	is misnamed and does not actually have anything to do with busyness.
+
+["restart", progpath, argv] ~
+	|:restart| command has been used and the Nvim server is about to exit.
+	The UI should wait for the server to exit, and then start a new server
+	using `progpath` as the full path to the Nvim executable |v:progpath| and
+	`argv` as its arguments |v:argv|, and reattach to the new server.
+	Note: |--embed| and |--headless| are excluded from `argv`, and the client
+	should decide itself whether to add either flag.
 
 ["suspend"] ~
 	|:suspend| command or |CTRL-Z| mapping is used. A terminal client (or
