@@ -33,6 +33,28 @@ local assert_log = t.assert_log
 
 local testlog = 'Xtest-tui-log'
 
+describe('TUI', function()
+  it('exit status 1 and error message with server --listen error #34365', function()
+    clear()
+    local addr_in_use = api.nvim_get_vvar('servername')
+    local screen = tt.setup_child_nvim(
+      { '--listen', addr_in_use, '-u', 'NONE', '-i', 'NONE' },
+      { extra_rows = 10, cols = 60 }
+    )
+    -- When the address is very long, the error message may be only partly visible.
+    if #addr_in_use <= 600 then
+      screen:expect({
+        any = vim.pesc(
+          ('%s: Failed to --listen: address already in use:'):format(
+            is_os('win') and 'nvim.exe' or 'nvim'
+          )
+        ),
+      })
+    end
+    screen:expect({ any = vim.pesc('[Process exited 1]') })
+  end)
+end)
+
 describe('TUI :detach', function()
   it('does not stop server', function()
     local job_opts = { env = {} }
@@ -91,11 +113,13 @@ describe('TUI :detach', function()
       nvim_set .. ' notermguicolors laststatus=2 background=dark',
     }, job_opts)
 
+    --- FIXME: On Windows spaces at the end of a screen line may have wrong attrs.
+    --- Remove the {MATCH:} when that's fixed.
     tt.feed_data('iHello, World')
     screen:expect([[
       Hello, World^                                      |
       {4:~                                                 }|*3
-      {MATCH:No Name}
+      {5:[No Name] [+]{MATCH: *}}{MATCH: *}|
       {3:-- INSERT --}                                      |
       {3:-- TERMINAL --}                                    |
     ]])
@@ -157,10 +181,6 @@ describe('TUI :detach', function()
   end)
 end)
 
-if t.skip(is_os('win')) then
-  return
-end
-
 describe('TUI :restart', function()
   it('resets buffer to blank', function()
     clear()
@@ -184,6 +204,25 @@ describe('TUI :restart', function()
       'echo getpid()',
     })
 
+    --- FIXME: On Windows spaces at the end of a screen line may have wrong attrs.
+    --- Remove this function when that's fixed.
+    ---
+    --- @param s string
+    local function screen_expect(s)
+      if is_os('win') then
+        s = s:gsub(' +%}%|\n', '{MATCH: *}}{MATCH: *}|\n')
+        s = s:gsub(' *%} +%|\n', '{MATCH: *}}{MATCH: *}|\n')
+        s = s:gsub('%}%^ +%|\n', '{MATCH:[ ^]*}}{MATCH:[ ^]*}|\n')
+      end
+      screen:expect(s)
+    end
+
+    -- The value of has("gui_running") should be 0 before and after :restart.
+    local function gui_running_check()
+      tt.feed_data(':echo "GUI Running: " .. has("gui_running")\013')
+      screen:expect({ any = 'GUI Running: 0' })
+    end
+
     local s0 = [[
       ^                                                  |
       {4:~                                                 }|*3
@@ -191,11 +230,21 @@ describe('TUI :restart', function()
       {MATCH:%d+ +}|
       {3:-- TERMINAL --}                                    |
     ]]
-    screen:expect(s0)
-    local server_session = n.connect(server_pipe)
-    local _, server_pid = server_session:request('nvim_call_function', 'getpid', {})
+    screen_expect(s0)
+    gui_running_check()
+
+    local server_session --[[@type test.Session]]
+    local server_pid --[[@type any]]
+    -- FIXME: On Windows connect() hangs.
+    if not is_os('win') then
+      server_session = n.connect(server_pipe)
+      _, server_pid = server_session:request('nvim_call_function', 'getpid', {})
+    end
 
     local function restart_pid_check()
+      if is_os('win') then
+        return
+      end
       server_session:close()
       server_session = n.connect(server_pipe)
       local _, new_pid = server_session:request('nvim_call_function', 'getpid', {})
@@ -211,11 +260,12 @@ describe('TUI :restart', function()
 
     -- Check ":restart" on an unmodified buffer.
     tt.feed_data(':restart\013')
-    screen:expect(s0)
+    screen_expect(s0)
     restart_pid_check()
+    gui_running_check()
 
     tt.feed_data('ithis will be removed\027')
-    screen:expect([[
+    screen_expect([[
       this will be remove^d                              |
       {4:~                                                 }|*3
       {5:[No Name] [+]                                     }|
@@ -225,7 +275,7 @@ describe('TUI :restart', function()
 
     -- Check ":restart" on a modified buffer.
     tt.feed_data(':restart\013')
-    screen:expect([[
+    screen_expect([[
       this will be removed                              |
       {5:                                                  }|
       {8:E37: No write since last change}                   |
@@ -237,25 +287,18 @@ describe('TUI :restart', function()
 
     -- Check ":restart!".
     tt.feed_data(':restart!\013')
-    screen:expect(s0)
+    screen_expect(s0)
     restart_pid_check()
-
-    tt.feed_data(':echo\n')
-    screen:expect([[
-      ^                                                  |
-      {4:~                                                 }|*3
-      {5:[No Name]                                         }|
-                                                        |
-      {3:-- TERMINAL --}                                    |
-    ]])
+    gui_running_check()
 
     -- No --listen conflict when server exit is delayed.
     feed_data(':lua vim.schedule(function() vim.wait(100) end); vim.cmd.restart()\n')
-    screen:expect(s0)
+    screen_expect(s0)
     restart_pid_check()
+    gui_running_check()
 
     screen:try_resize(60, 6)
-    screen:expect([[
+    screen_expect([[
       ^                                                            |
       {4:~                                                           }|*2
       {5:[No Name]                                                   }|
@@ -265,7 +308,7 @@ describe('TUI :restart', function()
 
     --- Check that ":restart" uses the updated size after terminal resize.
     tt.feed_data(':restart\013')
-    screen:expect([[
+    screen_expect([[
       ^                                                            |
       {4:~                                                           }|*2
       {5:[No Name]                                                   }|
@@ -273,8 +316,13 @@ describe('TUI :restart', function()
       {3:-- TERMINAL --}                                              |
     ]])
     restart_pid_check()
+    gui_running_check()
   end)
 end)
+
+if t.skip(is_os('win')) then
+  return
+end
 
 describe('TUI', function()
   local screen --[[@type test.functional.ui.screen]]
@@ -2227,15 +2275,20 @@ describe('TUI', function()
 
   it('no assert failure on deadly signal #21896', function()
     exec_lua([[vim.uv.kill(vim.fn.jobpid(vim.bo.channel), 'sigterm')]])
-    screen:expect {
-      grid = [[
+    screen:expect([[
       Nvim: Caught deadly signal 'SIGTERM'              |
                                                         |
       [Process exited 1]^                                |
                                                         |*3
       {3:-- TERMINAL --}                                    |
-    ]],
-    }
+    ]])
+  end)
+
+  it('exit status 1 and error message with deadly signal sent to server', function()
+    local _, server_pid = child_session:request('nvim_call_function', 'getpid', {})
+    exec_lua([[vim.uv.kill(..., 'sigterm')]], server_pid)
+    screen:expect({ any = vim.pesc([[Nvim: Caught deadly signal 'SIGTERM']]) })
+    screen:expect({ any = vim.pesc('[Process exited 1]') })
   end)
 
   it('no stack-use-after-scope with cursor color #22432', function()
@@ -3711,6 +3764,9 @@ describe('TUI client', function()
     ]]
     screen_server:expect(s0)
 
+    feed_data(':echo "GUI Running: " .. has("gui_running")\013')
+    screen_server:expect({ any = 'GUI Running: 0' })
+
     set_session(client_super)
     local screen_client = tt.setup_child_nvim({
       '--remote-ui',
@@ -3718,6 +3774,10 @@ describe('TUI client', function()
       server_pipe,
     })
     screen_client:expect(s0)
+
+    -- XXX: should has("gui_running") be 1 when there is a remote TUI?
+    feed_data(':echo "GUI Running: " .. has("gui_running")\013')
+    screen_client:expect({ any = 'GUI Running: 1' })
 
     -- grid smaller than containing terminal window is cleared properly
     feed_data(":call setline(1,['a'->repeat(&columns)]->repeat(&lines))\n")
@@ -3742,6 +3802,9 @@ describe('TUI client', function()
       {3:-- TERMINAL --}                                    |
     ]])
     screen_server:expect({ any = vim.pesc('[Process exited 0]') })
+
+    feed_data(':echo "GUI Running: " .. has("gui_running")\013')
+    screen_client:expect({ any = 'GUI Running: 0' })
 
     feed_data(':q!\n')
 
@@ -3789,6 +3852,7 @@ describe('TUI client', function()
     eq(1, api.nvim_get_vvar('shell_error'))
 
     command('bwipe!')
+    -- Start another remote client to attach to the same server.
     fn.jobstart({ nvim_prog, '--remote-ui', '--server', server_pipe }, { term = true })
     command('startinsert')
     screen_client:expect([[
@@ -3798,10 +3862,15 @@ describe('TUI client', function()
       {3:-- INSERT --}                                      |
       {3:-- TERMINAL --}                                    |
     ]])
+    feed_data('\027')
+
+    -- XXX: should has("gui_running") be 1 when there is a remote TUI?
+    feed_data(':echo "GUI Running: " .. has("gui_running")\013')
+    screen_client:expect({ any = 'GUI Running: 1' })
 
     -- Run :restart! on the client.
     -- The client should start a new server while the original server should exit.
-    feed_data('\027:restart!\n')
+    feed_data(':restart!\n')
     screen_client:expect([[
       ^                                                  |
       {4:~                                                 }|*4
@@ -3811,6 +3880,9 @@ describe('TUI client', function()
     retry(nil, nil, function()
       eq(nil, vim.uv.fs_stat(server_pipe))
     end)
+
+    feed_data(':echo "GUI Running: " .. has("gui_running")\013')
+    screen_client:expect({ any = 'GUI Running: 0' })
 
     client_super:close()
     server:close()
