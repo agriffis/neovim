@@ -18,6 +18,10 @@ BREAKING CHANGES IN HEAD OR EXPERIMENTAL                    *news-breaking-dev*
 The following changes to UNRELEASED features were made during the development
 cycle (Nvim HEAD, the "master" branch).
 
+EVENTS
+
+• Renamed "nvim.find_exrc" |default-autocmds| group to "nvim.exrc".
+
 EXPERIMENTS
 
 • todo
@@ -176,6 +180,8 @@ LSP
   `an` selects outwards and `in` selects inwards.
 • Support for multiline semantic tokens.
 • Support for the `disabled` field on code actions.
+• The function form of `cmd` in a vim.lsp.Config or vim.lsp.ClientConfig
+  receives the resolved config as the second arg: `cmd(dispatchers, config)`.
 
 LUA
 
