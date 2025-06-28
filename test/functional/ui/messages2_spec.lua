@@ -30,7 +30,7 @@ describe('messages2', function()
     screen:expect([[
                                                            |
       {1:~                                                    }|*9
-      ─{100:Pager}───────────────────────────────────────────────|
+      ─────────────────────────────────────────────────────|
       {4:fo^o                                                  }|
       {4:bar                                                  }|
       foo[+1]                             1,3           All|
@@ -40,7 +40,7 @@ describe('messages2', function()
     screen:expect([[
                                                            |
       {1:~                                                    }|*9
-      ─{100:Pager}───────────────────────────────────────────────|
+      ─────────────────────────────────────────────────────|
       {4:fo^o                                                  }|
       {4:bar                                                  }|
       {9:E354: Invalid register name: '^@'}   1,3           All|
@@ -48,29 +48,42 @@ describe('messages2', function()
     -- Multiple messages in same event loop iteration are appended.
     feed([[q:echo "foo\nbar" | echo "baz"<CR>]])
     screen:expect([[
-                                                           |
+      ^                                                     |
       {1:~                                                    }|*8
-      ─{100:Pager}───────────────────────────────────────────────|
-      {4:^foo                                                  }|
+      ─────────────────────────────────────────────────────|
+      {4:foo                                                  }|
       {4:bar                                                  }|
       {4:baz                                                  }|
-                                          1,1           All|
+                                          0,0-1         All|
+    ]])
+    -- Any key press closes the routed pager.
+    feed('j')
+    screen:expect([[
+      ^                                                     |
+      {1:~                                                    }|*12
+                                          0,0-1         All|
     ]])
     -- No error for ruler virt_text msg_row exceeding buffer length.
     command([[map Q <cmd>echo "foo\nbar" <bar> ls<CR>]])
-    feed('qQ')
+    feed('Q')
     screen:expect([[
-                                                           |
+      ^                                                     |
       {1:~                                                    }|*7
-      ─{100:Pager}───────────────────────────────────────────────|
-      {4:^foo                                                  }|
+      ─────────────────────────────────────────────────────|
+      {4:foo                                                  }|
       {4:bar                                                  }|
       {4:                                                     }|
       {4:  1 %a   "[No Name]"                    line 1       }|
-                                          1,1           All|
+                                          0,0-1         All|
+    ]])
+    feed('<Esc>')
+    screen:expect([[
+      ^                                                     |
+      {1:~                                                    }|*12
+                                          0,0-1         All|
     ]])
     -- edit_unputchar() does not clear already updated screen #34515.
-    feed('qix<Esc>dwi<C-r>')
+    feed('ix<Esc>dwi<C-r>')
     screen:expect([[
       {18:^"}                                                    |
       {1:~                                                    }|*12
@@ -89,7 +102,7 @@ describe('messages2', function()
     screen:expect([[
                                                            |
       {1:~                                                    }|*10
-      ─{100:Pager}───────────────────────────────────────────────|
+      ─────────────────────────────────────────────────────|
       {4:fo^o                                                  }|
       foo                                                  |
     ]])
