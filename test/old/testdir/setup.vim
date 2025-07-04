@@ -72,19 +72,6 @@ autocmd! nvim.popupmenu
 " Undo the 'grepprg' and 'grepformat' setting in _defaults.lua.
 set grepprg& grepformat&
 
-" roughly equivalent to test_setmouse() in Vim
-func Ntest_setmouse(row, col)
-  call nvim_input_mouse('move', '', '', 0, a:row - 1, a:col - 1)
-  if state('m') == ''
-    call getchar(0)
-  endif
-endfunc
-
-" roughly equivalent to term_wait() in Vim
-func Nterm_wait(buf, time = 10)
-  execute $'sleep {a:time}m'
-endfunc
-
 " Prevent Nvim log from writing to stderr.
 let $NVIM_LOG_FILE = exists($NVIM_LOG_FILE) ? $NVIM_LOG_FILE : 'Xnvim.log'
 

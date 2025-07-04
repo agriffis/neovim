@@ -104,6 +104,7 @@ typedef struct {
 typedef struct {
   pos_T search_start;   // where 'incsearch' starts searching
   pos_T save_cursor;
+  handle_T winid;       // window where this state is valid
   viewstate_T init_viewstate;
   viewstate_T old_viewstate;
   pos_T match_start;
@@ -257,6 +258,7 @@ static void restore_viewstate(win_T *wp, viewstate_T *vs)
 
 static void init_incsearch_state(incsearch_state_T *s)
 {
+  s->winid = curwin->handle;
   s->match_start = curwin->w_cursor;
   s->did_incsearch = false;
   s->incsearch_postponed = false;
@@ -601,6 +603,16 @@ static int may_add_char_to_search(int firstc, int *c, incsearch_state_T *s)
         // put a backslash before special characters
         stuffcharReadbuff(*c);
         *c = '\\';
+      }
+      // add any composing characters
+      if (utf_char2len(*c) != utfc_ptr2len(get_cursor_pos_ptr())) {
+        const int save_c = *c;
+        while (utf_char2len(*c) != utfc_ptr2len(get_cursor_pos_ptr())) {
+          curwin->w_cursor.col += utf_char2len(*c);
+          *c = gchar_cursor();
+          stuffcharReadbuff(*c);
+        }
+        *c = save_c;
       }
       return FAIL;
     }
@@ -1203,6 +1215,10 @@ static int command_line_execute(VimState *state, int key)
       do_cmdline(NULL, getcmdkeycmd, NULL, DOCMD_NOWAIT);
     } else {
       map_execute_lua(false);
+    }
+    // If the window changed incremental search state is not valid.
+    if (s->is_state.winid != curwin->handle) {
+      init_incsearch_state(&s->is_state);
     }
     // Re-apply 'incsearch' highlighting in case it was cleared.
     if (display_tick > display_tick_saved && s->is_state.did_incsearch) {
