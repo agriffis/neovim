@@ -195,6 +195,7 @@ LSP
 • The function form of `cmd` in a vim.lsp.Config or vim.lsp.ClientConfig
   receives the resolved config as the second arg: `cmd(dispatchers, config)`.
 • Support for annotated text edits.
+• `:checkhealth vim.lsp` is now available to check which buffers the active LSP features are attached to.
 
 LUA
 
@@ -224,6 +225,7 @@ OPTIONS
 • 'pummaxwidth' sets maximum width for the completion popup menu.
 • 'winborder' "bold" style.
 • |g:clipboard| accepts a string name to force any builtin clipboard tool.
+• 'busy' sets a buffer "busy" status. Indicated in the default statusline.
 
 PERFORMANCE
 
@@ -265,6 +267,7 @@ UI
 • Error messages are more concise:
   • "Error detected while processing:" changed to "Error in:".
   • "Error executing Lua:" changed to "Lua:".
+• 'busy' status is shown in default statusline with symbol ◐
 
 VIMSCRIPT
 
