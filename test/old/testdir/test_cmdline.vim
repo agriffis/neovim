@@ -4505,6 +4505,8 @@ func Test_search_complete()
   call assert_equal(['Foobar', 'FooBARR'], g:compl_info.matches)
   call feedkeys("gg/FO\<tab>\<f9>", 'tx')
   call assert_equal({},  g:compl_info)
+  call feedkeys("gg/\\cFo\<tab>\<f9>", 'tx')
+  call assert_equal(['\cFoobar', '\cFooBAr', '\cFooBARR'], g:compl_info.matches)
   set ignorecase
   call feedkeys("gg/f\<tab>\<f9>", 'tx')
   call assert_equal(['foobar', 'fooBAr', 'fooBARR'], g:compl_info.matches)
@@ -4512,13 +4514,19 @@ func Test_search_complete()
   call assert_equal(['Foobar', 'FooBAr', 'FooBARR'], g:compl_info.matches)
   call feedkeys("gg/FO\<tab>\<f9>", 'tx')
   call assert_equal(['FOobar', 'FOoBAr', 'FOoBARR'], g:compl_info.matches)
+  call feedkeys("gg/\\Cfo\<tab>\<f9>", 'tx')
+  call assert_equal(['\CfooBAr', '\Cfoobar'], g:compl_info.matches)
   set smartcase
   call feedkeys("gg/f\<tab>\<f9>", 'tx')
-  call assert_equal(['foobar', 'fooBAr', 'fooBARR'], g:compl_info.matches)
+  call assert_equal(['foobar', 'fooBAr', 'foobarr'], g:compl_info.matches)
   call feedkeys("gg/Fo\<tab>\<f9>", 'tx')
   call assert_equal(['Foobar', 'FooBARR'], g:compl_info.matches)
   call feedkeys("gg/FO\<tab>\<f9>", 'tx')
   call assert_equal({},  g:compl_info)
+  call feedkeys("gg/\\Cfo\<tab>\<f9>", 'tx')
+  call assert_equal(['\CfooBAr', '\Cfoobar'], g:compl_info.matches)
+  call feedkeys("gg/\\cFo\<tab>\<f9>", 'tx')
+  call assert_equal(['\cFoobar', '\cFooBAr', '\cFooBARR'], g:compl_info.matches)
 
   bw!
   call Ntest_override("char_avail", 0)
@@ -4637,6 +4645,37 @@ func Test_range_complete()
   delfunc GetComplInfo
   unlet! g:compl_info
   set wildcharm=0
+endfunc
+
+" With 'noselect' in 'wildmode', ensure that the popup menu (pum) does not retain
+" its scroll position after reopening. The menu should open showing the top items,
+" regardless of previous scrolling.
+func Test_pum_scroll_noselect()
+  CheckScreendump
+
+  let lines =<< trim [SCRIPT]
+    command! -nargs=* -complete=customlist,TestFn TestCmd echo
+    func TestFn(a, b, c)
+      return map(range(1, 50), 'printf("a%d", v:val)')
+    endfunc
+    set wildmode=noselect,full
+    set wildoptions=pum
+    set wildmenu
+    set noruler
+  [SCRIPT]
+  call writefile(lines, 'XTest_pum_scroll', 'D')
+  let buf = RunVimInTerminal('-S XTest_pum_scroll', {'rows': 10})
+
+  call term_sendkeys(buf, ":TestCmd \<tab>" . repeat("\<c-n>", 20))
+  call TermWait(buf, 50)
+  call VerifyScreenDump(buf, 'Test_pum_scroll_noselect_1', {})
+
+  call term_sendkeys(buf, "\<esc>:TestCmd \<tab>")
+  call TermWait(buf, 50)
+  call VerifyScreenDump(buf, 'Test_pum_scroll_noselect_2', {})
+
+  call term_sendkeys(buf, "\<esc>")
+  call StopVimInTerminal(buf)
 endfunc
 
 " vim: shiftwidth=2 sts=2 expandtab
