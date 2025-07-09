@@ -72,6 +72,7 @@ EVENTS
   emitted after the screen is cleared. These events arbitrarily assumed a
   message UI that mimicks the legacy message grid. Benefit: reduced UI event
   traffic and more flexibility for UIs.
+  The `msg_history_show` event has an additional "prev_cmd" argument.
 • A new `empty` message kind is emitted for an empty (e.g. `:echo ""`) message.
 
 HIGHLIGHTS
@@ -119,6 +120,8 @@ The following new features were added.
 
 API
 
+• |api-contract| allows existing functions to change return-type from `void =>
+  non-void`.
 • |nvim_win_text_height()| can limit the lines checked when a certain
   `max_height` is reached, and returns the `end_row` and `end_vcol` for which
   `max_height` or the calculated height is reached.
