@@ -31,9 +31,9 @@ describe('messages2', function()
                                                            |
       {1:~                                                    }|*9
       ─────────────────────────────────────────────────────|
-      {4:fo^o                                                  }|
-      {4:bar                                                  }|
-      foo[+1]                             1,3           All|
+      fo^o                                                  |
+      bar                                                  |
+                                          1,3           All|
     ]])
     -- New message clears spill indicator.
     feed('Q')
@@ -41,42 +41,44 @@ describe('messages2', function()
                                                            |
       {1:~                                                    }|*9
       ─────────────────────────────────────────────────────|
-      {4:fo^o                                                  }|
-      {4:bar                                                  }|
+      fo^o                                                  |
+      bar                                                  |
       {9:E354: Invalid register name: '^@'}   1,3           All|
     ]])
-    -- Multiple messages in same event loop iteration are appended.
-    feed([[q:echo "foo\nbar" | echo "baz"<CR>]])
+    -- Multiple messages in same event loop iteration are appended and shown in full.
+    feed([[q:echo "foo" | echo "bar\nbaz\n"->repeat(&lines)<CR>]])
     screen:expect([[
       ^                                                     |
-      {1:~                                                    }|*8
+      {1:~                                                    }|*5
       ─────────────────────────────────────────────────────|
-      {4:foo                                                  }|
-      {4:bar                                                  }|
-      {4:baz                                                  }|
-                                          0,0-1         All|
+      foo                                                  |
+      bar                                                  |
+      baz                                                  |
+      bar                                                  |
+      baz                                                  |
+      bar                                                  |
+      baz[+23]                                             |
     ]])
-    -- Any key press closes the routed pager.
+    -- Any key press resizes the cmdline and updates the spill indicator.
     feed('j')
     screen:expect([[
       ^                                                     |
       {1:~                                                    }|*12
-                                          0,0-1         All|
+      foo[+29]                            0,0-1         All|
     ]])
     -- No error for ruler virt_text msg_row exceeding buffer length.
     command([[map Q <cmd>echo "foo\nbar" <bar> ls<CR>]])
     feed('Q')
     screen:expect([[
       ^                                                     |
-      {1:~                                                    }|*7
+      {1:~                                                    }|*8
       ─────────────────────────────────────────────────────|
-      {4:foo                                                  }|
-      {4:bar                                                  }|
-      {4:                                                     }|
-      {4:  1 %a   "[No Name]"                    line 1       }|
-                                          0,0-1         All|
+      foo                                                  |
+      bar                                                  |
+                                                           |
+        1 %a   "[No Name]"                    line 1       |
     ]])
-    feed('<Esc>')
+    feed('<C-L>')
     screen:expect([[
       ^                                                     |
       {1:~                                                    }|*12
@@ -103,7 +105,7 @@ describe('messages2', function()
                                                            |
       {1:~                                                    }|*10
       ─────────────────────────────────────────────────────|
-      {4:fo^o                                                  }|
+      fo^o                                                  |
       foo                                                  |
     ]])
     command('bdelete | messages')
@@ -140,9 +142,9 @@ describe('messages2', function()
     screen:expect([[
       ^                                                     |
       {1:~                                                    }|*10
-      {1:~                                               }┌───┐|
-      {1:~                                               }│{4:foo}│|
-      {1:~                                               }└───┘|
+      {1:~                                                    }|
+      {1:~                                                    }|
+      {1:~                                                 }{4:foo}|
     ]])
     command('mode')
     screen:expect([[
@@ -154,9 +156,9 @@ describe('messages2', function()
     screen:expect([[
       ^                                                     |
       {1:~                                                    }|*10
-      {1:~                                               }┌───┐|
-      {1:~                                               }│{4:foo}│|
-      {1:~                                               }└───┘|
+      {1:~                                                    }|
+      {1:~                                                    }|
+      {1:~                                                 }{4:foo}|
     ]])
     command('echo ""')
     screen:expect_unchanged()
@@ -165,9 +167,29 @@ describe('messages2', function()
     screen:expect([[
       ^                                                     |
       {1:~                                                    }|*9
-      {1:~                                               }┌───┐|
-      {1:~                                               }│{4:foo}│|
-      {1:~                                               }└───┘|
+      {1:~                                                    }|
+      {1:~                                                    }|
+      {1:~                                                 }{4:foo}|
     ]])
+    -- Moved up when opening cmdline
+    feed(':')
+    screen:expect([[
+                                                           |
+      {1:~                                                    }|*10
+      {1:~                                                 }{4:foo}|
+      {16::}^                                                    |
+    ]])
+  end)
+
+  it("deleting buffer restores 'buftype'", function()
+    command('%bdelete')
+    screen:expect([[
+      ^                                                     |
+      {1:~                                                    }|*12
+      5 buffers deleted                                    |
+    ]])
+    -- Would trigger changed dialog if 'buftype' was not restored.
+    command('%bdelete')
+    screen:expect_unchanged()
   end)
 end)
