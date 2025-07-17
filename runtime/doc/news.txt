@@ -84,10 +84,13 @@ LSP
 • `root_markers` in |vim.lsp.Config| can now be ordered by priority.
 • The function set with |vim.lsp.log.set_format_func()| is now given all
   arguments corresponding to a log entry instead of the individual arguments.
+• `vim.lsp.semantic_tokens.start/stop` now renamed to
+  `vim.lsp.semantic_tokens.enable`
 
 LUA
 
-• todo
+• Renamed `vim.diff` to `vim.text.diff`.
+• |vim.net.request()| adds a minimal HTTP GET API using curl.
 
 OPTIONS
 
@@ -297,6 +300,7 @@ These existing features changed their behavior.
 • 'spellfile' location defaults to `stdpath("data").."/site/spell/"` instead of
   the first writable directory in 'runtimepath'.
 • |vim.version.range()| doesn't exclude `to` if it is equal to `from`.
+• 'scrollback' maximum value increased from 100000 to 1000000
 
 ==============================================================================
 REMOVED FEATURES                                                 *news-removed*
