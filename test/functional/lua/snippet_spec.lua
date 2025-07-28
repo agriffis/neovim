@@ -240,6 +240,23 @@ describe('vim.snippet', function()
     eq({ 'public function foo() {', '\t', '}' }, buf_lines(0))
   end)
 
+  it('does not change the chosen text when jumping back to a choice tabstop', function()
+    test_expand_success(
+      { '${1|public,protected,private|} function ${2:name}() {', '\t$0', '}' },
+      { ' function name() {', '\t', '}' }
+    )
+    wait_for_pum()
+    feed('<C-n><C-y><Tab>')
+    poke_eventloop()
+    feed('<S-Tab>')
+    poke_eventloop()
+    wait_for_pum()
+    feed('<Tab>')
+    poke_eventloop()
+    feed('foo')
+    eq({ 'protected function foo() {', '\t', '}' }, buf_lines(0))
+  end)
+
   it('jumps through adjacent tabstops', function()
     test_expand_success(
       { 'for i=1,${1:to}${2:,step} do\n\t$3\nend' },
@@ -249,7 +266,11 @@ describe('vim.snippet', function()
     feed('<Tab>')
     poke_eventloop()
     feed(',2')
-    eq({ 'for i=1,10,2 do', '\t', 'end' }, buf_lines(0))
+    -- Make sure changes on previous tabstops does not change following ones
+    feed('<S-Tab>')
+    poke_eventloop()
+    feed('20')
+    eq({ 'for i=1,20,2 do', '\t', 'end' }, buf_lines(0))
   end)
 
   it('updates snippet state when built-in completion menu is visible', function()
