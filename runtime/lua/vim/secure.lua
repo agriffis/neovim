@@ -121,16 +121,18 @@ function M.read(path)
     return contents
   end
 
-  local dir_msg = ''
+  local msg2 = ' To enable it, choose (v)iew then run `:trust`:'
+  local choices = '&ignore\n&view\n&deny'
   if hash == 'directory' then
-    dir_msg = ' DIRECTORY trust is decided only by its name, not its contents.'
+    msg2 = ' DIRECTORY trust is decided only by name, not contents:'
+    choices = '&ignore\n&view\n&deny\n&allow'
   end
 
   -- File either does not exist in trust database or the hash does not match
   local ok, result = pcall(
     vim.fn.confirm,
-    string.format('%s is not trusted.%s', fullpath, dir_msg),
-    '&ignore\n&view\n&deny\n&allow',
+    string.format('exrc: Found untrusted code.%s\n%s', msg2, fullpath),
+    choices,
     1
   )
 
@@ -147,7 +149,7 @@ function M.read(path)
     -- Deny
     trust[fullpath] = '!'
     contents = nil
-  elseif result == 4 then
+  elseif hash == 'directory' and result == 4 then
     -- Allow
     trust[fullpath] = hash
   end

@@ -191,7 +191,7 @@ IMPORTING LUA MODULES                                        *lua-module-load*
 Modules are searched for under the directories specified in 'runtimepath' and
 |packages-runtimepath|, in the order they appear in the output of this command
 >vim
-	:echo nvim_list_runtime_paths()
+    :echo nvim_list_runtime_paths()
 <
 Any "." in the module name is treated as a directory separator when searching.
 For a module `foo.bar`, each directory is searched for `lua/foo/bar.lua`, then
@@ -229,6 +229,11 @@ Note:
   |package.path| and |package.cpath|. Given that there are some badly written
   plugins using shell, which will not work with paths containing semicolons,
   it is better to not have them in 'runtimepath' at all.
+
+                                                         *lua-script-location*
+To get its own location, Lua scripts/modules can use |debug.getinfo()|: >
+    debug.getinfo(1, 'S').source:sub(2)
+<
 
 ==============================================================================
 COMMANDS                                                        *lua-commands*
@@ -1784,6 +1789,10 @@ SystemObj:write({data})                                    *SystemObj:write()*
 vim.system({cmd}, {opts}, {on_exit})                            *vim.system()*
     Runs a system command or throws an error if {cmd} cannot be run.
 
+    The command runs directly (not in 'shell') so shell builtins such as
+    "echo" in cmd.exe, cmdlets in powershell, or "help" in bash, will not work
+    unless you actually invoke a shell: `vim.system({'bash', '-c', 'help'})`.
+
     Examples: >lua
         local on_exit = function(obj)
           print(obj.code)
@@ -2091,6 +2100,35 @@ vim.islist({t})                                                 *vim.islist()*
 
     See also: ~
       • |vim.isarray()|
+
+vim.list.unique({t}, {key})                                *vim.list.unique()*
+    Removes duplicate values from a list-like table in-place.
+
+    Only the first occurrence of each value is kept. The operation is
+    performed in-place and the input table is modified.
+
+    Accepts an optional `hash` argument that if provided is called for each
+    value in the list to compute a hash key for uniqueness comparison. This is
+    useful for deduplicating table values or complex objects.
+
+    Example: >lua
+
+        local t = {1, 2, 2, 3, 1}
+        vim.list.unique(t)
+        -- t is now {1, 2, 3}
+
+        local t = { {id=1}, {id=2}, {id=1} }
+        vim.list.unique(t, function(x) return x.id end)
+        -- t is now { {id=1}, {id=2} }
+<
+
+    Parameters: ~
+      • {t}    (`any[]`)
+      • {key}  (`fun(x: T): any??`) Optional hash function to determine
+               uniqueness of values
+
+    Return: ~
+        (`any[]`) The deduplicated list
 
 vim.list_contains({t}, {value})                          *vim.list_contains()*
     Checks if a list-like table (integer keys without gaps) contains `value`.
