@@ -86,6 +86,7 @@ LSP
   arguments corresponding to a log entry instead of the individual arguments.
 • `vim.lsp.semantic_tokens.start/stop` now renamed to
   `vim.lsp.semantic_tokens.enable`
+• Missing fields in LSP messages are now represented using |vim.NIL| instead of nil.
 
 LUA
 
@@ -233,6 +234,7 @@ LUA
 • |Iter:take()| and |Iter:skip()| now optionally accept predicates.
 • Built-in plugin manager |vim.pack|
 • |vim.list.unique()| to deduplicate lists.
+• |vim.list.bisect()| for binary search.
 
 OPTIONS
 
