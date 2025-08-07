@@ -822,6 +822,10 @@ function M.convert_signature_help_to_markdown_lines(signature_help, ft, triggers
     if type(doc) == 'string' then
       signature.documentation = { kind = 'plaintext', value = doc }
     end
+    -- Add delimiter if there is documentation to display
+    if signature.documentation.value ~= '' then
+      contents[#contents + 1] = '---'
+    end
     M.convert_input_to_markdown_lines(signature.documentation, contents)
   end
   if signature.parameters and #signature.parameters > 0 then
@@ -942,7 +946,7 @@ function M.make_floating_popup_options(width, height, opts)
     col = 1
   end
 
-  local title = (opts.border and opts.title) and opts.title or nil
+  local title = ((opts.border or vim.o.winborder ~= '') and opts.title) and opts.title or nil
   local title_pos --- @type 'left'|'center'|'right'?
 
   if title then
