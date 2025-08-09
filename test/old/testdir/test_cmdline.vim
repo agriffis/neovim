@@ -1244,6 +1244,10 @@ func Test_cmdline_complete_various()
   call feedkeys(":ka\<C-A>\<C-B>\"\<CR>", 'xt')
   call assert_equal("\"ka\<C-A>", @:)
 
+  " completion for :keepmarks command
+  call feedkeys(":kee edi\<C-A>\<C-B>\"\<CR>", 'xt')
+  call assert_equal("\"kee edit", @:)
+
   " completion for short version of the :s command
   call feedkeys(":sI \<C-A>\<C-B>\"\<CR>", 'xt')
   call assert_equal("\"sI \<C-A>", @:)
@@ -4350,6 +4354,28 @@ func Test_term_option()
   let &cpo = _cpo
 endfunc
 
+func Test_ex_command_completion()
+  " required for :*
+  " set cpo+=*
+  let list = filter(getcompletion('', 'command'), 'exists(":" . v:val) == 0')
+  " :++ and :-- are only valid in Vim9 script context, so they can be ignored
+  " call assert_equal(['++', '--'], sort(list))
+  call assert_equal([], sort(list))
+  call assert_equal(2, exists(':k'))
+  call assert_equal(0, exists(':ke'))
+  call assert_equal(1, exists(':kee'))
+  call assert_equal(1, exists(':keep'))
+  call assert_equal(1, exists(':keepm'))
+  call assert_equal(1, exists(':keepma'))
+  call assert_equal(1, exists(':keepmar'))
+  call assert_equal(1, exists(':keepmark'))
+  call assert_equal(2, exists(':keepmarks'))
+  call assert_equal(2, exists(':keepalt'))
+  call assert_equal(2, exists(':keepjumps'))
+  call assert_equal(2, exists(':keeppatterns'))
+  set cpo-=*
+endfunc
+
 func Test_cd_bslash_completion_windows()
   CheckMSWindows
   let save_shellslash = &shellslash
@@ -4658,6 +4684,12 @@ func Test_search_wildmenu_screendump()
   call VerifyScreenDump(buf, 'Test_search_wildmenu_7', {})
   call term_sendkeys(buf, "\<c-n>\<c-y>")
   call VerifyScreenDump(buf, 'Test_search_wildmenu_8', {})
+
+  " 'incsearch' highlight is restored after dismissing popup (Ctrl_E)
+  call term_sendkeys(buf, "\<esc>:set wop=pum is hls&\<cr>")
+  call term_sendkeys(buf, "gg/th\<tab>\<c-e>")
+  call TermWait(buf, 50)
+  call VerifyScreenDump(buf, 'Test_search_wildmenu_9', {})
 
   call term_sendkeys(buf, "\<esc>")
   call StopVimInTerminal(buf)
