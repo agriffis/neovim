@@ -2990,6 +2990,39 @@ func Test_org_file()
   filetype off
 endfunc
 
+func Test_info_file()
+  filetype on
+
+  call writefile(['File: coreutils.info,  Node: Top,  Next: Introduction,  Up: (dir)'], 'Xfile', 'D')
+  split Xfile
+  call assert_equal('info', &filetype)
+  bwipe!
+
+  filetype off
+endfunc
+
+func Test_mail_file()
+  filetype on
+
+  call writefile(['Return-path: <lgc@debian.home.arpa>'], 'Xfile', 'D')
+  split Xfile
+  call assert_equal('mail', &filetype)
+  bwipe!
+
+  filetype off
+endfunc
+
+func Test_terminfo_file()
+  filetype on
+
+  call writefile(['#	Reconstructed via infocmp from file: /etc/terminfo/x/xterm'], 'Xfile', 'D')
+  split Xfile
+  call assert_equal('terminfo', &filetype)
+  bwipe!
+
+  filetype off
+endfunc
+
 " Filetypes detected from names of existing files
 func Test_pacmanlog()
   filetype on
@@ -2999,6 +3032,17 @@ func Test_pacmanlog()
     call assert_equal('pacmanlog', &filetype, 'for text: ' .. string(fname))
     bwipe!
   endfor
+  filetype off
+endfunc
+
+func Test_diff_format()
+  filetype on
+
+  call writefile(['0d555557  1 (John John   2025-01-01 00:00:00 +0000  1) foo'], 'Xdiff', 'D')
+  split Xdiff
+  call assert_true(empty(&filetype))
+  bwipe!
+
   filetype off
 endfunc
 
