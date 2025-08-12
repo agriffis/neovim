@@ -1133,12 +1133,6 @@ get_clients({filter})                                  *vim.lsp.get_clients()*
     Return: ~
         (`vim.lsp.Client[]`) List of |vim.lsp.Client| objects
 
-get_log_path()                                        *vim.lsp.get_log_path()*
-    Gets the path of the logfile used by the LSP client.
-
-    Return: ~
-        (`string`) path to log file
-
 is_enabled({name})                                      *vim.lsp.is_enabled()*
     Checks if the given LSP config is enabled (globally, not per-buffer).
 
@@ -1167,21 +1161,6 @@ omnifunc({findstart}, {base})                             *vim.lsp.omnifunc()*
       • |complete-functions|
       • |complete-items|
       • |CompleteDone|
-
-set_log_level({level})                               *vim.lsp.set_log_level()*
-    Sets the global log level for LSP logging.
-
-    Levels by name: "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "OFF"
-
-    Level numbers begin with "TRACE" at 0
-
-    Use `lsp.log_levels` for reverse lookup.
-
-    Parameters: ~
-      • {level}  (`integer|string`) the case insensitive level name or number
-
-    See also: ~
-      • |vim.lsp.log_levels|
 
 start({config}, {opts})                                      *vim.lsp.start()*
     Create a new LSP client and start a language server or reuses an already
@@ -1425,9 +1404,9 @@ format({opts})                                          *vim.lsp.buf.format()*
 
     Parameters: ~
       • {opts}  (`table?`) A table with the following fields:
-                • {formatting_options}? (`table`) Can be used to specify
-                  FormattingOptions. Some unspecified options will be
-                  automatically derived from the current Nvim options. See
+                • {formatting_options}? (`lsp.FormattingOptions`) Can be used
+                  to specify FormattingOptions. Some unspecified options will
+                  be automatically derived from the current Nvim options. See
                   https://microsoft.github.io/language-server-protocol/specification/#formattingOptions
                 • {timeout_ms}? (`integer`, default: `1000`) Time in
                   milliseconds to block for formatting requests. No effect if
@@ -1982,7 +1961,7 @@ refresh({opts})                                   *vim.lsp.codelens.refresh()*
                   for current buffer
 
 run()                                                 *vim.lsp.codelens.run()*
-    Run the code lens in the current line
+    Run the code lens available in the current line.
 
 save({lenses}, {bufnr}, {client_id})                 *vim.lsp.codelens.save()*
     Store lenses for a specific buffer and client
@@ -2279,12 +2258,12 @@ The `vim.lsp.log` module provides logging for the Nvim LSP client.
 
 When debugging language servers, it is helpful to enable extra-verbose logging
 of the LSP client RPC events. Example: >lua
-    vim.lsp.set_log_level 'trace'
+    vim.lsp.log.set_level 'trace'
     require('vim.lsp.log').set_format_func(vim.inspect)
 <
 
 Then try to run the language server, and open the log with: >vim
-    :lua vim.cmd('tabnew ' .. vim.lsp.get_log_path())
+    :lua vim.cmd('tabnew ' .. vim.lsp.log.get_filename())
 <
 
 (Or use `:LspLog` if you have nvim-lspconfig installed.)

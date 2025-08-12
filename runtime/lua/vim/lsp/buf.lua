@@ -330,8 +330,8 @@ local function process_signature_help_results(results)
       )
       api.nvim_command('redraw')
     else
-      local result = r.result --- @type lsp.SignatureHelp
-      if result and result.signatures and result.signatures[1] then
+      local result = r.result
+      if result and result.signatures then
         for i, sig in ipairs(result.signatures) do
           sig.activeParameter = sig.activeParameter or result.activeParameter
           local idx = #signatures + 1
@@ -516,7 +516,7 @@ end
 --- Can be used to specify FormattingOptions. Some unspecified options will be
 --- automatically derived from the current Nvim options.
 --- See https://microsoft.github.io/language-server-protocol/specification/#formattingOptions
---- @field formatting_options? table
+--- @field formatting_options? lsp.FormattingOptions
 ---
 --- Time in milliseconds to block for formatting requests. No effect if async=true.
 --- (default: `1000`)
