@@ -34,6 +34,7 @@
 #include "nvim/extmark.h"
 #include "nvim/extmark_defs.h"
 #include "nvim/fileio.h"
+#include "nvim/fuzzy.h"
 #include "nvim/garray.h"
 #include "nvim/garray_defs.h"
 #include "nvim/getchar.h"
@@ -1000,7 +1001,7 @@ static int ins_compl_add(char *const str, int len, char *const fname, char *cons
   // current match in the list of matches .
   if (compl_first_match == NULL) {
     match->cp_next = match->cp_prev = NULL;
-  } else if (cfc_has_mode() && score > 0 && compl_get_longest) {
+  } else if (cfc_has_mode() && score != FUZZY_SCORE_NONE && compl_get_longest) {
     compl_T *current = compl_first_match->cp_next;
     compl_T *prev = compl_first_match;
     inserted = false;
@@ -1188,7 +1189,8 @@ static void ins_compl_add_matches(int num_matches, char **matches, int icase)
 
   for (int i = 0; i < num_matches && add_r != FAIL; i++) {
     add_r = ins_compl_add(matches[i], -1, NULL, NULL, false, NULL, dir,
-                          CP_FAST | (icase ? CP_ICASE : 0), false, NULL, 0);
+                          CP_FAST | (icase ? CP_ICASE : 0), false, NULL,
+                          FUZZY_SCORE_NONE);
     if (add_r == OK) {
       // If dir was BACKWARD then honor it just once.
       dir = FORWARD;
@@ -1356,7 +1358,7 @@ static int cp_compare_nearest(const void *a, const void *b)
 {
   int score_a = ((compl_T *)a)->cp_score;
   int score_b = ((compl_T *)b)->cp_score;
-  if (score_a == 0 || score_b == 0) {
+  if (score_a == FUZZY_SCORE_NONE || score_b == FUZZY_SCORE_NONE) {
     return 0;
   }
   return (score_a > score_b) ? 1 : (score_a < score_b) ? -1 : 0;
@@ -1524,7 +1526,7 @@ static int ins_compl_build_pum(void)
     if (!match_at_original_text(comp)
         && (leader->data == NULL
             || ins_compl_equal(comp, leader->data, leader->size)
-            || (fuzzy_filter && comp->cp_score > 0))) {
+            || (fuzzy_filter && comp->cp_score != FUZZY_SCORE_NONE))) {
       // Limit number of items from each source if max_items is set.
       bool match_limit_exceeded = false;
       int cur_source = comp->cp_cpt_source_idx;
@@ -1863,7 +1865,7 @@ static int thesaurus_add_words_in_line(char *fname, char **buf_arg, int dir, con
     // Add the word. Skip the regexp match.
     if (wstart != skip_word) {
       status = ins_compl_add_infercase(wstart, (int)(ptr - wstart), p_ic,
-                                       fname, dir, false, 0);
+                                       fname, dir, false, FUZZY_SCORE_NONE);
       if (status == FAIL) {
         break;
       }
@@ -1885,7 +1887,7 @@ static void ins_compl_files(int count, char **files, bool thesaurus, int flags,
   char *leader = in_fuzzy_collect ? ins_compl_leader() : NULL;
   int leader_len = in_fuzzy_collect ? (int)ins_compl_leader_len() : 0;
 
-  for (int i = 0; i < count && !got_int && !compl_interrupted && !compl_time_slice_expired; i++) {
+  for (int i = 0; i < count && !got_int && !ins_compl_interrupted(); i++) {
     FILE *fp = os_fopen(files[i], "r");  // open dictionary file
     if (flags != DICT_EXACT && !shortmess(SHM_COMPLETIONSCAN) && !compl_autocomplete) {
       msg_hist_off = true;  // reset in msg_trunc()
@@ -1901,8 +1903,7 @@ static void ins_compl_files(int count, char **files, bool thesaurus, int flags,
 
     // Read dictionary file line by line.
     // Check each line for a match.
-    while (!got_int && !compl_interrupted && !compl_time_slice_expired
-           && !vim_fgets(buf, LSIZE, fp)) {
+    while (!got_int && !ins_compl_interrupted() && !vim_fgets(buf, LSIZE, fp)) {
       char *ptr = buf;
       if (regmatch != NULL) {
         while (vim_regexec(regmatch, buf, (colnr_T)(ptr - buf))) {
@@ -1910,7 +1911,8 @@ static void ins_compl_files(int count, char **files, bool thesaurus, int flags,
           ptr = ctrl_x_mode_line_or_eval() ? find_line_end(ptr) : find_word_end(ptr);
           int add_r = ins_compl_add_infercase(regmatch->startp[0],
                                               (int)(ptr - regmatch->startp[0]),
-                                              p_ic, files[i], *dir, false, 0);
+                                              p_ic, files[i], *dir, false,
+                                              FUZZY_SCORE_NONE);
           if (thesaurus) {
             // For a thesaurus, add all the words in the line
             ptr = buf;
@@ -2087,7 +2089,7 @@ void ins_compl_init_get_longest(void)
 /// Returns true when insert completion is interrupted.
 bool ins_compl_interrupted(void)
 {
-  return compl_interrupted;
+  return compl_interrupted || compl_time_slice_expired;
 }
 
 /// Returns true if the <Enter> key selects a match in the completion popup
@@ -3219,7 +3221,7 @@ static int ins_compl_add_tv(typval_T *const tv, const Direction dir, bool fast)
     return FAIL;
   }
   int status = ins_compl_add((char *)word, -1, NULL, cptext, true,
-                             &user_data, dir, flags, dup, user_hl, 0);
+                             &user_data, dir, flags, dup, user_hl, FUZZY_SCORE_NONE);
   if (status != OK) {
     tv_clear(&user_data);
   }
@@ -3315,7 +3317,7 @@ static void set_completion(colnr_T startcol, list_T *list)
   }
   if (ins_compl_add(compl_orig_text.data, (int)compl_orig_text.size,
                     NULL, NULL, false, NULL, 0,
-                    flags | CP_FAST, false, NULL, 0) != OK) {
+                    flags | CP_FAST, false, NULL, FUZZY_SCORE_NONE) != OK) {
     return;
   }
 
@@ -3387,11 +3389,7 @@ void f_complete_check(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 
   RedrawingDisabled = 0;
   ins_compl_check_keys(0, true);
-  if (compl_autocomplete && compl_time_slice_expired) {
-    rettv->vval.v_number = true;
-  } else {
-    rettv->vval.v_number = ins_compl_interrupted();
-  }
+  rettv->vval.v_number = ins_compl_interrupted();
   RedrawingDisabled = saved;
 }
 
@@ -3852,7 +3850,7 @@ static void get_next_include_file_completion(int compl_type)
                        ((compl_type == CTRL_X_PATH_DEFINES
                          && !(compl_cont_status & CONT_SOL))
                         ? FIND_DEFINE : FIND_ANY),
-                       1, ACTION_EXPAND, 1, MAXLNUM, false);
+                       1, ACTION_EXPAND, 1, MAXLNUM, false, compl_autocomplete);
 }
 
 /// Get the next set of words matching "compl_pattern" in dictionary or
@@ -4077,7 +4075,7 @@ static void get_next_filename_completion(void)
     for (int i = 0; i < num_matches; i++) {
       char *ptr = matches[i];
       int score = fuzzy_match_str(ptr, leader);
-      if (score > 0) {
+      if (score != FUZZY_SCORE_NONE) {
         GA_APPEND(int, &fuzzy_indices, i);
         compl_fuzzy_scores[i] = score;
       }
@@ -4250,7 +4248,7 @@ static int get_next_default_completion(ins_compl_next_state_T *st, pos_T *start_
   bool in_fuzzy_collect = (cfc_has_mode() && compl_length > 0)
                           || ((get_cot_flags() & kOptCotFlagFuzzy) && compl_autocomplete);
   char *leader = ins_compl_leader();
-  int score = 0;
+  int score = FUZZY_SCORE_NONE;
   const bool in_curbuf = st->ins_buf == curbuf;
 
   // If 'infercase' is set, don't use 'smartcase' here
@@ -4348,7 +4346,6 @@ static int get_next_default_completion(ins_compl_next_state_T *st, pos_T *start_
       if (score < 0) {
         score = -score;
       }
-      score++;
     }
 
     if (ins_compl_add_infercase(ptr, len, p_ic,
@@ -4406,7 +4403,8 @@ static void get_register_completion(void)
                                 compl_orig_text.size) == 0
                      : strncmp(str, compl_orig_text.data,
                                compl_orig_text.size) == 0)) {
-          if (ins_compl_add_infercase(str, str_len, p_ic, NULL, dir, false, 0) == OK) {
+          if (ins_compl_add_infercase(str, str_len, p_ic, NULL,
+                                      dir, false, FUZZY_SCORE_NONE) == OK) {
             dir = FORWARD;
           }
         }
@@ -4440,7 +4438,7 @@ static void get_register_completion(void)
                                    : strncmp(p, compl_orig_text.data,
                                              compl_orig_text.size) == 0))) {
             if (ins_compl_add_infercase(p, len, p_ic, NULL,
-                                        dir, false, 0) == OK) {
+                                        dir, false, FUZZY_SCORE_NONE) == OK) {
               dir = FORWARD;
             }
           }
@@ -4558,7 +4556,7 @@ static void get_next_bufname_token(void)
       char *tail = path_tail(b->b_sfname);
       if (strncmp(tail, compl_orig_text.data, compl_orig_text.size) == 0) {
         ins_compl_add(tail, (int)strlen(tail), NULL, NULL, false, NULL, 0,
-                      p_ic ? CP_ICASE : 0, false, NULL, 0);
+                      p_ic ? CP_ICASE : 0, false, NULL, FUZZY_SCORE_NONE);
       }
     }
   }
@@ -4801,7 +4799,8 @@ static int ins_compl_get_exp(pos_T *ini)
     // For `^P` completion, reset `compl_curr_match` to the head to avoid
     // mixing matches from different sources.
     if (!compl_dir_forward()) {
-      while (compl_curr_match->cp_prev) {
+      while (compl_curr_match->cp_prev
+             && !match_at_original_text(compl_curr_match->cp_prev)) {
         compl_curr_match = compl_curr_match->cp_prev;
       }
     }
@@ -5150,7 +5149,7 @@ static int find_next_completion_match(bool allow_get_expansion, int todo, bool a
     if (!match_at_original_text(compl_shown_match)
         && leader->data != NULL
         && !ins_compl_equal(compl_shown_match, leader->data, leader->size)
-        && !(compl_fuzzy_match && compl_shown_match->cp_score > 0)) {
+        && !(compl_fuzzy_match && compl_shown_match->cp_score != FUZZY_SCORE_NONE)) {
       todo++;
     } else {
       // Remember a matching item.
@@ -5924,7 +5923,7 @@ static int ins_compl_start(void)
   }
   if (ins_compl_add(compl_orig_text.data, (int)compl_orig_text.size,
                     NULL, NULL, false, NULL, 0,
-                    flags, false, NULL, 0) != OK) {
+                    flags, false, NULL, FUZZY_SCORE_NONE) != OK) {
     API_CLEAR_STRING(compl_pattern);
     API_CLEAR_STRING(compl_orig_text);
     kv_destroy(compl_orig_extmarks);
