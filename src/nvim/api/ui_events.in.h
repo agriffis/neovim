@@ -1,9 +1,7 @@
 #pragma once
 
 // This file is not compiled, just parsed for definitions
-#ifdef INCLUDE_GENERATED_DECLARATIONS
-# error "don't include this file, include nvim/ui.h"
-#endif
+#error "don't include this file, include nvim/ui.h"
 
 #include "nvim/api/private/defs.h"
 #include "nvim/func_attr.h"
@@ -29,6 +27,8 @@ void visual_bell(void)
   FUNC_API_SINCE(3);
 void flush(void)
   FUNC_API_SINCE(3) FUNC_API_REMOTE_IMPL;
+void connect(Array args)
+  FUNC_API_SINCE(14) FUNC_API_REMOTE_ONLY FUNC_API_REMOTE_IMPL FUNC_API_CLIENT_IMPL;
 void restart(String progpath, Array argv)
   FUNC_API_SINCE(14) FUNC_API_REMOTE_ONLY FUNC_API_REMOTE_IMPL FUNC_API_CLIENT_IMPL;
 void suspend(void)

@@ -42,10 +42,8 @@
 
 #define BUF_POS(ui) ((size_t)((ui)->packer.ptr - (ui)->packer.startptr))
 
-#ifdef INCLUDE_GENERATED_DECLARATIONS
-# include "api/ui.c.generated.h"
-# include "ui_events_remote.generated.h"  // IWYU pragma: export
-#endif
+#include "api/ui.c.generated.h"
+#include "ui_events_remote.generated.h"  // IWYU pragma: export
 
 // TODO(bfredl): just make UI:s owned by their channels instead
 static PMap(uint64_t) connected_uis = MAP_INIT;
@@ -319,6 +317,20 @@ bool remote_ui_restart(uint64_t channel_id, Error *err)
   push_call(ui, "restart", args);
   arena_mem_free(arena_finish(&arena));
   return true;
+}
+
+// Send a connect UI event to the UI on the given channel
+void remote_ui_connect(uint64_t channel_id, char *server_addr, Error *err)
+{
+  RemoteUI *ui = get_ui_or_err(channel_id, err);
+  if (!ui) {
+    return;
+  }
+
+  MAXSIZE_TEMP_ARRAY(args, 1);
+  ADD_C(args, CSTR_AS_OBJ(server_addr));
+
+  push_call(ui, "connect", args);
 }
 
 // TODO(bfredl): use me to detach a specific ui from the server

@@ -631,6 +631,12 @@ M.cmds = {
     func = 'ex_wrongmodifier',
   },
   {
+    command = 'connect',
+    flags = bit.bor(BANG, WORD1, NOTRLCOM, NEEDARG),
+    addr_type = 'ADDR_NONE',
+    func = 'ex_connect',
+  },
+  {
     command = 'const',
     flags = bit.bor(EXTRA, NOTRLCOM, SBOXOK, CMDWIN, LOCK_OK),
     addr_type = 'ADDR_NONE',

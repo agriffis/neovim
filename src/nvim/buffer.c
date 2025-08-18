@@ -115,9 +115,7 @@
 #include "nvim/window.h"
 #include "nvim/winfloat.h"
 
-#ifdef INCLUDE_GENERATED_DECLARATIONS
-# include "buffer.c.generated.h"
-#endif
+#include "buffer.c.generated.h"
 
 static const char e_attempt_to_delete_buffer_that_is_in_use_str[]
   = N_("E937: Attempt to delete a buffer that is in use: %s");
@@ -680,10 +678,6 @@ bool close_buffer(win_T *win, buf_T *buf, int action, bool abort_if_last, bool i
     return false;
   }
 
-  // Disable buffer-updates for the current buffer.
-  // No need to check `unload_buf`: in that case the function returned above.
-  buf_updates_unload(buf, false);
-
   if (win != NULL  // Avoid bogus clang warning.
       && win_valid_any_tab(win)
       && win->w_buffer == buf) {
@@ -790,6 +784,11 @@ void buf_freeall(buf_T *buf, int flags)
   bufref_T bufref;
   set_bufref(&bufref, buf);
 
+  buf_updates_unload(buf, false);
+  if (!bufref_valid(&bufref)) {
+    // on_detach callback deleted the buffer.
+    return;
+  }
   if ((buf->b_ml.ml_mfp != NULL)
       && apply_autocmds(EVENT_BUFUNLOAD, buf->b_fname, buf->b_fname, false, buf)
       && !bufref_valid(&bufref)) {
@@ -937,7 +936,7 @@ static void free_buffer_stuff(buf_T *buf, int free_flags)
   map_clear_mode(buf, MAP_ALL_MODES, true, true);   // clear local abbrevs
   XFREE_CLEAR(buf->b_start_fenc);
 
-  buf_updates_unload(buf, false);
+  buf_free_callbacks(buf);
 }
 
 /// Go to another buffer.  Handles the result of the ATTENTION dialog.

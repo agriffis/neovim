@@ -63,9 +63,7 @@
 #include "nvim/vim_defs.h"
 #include "nvim/window.h"
 
-#ifdef INCLUDE_GENERATED_DECLARATIONS
-# include "search.c.generated.h"
-#endif
+#include "search.c.generated.h"
 
 static const char e_search_hit_top_without_match_for_str[]
   = N_("E384: Search hit TOP without match for: %s");
@@ -1211,13 +1209,10 @@ int do_search(oparg_T *oap, int dirc, int search_delim, char *pat, size_t patlen
         } else if (!spats[0].off.line) {
           off_buf[off_len++] = 's';
         }
-        if (spats[0].off.off > 0 || spats[0].off.line) {
-          off_buf[off_len++] = '+';
-        }
         off_buf[off_len] = NUL;
         if (spats[0].off.off != 0 || spats[0].off.line) {
           off_len += (size_t)snprintf(off_buf + off_len, sizeof(off_buf) - off_len,
-                                      "%" PRId64, spats[0].off.off);
+                                      "%+" PRId64, spats[0].off.off);
         }
       }
 

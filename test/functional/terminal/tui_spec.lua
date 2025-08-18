@@ -318,6 +318,7 @@ describe('TUI :restart', function()
 
     -- Cancel the operation (abandons restart).
     tt.feed_data('C\013')
+    screen:expect({ any = vim.pesc('[No Name]') })
 
     -- Check ":confirm restart <cmd>" on a modified buffer.
     tt.feed_data(':confirm restart echo "Hello"\013')
@@ -362,6 +363,100 @@ describe('TUI :restart', function()
     ]])
     restart_pid_check()
     gui_running_check()
+  end)
+end)
+
+describe('TUI :connect', function()
+  if t.skip(is_os('win'), "relies on :detach which currently doesn't work on windows") then
+    return
+  end
+
+  local screen_empty = [[
+    ^                                                  |
+    {100:~                                                 }|*5
+                                                      |
+  ]]
+
+  it('leaves the current server running', function()
+    n.clear()
+    finally(function()
+      n.check_close()
+    end)
+
+    local server1 = new_pipename()
+    local screen1 = tt.setup_child_nvim({ '--listen', server1, '--clean' })
+    screen1:expect({ any = vim.pesc('[No Name]') })
+
+    tt.feed_data(':connect\013')
+    screen1:expect({ any = 'E471: Argument required' })
+
+    tt.feed_data('iThis is server 1.\027')
+    screen1:expect({ any = vim.pesc('This is server 1^.') })
+
+    -- Prevent screen2 from receiving the old terminal state.
+    command('enew')
+    screen1:expect(screen_empty)
+    screen1:detach()
+
+    local server2 = new_pipename()
+    local screen2 = tt.setup_child_nvim({ '--listen', server2, '--clean' })
+    screen2:expect({ any = vim.pesc('[No Name]') })
+
+    tt.feed_data('iThis is server 2.\027')
+    screen2:expect({ any = vim.pesc('This is server 2^.') })
+
+    tt.feed_data(':connect ' .. server1 .. '\013')
+    screen2:expect({ any = vim.pesc('This is server 1^.') })
+
+    local server1_session = n.connect(server1)
+    server1_session:request('nvim_command', 'qall!')
+    screen2:expect({ any = vim.pesc('[Process exited 0]') })
+
+    screen2:detach()
+
+    local server2_session = n.connect(server2)
+
+    local screen3 = tt.setup_child_nvim({ '--remote-ui', '--server', server2 })
+    screen3:expect({ any = vim.pesc('This is server 2^.') })
+
+    screen3:detach()
+    server2_session:request('nvim_command', 'qall!')
+  end)
+
+  it('! stops the current server', function()
+    n.clear()
+    finally(function()
+      n.check_close()
+    end)
+
+    local server1 = new_pipename()
+    local screen1 = tt.setup_child_nvim({ '--listen', server1, '--clean' })
+    screen1:expect({ any = vim.pesc('[No Name]') })
+
+    tt.feed_data('iThis is server 1.\027')
+    screen1:expect({ any = vim.pesc('This is server 1^.') })
+
+    -- Prevent screen2 from receiving the old terminal state.
+    command('enew')
+    screen1:expect(screen_empty)
+    screen1:detach()
+
+    local server2 = new_pipename()
+    local screen2 = tt.setup_child_nvim({ '--listen', server2, '--clean' })
+    screen2:expect({ any = vim.pesc('[No Name]') })
+
+    tt.feed_data(':connect! ' .. server1 .. '\013')
+    screen2:expect({ any = vim.pesc('This is server 1^.') })
+
+    retry(nil, nil, function()
+      eq(nil, vim.uv.fs_stat(server2))
+    end)
+
+    local server1_session = n.connect(server1)
+    server1_session:request('nvim_command', 'qall!')
+    screen2:expect({ any = vim.pesc('[Process exited 0]') })
+
+    screen2:detach()
   end)
 end)
 

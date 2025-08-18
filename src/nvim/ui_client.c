@@ -41,10 +41,8 @@ static bool tui_rgb = false;
 static bool ui_client_is_remote = false;
 
 // uncrustify:off
-#ifdef INCLUDE_GENERATED_DECLARATIONS
-# include "ui_client.c.generated.h"
-# include "ui_events_client.generated.h"
-#endif
+#include "ui_client.c.generated.h"
+#include "ui_events_client.generated.h"
 // uncrustify:on
 
 uint64_t ui_client_start_server(const char *exepath, size_t argc, char **argv)
@@ -281,6 +279,41 @@ void ui_client_event_raw_line(GridLineEvent *g)
 
   tui_raw_line(tui, grid, row, startcol, endcol, clearcol, g->cur_attr, lineflags,
                (const schar_T *)grid_line_buf_char, grid_line_buf_attr);
+}
+
+void ui_client_event_connect(Array args)
+{
+  if (args.size < 1 || args.items[0].type != kObjectTypeString) {
+    ELOG("Error handling UI event 'connect'");
+    return;
+  }
+
+  char *server_addr = args.items[0].data.string.data;
+  multiqueue_put(main_loop.fast_events, channel_connect_event, server_addr);
+  // Set a dummy channel ID to prevent client exit when server detaches.
+  ui_client_channel_id = UINT64_MAX;
+}
+
+static void channel_connect_event(void **argv)
+{
+  char *server_addr = argv[0];
+
+  const char *err = "";
+  bool is_tcp = !!strrchr(server_addr, ':');
+  CallbackReader on_data = CALLBACK_READER_INIT;
+  uint64_t chan = channel_connect(is_tcp, server_addr, true, on_data, 50, &err);
+
+  if (!strequal(err, "")) {
+    ELOG("Cannot connect to server %s: %s", server_addr, err);
+    ui_client_exit_status = 1;
+    os_exit(1);
+  }
+
+  ui_client_channel_id = chan;
+  ui_client_is_remote = true;
+  ui_client_attach(tui_width, tui_height, tui_term, tui_rgb);
+
+  ILOG("Connected to server %s on channel %" PRId64, server_addr, chan);
 }
 
 /// When a "restart" UI event is received, its arguments are saved here when

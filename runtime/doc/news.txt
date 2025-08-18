@@ -241,6 +241,7 @@ LUA
 • Built-in plugin manager |vim.pack|
 • |vim.list.unique()| to deduplicate lists.
 • |vim.list.bisect()| for binary search.
+• Experimental `vim.pos` and `vim.range` for Position/Range abstraction.
 
 OPTIONS
 
@@ -277,6 +278,11 @@ PLUGINS
 • Customize :checkhealth by handling a `FileType checkhealth` event.
   |health-usage|
 
+• Simplify Python provider setup to a single step: `uv tool install pynvim`
+  Nvim will detect the plugin's location without user configuration, even if
+  unrelated Python virtual environments are activated.
+  |provider-python|
+
 STARTUP
 
 • todo
@@ -297,6 +303,8 @@ TUI
 UI
 
 • |:restart| restarts Nvim and reattaches the current UI.
+• |:connect| dynamically connects the current UI to the server at the given
+  address.
 • |:checkhealth| shows a summary in the header for every healthcheck.
 • |ui-multigrid| provides composition information and absolute coordinates.
 • `vim._extui` provides an experimental commandline and message UI intended to
@@ -305,6 +313,7 @@ UI
   • "Error detected while processing:" changed to "Error in:".
   • "Error executing Lua:" changed to "Lua:".
 • 'busy' status is shown in default statusline with symbol ◐
+• Improved LSP signature help rendering.
 
 VIMSCRIPT
 
