@@ -289,6 +289,9 @@ static buf_T *compl_curr_buf = NULL;  ///< buf where completion is active
 // if the current source exceeds its timeout, it is interrupted and the next
 // begins with half the time. A small minimum timeout ensures every source
 // gets at least a brief chance.
+// Special case: when 'complete' contains "F" or "o" (function sources), a
+// longer fixed timeout is used (COMPL_FUNC_TIMEOUT_MS or
+// COMPL_FUNC_TIMEOUT_NON_KW_MS). - girish
 static bool compl_autocomplete = false;        ///< whether autocompletion is active
 static uint64_t compl_timeout_ms = COMPL_INITIAL_TIMEOUT_MS;
 static bool compl_time_slice_expired = false;  ///< time budget exceeded for current source
@@ -302,6 +305,10 @@ static bool compl_from_nonkeyword = false;     ///< completion started from non-
       compl_timeout_ms /= 2; \
     } \
   } while (0)
+
+// Timeout values for F{func}, F and o values in 'complete'
+#define COMPL_FUNC_TIMEOUT_MS           300
+#define COMPL_FUNC_TIMEOUT_NON_KW_MS    1000
 
 // List of flags for method of completion.
 static int compl_cont_status = 0;
@@ -2205,6 +2212,13 @@ static void ins_compl_new_leader(void)
   ins_compl_delete(true);
   ins_compl_insert_bytes(compl_leader.data + get_compl_len(), -1);
   compl_used_match = false;
+
+  if (p_acl > 0) {
+    pum_undisplay(true);
+    redraw_later(curwin, UPD_VALID);
+    update_screen();  // Show char (deletion) immediately
+    ui_flush();
+  }
 
   if (compl_started) {
     ins_compl_set_original_text(compl_leader.data, compl_leader.size);
@@ -4633,7 +4647,7 @@ static void prepare_cpt_compl_funcs(void)
 /// Start the timer for the current completion source.
 static void compl_source_start_timer(int source_idx)
 {
-  if (compl_autocomplete && cpt_sources_array != NULL) {
+  if (compl_autocomplete || p_cto > 0) {
     cpt_sources_array[source_idx].compl_start_tv = os_hrtime();
     compl_time_slice_expired = false;
   }
@@ -4650,8 +4664,6 @@ static int advance_cpt_sources_index_safe(void)
   return FAIL;
 }
 
-#define COMPL_FUNC_TIMEOUT_MS           300
-#define COMPL_FUNC_TIMEOUT_NON_KW_MS    1000
 /// Get the next expansion(s), using "compl_pattern".
 /// The search starts at position "ini" in curbuf and in the direction
 /// compl_direction.
@@ -4701,12 +4713,17 @@ static int ins_compl_get_exp(pos_T *ini)
   compl_old_match = compl_curr_match;   // remember the last current match
   st.cur_match_pos = compl_dir_forward() ? &st.last_match_pos : &st.first_match_pos;
 
-  if (cpt_sources_array != NULL && ctrl_x_mode_normal() && !ctrl_x_mode_line_or_eval()
-      && !(compl_cont_status & CONT_LOCAL)) {
+  bool normal_mode_strict = ctrl_x_mode_normal() && !ctrl_x_mode_line_or_eval()
+                            && !(compl_cont_status & CONT_LOCAL)
+                            && cpt_sources_array != NULL;
+  if (normal_mode_strict) {
     cpt_sources_index = 0;
-    if (compl_autocomplete) {
+    if (compl_autocomplete || p_cto > 0) {
       compl_source_start_timer(0);
-      compl_timeout_ms = COMPL_INITIAL_TIMEOUT_MS;
+      compl_time_slice_expired = false;
+      compl_timeout_ms = compl_autocomplete
+                         ? (uint64_t)MAX(COMPL_INITIAL_TIMEOUT_MS, p_act)
+                         : (uint64_t)p_cto;
     }
   }
 
@@ -4736,12 +4753,15 @@ static int ins_compl_get_exp(pos_T *ini)
       }
     }
 
-    if (compl_autocomplete && type == CTRL_X_FUNCTION) {
+    uint64_t compl_timeout_save = 0;
+    if (normal_mode_strict && type == CTRL_X_FUNCTION
+        && (compl_autocomplete || p_cto > 0)) {
       // LSP servers may sporadically take >1s to respond (e.g., while
       // loading modules), but other sources might already have matches.
       // To show results quickly use a short timeout for keyword
       // completion. Allow longer timeout for non-keyword completion
       // where only function based sources (e.g. LSP) are active.
+      compl_timeout_save = compl_timeout_ms;
       compl_timeout_ms = compl_from_nonkeyword
                          ? COMPL_FUNC_TIMEOUT_NON_KW_MS : COMPL_FUNC_TIMEOUT_MS;
     }
@@ -4789,9 +4809,10 @@ static int ins_compl_get_exp(pos_T *ini)
       compl_started = false;
     }
 
-    // Reset the timeout after collecting matches from function source
-    if (compl_autocomplete && type == CTRL_X_FUNCTION) {
-      compl_timeout_ms = COMPL_INITIAL_TIMEOUT_MS;
+    // Restore the timeout after collecting matches from function source
+    if (normal_mode_strict && type == CTRL_X_FUNCTION
+        && (compl_autocomplete || p_cto > 0)) {
+      compl_timeout_ms = compl_timeout_save;
     }
 
     // For `^P` completion, reset `compl_curr_match` to the head to avoid
@@ -4811,10 +4832,10 @@ static int ins_compl_get_exp(pos_T *ini)
     found_new_match = FAIL;
   }
 
-  int i = -1;               // total of matches, unknown
+  int match_count = -1;  // total of matches, unknown
   if (found_new_match == FAIL
       || (ctrl_x_mode_not_default() && !ctrl_x_mode_line_or_eval())) {
-    i = ins_compl_make_cyclic();
+    match_count = ins_compl_make_cyclic();
   }
 
   if (cfc_has_mode() && compl_get_longest && compl_num_bests > 0) {
@@ -4838,7 +4859,7 @@ static int ins_compl_get_exp(pos_T *ini)
     sort_compl_match_list(cp_compare_nearest);
   }
 
-  return i;
+  return match_count;
 }
 
 /// Update "compl_shown_match" to the actually shown match, it may differ when
@@ -5288,10 +5309,6 @@ static int ins_compl_next(bool allow_get_expansion, int count, bool insert_match
 /// collecting, and halve the timeout.
 static void check_elapsed_time(void)
 {
-  if (cpt_sources_array == NULL) {
-    return;
-  }
-
   uint64_t start_tv = cpt_sources_array[cpt_sources_index].compl_start_tv;
   uint64_t elapsed_ms = (os_hrtime() - start_tv) / 1000000;
 
@@ -5348,8 +5365,13 @@ void ins_compl_check_keys(int frequency, bool in_compl_func)
         vungetc(c);
       }
     }
-  } else if (compl_autocomplete) {
-    check_elapsed_time();
+  } else {
+    bool normal_mode_strict = ctrl_x_mode_normal() && !ctrl_x_mode_line_or_eval()
+                              && !(compl_cont_status & CONT_LOCAL)
+                              && cpt_sources_array != NULL && cpt_sources_index >= 0;
+    if (normal_mode_strict && (compl_autocomplete || p_cto > 0)) {
+      check_elapsed_time();
+    }
   }
 
   if (compl_pending != 0 && !got_int && !(cot_flags & kOptCotFlagNoinsert)
@@ -6015,6 +6037,10 @@ static void ins_compl_show_statusmsg(void)
 /// Returns OK if completion was done, FAIL if something failed.
 int ins_complete(int c, bool enable_pum)
 {
+  const bool disable_ac_delay = compl_started && ctrl_x_mode_normal()
+                                && (c == Ctrl_N || c == Ctrl_P || c == Ctrl_R
+                                    || ins_compl_pum_key(c));
+
   compl_direction = ins_compl_key2dir(c);
   int insert_match = ins_compl_use_match(c);
 
@@ -6026,6 +6052,10 @@ int ins_complete(int c, bool enable_pum)
     return FAIL;
   }
 
+  uint64_t compl_start_tv = 0;  ///< Time when match collection starts
+  if (compl_autocomplete && p_acl > 0 && !disable_ac_delay) {
+    compl_start_tv = os_hrtime();
+  }
   compl_curr_win = curwin;
   compl_curr_buf = curwin->w_buffer;
   compl_shown_match = compl_curr_match;
@@ -6050,7 +6080,8 @@ int ins_complete(int c, bool enable_pum)
   }
 
   // we found no match if the list has only the "compl_orig_text"-entry
-  if (is_first_match(compl_first_match->cp_next)) {
+  bool no_matches_found = is_first_match(compl_first_match->cp_next);
+  if (no_matches_found) {
     // remove N_ADDS flag, so next ^X<> won't try to go to ADDING mode,
     // because we couldn't expand anything at first place, but if we used
     // ^P, ^N, ^X^I or ^X^D we might want to add-expand a single-char-word
@@ -6074,6 +6105,22 @@ int ins_complete(int c, bool enable_pum)
     ins_compl_show_statusmsg();
   }
 
+  // Wait for the autocompletion delay to expire
+  if (compl_autocomplete && p_acl > 0 && !disable_ac_delay && !no_matches_found
+      && (os_hrtime() - compl_start_tv) / 1000000 < (uint64_t)p_acl) {
+    setcursor();
+    ui_flush();
+    do {
+      if (char_avail()) {
+        ins_compl_restart();
+        compl_interrupted = true;
+        break;
+      } else {
+        os_delay(2L, true);
+      }
+    } while ((os_hrtime() - compl_start_tv) / 1000000 < (uint64_t)p_acl);
+  }
+
   // Show the popup menu, unless we got interrupted.
   if (enable_pum && !compl_interrupted) {
     show_pum(save_w_wrow, save_w_leftcol);
@@ -6084,15 +6131,10 @@ int ins_complete(int c, bool enable_pum)
   return OK;
 }
 
-/// Returns true if the given character 'c' can be used to trigger
-/// autocompletion.
-bool ins_compl_setup_autocompl(int c)
+/// Enable autocompletion
+void ins_compl_enable_autocomplete(void)
 {
-  if (vim_isprintc(c)) {
-    compl_autocomplete = true;
-    return true;
-  }
-  return false;
+  compl_autocomplete = true;
 }
 
 /// Remove (if needed) and show the popup menu
