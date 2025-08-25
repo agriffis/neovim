@@ -1424,7 +1424,7 @@ describe('completion', function()
       {1:~                                                           }|*6
                                                                   |
     ]])
-    screen.timeout = 200
+    screen.timeout = 400
 
     feed('Gof')
     screen:expect([[
@@ -1557,8 +1557,24 @@ describe('completion', function()
       {1:~                                                           }|*5
       {5:-- INSERT --}                                                |
     ]])
+    feed('<Up>')
+    screen:expect([[
+      foo                                                         |
+      foobar                                                      |
+      f^oobarbaz                                                   |
+      f                                                           |
+      {1:~                                                           }|*5
+      {5:-- INSERT --}                                                |
+    ]])
     feed('<Down>')
-    screen:expect_unchanged()
+    screen:expect([[
+      foo                                                         |
+      foobar                                                      |
+      foobarbaz                                                   |
+      f^                                                           |
+      {1:~                                                           }|*5
+      {5:-- INSERT --}                                                |
+    ]])
 
     feed('<esc>')
   end)
