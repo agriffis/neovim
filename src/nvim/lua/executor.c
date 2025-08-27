@@ -966,7 +966,7 @@ static void nlua_print_event(void **argv)
   HlMessage msg = KV_INITIAL_VALUE;
   HlMessageChunk chunk = { { .data = argv[0], .size = (size_t)(intptr_t)argv[1] - 1 }, 0 };
   kv_push(msg, chunk);
-  msg_multihl(msg, "lua_print", true, false);
+  msg_multihl(INTEGER_OBJ(0), msg, "lua_print", true, false, NULL);
 }
 
 /// Print as a Vim message
@@ -1472,7 +1472,7 @@ static void nlua_typval_exec(const char *lcmd, size_t lcmd_len, const char *name
 
 void nlua_exec_ga(garray_T *ga, char *name)
 {
-  char *code = ga_concat_strings_sep(ga, "\n");
+  char *code = ga_concat_strings(ga, "\n");
   size_t len = strlen(code);
   nlua_typval_exec(code, len, name, NULL, 0, false, NULL);
   xfree(code);

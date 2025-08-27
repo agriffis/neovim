@@ -4279,6 +4279,10 @@ int win_new_tabpage(int after, char *filename)
     newtp->tp_topframe = topframe;
     last_status(false);
 
+    if (curbuf->terminal) {
+      terminal_check_size(curbuf->terminal);
+    }
+
     redraw_all_later(UPD_NOT_VALID);
 
     tabpage_check_windows(old_curtab);
@@ -7497,11 +7501,13 @@ void win_get_tabwin(handle_T id, int *tabnr, int *winnr)
   FOR_ALL_TABS(tp) {
     FOR_ALL_WINDOWS_IN_TAB(wp, tp) {
       if (wp->handle == id) {
-        *winnr = wnum;
-        *tabnr = tnum;
+        if (win_has_winnr(wp, tp)) {
+          *winnr = wnum;
+          *tabnr = tnum;
+        }
         return;
       }
-      wnum += win_has_winnr(wp);
+      wnum += win_has_winnr(wp, tp);
     }
     tnum++;
     wnum = 1;
