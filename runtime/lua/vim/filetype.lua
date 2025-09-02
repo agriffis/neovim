@@ -2236,6 +2236,7 @@ local pattern = {
   },
   ['/%.'] = {
     ['/%.aws/credentials$'] = 'confini',
+    ['/%.aws/cli/alias$'] = 'confini',
     ['/%.gitconfig%.d/'] = starsetf('gitconfig'),
     ['/%.gnupg/gpg%.conf$'] = 'gpg',
     ['/%.gnupg/options$'] = 'gpg',
@@ -2244,6 +2245,7 @@ local pattern = {
     ['/%.pinforc$'] = 'pinfo',
     ['/%.cargo/credentials$'] = 'toml',
     ['/%.init/.*%.override$'] = 'upstart',
+    ['/%.kube/kuberc$'] = 'yaml',
   },
   ['calendar/'] = {
     ['/%.calendar/'] = starsetf('calendar'),

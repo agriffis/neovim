@@ -68,7 +68,8 @@ DIAGNOSTICS
 
 EDITOR
 
-• todo
+• |i_CTRL-R| inserts named registers (A-Z,a-z,0-9) literally like pasting instead of
+  as typed. To get the old behavior you can use `<C-R>=@x`.
 
 EVENTS
 
@@ -204,6 +205,7 @@ HIGHLIGHTS
 • |hl-DiffTextAdd| highlights added text within a changed line.
 • |hl-StderrMsg| |hl-StdoutMsg|
 • |hl-SnippetTabstopActive| highlights the currently active tabstop.
+• |hl-OkMsg| highlights success messages.
 
 LSP
 
@@ -247,6 +249,7 @@ LSP
 
 LUA
 
+• |vim.wait()| returns the callback results.
 • Lua type annotations for `vim.uv`.
 • |vim.hl.range()| now allows multiple timed highlights.
 • |vim.tbl_extend()| and |vim.tbl_deep_extend()| now accept a function behavior argument.
