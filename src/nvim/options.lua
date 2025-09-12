@@ -2374,7 +2374,7 @@ local options = {
     {
       abbreviation = 'dip',
       cb = 'did_set_diffopt',
-      defaults = 'internal,filler,closeoff,inline:simple,linematch:40',
+      defaults = 'internal,filler,closeoff,indent-heuristic,inline:char,linematch:40',
       -- Keep this in sync with diffopt_changed().
       values = {
         'filler',
@@ -4700,8 +4700,8 @@ local options = {
         autocmd.  Example: >vim
         	augroup vimrc-incsearch-highlight
         	  autocmd!
-        	  autocmd CmdlineEnter /,\? :set hlsearch
-        	  autocmd CmdlineLeave /,\? :set nohlsearch
+        	  autocmd CmdlineEnter [\/\?] :set hlsearch
+        	  autocmd CmdlineLeave [\/\?] :set nohlsearch
         	augroup END
         <
         CTRL-L can be used to add one character from after the current match
