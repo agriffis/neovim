@@ -382,7 +382,8 @@ Integer nvim_input(uint64_t channel_id, String keys)
 ///                 The same specifiers are used as for a key press, except
 ///                 that the "-" separator is optional, so "C-A-", "c-a"
 ///                 and "CA" can all be used to specify Ctrl+Alt+click.
-/// @param grid Grid number if the client uses |ui-multigrid|, else 0.
+/// @param grid Grid number (used by |ui-multigrid| client), or 0 to let Nvim decide positioning of
+///             windows. For more information, see [dev-ui-multigrid]
 /// @param row Mouse row-position (zero-based, like redraw events)
 /// @param col Mouse column-position (zero-based, like redraw events)
 /// @param[out] err Error details, if any
@@ -2141,8 +2142,8 @@ DictAs(eval_statusline_ret) nvim_eval_statusline(String str, Dict(eval_statuslin
     if (opts->use_winbar) {
       fillchar = wp->w_p_fcs_chars.wbr;
     } else {
-      int attr;
-      fillchar = fillchar_status(&attr, wp);
+      hlf_T group;
+      fillchar = fillchar_status(&group, wp);
     }
   }
 

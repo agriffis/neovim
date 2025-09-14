@@ -201,6 +201,7 @@ EVENTS
 • |CmdlineLeavePre| triggered before preparing to leave the command line.
 • New `append` paremeter for |ui-messages| `msg_show` event.
 • New `msg_id` paremeter for |ui-messages| `msg_show` event.
+• 'rulerformat' is emitted as `msg_ruler` when not part of the statusline.
 • Creating or updating a progress message with |nvim_echo()| triggers a |Progress| event.
 
 HIGHLIGHTS
@@ -265,6 +266,7 @@ LUA
 • |vim.list.bisect()| for binary search.
 • Experimental `vim.pos` and `vim.range` for Position/Range abstraction.
 • |vim.json.encode()| has an `indent` option for pretty-formatting.
+• |vim.json.encode()| has an `sort_keys` option.
 
 OPTIONS
 
@@ -338,6 +340,7 @@ UI
   • "Error executing Lua:" changed to "Lua:".
 • 'busy' status is shown in default statusline with symbol ◐
 • Improved LSP signature help rendering.
+• Multigrid UIs can call nvim_input_mouse with grid 0 to let Nvim decide the grid.
 
 VIMSCRIPT
 
