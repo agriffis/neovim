@@ -2274,7 +2274,7 @@ static void ins_compl_new_leader(void)
       if ((cur_cot_flags & (kOptCotFlagNoinsert|kOptCotFlagNoselect)) == kOptCotFlagNoinsert
           && compl_first_match) {
         compl_shown_match = compl_first_match;
-        if (compl_shows_dir_forward()) {
+        if (compl_shows_dir_forward() && !compl_autocomplete) {
           compl_shown_match = compl_first_match->cp_next;
         }
       }
@@ -5069,10 +5069,11 @@ static char *find_common_prefix(size_t *prefix_len, bool curbuf_only)
 
       if (!match_limit_exceeded
           && (!curbuf_only || cpt_sources_array[cur_source].cs_flag == '.')) {
-        if (first == NULL) {
+        if (first == NULL && strncmp(ins_compl_leader(), compl->cp_str.data,
+                                     ins_compl_leader_len()) == 0) {
           first = compl->cp_str.data;
           len = (int)strlen(first);
-        } else {
+        } else if (first != NULL) {
           int j = 0;  // count in bytes
           char *s1 = first;
           char *s2 = compl->cp_str.data;
@@ -5100,7 +5101,7 @@ static char *find_common_prefix(size_t *prefix_len, bool curbuf_only)
 
   xfree(match_count);
 
-  if (len > get_compl_len()) {
+  if (len > (int)ins_compl_leader_len()) {
     *prefix_len = (size_t)len;
     return first;
   }
@@ -5189,12 +5190,14 @@ static void ins_compl_show_filename(void)
       MB_PTR_ADV(s);
     }
   }
-  msg_hist_off = true;
-  vim_snprintf(IObuff, IOSIZE, "%s %s%s", lead,
-               s > compl_shown_match->cp_fname ? "<" : "", s);
-  msg(IObuff, 0);
-  msg_hist_off = false;
-  redraw_cmdline = false;  // don't overwrite!
+  if (!compl_autocomplete) {
+    msg_hist_off = true;
+    vim_snprintf(IObuff, IOSIZE, "%s %s%s", lead,
+                 s > compl_shown_match->cp_fname ? "<" : "", s);
+    msg(IObuff, 0);
+    msg_hist_off = false;
+    redraw_cmdline = false;  // don't overwrite!
+  }
 }
 
 /// Find the appropriate completion item when 'complete' ('cpt') includes
