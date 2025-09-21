@@ -1416,7 +1416,7 @@ describe('completion', function()
     screen:try_resize(60, 10)
     source([[
       call setline(1, ['foo', 'foobar', 'foobarbaz'])
-      set autocomplete
+      setlocal autocomplete
     ]])
     screen:expect([[
       ^foo                                                         |
@@ -1523,6 +1523,17 @@ describe('completion', function()
       {5:-- INSERT --}                                                |
     ]])
     vim.uv.sleep(500)
+    screen:expect([[
+      foo                                                         |
+      foobar                                                      |
+      foobarbaz                                                   |
+      f^                                                           |
+      {4:foobarbaz      }{1:                                             }|
+      {4:foobar         }{1:                                             }|
+      {4:foo            }{1:                                             }|
+      {1:~                                                           }|*2
+      {5:-- INSERT --}                                                |
+    ]])
     feed('<C-N>')
     screen:expect([[
       foo                                                         |

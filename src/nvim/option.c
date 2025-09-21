@@ -384,6 +384,7 @@ void set_init_1(bool clean_arg)
   set_options_default(0);
 
   curbuf->b_p_initialized = true;
+  curbuf->b_p_ac = -1;
   curbuf->b_p_ar = -1;          // no local 'autoread' value
   curbuf->b_p_ul = NO_LOCAL_UNDOLEVEL;
   check_buf_options(curbuf);
@@ -2992,8 +2993,6 @@ bool is_tty_option(const char *name)
   return find_tty_option_end(name) != NULL;
 }
 
-#define TCO_BUFFER_SIZE 8
-
 /// Get value of TTY option.
 ///
 /// @param  name  Name of TTY option.
@@ -3007,8 +3006,8 @@ OptVal get_tty_option(const char *name)
     if (t_colors <= 1) {
       value = xstrdup("");
     } else {
-      value = xmalloc(TCO_BUFFER_SIZE);
-      snprintf(value, TCO_BUFFER_SIZE, "%d", t_colors);
+      value = xmalloc(NUMBUFLEN);
+      snprintf(value, NUMBUFLEN, "%d", t_colors);
     }
   } else if (strequal(name, "term")) {
     value = p_term ? xstrdup(p_term) : xstrdup("nvim");
@@ -3368,6 +3367,7 @@ static OptVal get_option_unset_value(OptIndex opt_idx)
     }
 
     switch (opt_idx) {
+    case kOptAutocomplete:
     case kOptAutoread:
       return BOOLEAN_OPTVAL(kNone);
     case kOptScrolloff:
@@ -4421,6 +4421,8 @@ void *get_varp_scope_from(vimoption_T *p, int opt_flags, buf_T *buf, win_T *win)
       return &(buf->b_p_kp);
     case kOptPath:
       return &(buf->b_p_path);
+    case kOptAutocomplete:
+      return &(buf->b_p_ac);
     case kOptAutoread:
       return &(buf->b_p_ar);
     case kOptTags:
@@ -4508,6 +4510,8 @@ void *get_varp_from(vimoption_T *p, buf_T *buf, win_T *win)
     return *buf->b_p_kp != NUL ? &buf->b_p_kp : p->var;
   case kOptPath:
     return *buf->b_p_path != NUL ? &(buf->b_p_path) : p->var;
+  case kOptAutocomplete:
+    return buf->b_p_ac >= 0 ? &(buf->b_p_ac) : p->var;
   case kOptAutoread:
     return buf->b_p_ar >= 0 ? &(buf->b_p_ar) : p->var;
   case kOptTags:
@@ -5204,6 +5208,7 @@ void buf_copy_options(buf_T *buf, int flags)
 
       // options that are normally global but also have a local value
       // are not copied, start using the global value
+      buf->b_p_ac = -1;
       buf->b_p_ar = -1;
       buf->b_p_ul = NO_LOCAL_UNDOLEVEL;
       buf->b_p_bkc = empty_string_option;
