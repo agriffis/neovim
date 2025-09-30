@@ -1893,6 +1893,9 @@ function vim.fn.exp(expr) end
 ---   :r    Root (one extension removed)
 ---   :e    Extension only
 ---
+--- More modifiers are supported, for the full list see
+--- |filename-modifiers|.
+---
 --- Example: >vim
 ---   let &tags = expand("%:p:h") .. "/tags"
 --- <Note that when expanding a string that starts with '%', '#' or
@@ -6550,6 +6553,14 @@ function vim.fn.perleval(expr) end
 --- @param y number
 --- @return number
 function vim.fn.pow(x, y) end
+
+--- Returns non-zero if text has been inserted after the cursor
+--- because "preinsert" is present in 'completeopt', or because
+--- "longest" is present in 'completeopt' while 'autocomplete'
+--- is active.  Otherwise returns zero.
+---
+--- @return number
+function vim.fn.preinserted() end
 
 --- Return the line number of the first line at or above {lnum}
 --- that is not blank.  Example: >vim

@@ -2442,6 +2442,9 @@ M.funcs = {
       	:r		Root (one extension removed)
       	:e		Extension only
 
+      More modifiers are supported, for the full list see
+      |filename-modifiers|.
+
       Example: >vim
       	let &tags = expand("%:p:h") .. "/tags"
       <Note that when expanding a string that starts with '%', '#' or
@@ -8020,6 +8023,18 @@ M.funcs = {
     params = { { 'x', 'number' }, { 'y', 'number' } },
     returns = 'number',
     signature = 'pow({x}, {y})',
+  },
+  preinserted = {
+    desc = [=[
+      Returns non-zero if text has been inserted after the cursor
+      because "preinsert" is present in 'completeopt', or because
+      "longest" is present in 'completeopt' while 'autocomplete'
+      is active.  Otherwise returns zero.
+    ]=],
+    name = 'preinserted',
+    params = {},
+    returns = 'number',
+    signature = 'preinserted()',
   },
   prevnonblank = {
     args = 1,
