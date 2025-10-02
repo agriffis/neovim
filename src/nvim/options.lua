@@ -1664,12 +1664,11 @@ local options = {
         	    see 'completefuzzycollect'.
 
            longest
-        	    When 'autocomplete' is not active, only the longest
-        	    common prefix of the matches is inserted.  If the popup
-        	    menu is displayed, you can use CTRL-L to add more
-        	    characters.  Whether case is ignored depends on the type
-        	    of completion.  For buffer text the 'ignorecase' option
-        	    applies.
+        	    When 'autocomplete' is not active, only the longest common
+        	    prefix of the matches is inserted.  If the popup menu is
+        	    displayed, you can use CTRL-L to add more characters.
+        	    Whether case is ignored depends on the type of completion.
+        	    For buffer text the 'ignorecase' option applies.
 
         	    When 'autocomplete' is active and no completion item is
         	    selected, the longest common prefix of the matches is
@@ -1700,7 +1699,9 @@ local options = {
 
            noselect Same as "noinsert", except that no menu item is
         	    pre-selected.  If both "noinsert" and "noselect" are
-        	    present, "noselect" has precedence.
+        	    present, "noselect" takes precedence.  This options is
+        	    enabled automatically when 'autocomplete' is on, unless
+        	    "preinsert" is also enabled.
 
            nosort   Disable sorting of completion candidates based on fuzzy
         	    scores when "fuzzy" is enabled.  Candidates will appear
@@ -1711,8 +1712,8 @@ local options = {
         	    with "menu" or "menuone".  Overrides "preview".
 
            preinsert
-        	    Inserts the text of the first completion candidate
-        	    beyond the current leader, highlighted with |hl-PreInsert|.
+        	    Inserts the text of the first completion candidate beyond
+        	    the current leader, highlighted with |hl-PreInsert|.
         	    The cursor does not move.
         	    Requires "fuzzy" to be unset, and either "menuone" in
         	    'completeopt' or 'autocomplete' enabled.  When
