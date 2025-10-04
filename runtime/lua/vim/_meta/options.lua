@@ -1219,8 +1219,8 @@ vim.go.cia = vim.go.completeitemalign
 ---
 ---    noselect Same as "noinsert", except that no menu item is
 --- 	    pre-selected.  If both "noinsert" and "noselect" are
---- 	    present, "noselect" takes precedence.  This options is
---- 	    enabled automatically when 'autocomplete' is on, unless
+--- 	    present, "noselect" takes precedence.  This is enabled
+--- 	    automatically when 'autocomplete' is on, unless
 --- 	    "preinsert" is also enabled.
 ---
 ---    nosort   Disable sorting of completion candidates based on fuzzy
@@ -2578,7 +2578,10 @@ vim.bo.ft = vim.bo.filetype
 ---   fold		'·' or '-'	filling 'foldtext'
 ---   foldopen	'-'		mark the beginning of a fold
 ---   foldclose	'+'		show a closed fold
----   foldsep	'│' or '|'      open fold middle marker
+---   foldsep	'│' or '|'	open fold middle marker
+---   foldinner	none		character to show instead of the
+--- 				numeric foldlevel when it would be
+--- 				repeated in a narrow 'foldcolumn'
 ---   diff		'-'		deleted lines of the 'diff' option
 ---   msgsep	' '		message separator 'display'
 ---   eob		'~'		empty lines at the end of a buffer

@@ -58,6 +58,7 @@
 #include "nvim/eval.h"
 #include "nvim/eval/typval.h"
 #include "nvim/eval/typval_defs.h"
+#include "nvim/eval/vars.h"
 #include "nvim/event/defs.h"
 #include "nvim/event/loop.h"
 #include "nvim/event/multiqueue.h"
@@ -268,30 +269,31 @@ static void emit_termrequest(void **argv)
   xfree(pending_send);
 }
 
-static void schedule_termrequest(Terminal *term, char *sequence, size_t sequence_length)
+static void schedule_termrequest(Terminal *term)
 {
   term->pending.send = xmalloc(sizeof(StringBuilder));
   kv_init(*term->pending.send);
 
   int line = row_to_linenr(term, term->cursor.row);
-  multiqueue_put(main_loop.events, emit_termrequest, term, sequence, (void *)sequence_length,
-                 term->pending.send, (void *)(intptr_t)line,
-                 (void *)(intptr_t)term->cursor.col);
+  multiqueue_put(main_loop.events, emit_termrequest, term,
+                 xmemdup(term->termrequest_buffer.items, term->termrequest_buffer.size),
+                 (void *)(intptr_t)term->termrequest_buffer.size, term->pending.send,
+                 (void *)(intptr_t)line, (void *)(intptr_t)term->cursor.col);
 }
 
-static int parse_osc8(VTermStringFragment frag, int *attr)
+static int parse_osc8(const char *str, int *attr)
   FUNC_ATTR_NONNULL_ALL
 {
   // Parse the URI from the OSC 8 sequence and add the URL to our URL set.
   // Skip the ID, we don't use it (for now)
   size_t i = 0;
-  for (; i < frag.len; i++) {
-    if (frag.str[i] == ';') {
+  for (; str[i] != NUL; i++) {
+    if (str[i] == ';') {
       break;
     }
   }
 
-  if (frag.str[i] != ';') {
+  if (str[i] != ';') {
     // Invalid OSC sequence
     return 0;
   }
@@ -299,17 +301,13 @@ static int parse_osc8(VTermStringFragment frag, int *attr)
   // Move past the semicolon
   i++;
 
-  if (i >= frag.len) {
+  if (str[i] == NUL) {
     // Empty OSC 8, no URL
     *attr = 0;
     return 1;
   }
 
-  char *url = xmemdupz(&frag.str[i], frag.len - i + 1);
-  url[frag.len - i] = 0;
-  *attr = hl_add_url(0, url);
-  xfree(url);
-
+  *attr = hl_add_url(0, str + i);
   return 1;
 }
 
@@ -322,16 +320,7 @@ static int on_osc(int command, VTermStringFragment frag, void *user)
     return 0;
   }
 
-  if (command == 8) {
-    int attr = 0;
-    if (parse_osc8(frag, &attr)) {
-      VTermState *state = vterm_obtain_state(term->vt);
-      VTermValue value = { .number = attr };
-      vterm_state_set_penattr(state, VTERM_ATTR_URI, VTERM_VALUETYPE_INT, &value);
-    }
-  }
-
-  if (!has_event(EVENT_TERMREQUEST)) {
+  if (command != 8 && !has_event(EVENT_TERMREQUEST)) {
     return 1;
   }
 
@@ -341,8 +330,19 @@ static int on_osc(int command, VTermStringFragment frag, void *user)
   }
   kv_concat_len(term->termrequest_buffer, frag.str, frag.len);
   if (frag.final) {
-    char *sequence = xmemdup(term->termrequest_buffer.items, term->termrequest_buffer.size);
-    schedule_termrequest(user, sequence, term->termrequest_buffer.size);
+    if (has_event(EVENT_TERMREQUEST)) {
+      schedule_termrequest(term);
+    }
+    if (command == 8) {
+      kv_push(term->termrequest_buffer, NUL);
+      const size_t off = STRLEN_LITERAL("\x1b]8;");
+      int attr = 0;
+      if (parse_osc8(term->termrequest_buffer.items + off, &attr)) {
+        VTermState *state = vterm_obtain_state(term->vt);
+        VTermValue value = { .number = attr };
+        vterm_state_set_penattr(state, VTERM_ATTR_URI, VTERM_VALUETYPE_INT, &value);
+      }
+    }
   }
   return 1;
 }
@@ -364,8 +364,7 @@ static int on_dcs(const char *command, size_t commandlen, VTermStringFragment fr
   }
   kv_concat_len(term->termrequest_buffer, frag.str, frag.len);
   if (frag.final) {
-    char *sequence = xmemdup(term->termrequest_buffer.items, term->termrequest_buffer.size);
-    schedule_termrequest(user, sequence, term->termrequest_buffer.size);
+    schedule_termrequest(term);
   }
   return 1;
 }
@@ -387,8 +386,7 @@ static int on_apc(VTermStringFragment frag, void *user)
   }
   kv_concat_len(term->termrequest_buffer, frag.str, frag.len);
   if (frag.final) {
-    char *sequence = xmemdup(term->termrequest_buffer.items, term->termrequest_buffer.size);
-    schedule_termrequest(user, sequence, term->termrequest_buffer.size);
+    schedule_termrequest(term);
   }
   return 1;
 }

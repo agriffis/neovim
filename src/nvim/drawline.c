@@ -21,7 +21,7 @@
 #include "nvim/diff.h"
 #include "nvim/drawline.h"
 #include "nvim/drawscreen.h"
-#include "nvim/eval.h"
+#include "nvim/eval/vars.h"
 #include "nvim/fold.h"
 #include "nvim/fold_defs.h"
 #include "nvim/globals.h"
@@ -517,6 +517,8 @@ void fill_foldcolumn(win_T *wp, foldinfo_T foldinfo, linenr_T lnum, int attr, in
       symbol = wp->w_p_fcs_chars.foldopen;
     } else if (first_level == 1) {
       symbol = wp->w_p_fcs_chars.foldsep;
+    } else if (wp->w_p_fcs_chars.foldinner != NUL) {
+      symbol = wp->w_p_fcs_chars.foldinner;
     } else if (first_level + i <= 9) {
       symbol = schar_from_ascii('0' + first_level + i);
     } else {
