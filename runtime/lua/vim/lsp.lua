@@ -56,7 +56,7 @@ function lsp._unsupported_method(method)
   return msg
 end
 
----@param workspace_folders string|lsp.WorkspaceFolder[]|fun(bufnr: integer, on_dir:fun(root_dir?:string))?
+---@param workspace_folders string|lsp.WorkspaceFolder[]?
 ---@return lsp.WorkspaceFolder[]?
 function lsp._get_workspace_folders(workspace_folders)
   if type(workspace_folders) == 'table' then
@@ -68,15 +68,6 @@ function lsp._get_workspace_folders(workspace_folders)
         name = workspace_folders,
       },
     }
-  elseif type(workspace_folders) == 'function' then
-    local name = lsp.client._resolve_root_dir(1000, 0, workspace_folders)
-    return name
-      and {
-        {
-          uri = vim.uri_from_fname(name),
-          name = name,
-        },
-      }
   end
 end
 
@@ -443,10 +434,16 @@ local function validate_config(config)
   validate('filetypes', config.filetypes, 'table', true)
 end
 
+--- Returns true if:
+--- 1. the config is managed by vim.lsp,
+--- 2. it applies to the given buffer, and
+--- 3. its config is valid (in particular: its `cmd` isn't broken).
+---
 --- @param bufnr integer
 --- @param config vim.lsp.Config
 --- @param logging boolean
 local function can_start(bufnr, config, logging)
+  assert(config)
   if
     type(config.filetypes) == 'table'
     and not vim.tbl_contains(config.filetypes, vim.bo[bufnr].filetype)
@@ -485,7 +482,13 @@ local function lsp_enable_callback(bufnr)
   -- Stop any clients that no longer apply to this buffer.
   local clients = lsp.get_clients({ bufnr = bufnr, _uninitialized = true })
   for _, client in ipairs(clients) do
-    if lsp.is_enabled(client.name) and not can_start(bufnr, lsp.config[client.name], false) then
+    -- Don't index into lsp.config[…] unless is_enabled() is true.
+    if
+      lsp.is_enabled(client.name)
+      -- Check that the client is managed by vim.lsp.config before deciding to detach it!
+      and lsp.config[client.name]
+      and not can_start(bufnr, lsp.config[client.name], false)
+    then
       lsp.buf_detach_client(bufnr, client.id)
     end
   end
