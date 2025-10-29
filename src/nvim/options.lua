@@ -178,7 +178,7 @@ local options = {
         - Disable the use of 'keymap' (without changing its value).
         Note that 'arabicshape' and 'delcombine' are not reset (it is a global
         option).
-        Also see |arabic.txt|.
+        Also see |l10n-arabic.txt|.
       ]=],
       full_name = 'arabic',
       redraw = { 'curswant' },
@@ -201,7 +201,7 @@ local options = {
         When disabled the display shows each character's true stand-alone
         form.
         Arabic is a complex language which requires other settings, for
-        further details see |arabic.txt|.
+        further details see |l10n-arabic.txt|.
       ]=],
       full_name = 'arabicshape',
       redraw = { 'all_windows', 'ui_option' },
@@ -4701,10 +4701,9 @@ local options = {
       defaults = true,
       desc = [=[
         While typing a search command, show where the pattern, as it was typed
-        so far, matches (ignoring {offset} and {address} modifiers).  The
-        matched string is highlighted.  If the pattern is invalid or not
-        found, nothing is shown.  The screen will be updated often, this is
-        only useful on fast terminals.
+        so far, matches.  The matched string is highlighted.  If the pattern
+        is invalid or not found, nothing is shown.  The screen will be updated
+        often, this is only useful on fast terminals.
         Note that the match will be shown, but the cursor will return to its
         original position when no match is found and when pressing <Esc>.  You
         still need to finish the search command with <Enter> to move the
@@ -9500,7 +9499,7 @@ local options = {
         'arabic' is set and the value of 'arabicshape' will be ignored.
         Note that setting 'termbidi' has the immediate effect that
         'arabicshape' is ignored, but 'rightleft' isn't changed automatically.
-        For further details see |arabic.txt|.
+        For further details see |l10n-arabic.txt|.
       ]=],
       full_name = 'termbidi',
       scope = { 'global' },
