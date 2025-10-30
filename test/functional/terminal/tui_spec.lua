@@ -53,6 +53,48 @@ describe('TUI', function()
     end
     screen:expect({ any = vim.pesc('[Process exited 1]'), unchanged = true })
   end)
+
+  it('suspending does not crash or hang', function()
+    clear()
+    local screen = tt.setup_child_nvim({ '--clean', '--cmd', 'set notermguicolors' })
+    local s0 = [[
+      ^                                                  |
+      ~                                                 |*3
+      {2:[No Name]                       0,0-1          All}|
+                                                        |
+      {5:-- TERMINAL --}                                    |
+    ]]
+    screen:expect(s0)
+    feed_data(':')
+    local s1 = [[
+                                                        |
+      ~                                                 |*3
+      {2:[No Name]                       0,0-1          All}|
+      :^                                                 |
+      {5:-- TERMINAL --}                                    |
+    ]]
+    screen:expect(s1)
+    feed_data('suspend\r')
+    if is_os('win') then -- no-op on Windows
+      screen:expect([[
+        ^                                                  |
+        ~                                                 |*3
+        {2:[No Name]                       0,0-1          All}|
+        :suspend                                          |
+        {5:-- TERMINAL --}                                    |
+      ]])
+    else -- resuming works on other platforms
+      screen:expect([[
+        ^                                                  |
+                                                          |*5
+        {5:-- TERMINAL --}                                    |
+      ]])
+      exec_lua([[vim.uv.kill(vim.fn.jobpid(vim.bo.channel), 'sigcont')]])
+      screen:expect(s0)
+    end
+    feed_data(':')
+    screen:expect(s1)
+  end)
 end)
 
 describe('TUI :detach', function()
@@ -4098,5 +4140,70 @@ describe('TUI client', function()
     it('with :cquit', function()
       test_remote_tui_quit(42)
     end)
+  end)
+
+  it('suspend/resume works with multiple clients', function()
+    local server_super, screen_server, screen_client = start_tui_and_remote_client()
+    local server_super_exec_lua = tt.make_lua_executor(server_super)
+
+    local screen_normal = [[
+      Hello, Worl^d                                      |
+      {100:~                                                 }|*3
+      {3:[No Name] [+]                                     }|
+                                                        |
+      {5:-- TERMINAL --}                                    |
+    ]]
+    local screen_suspended = [[
+      ^                                                  |
+                                                        |*5
+      {5:-- TERMINAL --}                                    |
+    ]]
+
+    screen_client:expect({ grid = screen_normal, unchanged = true })
+    screen_server:expect({ grid = screen_normal, unchanged = true })
+
+    -- Suspend both clients.
+    feed_data(':suspend\r')
+    screen_client:expect({ grid = screen_suspended })
+    screen_server:expect({ grid = screen_suspended })
+
+    -- Resume the remote client.
+    exec_lua([[vim.uv.kill(vim.fn.jobpid(vim.bo.channel), 'sigcont')]])
+    screen_client:expect({ grid = screen_normal })
+    screen_server:expect({ grid = screen_suspended, unchanged = true })
+
+    -- Resume the embedding client.
+    server_super_exec_lua([[vim.uv.kill(vim.fn.jobpid(vim.bo.channel), 'sigcont')]])
+    screen_server:expect({ grid = screen_normal })
+    screen_client:expect({ grid = screen_normal, unchanged = true })
+
+    -- Suspend both clients again.
+    feed_data(':suspend\r')
+    screen_client:expect({ grid = screen_suspended })
+    screen_server:expect({ grid = screen_suspended })
+
+    -- Resume the remote client.
+    exec_lua([[vim.uv.kill(vim.fn.jobpid(vim.bo.channel), 'sigcont')]])
+    screen_client:expect({ grid = screen_normal })
+    screen_server:expect({ grid = screen_suspended, unchanged = true })
+
+    -- Suspend the remote client again.
+    feed_data(':suspend\r')
+    screen_client:expect({ grid = screen_suspended })
+    screen_server:expect({ grid = screen_suspended, unchanged = true })
+
+    -- Resume the embedding client.
+    server_super_exec_lua([[vim.uv.kill(vim.fn.jobpid(vim.bo.channel), 'sigcont')]])
+    screen_server:expect({ grid = screen_normal })
+    screen_client:expect({ grid = screen_suspended, unchanged = true })
+
+    -- Resume the remote client.
+    exec_lua([[vim.uv.kill(vim.fn.jobpid(vim.bo.channel), 'sigcont')]])
+    screen_client:expect({ grid = screen_normal })
+    screen_server:expect({ grid = screen_normal, unchanged = true })
+
+    feed_data(':quit!\r')
+    screen_server:expect({ any = vim.pesc('[Process exited 0]') })
+    screen_client:expect({ any = vim.pesc('[Process exited 0]') })
   end)
 end)
