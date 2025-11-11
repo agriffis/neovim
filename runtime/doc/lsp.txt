@@ -262,7 +262,7 @@ FAQ                                                     *lsp-faq*
 
 - Q: How to force-reload LSP?
 - A: Stop all clients, then reload the buffer. >vim
-     :lua vim.lsp.stop_client(vim.lsp.get_clients())
+     :lua vim.iter(vim.lsp.get_clients()):each(function(client) client:stop() end)
      :edit
 
 - Q: Why isn't completion working?
@@ -1112,16 +1112,6 @@ formatexpr({opts})                                      *vim.lsp.formatexpr()*
                 • {timeout_ms} (`integer`, default: 500ms) The timeout period
                   for the formatting request..
 
-                                          *vim.lsp.get_buffers_by_client_id()*
-get_buffers_by_client_id({client_id})
-    Returns list of buffers attached to client_id.
-
-    Parameters: ~
-      • {client_id}  (`integer`) client id
-
-    Return: ~
-        (`integer[]`) buffers list of buffer ids
-
 get_client_by_id({client_id})                     *vim.lsp.get_client_by_id()*
     Gets a client by id, or nil if the id is invalid or the client was
     stopped. The returned client may not yet be fully initialized.
@@ -1247,22 +1237,6 @@ status()                                                    *vim.lsp.status()*
 
     Return: ~
         (`string`)
-
-stop_client({client_id}, {force})                      *vim.lsp.stop_client()*
-    Stops a client(s).
-
-    You can also use the `stop()` function on a |vim.lsp.Client| object. To
-    stop all clients: >lua
-        vim.lsp.stop_client(vim.lsp.get_clients())
-<
-
-    By default asks the server to shutdown, unless stop was requested already
-    for this client, then force-shutdown is attempted.
-
-    Parameters: ~
-      • {client_id}  (`integer|integer[]|vim.lsp.Client[]`) id, list of id's,
-                     or list of |vim.lsp.Client| objects
-      • {force}      (`boolean?`) shutdown forcefully
 
 tagfunc({pattern}, {flags})                                *vim.lsp.tagfunc()*
     Provides an interface between the built-in client and 'tagfunc'.
