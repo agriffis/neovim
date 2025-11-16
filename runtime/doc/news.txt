@@ -71,6 +71,8 @@ EDITOR
 - |i_CTRL-R| inserts named/clipboard registers (A-Z,a-z,0-9+) literally, like
   pasting instead of like user input. Improves performance, avoids broken
   formatting. To get the old behavior you can use `<C-R>=@x`.
+- Buffer name URI scheme parsing more closely follows RFC3986, so for example
+  "svn+ssh:", "ed2k:", and "iris.xpc:" are recognized as URI schemes.
 
 EVENTS
 
