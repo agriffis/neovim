@@ -156,6 +156,8 @@ API
 • |nvim_echo()| can create |Progress| messages
 • |nvim_open_win()| floating windows can show a 'statusline'. Plugins can use
   `style='minimal'` or `:setlocal statusline=` to hide the statusline.
+• Added experimental |nvim__exec_lua_fast()| to allow remote API clients to
+  execute code while nvim is blocking for input.
 
 BUILD
 
@@ -275,10 +277,10 @@ LSP
 • |Client:stop()| now accepts a numerical `force` argument to be interpreted as the time to wait
   before forcing the shutdown.
 • Add cmp field to opts of |vim.lsp.completion.enable()| for custom completion ordering.
-• |vim.lsp.enable()| when `enable == false` now force stops the client after
-  3000 milliseconds when it takes too long to shutdown after being disabled.
 • Push diagnostics (|vim.lsp.diagnostic.on_publish_diagnostics()|) now respect
   the `version` property in the notification params.
+• |vim.lsp.ClientConfig| has an `exit_timeout` field to control the timeout of
+  client force stopping. Defaults to `false`.
 
 LUA
 
