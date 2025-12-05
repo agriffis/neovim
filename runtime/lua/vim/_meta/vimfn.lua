@@ -1647,12 +1647,16 @@ function vim.fn.eventhandler() end
 --- then the name is also tried without adding an extension.
 --- On MS-Windows it only checks if the file exists and is not a
 --- directory, not if it's really executable.
+---
 --- On MS-Windows an executable in the same directory as the Vim
 --- executable is always found (it's added to $PATH at |startup|).
 ---       *NoDefaultCurrentDirectoryInExePath*
---- On MS-Windows an executable in Vim's current working directory
---- is also normally found, but this can be disabled by setting
---- the $NoDefaultCurrentDirectoryInExePath environment variable.
+--- On MS-Windows when using cmd.exe as 'shell' an executable in
+--- Vim's current working directory is also normally found, which
+--- can be disabled by setting the
+--- `$NoDefaultCurrentDirectoryInExePath` environment variable.
+--- This is always done when executing external commands using
+--- e.g. |:!|, |:make|, |system()| for security reasons.
 ---
 --- The result is a Number:
 ---   1  exists
@@ -4009,8 +4013,12 @@ function vim.fn.gettext(text) end
 ---       'wrap' is off
 ---   loclist    1 if showing a location list
 ---   quickfix  1 if quickfix or location list window
----   terminal  1 if a terminal window
+---   status_height  status lines height (0 or 1)
 ---   tabnr    tab page number
+---   terminal  1 if a terminal window
+---   textoff    number of columns occupied by any
+---       'foldcolumn', 'signcolumn' and line
+---       number in front of the text
 ---   topline    first displayed buffer line
 ---   variables  a reference to the dictionary with
 ---       window-local variables
@@ -4019,9 +4027,6 @@ function vim.fn.gettext(text) end
 ---       otherwise
 ---   wincol    leftmost screen column of the window;
 ---       "col" from |win_screenpos()|
----   textoff    number of columns occupied by any
----       'foldcolumn', 'signcolumn' and line
----       number in front of the text
 ---   winid    |window-ID|
 ---   winnr    window number
 ---   winrow    topmost screen line of the window;
