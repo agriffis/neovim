@@ -608,4 +608,111 @@ describe('vim.lsp.diagnostic', function()
       eq('spongebob', relatedPreviousResultId)
     end)
   end)
+
+  describe('vim.lsp.diagnostic.on_refresh', function()
+    it('refreshes diagnostics on server-to-client request', function()
+      exec_lua(create_server_definition)
+      exec_lua(function()
+        _G.requests = 0
+        _G.server = _G._create_server({
+          capabilities = {
+            diagnosticProvider = {},
+          },
+          handlers = {
+            ['textDocument/diagnostic'] = function(_, _, callback)
+              _G.requests = _G.requests + 1
+              callback(nil, {
+                kind = 'full',
+                items = {
+                  _G.make_warning('Pull Diagnostic', 4, 4, 4, 4),
+                },
+              })
+            end,
+          },
+        })
+        client_id = vim.lsp.start({ name = 'dummy', cmd = _G.server.cmd })
+      end)
+
+      local diags = exec_lua(function()
+        vim.lsp.diagnostic.on_diagnostic(nil, {
+          kind = 'full',
+          items = {
+            _G.make_error('Pull Diagnostic', 4, 4, 4, 4),
+          },
+        }, {
+          params = {
+            textDocument = { uri = fake_uri },
+          },
+          uri = fake_uri,
+          client_id = client_id,
+          bufnr = diagnostic_bufnr,
+        }, {})
+
+        return vim.diagnostic.get(diagnostic_bufnr)
+      end)
+      eq(1, #diags)
+      eq(1, diags[1].severity)
+
+      local requests, refreshed_diags = exec_lua(function()
+        vim.lsp.diagnostic.on_refresh(nil, nil, {
+          method = 'workspace/diagnostic/refresh',
+          client_id = client_id,
+        })
+
+        return _G.requests, vim.diagnostic.get(diagnostic_bufnr)
+      end)
+      eq(1, requests)
+      eq(1, #refreshed_diags)
+      eq(2, refreshed_diags[1].severity)
+    end)
+
+    it('refreshes workspace diagnostics', function()
+      local fake_uri_3 = 'file:///fake/uri3'
+      exec_lua(create_server_definition)
+      exec_lua(function()
+        _G.requests = 0
+        _G.server = _G._create_server({
+          capabilities = {
+            diagnosticProvider = { workspaceDiagnostics = true },
+          },
+          handlers = {
+            ['workspace/diagnostic'] = function(_, _, callback)
+              _G.requests = _G.requests + 1
+              callback(nil, {
+                items = {
+                  {
+                    kind = 'full',
+                    uri = fake_uri_3,
+                    items = {
+                      _G.make_error('Workspace Diagnostic', 4, 4, 4, 4),
+                    },
+                  },
+                },
+              })
+            end,
+          },
+        })
+        client_id = vim.lsp.start({ name = 'dummy', cmd = _G.server.cmd })
+      end)
+
+      eq(
+        0,
+        exec_lua(function()
+          return #vim.diagnostic.get()
+        end)
+      )
+
+      local requests, diags = exec_lua(function()
+        vim.lsp.diagnostic.on_refresh(nil, nil, {
+          method = 'workspace/diagnostic/refresh',
+          client_id = client_id,
+        })
+
+        return _G.requests, vim.diagnostic.get()
+      end)
+      eq(1, requests)
+      eq(1, #diags)
+      eq(1, diags[1].severity)
+    end)
+  end)
 end)

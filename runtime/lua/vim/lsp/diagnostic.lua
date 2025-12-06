@@ -388,6 +388,33 @@ local function refresh(bufnr, client_id, only_visible)
   end
 end
 
+--- |lsp-handler| for the method `workspace/diagnostic/refresh`
+---@param ctx lsp.HandlerContext
+---@private
+function M.on_refresh(err, _, ctx)
+  if err then
+    return vim.NIL
+  end
+  local client = vim.lsp.get_client_by_id(ctx.client_id)
+  if client == nil then
+    return vim.NIL
+  end
+  if
+    client.server_capabilities.diagnosticProvider
+    and client.server_capabilities.diagnosticProvider.workspaceDiagnostics
+  then
+    M._workspace_diagnostics({ client_id = ctx.client_id })
+  else
+    for bufnr in pairs(client.attached_buffers or {}) do
+      if bufstates[bufnr] and bufstates[bufnr].pull_kind == 'document' then
+        refresh(bufnr)
+      end
+    end
+  end
+
+  return vim.NIL
+end
+
 --- Enable pull diagnostics for a buffer
 ---@param bufnr (integer) Buffer handle, or 0 for current
 function M._enable(bufnr)
