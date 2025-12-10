@@ -78,6 +78,9 @@ EDITOR
   formatting. To get the old behavior you can use `<C-R>=@x`.
 • Buffer name URI scheme parsing more closely follows RFC3986, so for example
   "svn+ssh:", "ed2k:", and "iris.xpc:" are recognized as URI schemes.
+• On Windows, Nvim no longer searches the current directory for executables
+  for running external commands; use a relative or absolute path if you want
+  the previous behavior |NoDefaultCurrentDirectoryInExePath|.
 
 EVENTS
 
@@ -285,8 +288,6 @@ LSP
   • `exit_timeout` graduated from "experimental" `flags.exit_timeout`
     to a top-level field. Defaults to `false`.
 • Add cmp field to opts of |vim.lsp.completion.enable()| for custom completion ordering.
-• Push diagnostics (|vim.lsp.diagnostic.on_publish_diagnostics()|) now respect
-  the `version` property in the notification params.
 • Support for `workspace/diagnostic/refresh`:
   https://microsoft.github.io/language-server-protocol/specification/#diagnostic_refresh
 - Support for dynamic registration for `textDocument/diagnostic`

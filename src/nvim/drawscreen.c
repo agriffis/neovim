@@ -1367,6 +1367,12 @@ static void draw_sep_connectors_win(win_T *wp)
 /// bot: from bot_start to last row (when scrolled up)
 static void win_update(win_T *wp)
 {
+  // Return early when the windows would overflow the shrunk terminal window
+  // avoiding invalid drawing an assert failure
+  if (wp->w_grid.target == &default_grid && wp->w_wincol >= Columns) {
+    return;
+  }
+
   int top_end = 0;              // Below last row of the top area that needs
                                 // updating.  0 when no top area updating.
   int mid_start = 999;          // first row of the mid area that needs
@@ -2039,11 +2045,11 @@ static void win_update(win_T *wp)
       // When at start of changed lines: May scroll following lines
       // up or down to minimize redrawing.
       // Don't do this when the change continues until the end.
-      // Don't scroll the top area which was already scrolled above,
-      // but do scroll for changed lines below the top area.
+      // Don't scroll for changed lines in the top area if that's already
+      // done above, but do scroll for changed lines below the top area.
       if (!scrolled_for_mod && mod_bot != MAXLNUM
           && lnum >= mod_top && lnum < MAX(mod_bot, mod_top + 1)
-          && row >= top_end) {
+          && (!scrolled_down || row >= top_end)) {
         scrolled_for_mod = true;
 
         int old_cline_height = 0;
