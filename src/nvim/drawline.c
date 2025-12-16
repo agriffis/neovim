@@ -1668,7 +1668,8 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, int col_rows, b
     = !has_foldtext && buf_meta_total(wp->w_buffer, kMTMetaInline) > 0;
   int virt_line_index = -1;
   int virt_line_flags = 0;
-  // Repeat for the whole displayed line.
+
+  // Repeat for each cell in the displayed line.
   while (true) {
     int has_match_conc = 0;  ///< match wants to conceal
     int decor_conceal = 0;
@@ -2930,14 +2931,22 @@ int win_line(win_T *wp, linenr_T lnum, int startrow, int endrow, int col_rows, b
       if (wlv.line_attr_lowprio != 0) {
         HlAttrs line_ae = syn_attr2entry(wlv.line_attr_lowprio);
         HlAttrs char_ae = syn_attr2entry(wlv.char_attr);
+        int win_normal_bg = normal_bg;
+        int win_normal_cterm_bg = cterm_normal_bg_color;
+
+        // Get window-local Normal background (respects winhighlight)
+        if (bg_attr != 0) {
+          HlAttrs norm_ae = syn_attr2entry(bg_attr);
+          win_normal_bg = norm_ae.rgb_bg_color;
+          win_normal_cterm_bg = norm_ae.cterm_bg_color;
+        }
+        bool char_is_normal_bg = ui_rgb_attached()
+                                 ? (char_ae.rgb_bg_color == win_normal_bg)
+                                 : (char_ae.cterm_bg_color == win_normal_cterm_bg);
+
         // If line has background (CursorLine) and char's background equals Normal's background,
         // reverse the combination order to let CursorLine override normal_bg.
-        bool has_line_bg = line_ae.rgb_bg_color >= 0 || line_ae.cterm_bg_color > 0;
-        bool char_is_normal_bg = ui_rgb_attached()
-                                 ? (char_ae.rgb_bg_color == normal_bg)
-                                 : (char_ae.cterm_bg_color == cterm_normal_bg_color);
-
-        if (has_line_bg && char_is_normal_bg) {
+        if ((line_ae.rgb_bg_color >= 0 || line_ae.cterm_bg_color > 0) && char_is_normal_bg) {
           low = wlv.char_attr;
           high = wlv.line_attr_lowprio;
         }
