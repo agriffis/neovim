@@ -286,6 +286,17 @@ static int buf_write_convert(struct bw_info *ip, char **bufp, int *lenp)
         c = n > 1 ? (unsigned)utf_ptr2char(*bufp + wlen)
                   : (uint8_t)(*bufp)[wlen];
       }
+      // Check that there is enough space
+      if (!(flags & FIO_LATIN1)) {
+        size_t need = (flags & FIO_UCS4) ? 4 : 2;
+        if ((flags & FIO_UTF16) && c >= 0x10000) {
+          need = 4;
+        }
+
+        if ((size_t)(p - ip->bw_conv_buf) + need > ip->bw_conv_buflen) {
+          return FAIL;
+        }
+      }
 
       if (ucs2bytes(c, &p, flags) && !ip->bw_conv_error) {
         ip->bw_conv_error = true;
@@ -1226,7 +1237,7 @@ int buf_write(buf_T *buf, char *fname, char *sfname, linenr_T start, linenr_T en
   // the original file.
   // Don't do this if there is a backup file and we are exiting.
   if (reset_changed && !newfile && overwriting && !(exiting && backup != NULL)) {
-    ml_preserve(buf, false, !!p_fs);
+    ml_preserve(buf, false, !!(buf->b_p_fs >= 0 ? buf->b_p_fs : p_fs));
     if (got_int) {
       err = set_err(_(e_interr));
       goto restore_backup;
@@ -1258,11 +1269,13 @@ int buf_write(buf_T *buf, char *fname, char *sfname, linenr_T start, linenr_T en
   if (converted) {
     wb_flags = get_fio_flags(fenc);
     if (wb_flags & (FIO_UCS2 | FIO_UCS4 | FIO_UTF16 | FIO_UTF8)) {
+      // overallocate a bit, in case we read incomplete multi-byte chars
+      int size = bufsize + CONV_RESTLEN;
       // Need to allocate a buffer to translate into.
       if (wb_flags & (FIO_UCS2 | FIO_UTF16 | FIO_UTF8)) {
-        write_info.bw_conv_buflen = (size_t)bufsize * 2;
+        write_info.bw_conv_buflen = (size_t)size * 2;
       } else {       // FIO_UCS4
-        write_info.bw_conv_buflen = (size_t)bufsize * 4;
+        write_info.bw_conv_buflen = (size_t)size * 4;
       }
       write_info.bw_conv_buf = verbose_try_malloc(write_info.bw_conv_buflen);
       if (!write_info.bw_conv_buf) {
@@ -1575,9 +1588,9 @@ restore_backup:
     // (could be a pipe).
     // If the 'fsync' option is false, don't fsync().  Useful for laptops.
     int error;
-    if (p_fs && (error = os_fsync(fd)) != 0 && !device
+    if ((buf->b_p_fs >= 0 ? buf->b_p_fs : p_fs) && (error = os_fsync(fd)) != 0
         // fsync not supported on this storage.
-        && error != UV_ENOTSUP) {
+        && error != UV_ENOTSUP && !device) {
       err = set_err_arg(e_fsync, error);
       end = 0;
     }

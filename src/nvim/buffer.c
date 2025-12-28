@@ -2145,6 +2145,7 @@ void free_buf_options(buf_T *buf, bool free_p_ff)
   clear_string_option(&buf->b_p_qe);
   buf->b_p_ac = -1;
   buf->b_p_ar = -1;
+  buf->b_p_fs = -1;
   buf->b_p_ul = NO_LOCAL_UNDOLEVEL;
   clear_string_option(&buf->b_p_lw);
   clear_string_option(&buf->b_p_bkc);
@@ -3787,6 +3788,7 @@ static int chk_modeline(linenr_T lnum, int flags)
 {
   char *e;
   int retval = OK;
+  ESTACK_CHECK_DECLARATION;
 
   int prev = -1;
   char *s = ml_get(lnum);
@@ -3842,6 +3844,7 @@ static int chk_modeline(linenr_T lnum, int flags)
 
   // prepare for emsg()
   estack_push(ETYPE_MODELINE, "modelines", lnum);
+  ESTACK_CHECK_SETUP;
 
   bool end = false;
   while (end == false) {
@@ -3898,6 +3901,7 @@ static int chk_modeline(linenr_T lnum, int flags)
                                       // careful not to go off the end
   }
 
+  ESTACK_CHECK_NOW;
   estack_pop();
   xfree(linecopy);
 
