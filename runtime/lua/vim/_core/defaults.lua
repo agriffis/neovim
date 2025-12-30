@@ -1,3 +1,5 @@
+-- Default user-commands, autocmds, mappings, menus.
+
 --- Default user commands
 do
   vim.api.nvim_create_user_command('Inspect', function(cmd)
@@ -440,13 +442,13 @@ do
     -- Add empty lines
     vim.keymap.set('n', '[<Space>', function()
       -- TODO: update once it is possible to assign a Lua function to options #25672
-      vim.go.operatorfunc = "v:lua.require'vim._buf'.space_above"
+      vim.go.operatorfunc = "v:lua.require'vim._core.util'.space_above"
       return 'g@l'
     end, { expr = true, desc = 'Add empty line above cursor' })
 
     vim.keymap.set('n', ']<Space>', function()
       -- TODO: update once it is possible to assign a Lua function to options #25672
-      vim.go.operatorfunc = "v:lua.require'vim._buf'.space_below"
+      vim.go.operatorfunc = "v:lua.require'vim._core.util'.space_below"
       return 'g@l'
     end, { expr = true, desc = 'Add empty line below cursor' })
   end
@@ -567,7 +569,14 @@ do
           red, green, blue = 65535, 65535, 65535
         end
         local command = fg_request and 10 or 11
-        local data = string.format('\027]%d;rgb:%04x/%04x/%04x\007', command, red, green, blue)
+        local data = string.format(
+          '\027]%d;rgb:%04x/%04x/%04x%s',
+          command,
+          red,
+          green,
+          blue,
+          args.data.terminator
+        )
         vim.api.nvim_chan_send(channel, data)
       end
     end,

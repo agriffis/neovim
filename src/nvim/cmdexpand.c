@@ -2875,7 +2875,7 @@ static char *get_lsp_arg(expand_T *xp FUNC_ATTR_UNUSED, int idx)
 
     ADD_C(args, CSTR_AS_OBJ(xp->xp_line));
     // Build the current command line as a Lua string argument
-    Object res = NLUA_EXEC_STATIC("return require'vim._core.ex_cmd.lsp'.lsp_complete(...)", args,
+    Object res = NLUA_EXEC_STATIC("return require'vim._core.ex_cmd'.lsp_complete(...)", args,
                                   kRetObject, NULL,
                                   &err);
     api_clear_error(&err);
@@ -4057,7 +4057,7 @@ static int copy_substring_from_pos(pos_T *start, pos_T *end, char **match, pos_T
   ga_concat_len(&ga, start_ptr, (size_t)segment_len);
   if (!is_single_line) {
     if (exacttext) {
-      ga_concat_len(&ga, "\\n", 2);
+      ga_concat_len(&ga, S_LEN("\\n"));
     } else {
       ga_append(&ga, '\n');
     }
@@ -4067,10 +4067,11 @@ static int copy_substring_from_pos(pos_T *start, pos_T *end, char **match, pos_T
   if (!is_single_line) {
     for (linenr_T lnum = start->lnum + 1; lnum < end->lnum; lnum++) {
       char *line = ml_get(lnum);
-      ga_grow(&ga, ml_get_len(lnum) + 2);
-      ga_concat(&ga, line);
+      int linelen = ml_get_len(lnum);
+      ga_grow(&ga, linelen + 2);
+      ga_concat_len(&ga, line, (size_t)linelen);
       if (exacttext) {
-        ga_concat_len(&ga, "\\n", 2);
+        ga_concat_len(&ga, S_LEN("\\n"));
       } else {
         ga_append(&ga, '\n');
       }
