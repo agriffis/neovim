@@ -425,6 +425,36 @@ describe(':terminal buffer', function()
     ]])
     eq('TermLeave bar false', exec_lua('return _G.last_event'))
   end)
+
+  it('no crash with race between buffer close and OSC 2', function()
+    skip(is_os('win'), 'tty-test cannot forward OSC 2 on Windows?')
+    exec_lua(function()
+      vim.api.nvim_chan_send(vim.bo.channel, '\027]2;SOME_TITLE\007')
+    end)
+    retry(nil, 4000, function()
+      eq('SOME_TITLE', api.nvim_buf_get_var(0, 'term_title'))
+    end)
+    screen:expect_unchanged()
+    --- @type string
+    local title_before_del = exec_lua(function()
+      vim.wait(10) -- Ensure there are no pending events.
+      vim.api.nvim_chan_send(vim.bo.channel, '\027]2;OTHER_TITLE\007')
+      vim.uv.run('once') -- Only process the pending write.
+      vim.uv.sleep(50) -- Block the event loop and wait for tty-test to forward OSC 2.
+      local term_title = vim.b.term_title
+      vim.api.nvim_buf_delete(0, { force = true })
+      vim.wait(10, nil, nil, true) -- Process fast events only.
+      return term_title
+    end)
+    -- Title isn't changed until the second vim.wait().
+    eq('SOME_TITLE', title_before_del)
+    screen:expect([[
+      ^                                                  |
+      {100:~                                                 }|*5
+                                                        |
+    ]])
+    assert_alive()
+  end)
 end)
 
 describe(':terminal buffer', function()
@@ -658,6 +688,34 @@ describe(':terminal buffer', function()
                                                           |
       ]])
     end)
+
+    describe('no heap-use-after-free after', function()
+      local term
+
+      before_each(function()
+        term = exec_lua(function()
+          vim.api.nvim_create_autocmd('TermRequest', { callback = function() end })
+          return vim.api.nvim_open_term(0, {})
+        end)
+      end)
+
+      it('wiping buffer with pending TermRequest #37226', function()
+        exec_lua(function()
+          vim.api.nvim_chan_send(term, '\027]8;;https://example.com\027\\')
+          vim.api.nvim_buf_delete(0, { force = true })
+        end)
+        assert_alive()
+      end)
+
+      it('unloading buffer with pending TermRequest #37226', function()
+        api.nvim_create_buf(true, false) -- Create a buffer to switch to.
+        exec_lua(function()
+          vim.api.nvim_chan_send(term, '\027]8;;https://example.com\027\\')
+          vim.api.nvim_buf_delete(0, { force = true, unload = true })
+        end)
+        assert_alive()
+      end)
+    end)
   end)
 
   it('no heap-buffer-overflow when using jobstart("echo",{term=true}) #3161', function()
@@ -817,6 +875,148 @@ describe(':terminal buffer', function()
                                                         |
     ]])
     eq(false, api.nvim_buf_is_valid(term_buf))
+  end)
+
+  local function test_open_term_in_buf_with_running_term(env)
+    describe('does not allow', function()
+      it('opening another terminal with jobstart() in same buffer', function()
+        eq(
+          ('Vim:Terminal already connected to buffer %d'):format(env.buf),
+          pcall_err(fn.jobstart, { testprg('tty-test') }, { term = true })
+        )
+        env.screen:expect_unchanged()
+      end)
+
+      it('opening another terminal with nvim_open_term() in same buffer', function()
+        eq(
+          ('Terminal already connected to buffer %d'):format(env.buf),
+          pcall_err(api.nvim_open_term, env.buf, {})
+        )
+        env.screen:expect_unchanged()
+      end)
+    end)
+  end
+
+  describe('with running terminal job', function()
+    local env = {}
+
+    before_each(function()
+      env.screen = Screen.new(60, 6)
+      fn.jobstart({ testprg('tty-test') }, { term = true })
+      env.screen:expect([[
+        ^tty ready                                                   |
+                                                                    |*5
+      ]])
+      env.buf = api.nvim_get_current_buf()
+      api.nvim_set_option_value('modified', false, { buf = env.buf })
+    end)
+
+    test_open_term_in_buf_with_running_term(env)
+  end)
+
+  describe('with open nvim_open_term() channel', function()
+    local env = {}
+
+    before_each(function()
+      env.screen = Screen.new(60, 6)
+      local chan = api.nvim_open_term(0, {})
+      api.nvim_chan_send(chan, 'TEST')
+      env.screen:expect([[
+        ^TEST                                                        |
+                                                                    |*5
+      ]])
+      env.buf = api.nvim_get_current_buf()
+      api.nvim_set_option_value('modified', false, { buf = env.buf })
+    end)
+
+    test_open_term_in_buf_with_running_term(env)
+  end)
+
+  local function test_open_term_in_buf_with_closed_term(env)
+    describe('does not leak memory when', function()
+      describe('opening another terminal with jobstart() in same buffer', function()
+        it('in Normal mode', function()
+          fn.jobstart({ testprg('tty-test') }, { term = true })
+          env.screen:expect([[
+            ^tty ready                                                   |
+                                                                        |*5
+          ]])
+        end)
+
+        it('in Terminal mode', function()
+          feed('i')
+          eq({ blocking = false, mode = 't' }, api.nvim_get_mode())
+          fn.jobstart({ testprg('tty-test') }, { term = true })
+          env.screen:expect([[
+            tty ready                                                   |
+            ^                                                            |
+                                                                        |*3
+            {5:-- TERMINAL --}                                              |
+          ]])
+        end)
+      end)
+
+      describe('opening another terminal with nvim_open_term() in same buffer', function()
+        it('in Normal mode', function()
+          local chan = api.nvim_open_term(env.buf, {})
+          api.nvim_chan_send(chan, 'OTHER')
+          env.screen:expect([[
+            ^OTHER                                                       |
+                                                                        |*5
+          ]])
+        end)
+
+        it('in Terminal mode', function()
+          feed('i')
+          eq({ blocking = false, mode = 't' }, api.nvim_get_mode())
+          local chan = api.nvim_open_term(env.buf, {})
+          api.nvim_chan_send(chan, 'OTHER')
+          env.screen:expect([[
+            OTHER^                                                       |
+                                                                        |*4
+            {5:-- TERMINAL --}                                              |
+          ]])
+        end)
+      end)
+    end)
+  end
+
+  describe('with exited terminal job', function()
+    local env = {}
+
+    before_each(function()
+      env.screen = Screen.new(60, 6)
+      fn.jobstart({ testprg('shell-test') }, { term = true })
+      env.screen:expect([[
+        ^ready $                                                     |
+        [Process exited 0]                                          |
+                                                                    |*4
+      ]])
+      env.buf = api.nvim_get_current_buf()
+      api.nvim_set_option_value('modified', false, { buf = env.buf })
+    end)
+
+    test_open_term_in_buf_with_closed_term(env)
+  end)
+
+  describe('with closed nvim_open_term() channel', function()
+    local env = {}
+
+    before_each(function()
+      env.screen = Screen.new(60, 6)
+      local chan = api.nvim_open_term(0, {})
+      api.nvim_chan_send(chan, 'TEST')
+      fn.chanclose(chan)
+      env.screen:expect([[
+        ^TEST                                                        |
+        [Terminal closed]                                           |
+                                                                    |*4
+      ]])
+      env.buf = api.nvim_get_current_buf()
+      api.nvim_set_option_value('modified', false, { buf = env.buf })
+    end)
+
+    test_open_term_in_buf_with_closed_term(env)
   end)
 end)
 
