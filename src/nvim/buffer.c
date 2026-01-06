@@ -648,10 +648,6 @@ bool close_buffer(win_T *win, buf_T *buf, int action, bool abort_if_last, bool i
     return true;
   }
 
-  if (buf->terminal) {
-    buf_close_terminal(buf);
-  }
-
   // Always remove the buffer when there is no file name.
   if (buf->b_ffname == NULL) {
     del_buf = true;
@@ -813,11 +809,12 @@ void buf_freeall(buf_T *buf, int flags)
   bufref_T bufref;
   set_bufref(&bufref, buf);
 
-  buf_updates_unload(buf, false);
-  if (!bufref_valid(&bufref)) {
-    // on_detach callback deleted the buffer.
-    return;
+  if (buf->terminal) {
+    buf_close_terminal(buf);
   }
+
+  buf_updates_unload(buf, false);
+
   if ((buf->b_ml.ml_mfp != NULL)
       && apply_autocmds(EVENT_BUFUNLOAD, buf->b_fname, buf->b_fname, false, buf)
       && !bufref_valid(&bufref)) {
@@ -2068,6 +2065,7 @@ bool curbuf_reusable(void)
   return (curbuf != NULL
           && curbuf->b_ffname == NULL
           && curbuf->b_nwindows <= 1
+          && !curbuf->terminal
           && (curbuf->b_ml.ml_mfp == NULL || buf_is_empty(curbuf))
           && !bt_quickfix(curbuf)
           && !curbufIsChanged());
