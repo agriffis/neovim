@@ -5680,6 +5680,14 @@ describe('LSP', function()
         },
       }, result)
     end)
+
+    it('with flags including i, returns NIL', function()
+      exec_lua(function()
+        local result = vim.lsp.tagfunc('foobar', 'cir')
+        assert(result == vim.NIL, 'should not issue LSP requests')
+        return {}
+      end)
+    end)
   end)
 
   describe('cmd', function()
@@ -5945,7 +5953,7 @@ describe('LSP', function()
           },
         }, { client_id = client_id })
 
-        -- Checks after registering without worspaceDiagnostics support
+        -- Checks after registering without workspaceDiagnostics support
         -- Returns false
         check('workspace/diagnostic')
 

@@ -5306,9 +5306,8 @@ local options = {
       desc = [=[
         Lisp mode: When <Enter> is typed in insert mode set the indent for
         the next line to Lisp standards (well, sort of).  Also happens with
-        "cc" or "S".  'autoindent' must also be on for this to work.  The 'p'
-        flag in 'cpoptions' changes the method of indenting: Vi compatible or
-        better.  Also see 'lispwords'.
+        "cc" or "S".  'autoindent' must also be on for this to work.
+        Also see 'lispwords'.
         The '-' character is included in keyword characters.  Redefines the
         "=" operator to use this same indentation algorithm rather than
         calling an external program if 'equalprg' is empty.
@@ -6728,6 +6727,9 @@ local options = {
         function and an example.  The value can be the name of a function, a
         |lambda| or a |Funcref|.  See |option-value-function| for more
         information.
+
+        It is not allowed to change text or jump to another window while
+        evaluating 'qftf' |textlock|.
 
         This option cannot be set from a |modeline| or in the |sandbox|, for
         security reasons.
@@ -8362,11 +8364,11 @@ local options = {
         different values, you might consider setting 'smarttab'.
 
         The 'L' flag in 'cpoptions' alters tab behavior when 'list' is
-        enabled.  See also |ins-expandtab| ans user manual section |30.5| for
+        enabled.  See also |ins-expandtab| and user manual section |30.5| for
         in-depth explanations.
 
-        The value of 'softtabstop' will be ignored if 'varsofttabstop' is set to
-        anything other than an empty string.
+        The value of 'softtabstop' will be ignored if 'varsofttabstop' is set
+        to anything other than an empty string.
       ]=],
       full_name = 'softtabstop',
       scope = { 'buf' },
