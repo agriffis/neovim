@@ -1083,6 +1083,14 @@ func Test_BufEnter()
     bwipe!
     au! BufEnter
   endfor
+
+  new
+  new
+  autocmd BufEnter * ++once close
+  call assert_fails('close', 'E1312:')
+
+  au! BufEnter
+  only
 endfunc
 
 " Closing a window might cause an endless loop
@@ -2341,7 +2349,7 @@ func Test_bufunload_all()
     endfunc
     au BufUnload * call UnloadAllBufs()
     au VimLeave * call writefile(['Test Finished'], 'Xout')
-    set nohidden
+    set nohidden  " Accommodate Nvim default
     edit Xxx1
     split Xxx2
     q
