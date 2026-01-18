@@ -116,6 +116,17 @@
 
 #include "buffer.c.generated.h"
 
+#ifdef ABORT_ON_INTERNAL_ERROR
+# define CHECK_CURBUF \
+  do { \
+    if (curwin != NULL && curwin->w_buffer != curbuf) { \
+      iemsg("curbuf != curwin->w_buffer"); \
+    } \
+  } while (0)
+#else
+# define CHECK_CURBUF do {} while (0)
+#endif
+
 static const char e_attempt_to_delete_buffer_that_is_in_use_str[]
   = N_("E937: Attempt to delete a buffer that is in use: %s");
 
@@ -544,6 +555,8 @@ bool close_buffer(win_T *win, buf_T *buf, int action, bool abort_if_last, bool i
   win_T *the_curwin = curwin;
   tabpage_T *the_curtab = curtab;
 
+  CHECK_CURBUF;
+
   // Force unloading or deleting when 'bufhidden' says so, but not for terminal
   // buffers.
   // The caller must take care of NOT deleting/freeing when 'bufhidden' is
@@ -718,13 +731,21 @@ bool close_buffer(win_T *win, buf_T *buf, int action, bool abort_if_last, bool i
 
   // Autocommands may have opened or closed windows for this buffer.
   // Decrement the count for the close we do here.
-  if (buf->b_nwindows > 0) {
+  // Don't decrement b_nwindows if the buffer wasn't displayed in any window
+  // before calling buf_freeall().
+  if (nwindows > 0 && buf->b_nwindows > 0) {
     buf->b_nwindows--;
   }
 
   // Remove the buffer from the list.
-  // Do not wipe out the buffer if it is used in a window.
-  if (wipe_buf && buf->b_nwindows <= 0) {
+  // Do not wipe out the buffer if it is used in a window, or if autocommands
+  // wiped out all other buffers (unless when inside free_all_mem() where all
+  // buffers need to be freed and autocommands are blocked).
+  if (wipe_buf && buf->b_nwindows <= 0 && (buf->b_prev != NULL || buf->b_next != NULL
+#if defined(EXITFREE)
+                                           || entered_free_all_mem
+#endif
+                                           )) {
     if (clear_w_buf) {
       win->w_buffer = NULL;
     }
@@ -930,6 +951,9 @@ static void free_buffer(buf_T *buf)
     au_pending_free_buf = buf;
   } else {
     xfree(buf);
+    if (curbuf == buf) {
+      curbuf = NULL;  // make clear it's not to be used
+    }
   }
 }
 
