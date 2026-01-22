@@ -33,21 +33,35 @@ describe(':terminal buffer', function()
   end)
 
   it('terminal-mode forces various options', function()
+    local expr =
+      '[&l:cursorlineopt, &l:cursorline, &l:cursorcolumn, &l:scrolloff, &l:sidescrolloff]'
+
     feed([[<C-\><C-N>]])
     command('setlocal cursorline cursorlineopt=both cursorcolumn scrolloff=4 sidescrolloff=7')
-    eq(
-      { 'both', 1, 1, 4, 7 },
-      eval('[&l:cursorlineopt, &l:cursorline, &l:cursorcolumn, &l:scrolloff, &l:sidescrolloff]')
-    )
+    eq({ 'both', 1, 1, 4, 7 }, eval(expr))
     eq('nt', eval('mode(1)'))
 
-    -- Enter terminal-mode ("insert" mode in :terminal).
+    -- Enter Terminal mode ("insert" mode in :terminal).
     feed('i')
     eq('t', eval('mode(1)'))
-    eq(
-      { 'number', 1, 0, 0, 0 },
-      eval('[&l:cursorlineopt, &l:cursorline, &l:cursorcolumn, &l:scrolloff, &l:sidescrolloff]')
-    )
+    eq({ 'number', 1, 0, 0, 0 }, eval(expr))
+
+    -- Return to Normal mode.
+    feed([[<C-\><C-N>]])
+    eq('nt', eval('mode(1)'))
+    eq({ 'both', 1, 1, 4, 7 }, eval(expr))
+
+    -- Enter Terminal mode again.
+    feed('i')
+    eq('t', eval('mode(1)'))
+    eq({ 'number', 1, 0, 0, 0 }, eval(expr))
+
+    -- Delete the terminal buffer and return to the previous buffer.
+    command('bwipe!')
+    feed('<Ignore>') -- Add input to separate two RPC requests
+    eq('n', eval('mode(1)'))
+    -- Window options in the old buffer should be unchanged. #37484
+    eq({ 'both', 0, 0, -1, -1 }, eval(expr))
   end)
 
   it('terminal-mode does not change cursorlineopt if cursorline is disabled', function()
@@ -1138,14 +1152,18 @@ describe('on_lines does not emit out-of-bounds line indexes when', function()
 end)
 
 describe('terminal input', function()
+  local chan --- @type integer
+
   before_each(function()
     clear()
-    exec_lua([[
+    chan = exec_lua(function()
       _G.input_data = ''
-      vim.api.nvim_open_term(0, { on_input = function(_, _, _, data)
-        _G.input_data = _G.input_data .. data
-      end })
-    ]])
+      return vim.api.nvim_open_term(0, {
+        on_input = function(_, _, _, data)
+          _G.input_data = _G.input_data .. data
+        end,
+      })
+    end)
     feed('i')
     poke_eventloop()
   end)
@@ -1158,6 +1176,35 @@ describe('terminal input', function()
   it('unknown special keys are not sent', function()
     feed('aaa<Help>bbb')
     eq('aaabbb', exec_lua([[return _G.input_data]]))
+  end)
+
+  it('<Ignore> is no-op', function()
+    feed('aaa<Ignore>bbb')
+    eq('aaabbb', exec_lua([[return _G.input_data]]))
+    eq({ mode = 't', blocking = false }, api.nvim_get_mode())
+    feed([[<C-\><Ignore><C-N>]])
+    eq({ mode = 'nt', blocking = false }, api.nvim_get_mode())
+    feed('v')
+    eq({ mode = 'v', blocking = false }, api.nvim_get_mode())
+    feed('<Esc>')
+    eq({ mode = 'nt', blocking = false }, api.nvim_get_mode())
+    feed('i')
+    eq({ mode = 't', blocking = false }, api.nvim_get_mode())
+    feed([[<C-\><Ignore><C-O>]])
+    eq({ mode = 'ntT', blocking = false }, api.nvim_get_mode())
+    feed('v')
+    eq({ mode = 'v', blocking = false }, api.nvim_get_mode())
+    feed('<Esc>')
+    eq({ mode = 't', blocking = false }, api.nvim_get_mode())
+    fn.chanclose(chan)
+    feed('<MouseMove>')
+    eq({ mode = 't', blocking = false }, api.nvim_get_mode())
+    feed('<Ignore>')
+    eq({ mode = 't', blocking = false }, api.nvim_get_mode())
+    eq('terminal', api.nvim_get_option_value('buftype', { buf = 0 }))
+    feed('<Space>')
+    eq({ mode = 'n', blocking = false }, api.nvim_get_mode())
+    eq('', api.nvim_get_option_value('buftype', { buf = 0 }))
   end)
 end)
 
