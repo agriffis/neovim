@@ -1074,7 +1074,7 @@ describe('LSP', function()
         {
           { code = -32802 },
           NIL,
-          { method = 'error_code_test', bufnr = 1, client_id = 1, version = 0 },
+          { method = 'error_code_test', bufnr = 1, client_id = 1, request_id = 2, version = 0 },
         },
       }
       local client --- @type vim.lsp.Client
@@ -1107,7 +1107,7 @@ describe('LSP', function()
         {
           { code = -32801 },
           NIL,
-          { method = 'error_code_test', bufnr = 1, client_id = 1, version = 0 },
+          { method = 'error_code_test', bufnr = 1, client_id = 1, request_id = 2, version = 0 },
         },
       }
       local client --- @type vim.lsp.Client
@@ -1137,7 +1137,11 @@ describe('LSP', function()
     it('should track pending requests to the language server', function()
       local expected_handlers = {
         { NIL, {}, { method = 'finish', client_id = 1 } },
-        { NIL, {}, { method = 'slow_request', bufnr = 1, client_id = 1, version = 0 } },
+        {
+          NIL,
+          {},
+          { method = 'slow_request', bufnr = 1, client_id = 1, request_id = 2, version = 0 },
+        },
       }
       local client --- @type vim.lsp.Client
       test_rpc_server {
@@ -1212,7 +1216,11 @@ describe('LSP', function()
     it('should clear pending and cancel requests on reply', function()
       local expected_handlers = {
         { NIL, {}, { method = 'finish', client_id = 1 } },
-        { NIL, {}, { method = 'slow_request', bufnr = 1, client_id = 1, version = 0 } },
+        {
+          NIL,
+          {},
+          { method = 'slow_request', bufnr = 1, client_id = 1, request_id = 2, version = 0 },
+        },
       }
       local client --- @type vim.lsp.Client
       test_rpc_server {
@@ -1316,7 +1324,11 @@ describe('LSP', function()
     it('should trigger LspRequest autocmd when requests table changes', function()
       local expected_handlers = {
         { NIL, {}, { method = 'finish', client_id = 1 } },
-        { NIL, {}, { method = 'slow_request', bufnr = 1, client_id = 1, version = 0 } },
+        {
+          NIL,
+          {},
+          { method = 'slow_request', bufnr = 1, client_id = 1, request_id = 2, version = 0 },
+        },
       }
       local client --- @type vim.lsp.Client
       test_rpc_server {
@@ -1609,6 +1621,7 @@ describe('LSP', function()
             },
             bufnr = 2,
             client_id = 1,
+            request_id = 2,
             version = 0,
           },
         },
@@ -4515,7 +4528,7 @@ describe('LSP', function()
         name = 'prepare_rename_placeholder',
         expected_handlers = {
           { NIL, {}, { method = 'shutdown', client_id = 1 } },
-          { {}, NIL, { method = 'textDocument/rename', client_id = 1, bufnr = 1 } },
+          { {}, NIL, { method = 'textDocument/rename', client_id = 1, request_id = 3, bufnr = 1 } },
           { NIL, {}, { method = 'start', client_id = 1 } },
         },
         expected_text = 'placeholder', -- see fake lsp response
@@ -4525,7 +4538,7 @@ describe('LSP', function()
         name = 'prepare_rename_range',
         expected_handlers = {
           { NIL, {}, { method = 'shutdown', client_id = 1 } },
-          { {}, NIL, { method = 'textDocument/rename', client_id = 1, bufnr = 1 } },
+          { {}, NIL, { method = 'textDocument/rename', client_id = 1, request_id = 3, bufnr = 1 } },
           { NIL, {}, { method = 'start', client_id = 1 } },
         },
         expected_text = 'line', -- see test case and fake lsp response
@@ -4653,7 +4666,7 @@ describe('LSP', function()
         {
           NIL,
           { command = 'dummy1', title = 'Command 1' },
-          { bufnr = 1, method = 'workspace/executeCommand', client_id = 1 },
+          { bufnr = 1, method = 'workspace/executeCommand', request_id = 3, client_id = 1 },
         },
         { NIL, {}, { method = 'start', client_id = 1 } },
       }
@@ -6857,6 +6870,40 @@ describe('LSP', function()
           local foos = vim.lsp.get_clients({ bufnr = assert(_G.foo_buf) })
           local bars = vim.lsp.get_clients({ bufnr = assert(_G.bar_buf) })
           return { #foos, 'foo', #bars, bars[1].name }
+        end)
+      )
+    end)
+
+    it('in first FileType event (on startup)', function()
+      local tmp = tmpname()
+      write_file(tmp, string.dump(create_server_definition))
+      n.clear({
+        args = {
+          '--cmd',
+          string.format([[lua assert(loadfile(%q))()]], tmp),
+          '--cmd',
+          [[lua _G.server = _G._create_server({ handlers = {initialize = function(_, _, callback) callback(nil, {capabilities = {}}) end} })]],
+          '--cmd',
+          [[lua vim.lsp.config('foo', { cmd = _G.server.cmd, filetypes = { 'foo' }, root_markers = { '.foorc' } })]],
+          '--cmd',
+          [[au FileType * ++once lua vim.lsp.enable('foo')]],
+          '-c',
+          'set ft=foo',
+        },
+      })
+
+      eq(
+        { 1, 'foo' },
+        exec_lua(function()
+          local foos = vim.lsp.get_clients({ bufnr = 0 })
+          return { #foos, (foos[1] or {}).name }
+        end)
+      )
+      exec_lua([[vim.lsp.enable('foo', false)]])
+      eq(
+        0,
+        exec_lua(function()
+          return #vim.lsp.get_clients({ bufnr = 0 })
         end)
       )
     end)

@@ -418,6 +418,14 @@ local function check_external_tools()
     health.warn('ripgrep not available')
   end
 
+  local open_cmd, err = vim.ui._get_open_cmd()
+  if open_cmd then
+    health.ok(('vim.ui.open: handler found (%s)'):format(open_cmd[1]))
+  else
+    --- @cast err string
+    health.warn(err)
+  end
+
   -- `vim.pack` prefers git 2.36 but tries to work with 2.x.
   if vim.fn.executable('git') == 1 then
     local git = vim.fn.exepath('git')
@@ -604,25 +612,31 @@ local function check_sysinfo()
     )
   )
 
-  local encoded_body = vim.uri_encode(body) --- @type string
-  local issue_url = 'https://github.com/neovim/neovim/issues/new?labels=bug&body=' .. encoded_body
-  vim.schedule(function()
-    local win = vim.api.nvim_get_current_win()
-    local buf = vim.api.nvim_win_get_buf(win)
-    if vim.bo[buf].filetype ~= 'checkhealth' then
-      return
-    end
-    _G.nvim_health_bugreport_open = function()
-      vim.ui.open(issue_url)
-    end
-    vim.wo[win].winbar =
-      '%#WarningMsg#%@v:lua.nvim_health_bugreport_open@Click to Create Bug Report on GitHub%X%*'
-    vim.api.nvim_create_autocmd('BufDelete', {
-      buffer = buf,
-      once = true,
-      command = 'lua _G.nvim_health_bugreport_open = nil',
-    })
-  end)
+  vim.api.nvim_create_autocmd('FileType', {
+    pattern = 'checkhealth',
+    once = true,
+    callback = function(args)
+      local buf = args.buf
+      local win = vim.fn.bufwinid(buf)
+      if win == -1 then
+        return
+      end
+      local encoded_body = vim.uri_encode(body) --- @type string
+      local issue_url = 'https://github.com/neovim/neovim/issues/new?type=Bug&body=' .. encoded_body
+
+      _G.nvim_health_bugreport_open = function()
+        vim.ui.open(issue_url)
+      end
+      vim.wo[win].winbar =
+        '%#WarningMsg#%@v:lua.nvim_health_bugreport_open@Click to Create Bug Report on GitHub%X%*'
+
+      vim.api.nvim_create_autocmd('BufDelete', {
+        buffer = buf,
+        once = true,
+        command = 'lua _G.nvim_health_bugreport_open = nil',
+      })
+    end,
+  })
 end
 
 function M.check()

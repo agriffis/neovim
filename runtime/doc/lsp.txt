@@ -993,6 +993,14 @@ enable({name}, {enable})                                    *vim.lsp.enable()*
     To disable, pass `enable=false`: Stops related clients and servers
     (force-stops servers after a timeout, unless `exit_timeout=false`).
 
+    Raises an error under the following conditions:
+    • `{name}` is not a valid LSP config name (for example, `'*'`).
+    • `{name}` corresponds to an LSP config file which raises an error.
+
+    If an error is raised when multiple names are provided, this function will
+    have no side-effects; it will not enable/disable any configs, including
+    ones which contain no errors.
+
     Examples: >lua
         vim.lsp.enable('clangd')
         vim.lsp.enable({'lua_ls', 'pyright'})
@@ -2436,7 +2444,7 @@ Lua module: vim.lsp.rpc                                              *lsp-rpc*
     Client RPC object
 
     Fields: ~
-      • {request}     (`fun(method: string, params: table?, callback: fun(err?: lsp.ResponseError, result: any), notify_reply_callback?: fun(message_id: integer)):boolean,integer?`)
+      • {request}     (`fun(method: string, params: table?, callback: fun(err?: lsp.ResponseError, result: any, request_id: integer), notify_reply_callback?: fun(message_id: integer)):boolean,integer?`)
                       See |vim.lsp.rpc.request()|
       • {notify}      (`fun(method: string, params: any): boolean`) See
                       |vim.lsp.rpc.notify()|
