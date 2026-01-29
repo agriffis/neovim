@@ -268,8 +268,10 @@ static void emit_termrequest(void **argv)
         terminator ==
         VTERM_TERMINATOR_BEL ? STATIC_CSTR_AS_OBJ("\x07") : STATIC_CSTR_AS_OBJ("\x1b\\"));
 
+  term->refcount++;
   apply_autocmds_group(EVENT_TERMREQUEST, NULL, NULL, true, AUGROUP_ALL, buf, NULL,
                        &DICT_OBJ(data));
+  term->refcount--;
   xfree(sequence);
 
   StringBuilder *term_pending_send = term->pending.send;
@@ -282,6 +284,13 @@ static void emit_termrequest(void **argv)
     term->pending.send = term_pending_send;
   }
   xfree(pending_send);
+
+  // Terminal buffer closed during TermRequest in Normal mode: destroy the terminal.
+  // In Terminal mode term->refcount should still be non-zero here.
+  if (term->buf_handle == 0 && !term->refcount) {
+    term->destroy = true;
+    term->opts.close_cb(term->opts.data);
+  }
 }
 
 static void schedule_termrequest(Terminal *term)
@@ -563,6 +572,13 @@ void terminal_open(Terminal **termpp, buf_T *buf)
   aco_save_T aco;
   aucmd_prepbuf(&aco, buf);
 
+  if (term->sb_buffer != NULL) {
+    // If scrollback has been allocated by autocommands between terminal_alloc()
+    // and terminal_open(), it also needs to be refreshed.
+    refresh_scrollback(term, buf);
+  } else {
+    assert(term->invalid_start >= 0);
+  }
   refresh_screen(term, buf);
   set_option_value(kOptBuftype, STATIC_CSTR_AS_OPTVAL("terminal"), OPT_LOCAL);
 
