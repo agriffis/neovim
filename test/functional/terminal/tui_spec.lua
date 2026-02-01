@@ -114,7 +114,7 @@ end)
 
 describe('TUI :detach', function()
   it('does not stop server', function()
-    local job_opts = { env = env_notermguicolors }
+    local job_opts = { env = t.shallowcopy(env_notermguicolors) }
 
     if is_os('win') then
       -- TODO(justinmk): on Windows,
@@ -259,8 +259,7 @@ describe('TUI :restart', function()
       nvim_set .. ' notermguicolors laststatus=2 background=dark',
       '--cmd',
       'echo getpid()',
-    }) -- FIXME: why does using env_notermguicolors cause immediate exit on Windows?
-    -- }, { env = env_notermguicolors })
+    }, { env = env_notermguicolors })
 
     --- FIXME: On Windows spaces at the end of a screen line may have wrong attrs.
     --- Remove this function when that's fixed.
@@ -291,18 +290,10 @@ describe('TUI :restart', function()
     screen_expect(s0)
     gui_running_check()
 
-    local server_session --[[@type test.Session]]
-    local server_pid --[[@type any]]
-    -- FIXME: On Windows connect() hangs.
-    if not is_os('win') then
-      server_session = n.connect(server_pipe)
-      _, server_pid = server_session:request('nvim_call_function', 'getpid', {})
-    end
+    local server_session = n.connect(server_pipe)
+    local _, server_pid = server_session:request('nvim_call_function', 'getpid', {})
 
     local function restart_pid_check()
-      if is_os('win') then
-        return
-      end
       server_session:close()
       server_session = n.connect(server_pipe)
       local _, new_pid = server_session:request('nvim_call_function', 'getpid', {})
