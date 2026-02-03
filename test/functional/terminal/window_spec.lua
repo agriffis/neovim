@@ -283,7 +283,6 @@ describe(':terminal window', function()
   end)
 
   it('redraws cursor info in terminal mode', function()
-    skip(is_os('win'), '#31587')
     command('file AMOGUS | set laststatus=2 ruler')
     screen:expect([[
       tty ready                                         |
@@ -337,7 +336,6 @@ describe(':terminal window', function()
   end)
 
   it('has correct topline if scrolled by events', function()
-    skip(is_os('win'), '#31587')
     local lines = {}
     for i = 1, 10 do
       table.insert(lines, 'cool line ' .. i)
