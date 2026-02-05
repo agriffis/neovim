@@ -579,11 +579,18 @@ void ui_flush(void)
     arena_mem_free(arena_finish(&arena));
     pending_mode_info_update = false;
   }
-  if (pending_mode_update && !starting) {
-    char *full_name = shape_table[ui_mode_idx].full_name;
-    ui_call_mode_change(cstr_as_string(full_name), ui_mode_idx);
+
+  static bool cursor_was_obscured = false;
+  bool cursor_obscured = ui_cursor_is_behind_floatwin();
+  if ((cursor_obscured != cursor_was_obscured || pending_mode_update) && !starting) {
+    // Show "empty box" (underline style) cursor instead if behind a floatwin.
+    int idx = cursor_obscured ? SHAPE_IDX_R : ui_mode_idx;
+    char *full_name = shape_table[idx].full_name;
+    ui_call_mode_change(cstr_as_string(full_name), idx);
     pending_mode_update = false;
+    cursor_was_obscured = cursor_obscured;
   }
+
   if (pending_has_mouse != has_mouse) {
     (has_mouse ? ui_call_mouse_on : ui_call_mouse_off)();
     pending_has_mouse = has_mouse;
@@ -672,6 +679,22 @@ void ui_cursor_shape(void)
 {
   ui_cursor_shape_no_check_conceal();
   conceal_check_cursor_line();
+}
+
+/// Check if the cursor is behind a floating window (only in compositor mode).
+/// @return true if cursor is obscured by a float with higher zindex
+static bool ui_cursor_is_behind_floatwin(void)
+{
+  if ((State & MODE_CMDLINE) || !ui_comp_should_draw()) {
+    return false;
+  }
+
+  int crow = curwin->w_winrow + curwin->w_winrow_off + curwin->w_wrow;
+  int ccol = curwin->w_wincol + curwin->w_wincol_off
+             + (curwin->w_p_rl ? curwin->w_view_width - curwin->w_wcol - 1 : curwin->w_wcol);
+
+  ScreenGrid *top_grid = ui_comp_get_grid_at_coord(crow, ccol);
+  return top_grid != &curwin->w_grid_alloc && top_grid != &default_grid;
 }
 
 /// Returns true if the given UI extension is enabled.
