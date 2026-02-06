@@ -3482,6 +3482,8 @@ vim.keymap.set({modes}, {lhs}, {rhs}, {opts})               *vim.keymap.set()*
       • {opts}   (`table?`) Table of |:map-arguments|. Same as
                  |nvim_set_keymap()| {opts}, except:
                  • {replace_keycodes} defaults to `true` if "expr" is `true`.
+                 • {noremap} is not supported; use {remap} instead (see
+                   below).
 
                  Also accepts:
                  • {buffer}? (`integer|boolean`) Creates buffer-local mapping,
@@ -5208,13 +5210,13 @@ vim.version.range({spec})                                *vim.version.range()*
 
 
 ==============================================================================
-Lua module: vim._extui                                            *vim._extui*
+Lua module: vim._core.ui2                                      *vim._core.ui2*
 
 WARNING: This is an experimental interface intended to replace the message
 grid in the TUI.
 
 To enable the experimental UI (default opts shown): >lua
-    require('vim._extui').enable({
+    require('vim._core.ui2').enable({
      enable = true, -- Whether to enable or disable the UI.
      msg = { -- Options related to the message module.
        ---@type 'cmd'|'msg' Where to place regular messages, either in the

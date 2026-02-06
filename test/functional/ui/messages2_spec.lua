@@ -15,11 +15,11 @@ describe('messages2', function()
       [100] = { foreground = Screen.colors.Magenta1, bold = true },
     })
     exec_lua(function()
-      require('vim._extui').enable({})
+      require('vim._core.ui2').enable({})
     end)
   end)
   after_each(function()
-    -- Since vim._extui lasts until Nvim exits, there may be unfinished timers.
+    -- Since ui2 module lasts until Nvim exits, there may be unfinished timers.
     -- Close unfinished timers to avoid 2s delay on exit with ASAN or TSAN.
     exec_lua(function()
       vim.uv.walk(function(handle)
@@ -610,6 +610,49 @@ describe('messages2', function()
     screen:expect([[
       ^                                                     |
       {1:~                                                    }|*5
+    ]])
+  end)
+
+  it('while cmdline is open', function()
+    command('cnoremap <C-A> <Cmd>lua error("foo")<CR>')
+    feed(':echo "bar"<C-A>')
+    screen:expect([[
+                                                           |
+      {1:~                                                    }|*7
+      {3:                                                     }|
+      {9:E5108: Lua: [string ":lua"]:1: foo}                   |
+      {9:stack traceback:}                                     |
+      {9:        [C]: in function 'error'}                     |
+      {9:        [string ":lua"]:1: in main chunk}             |
+      {16::}{15:echo} {26:"bar"}^                                          |
+    ]])
+    feed('<CR>')
+    screen:expect([[
+      ^                                                     |
+      {1:~                                                    }|*12
+      bar                                                  |
+    ]])
+    command('set cmdheight=0')
+    feed([[:call confirm("foo\nbar")<C-A>]])
+    screen:expect([[
+                                                           |
+      {1:~                                                    }|*8
+      {1:~            }{9:E5108: Lua: [string ":lua"]:1: foo}{4:      }|
+      {1:~            }{9:stack traceback:}{4:                        }|
+      {1:~            }{9:        [C]: in function 'error'}{4:        }|
+      {1:~            }{9:        [string ":lua"]:1: in main chunk}|
+      {16::}{15:call} {25:confirm}{16:(}{26:"foo\nbar"}{16:)}^                            |
+    ]])
+    feed('<CR>')
+    screen:expect([[
+                                                           |
+      {1:~                                                    }|*7
+      {3:                                                     }|
+                                                           |
+      {6:foo}                                                  |
+      {6:bar}                                                  |
+                                                           |
+      {6:[O]k: }^                                               |
     ]])
   end)
 end)
