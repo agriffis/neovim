@@ -424,10 +424,14 @@ describe(':terminal window', function()
     ]])
   end)
 
-  it('in new tabpage has correct terminal size', function()
+  it('updates terminal size', function()
+    skip(is_os('win'), "Windows doesn't show all lines?")
     screen:set_default_attr_ids({
       [1] = { reverse = true },
+      [2] = { background = 225, foreground = Screen.colors.Gray0 },
       [3] = { bold = true },
+      [4] = { foreground = 12 },
+      [5] = { reverse = true, bold = true },
       [17] = { background = 2, foreground = Screen.colors.Grey0 },
       [18] = { background = 2, foreground = 8 },
       [19] = { underline = true, foreground = Screen.colors.Grey0, background = 7 },
@@ -452,6 +456,115 @@ describe(':terminal window', function()
       ^                                                  |
                                                         |
       {3:-- TERMINAL --}                                    |
+    ]])
+
+    command('quit | botright split')
+    -- NOTE: right window's cursor not on the last line, so it's not tailing.
+    screen:expect([[
+      rows: 5, cols: 50        │rows: 5, cols: 25       |
+      rows: 2, cols: 50        │rows: 5, cols: 50       |
+      {18:foo [-]                   foo [-]                 }|
+      rows: 2, cols: 50                                 |
+      ^                                                  |
+      {17:foo [-]                                           }|
+      {3:-- TERMINAL --}                                    |
+    ]])
+    command('quit')
+    screen:expect([[
+      rows: 5, cols: 25        │tty ready               |
+      rows: 5, cols: 50        │rows: 5, cols: 25       |
+      rows: 2, cols: 50        │rows: 5, cols: 50       |
+      rows: 5, cols: 25        │rows: 2, cols: 50       |
+      ^                         │rows: 5, cols: 25       |
+      {17:foo [-]                   }{18:foo [-]                 }|
+      {3:-- TERMINAL --}                                    |
+    ]])
+    command('call nvim_open_win(0, 0, #{relative: "editor", row: 0, col: 0, width: 40, height: 3})')
+    screen:expect([[
+      {2:rows: 5, cols: 25                       }          |
+      {2:rows: 5, cols: 40                       } 25       |
+      {2:                                        } 50       |
+      rows: 5, cols: 40        │rows: 2, cols: 50       |
+      ^                         │rows: 5, cols: 25       |
+      {17:foo [-]                   }{18:foo [-]                 }|
+      {3:-- TERMINAL --}                                    |
+    ]])
+    command('fclose!')
+    screen:expect([[
+      rows: 2, cols: 50        │tty ready               |
+      rows: 5, cols: 25        │rows: 5, cols: 25       |
+      rows: 5, cols: 40        │rows: 5, cols: 50       |
+      rows: 5, cols: 25        │rows: 2, cols: 50       |
+      ^                         │rows: 5, cols: 25       |
+      {17:foo [-]                   }{18:foo [-]                 }|
+      {3:-- TERMINAL --}                                    |
+    ]])
+    command('tab split')
+    screen:expect([[
+      {19: }{20:2}{19: foo }{3: foo }{1:                                     }{19:X}|
+      rows: 5, cols: 25                                 |
+      rows: 5, cols: 40                                 |
+      rows: 5, cols: 25                                 |
+      rows: 5, cols: 50                                 |
+      ^                                                  |
+      {3:-- TERMINAL --}                                    |
+    ]])
+    command('tabfirst | tabonly')
+    screen:expect([[
+      rows: 5, cols: 40        │tty ready               |
+      rows: 5, cols: 25        │rows: 5, cols: 25       |
+      rows: 5, cols: 50        │rows: 5, cols: 50       |
+      rows: 5, cols: 25        │rows: 2, cols: 50       |
+      ^                         │rows: 5, cols: 25       |
+      {17:foo [-]                   }{18:foo [-]                 }|
+      {3:-- TERMINAL --}                                    |
+    ]])
+
+    -- Sizing logic should only consider the final buffer shown in a window, even if autocommands
+    -- changed it at the last moment.
+    exec_lua(function()
+      vim.g.fired = 0
+      vim.api.nvim_create_autocmd('BufHidden', {
+        callback = function(ev)
+          vim.api.nvim_win_set_buf(vim.fn.win_findbuf(ev.buf)[1], vim.fn.bufnr('foo'))
+          vim.g.fired = vim.g.fired + 1
+          return vim.g.fired == 2
+        end,
+      })
+    end)
+    command('botright new')
+    screen:expect([[
+      rows: 2, cols: 25        │rows: 5, cols: 50       |
+                               │rows: 2, cols: 50       |
+      {18:foo [-]                   foo [-]                 }|
+      ^                                                  |
+      {4:~                                                 }|
+      {5:[No Name]                                         }|
+                                                        |
+    ]])
+    command('quit')
+    eq(1, eval('g:fired'))
+    screen:expect([[
+      rows: 5, cols: 50        │rows: 5, cols: 25       |
+      rows: 5, cols: 25        │rows: 5, cols: 50       |
+      rows: 2, cols: 25        │rows: 2, cols: 50       |
+      rows: 5, cols: 25        │rows: 5, cols: 25       |
+      ^                         │rows: 5, cols: 40       |
+      {17:foo [-]                   }{18:foo [-]                 }|
+                                                        |
+    ]])
+    -- Check it doesn't use the size of the closed window in the other tab page; size should only
+    -- change via the :wincmd below. Hide tabline so it doesn't affect sizes.
+    command('set showtabline=0 | tabnew | tabprevious | wincmd > | tabonly')
+    eq(2, eval('g:fired'))
+    screen:expect([[
+      rows: 5, cols: 25         │rows: 5, cols: 25      |
+      rows: 2, cols: 25         │rows: 5, cols: 50      |
+      rows: 5, cols: 25         │rows: 2, cols: 50      |
+      rows: 5, cols: 26         │rows: 5, cols: 25      |
+      ^                          │rows: 5, cols: 40      |
+      {17:foo [-]                    }{18:foo [-]                }|
+                                                        |
     ]])
   end)
 

@@ -2976,6 +2976,10 @@ int win_close(win_T *win, bool free_buf, bool force)
     }
   }
 
+  // About to free the window. Remember its final buffer for terminal_check_size,
+  // which may have changed since the last set_bufref. (e.g: close_buffer autocmds)
+  set_bufref(&bufref, win->w_buffer);
+
   // Free the memory used for the window and get the window that received
   // the screen space.
   int dir;
@@ -3038,6 +3042,9 @@ int win_close(win_T *win, bool free_buf, bool force)
       win_comp_pos();
       win_fix_scroll(false);
     }
+  }
+  if (bufref.br_buf && bufref_valid(&bufref) && bufref.br_buf->terminal) {
+    terminal_check_size(bufref.br_buf->terminal);
   }
 
   if (close_curwin) {
@@ -3259,18 +3266,25 @@ bool win_close_othertab(win_T *win, int free_buf, tabpage_T *tp, bool force)
     }
   }
 
+  // About to free the window. Remember its final buffer for terminal_check_size/TabClosed,
+  // which may have changed since the last set_bufref. (e.g: close_buffer autocmds)
+  set_bufref(&bufref, win->w_buffer);
+
   // Free the memory used for the window.
-  buf_T *buf = win->w_buffer;
   int dir;
   win_free_mem(win, &dir, tp);
 
+  if (bufref.br_buf && bufref_valid(&bufref) && bufref.br_buf->terminal) {
+    terminal_check_size(bufref.br_buf->terminal);
+  }
   if (free_tp_idx > 0) {
     free_tabpage(tp);
 
     if (has_event(EVENT_TABCLOSED)) {
       char prev_idx[NUMBUFLEN];
       vim_snprintf(prev_idx, NUMBUFLEN, "%i", free_tp_idx);
-      apply_autocmds(EVENT_TABCLOSED, prev_idx, prev_idx, false, buf);
+      apply_autocmds(EVENT_TABCLOSED, prev_idx, prev_idx, false,
+                     bufref.br_buf && bufref_valid(&bufref) ? bufref.br_buf : curbuf);
     }
   }
   return true;
