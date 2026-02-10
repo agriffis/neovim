@@ -155,9 +155,7 @@ struct terminal {
   size_t sb_current;                // Lines stored in sb_buffer.
   size_t sb_size;                   // Capacity of sb_buffer.
   // "virtual index" that points to the first sb_buffer row that we need to
-  // push to the terminal buffer when refreshing the scrollback. When negative,
-  // it actually points to entries that are no longer in sb_buffer (because the
-  // window height has increased) and must be deleted from the terminal buffer
+  // push to the terminal buffer when refreshing the scrollback.
   int sb_pending;
   size_t sb_deleted;                // Lines deleted from sb_buffer.
   size_t sb_deleted_last;           // Value of sb_deleted on last refresh_scrollback()
@@ -171,6 +169,7 @@ struct terminal {
   // refresh_timer_cb may be called after the buffer was freed, and there's
   // no way to know if the memory was reused.
   handle_T buf_handle;
+  bool in_altscreen;
   // program exited
   bool closed;
   // when true, the terminal's destruction is already enqueued.
@@ -216,6 +215,7 @@ static VTermScreenCallbacks vterm_screen_callbacks = {
   .theme = term_theme,
   .sb_pushline = term_sb_push,  // Called before a line goes offscreen.
   .sb_popline = term_sb_pop,
+  .sb_clear = term_sb_clear,
 };
 
 static VTermSelectionCallbacks vterm_selection_callbacks = {
@@ -544,8 +544,8 @@ Terminal *terminal_alloc(buf_T *buf, TerminalOptions opts)
   }
   vterm_state_set_termprop(state, VTERM_PROP_CURSORBLINK, &cursor_blink);
 
-  // force a initial refresh of the screen to ensure the buffer will always
-  // have as many lines as screen rows when refresh_scrollback is called
+  // Force a initial refresh of the screen to ensure the buffer will always
+  // have as many lines as screen rows when refresh_scrollback() is called.
   term->invalid_start = 0;
   term->invalid_end = opts.height;
 
@@ -555,6 +555,12 @@ Terminal *terminal_alloc(buf_T *buf, TerminalOptions opts)
   // This queue is never processed directly: when the terminal is refreshed, all
   // events from this queue are copied back onto the main event queue.
   term->pending.events = multiqueue_new(NULL, NULL);
+
+  linenr_T line_count = buf->b_ml.ml_line_count;
+  while (!(buf->b_ml.ml_flags & ML_EMPTY)) {
+    ml_delete_buf(buf, 1, false);
+  }
+  deleted_lines_buf(buf, 1, line_count);
 
   return term;
 }
@@ -580,7 +586,9 @@ void terminal_open(Terminal **termpp, buf_T *buf)
     assert(term->invalid_start >= 0);
   }
   refresh_screen(term, buf);
+  buf->b_locked++;
   set_option_value(kOptBuftype, STATIC_CSTR_AS_OPTVAL("terminal"), OPT_LOCAL);
+  buf->b_locked--;
 
   if (buf->b_ffname != NULL) {
     buf_set_term_title(buf, buf->b_ffname, strlen(buf->b_ffname));
@@ -1467,6 +1475,7 @@ static int term_settermprop(VTermProp prop, VTermValue *val, void *data)
 
   switch (prop) {
   case VTERM_PROP_ALTSCREEN:
+    term->in_altscreen = val->boolean;
     break;
 
   case VTERM_PROP_CURSORVISIBLE:
@@ -1613,7 +1622,7 @@ static int term_sb_pop(int cols, VTermScreenCell *cells, void *data)
     return 0;
   }
 
-  if (term->sb_pending) {
+  if (term->sb_pending > 0) {
     term->sb_pending--;
   }
 
@@ -1682,6 +1691,26 @@ static int term_selection_set(VTermSelectionMask mask, VTermStringFragment frag,
     char *data = xmemdupz(term->selection.items, kv_size(term->selection));
     multiqueue_put(main_loop.events, term_clipboard_set, (void *)mask, data);
   }
+
+  return 1;
+}
+
+static int term_sb_clear(void *data)
+{
+  Terminal *term = data;
+
+  if (term->in_altscreen || !term->sb_size || !term->sb_current) {
+    return 1;
+  }
+
+  for (size_t i = 0; i < term->sb_current; i++) {
+    xfree(term->sb_buffer[i]);
+  }
+
+  term->sb_deleted += term->sb_current;
+  term->sb_current = 0;
+  term->sb_pending = 0;
+  invalidate_terminal(term, -1, -1);
 
   return 1;
 }
@@ -2366,6 +2395,15 @@ static void refresh_scrollback(Terminal *term, buf_T *buf)
   int width, height;
   vterm_get_size(term->vt, &height, &width);
 
+  int max_line_count = (int)term->sb_current - term->sb_pending + height;
+  // Remove extra lines at the top if scrollback lines have been deleted.
+  while (deleted > 0 && buf->b_ml.ml_line_count > max_line_count) {
+    ml_delete_buf(buf, 1, false);
+    deleted_lines_buf(buf, 1, 1);
+    deleted--;
+  }
+  max_line_count += term->sb_pending;
+
   // May still have pending scrollback after increase in terminal height if the
   // scrollback wasn't refreshed in time; append these to the top of the buffer.
   int row_offset = term->sb_pending;
@@ -2381,21 +2419,15 @@ static void refresh_scrollback(Terminal *term, buf_T *buf)
     // This means that either the window height has decreased or the screen
     // became full and libvterm had to push all rows up. Convert the first
     // pending scrollback row into a string and append it just above the visible
-    // section of the buffer
-    if (((int)buf->b_ml.ml_line_count - height) >= (int)term->sb_size) {
-      // scrollback full, delete lines at the top
-      ml_delete_buf(buf, 1, false);
-      deleted_lines_buf(buf, 1, 1);
-    }
+    // section of the buffer.
     fetch_row(term, -term->sb_pending - row_offset, width);
-    int buf_index = (int)buf->b_ml.ml_line_count - height;
+    int buf_index = buf->b_ml.ml_line_count - height;
     ml_append_buf(buf, buf_index, term->textbuf, 0, false);
     appended_lines_buf(buf, buf_index, 1);
     term->sb_pending--;
   }
 
-  // Remove extra lines at the bottom
-  int max_line_count = (int)term->sb_current + height;
+  // Remove extra lines at the bottom.
   while (buf->b_ml.ml_line_count > max_line_count) {
     ml_delete_buf(buf, buf->b_ml.ml_line_count, false);
     deleted_lines_buf(buf, buf->b_ml.ml_line_count, 1);
