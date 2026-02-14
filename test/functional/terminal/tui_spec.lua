@@ -100,11 +100,11 @@ describe('TUI', function()
       ]])
     else -- resuming works on other platforms
       screen:expect([[
-        ^                                                  |
                                                           |*5
+        ^[Process suspended]                               |
         {5:-- TERMINAL --}                                    |
       ]])
-      exec_lua([[vim.uv.kill(vim.fn.jobpid(vim.bo.channel), 'sigcont')]])
+      n.feed('<Space>')
       screen:expect(s0)
     end
     feed_data(':')
@@ -427,6 +427,54 @@ describe('TUI :restart', function()
     ]])
     restart_pid_check()
     gui_running_check()
+  end)
+
+  it('filters stdin marker from v:argv on restart #34417', function()
+    t.skip(is_os('win'), 'stdin behavior differs on Windows')
+    clear()
+    local server_session
+    finally(function()
+      if server_session then
+        server_session:close()
+      end
+      n.check_close()
+    end)
+    local server_pipe = new_pipename()
+    local screen = tt.setup_child_nvim({
+      '-u',
+      'NONE',
+      '-i',
+      'NONE',
+      '--listen',
+      server_pipe,
+      '--cmd',
+      'set notermguicolors',
+      '-',
+    })
+    screen:expect([[
+      ^                                                  |
+      ~                                                 |*3
+      {2:[No Name] [RO]                  1,0-1          All}|
+                                                        |
+      {5:-- TERMINAL --}                                    |
+    ]])
+    server_session = n.connect(server_pipe)
+    local expr = 'index(v:argv, "-") >= 0 ? v:true : v:false'
+    local _, has_stdin = server_session:request('nvim_eval', expr)
+    eq(true, has_stdin)
+
+    tt.feed_data(':restart\013')
+    screen:expect([[
+      ^                                                  |
+      ~                                                 |*3
+      {2:[No Name]                       0,0-1          All}|
+                                                        |
+      {5:-- TERMINAL --}                                    |
+    ]])
+    server_session:close()
+    server_session = n.connect(server_pipe)
+    local _, has_stdin_after = server_session:request('nvim_eval', expr)
+    eq(false, has_stdin_after)
   end)
 end)
 
@@ -4361,7 +4409,6 @@ describe('TUI client', function()
   it('suspend/resume works with multiple clients', function()
     t.skip(is_os('win'), 'N/A for Windows')
     local server_super, screen_server, screen_client = start_tui_and_remote_client()
-    local server_super_exec_lua = tt.make_lua_executor(server_super)
 
     local screen_normal = [[
       Hello, Worl^d                                      |
@@ -4371,8 +4418,8 @@ describe('TUI client', function()
       {5:-- TERMINAL --}                                    |
     ]]
     local screen_suspended = [[
-      ^                                                  |
                                                         |*5
+      ^[Process suspended]                               |
       {5:-- TERMINAL --}                                    |
     ]]
 
@@ -4385,12 +4432,12 @@ describe('TUI client', function()
     screen_server:expect({ grid = screen_suspended })
 
     -- Resume the remote client.
-    exec_lua([[vim.uv.kill(vim.fn.jobpid(vim.bo.channel), 'sigcont')]])
+    n.feed('<Space>')
     screen_client:expect({ grid = screen_normal })
     screen_server:expect({ grid = screen_suspended, unchanged = true })
 
     -- Resume the embedding client.
-    server_super_exec_lua([[vim.uv.kill(vim.fn.jobpid(vim.bo.channel), 'sigcont')]])
+    server_super:request('nvim_input', '<Space>')
     screen_server:expect({ grid = screen_normal })
     screen_client:expect({ grid = screen_normal, unchanged = true })
 
@@ -4400,7 +4447,7 @@ describe('TUI client', function()
     screen_server:expect({ grid = screen_suspended })
 
     -- Resume the remote client.
-    exec_lua([[vim.uv.kill(vim.fn.jobpid(vim.bo.channel), 'sigcont')]])
+    n.feed('<Space>')
     screen_client:expect({ grid = screen_normal })
     screen_server:expect({ grid = screen_suspended, unchanged = true })
 
@@ -4410,12 +4457,12 @@ describe('TUI client', function()
     screen_server:expect({ grid = screen_suspended, unchanged = true })
 
     -- Resume the embedding client.
-    server_super_exec_lua([[vim.uv.kill(vim.fn.jobpid(vim.bo.channel), 'sigcont')]])
+    server_super:request('nvim_input', '<Space>')
     screen_server:expect({ grid = screen_normal })
     screen_client:expect({ grid = screen_suspended, unchanged = true })
 
     -- Resume the remote client.
-    exec_lua([[vim.uv.kill(vim.fn.jobpid(vim.bo.channel), 'sigcont')]])
+    n.feed('<Space>')
     screen_client:expect({ grid = screen_normal })
     screen_server:expect({ grid = screen_normal, unchanged = true })
 
