@@ -6,6 +6,13 @@ local Screen = require('test.functional.ui.screen')
 
 local clear, command, exec_lua, feed = n.clear, n.command, n.exec_lua, n.feed
 
+local function set_msg_target_zero_ch()
+  exec_lua(function()
+    require('vim._core.ui2').enable({ msg = { target = 'msg' } })
+    vim.o.cmdheight = 0
+  end)
+end
+
 describe('messages2', function()
   local screen
   before_each(function()
@@ -188,7 +195,7 @@ describe('messages2', function()
       {1:~                                                    }|*12
                                                            |
     ]])
-    command('set cmdheight=0')
+    set_msg_target_zero_ch()
     command('echo "foo"')
     screen:expect([[
       ^                                                     |
@@ -311,7 +318,7 @@ describe('messages2', function()
     local top = [[
                                                                              |
       {1:~                                                                      }|*4
-      {3:                                                                       }|
+      {3: f/d/j: screen/page/line down, b/u/k: up, <Esc>: stop paging           }|
       0                                                                      |
       1                                                                      |
       2                                                                      |
@@ -327,7 +334,7 @@ describe('messages2', function()
     screen:expect([[
                                                                              |
       {1:~                                                                      }|*4
-      {3:                                                                       }|
+      {3: f/d/j: screen/page/line down, b/u/k: up, <Esc>: stop paging           }|
       1 [+1]                                                                 |
       2                                                                      |
       3                                                                      |
@@ -343,7 +350,7 @@ describe('messages2', function()
     screen:expect([[
                                                                              |
       {1:~                                                                      }|*4
-      {3:                                                                       }|
+      {3: f/d/j: screen/page/line down, b/u/k: up, <Esc>: stop paging           }|
       3 [+3]                                                                 |
       4                                                                      |
       5                                                                      |
@@ -359,7 +366,7 @@ describe('messages2', function()
     screen:expect([[
                                                                              |
       {1:~                                                                      }|*4
-      {3:                                                                       }|
+      {3: f/d/j: screen/page/line down, b/u/k: up, <Esc>: stop paging           }|
       5 [+5]                                                                 |
       6                                                                      |
       7                                                                      |
@@ -375,7 +382,7 @@ describe('messages2', function()
     screen:expect([[
                                                                              |
       {1:~                                                                      }|*4
-      {3:                                                                       }|
+      {3: f/d/j: screen/page/line down, b/u/k: up, <Esc>: stop paging           }|
       93 [+93]                                                               |
       94                                                                     |
       95                                                                     |
@@ -390,7 +397,7 @@ describe('messages2', function()
     screen:expect([[
                                                                              |
       {1:~                                                                      }|*3
-      {3:                                                                       }|
+      {3: f/d/j: screen/page/line down, b/u/k: up, <Esc>: stop paging           }|
       93 [+93]                                                               |
       94                                                                     |
       95                                                                     |
@@ -403,6 +410,21 @@ describe('messages2', function()
     ]])
     feed('<Backspace>g')
     screen:expect(top)
+    feed('<Esc>f')
+    screen:expect([[
+                                                                             |
+      {1:~                                                                      }|*3
+      {3:                                                                       }|
+      0                                                                      |
+      1                                                                      |
+      2                                                                      |
+      3                                                                      |
+      4                                                                      |
+      5                                                                      |
+      6 [+93]                                                                |
+      Type number and <Enter> or click with the mouse (q or empty cancels): f|
+      ^                                                                       |
+    ]])
   end)
 
   it('FileType is fired after default options are set', function()
@@ -437,7 +459,8 @@ describe('messages2', function()
       {1:~                                                    }|*12
       {9:E486: Pattern not found: foo}{100:                         }|
     ]])
-    command('set cmdheight=0 | echo "foo"')
+    set_msg_target_zero_ch()
+    command('echo "foo"')
     screen:expect([[
       ^                                                     |
       {1:~                                                    }|*12
@@ -605,8 +628,8 @@ describe('messages2', function()
       baz                                                  |
       foo                                                  |*2
     ]])
+    set_msg_target_zero_ch()
     exec_lua(function()
-      vim.o.cmdheight = 0
       vim.api.nvim_echo({ { 'foo' } }, true, { id = 1 })
       vim.api.nvim_echo({ { 'bar\nbaz' } }, true, { id = 2 })
       vim.api.nvim_echo({ { 'foo' } }, true, { id = 3 })
@@ -673,7 +696,7 @@ describe('messages2', function()
       {1:~                                                    }|*12
       bar                                                  |
     ]])
-    command('set cmdheight=0')
+    set_msg_target_zero_ch()
     feed([[:call confirm("foo\nbar")<C-A>]])
     screen:expect([[
                                                            |
