@@ -1418,15 +1418,32 @@ static String *get_leader_for_startcol(compl_T *match, bool cached)
     return NULL;
   }
 
-  if (cpt_sources_array == NULL || compl_leader.data == NULL) {
+  if (cpt_sources_array == NULL) {
     goto theend;
   }
 
   int cpt_idx = match->cp_cpt_source_idx;
-  if (cpt_idx < 0 || compl_col <= 0) {
+  if (cpt_idx < 0) {
     goto theend;
   }
   int startcol = cpt_sources_array[cpt_idx].cs_startcol;
+
+  if (compl_leader.data == NULL) {
+    // When leader is not set (e.g. 'autocomplete' first fires before
+    // compl_leader is initialised), fall back to compl_orig_text for
+    // matches starting at or after compl_col.  Matches starting before
+    // compl_col carry pre-compl_col text and must not be compared with
+    // compl_orig_text, so return &compl_leader (NULL string) to signal
+    // "pass through" (no prefix filter).
+    if (startcol < 0 || startcol >= compl_col) {
+      return &compl_orig_text;
+    }
+    return &compl_leader;  // pass through (startcol < compl_col)
+  }
+
+  if (compl_col <= 0) {
+    goto theend;
+  }
 
   if (startcol >= 0 && startcol < compl_col) {
     int prepend_len = compl_col - startcol;
@@ -3776,6 +3793,7 @@ static int process_next_cpt_value(ins_compl_next_state_T *st, int *compl_type_ar
     }
     if (!shortmess(SHM_COMPLETIONSCAN) && !compl_autocomplete) {
       msg_hist_off = true;  // reset in msg_trunc()
+      msg_ext_overwrite = true;
       msg_ext_set_kind("completion");
       vim_snprintf(IObuff, IOSIZE, _("Scanning: %s"),
                    st->ins_buf->b_fname == NULL
@@ -3818,6 +3836,7 @@ static int process_next_cpt_value(ins_compl_next_state_T *st, int *compl_type_ar
         if (!shortmess(SHM_COMPLETIONSCAN) && !compl_autocomplete) {
           msg_ext_set_kind("completion");
           msg_hist_off = true;  // reset in msg_trunc()
+          msg_ext_overwrite = true;
           vim_snprintf(IObuff, IOSIZE, "%s", _("Scanning tags."));
           msg_trunc(IObuff, true, HLF_R);
         }
