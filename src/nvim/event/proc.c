@@ -391,9 +391,12 @@ static void flush_stream(Proc *proc, RStream *stream)
 
   // Read remaining data.
   while (!stream->s.closed && stream->num_bytes < max_bytes) {
-    // Remember number of bytes before polling
+    // Remember number of bytes before polling.
     size_t num_bytes = stream->num_bytes;
 
+    if (proc->type == kProcTypePty && !stream->did_eof) {
+      pty_proc_flush_master((PtyProc *)proc);
+    }
     // Poll for data and process the generated events.
     loop_poll_events(proc->loop, 0);
     if (stream->s.events) {
