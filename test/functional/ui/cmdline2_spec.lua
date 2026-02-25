@@ -244,24 +244,20 @@ describe('cmdline2', function()
     feed('call confirm("Ok?")<CR>')
     screen:try_resize(screen._width + 1, screen._height)
     screen:expect([[
-                                                            |
-      {1:~                                                     }|*8
+                                                            |*10
       {3:                                                      }|
                                                             |
       {6:Ok?}                                                   |
-                                                            |
       {6:[O]k: }^                                                |
     ]])
     -- And resizing the next event loop iteration also works.
     feed('k')
     screen:try_resize(screen._width, screen._height + 1)
     screen:expect([[
-                                                            |
-      {1:~                                                     }|*9
+                                                            |*11
       {3:                                                      }|
                                                             |
       {6:Ok?}                                                   |
-                                                            |
       {6:[O]k: }^                                                |
     ]])
   end)
