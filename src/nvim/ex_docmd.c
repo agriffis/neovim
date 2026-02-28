@@ -2341,12 +2341,7 @@ static char *do_one_cmd(char **cmdlinep, int flags, cstack_T *cstack, LineGetter
     // Also do this for ":read !cmd", ":write !cmd" and ":global".
     // Any others?
     for (char *s = ea.arg; *s; s++) {
-      // Remove one backslash before a newline, so that it's possible to
-      // pass a newline to the shell and also a newline that is preceded
-      // with a backslash.  This makes it impossible to end a shell
-      // command in a backslash, but that doesn't appear useful.
-      // Halving the number of backslashes is incompatible with previous
-      // versions.
+      // Remove one backslash before a newline.
       if (*s == '\\' && s[1] == '\n') {
         STRMOVE(s, s + 1);
       } else if (*s == '\n') {
@@ -4954,6 +4949,12 @@ static void ex_restart(exarg_T *eap)
       continue;  // Drop --embed/--headless: the client decides how to start+attach the server.
     } else if (strequal(arg, "-")) {
       continue;  // Drop stdin ("-") argument.
+    } else if (strequal(arg, "-s")) {
+      // Drop "-s <scriptfile>": skip the scriptfile arg too.
+      if (li->li_next != NULL) {
+        li = li->li_next;
+      }
+      continue;
     } else if (strequal(arg, "+:::")) {
       // The special placeholder "+:::" marks a previous :restart command.
       // Drop the `"+:::", "-c", "…"` triplet, to avoid "stacking" commands from previous :restart(s).
