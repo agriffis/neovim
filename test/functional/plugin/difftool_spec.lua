@@ -98,4 +98,52 @@ describe('nvim.difftool', function()
     local ok = pcall(fn.nvim_get_autocmds, { group = 'nvim.difftool.events' })
     eq(false, ok)
   end)
+
+  it('does not reset quickfix list when closing quickfix window', function()
+    command(('DiffTool %s %s'):format(testdir_left, testdir_right))
+    local qflist_before = fn.getqflist()
+    assert(#qflist_before > 0, 'quickfix list should not be empty')
+
+    -- Close the quickfix window
+    command('cclose')
+
+    -- Quickfix list should still be intact
+    local qflist_after = fn.getqflist()
+    eq(#qflist_before, #qflist_after)
+
+    -- Autocmds should still be active
+    local autocmds = fn.nvim_get_autocmds({ group = 'nvim.difftool.events' })
+    assert(#autocmds > 0, 'autocmds should still exist after closing quickfix window')
+  end)
+
+  it('opens difftool automatically when started with nvim -d', function()
+    -- Start Neovim with -d flag for directory diff
+    clear({
+      args = {
+        '--cmd',
+        'packadd nvim.difftool',
+        '-d',
+        testdir_left,
+        testdir_right,
+      },
+    })
+
+    -- Wait for difftool to open
+    n.poke_eventloop()
+
+    -- Verify we have 3 windows (left, right, and quickfix)
+    eq(3, #fn.getwininfo())
+
+    -- Verify quickfix list has the expected entries
+    local qflist = fn.getqflist()
+    local entries = {}
+    for _, item in ipairs(qflist) do
+      table.insert(entries, { text = item.text, rel = item.user_data and item.user_data.rel })
+    end
+    eq({
+      { text = 'M', rel = 'file1.txt' },
+      { text = 'D', rel = 'file2.txt' },
+      { text = 'A', rel = 'file3.txt' },
+    }, entries)
+  end)
 end)

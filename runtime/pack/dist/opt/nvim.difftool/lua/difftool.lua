@@ -3,16 +3,16 @@
 ---:DiffTool {left} {right}                                           *:DiffTool*
 ---Compares two directories or files side-by-side.
 ---Supports directory diffing, rename detection, and highlights changes
----in quickfix list.
+---in quickfix list. Replaces the built-in `nvim -d` diff mode with this interface.
 ---</pre>
 ---
 --- The plugin is not loaded by default; use `:packadd nvim.difftool` before invoking `:DiffTool`.
 ---
---- Example `git difftool -d` integration using `DiffTool` command:
+--- Example `git difftool -d` integration using `nvim -d` replacement:
 ---
 --- ```ini
 --- [difftool "nvim_difftool"]
----   cmd = nvim -c \"packadd nvim.difftool\" -c \"DiffTool $LOCAL $REMOTE\"
+---   cmd = nvim -c \"packadd nvim.difftool\" -d \"$LOCAL\" \"$REMOTE\"
 --- [diff]
 ---   tool = nvim_difftool
 --- ```
@@ -28,7 +28,6 @@ local layout = {
   group = nil,
   left_win = nil,
   right_win = nil,
-  qf_win = nil,
 }
 
 local util = require('vim._core.util')
@@ -42,7 +41,6 @@ local function cleanup_layout(with_qf)
   end
   layout.left_win = nil
   layout.right_win = nil
-  layout.qf_win = nil
 
   if with_qf then
     vim.fn.setqflist({})
@@ -55,9 +53,8 @@ end
 local function setup_layout(with_qf)
   local left_valid = layout.left_win and vim.api.nvim_win_is_valid(layout.left_win)
   local right_valid = layout.right_win and vim.api.nvim_win_is_valid(layout.right_win)
-  local qf_valid = layout.qf_win and vim.api.nvim_win_is_valid(layout.qf_win)
 
-  if left_valid and right_valid and (not with_qf or qf_valid) then
+  if left_valid and right_valid then
     return false
   end
 
@@ -68,9 +65,6 @@ local function setup_layout(with_qf)
 
   if with_qf then
     vim.cmd('botright copen')
-    layout.qf_win = vim.api.nvim_get_current_win()
-  else
-    layout.qf_win = nil
   end
   vim.api.nvim_set_current_win(layout.right_win)
 
@@ -89,20 +83,6 @@ local function setup_layout(with_qf)
       cleanup_layout(with_qf)
     end,
   })
-  if with_qf then
-    vim.api.nvim_create_autocmd('WinClosed', {
-      group = layout.group,
-      pattern = tostring(layout.qf_win),
-      callback = function()
-        -- For quickfix also close one of diff windows
-        if layout.left_win and vim.api.nvim_win_is_valid(layout.left_win) then
-          vim.api.nvim_win_close(layout.left_win, true)
-        end
-
-        cleanup_layout(with_qf)
-      end,
-    })
-  end
 end
 
 --- Diff two files
@@ -497,7 +477,7 @@ function M.open(left, right, opt)
 
       vim.w.lazyredraw = true
       vim.schedule(function()
-        diff_files(entry.user_data.left, entry.user_data.right, true)
+        diff_files(entry.user_data.left, entry.user_data.right)
         vim.w.lazyredraw = false
       end)
     end,
