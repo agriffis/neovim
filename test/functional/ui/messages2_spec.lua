@@ -129,7 +129,7 @@ describe('messages2', function()
     -- Switching tabpage closes expanded cmdline #37659.
     command('tabnew | echo "foo\nbar"')
     screen:expect([[
-      {24: + [No Name] }{5: }{100:2}{5: [No Name] }{2:                          }{24:X}|
+      {24: + [No Name] }{5: [No Name] }{2:                            }{24:X}|
       ^                                                     |
       {1:~                                                    }|*9
       {3:                                                     }|
@@ -170,7 +170,7 @@ describe('messages2', function()
     ]])
   end)
 
-  it('new buffer, window and options after closing a buffer', function()
+  it('new buffer, window and options after closing a buffer or switching tabpage', function()
     command('set nomodifiable | echom "foo" | messages')
     screen:expect([[
                                                            |
@@ -181,6 +181,15 @@ describe('messages2', function()
     ]])
     command('bdelete | messages')
     screen:expect_unchanged()
+    set_msg_target_zero_ch()
+    command('quit | echo "foo\nbar" | tabnew')
+    screen:expect([[
+      {24: [No Name] }{5: [No Name] }{2:                              }{24:X}|
+      ^                                                     |
+      {1:~                                                    }|*10
+      {1:~                                                 }{4:foo}|
+      {1:~                                                 }{4:bar}|
+    ]])
   end)
 
   it('screenclear and empty message clears messages', function()
@@ -325,11 +334,31 @@ describe('messages2', function()
     ]])
     command('echo "foo\nbar"')
     screen:expect_unchanged()
+    -- Place cmdline and subsequent message below expanded cmdline instead: #37653.
     feed(':')
+    n.poke_eventloop()
+    feed('echo "baz"')
+    n.poke_eventloop()
+    feed('<CR>')
     screen:expect([[
-                                                           |
+      ^                                                     |
+      {1:~                                                    }|*8
+      {3:                                                     }|
+      foo                                                  |
+      bar                                                  |
+      {16::}{15:echo} {26:"baz"}                                          |
+      baz                                                  |
+    ]])
+    -- No message closes expanded cmdline.
+    feed(':')
+    n.poke_eventloop()
+    feed('call setline(1, "foo")')
+    n.poke_eventloop()
+    feed('<CR>')
+    screen:expect([[
+      ^foo                                                  |
       {1:~                                                    }|*12
-      {16::}^                                                    |
+      {16::}{15:call} {25:setline}{16:(}{26:1}{16:,} {26:"foo"}{16:)}                              |
     ]])
   end)
 
