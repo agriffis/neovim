@@ -1638,6 +1638,34 @@ stack traceback:
       },
     })
   end)
+
+  it('trigger', function()
+    command('echo "foo"')
+    screen:expect({
+      grid = [[
+        ^                         |
+        {1:~                        }|*4
+      ]],
+      messages = { { content = { { 'foo' } }, kind = 'echo', trigger = '' } },
+    })
+    command('map Q :echo "foo"<CR>')
+    feed('Q')
+    screen:expect({
+      grid = [[
+        ^                         |
+        {1:~                        }|*4
+      ]],
+      messages = { { content = { { 'foo' } }, kind = 'echo', trigger = '' } },
+    })
+    feed(':echo "foo"<CR>')
+    screen:expect({
+      grid = [[
+        ^                         |
+        {1:~                        }|*4
+      ]],
+      messages = { { content = { { 'foo' } }, kind = 'echo', trigger = 'typed_cmd' } },
+    })
+  end)
 end)
 
 describe('ui/builtin messages', function()
@@ -2479,7 +2507,7 @@ describe('ui/msg_puts_printf', function()
       ^Exモードに入ります。ノー |
       マルモードに戻るには "vis|
       ual" と入力してください。|
-      :                        |
+      [Process exited 0]       |
                                |
     ]])
   end)
