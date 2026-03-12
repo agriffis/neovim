@@ -9,6 +9,7 @@ local neq = t.neq
 local exec_lua = n.exec_lua
 local feed = n.feed
 local retry = t.retry
+local Screen = require('test.functional.ui.screen')
 
 local create_server_definition = t_lsp.create_server_definition
 
@@ -751,7 +752,7 @@ describe('vim.lsp.completion: item conversion', function()
     eq('foobar', result.items[1].user_data.nvim.lsp.completion_item.textEdit.newText)
   end)
 
-  it('shows snippet source in doc popup if completeopt include popup', function()
+  it('shows snippet source in doc popup if completeopt=popup', function()
     exec_lua([[
       vim.opt.completeopt:append('popup')
       vim.bo.filetype = 'lua'
@@ -1000,6 +1001,9 @@ describe('vim.lsp.completion: protocol', function()
         },
       },
     }
+    exec_lua(function()
+      vim.o.completeopt = 'menuone,noselect'
+    end)
     local client_id = create_server('dummy', completion_list)
 
     exec_lua(function()
@@ -1038,6 +1042,9 @@ describe('vim.lsp.completion: protocol', function()
       isIncomplete = false,
       items = { { label = 'hello' } },
     }
+    exec_lua(function()
+      vim.o.completeopt = 'menuone,noselect'
+    end)
     local client_id = create_server('dummy', completion_list, {
       resolve_result = {
         label = 'hello',
@@ -1353,6 +1360,103 @@ describe('vim.lsp.completion: integration', function()
     wait_for_pum()
     feed('<C-y>')
     eq('w-1/2', n.api.nvim_get_current_line())
+  end)
+
+  it('selecting an item triggers completionItem/resolve + preview', function()
+    local screen = Screen.new(50, 20)
+    screen:add_extra_attr_ids({
+      [100] = { background = Screen.colors.Plum1, foreground = Screen.colors.Blue },
+    })
+    local completion_list = {
+      isIncomplete = false,
+      items = {
+        {
+          insertText = 'nvim__id_array',
+          insertTextFormat = 1,
+          kind = 3,
+          label = 'nvim__id_array(arr)',
+          sortText = '0002',
+        },
+      },
+    }
+    exec_lua(function()
+      vim.o.completeopt = 'menuone,popup'
+    end)
+    create_server('dummy', completion_list, {
+      resolve_result = {
+        detail = 'function',
+        documentation = {
+          kind = 'markdown',
+          value = [[```lua\nfunction vim.api.nvim__id_array(arr: any[])\n  -> any[]\n```]],
+        },
+        insertText = 'nvim__id_array',
+        insertTextFormat = 1,
+        kind = 3,
+        label = 'nvim__id_array(arr)',
+        sortText = '0002',
+      },
+    })
+
+    feed('Sapi.<C-X><C-O>')
+    retry(nil, nil, function()
+      eq(
+        { true, true, [[```lua\nfunction vim.api.nvim__id_array(arr: any[])\n  -> any[]\n```]] },
+        exec_lua(function()
+          local data = vim.fn.complete_info({ 'selected' })
+          return {
+            vim.api.nvim_win_is_valid(data.preview_winid),
+            vim.api.nvim_buf_is_valid(data.preview_bufnr),
+            vim.api.nvim_buf_get_lines(data.preview_bufnr, 0, -1, false)[1],
+          }
+        end)
+      )
+    end)
+    screen:expect([[
+      api.nvim__id_array^                                |
+      {1:~  }{12: nvim__id_array Function }{100:lua\nfunction vim.}{4:   }{1: }|
+      {1:~                           }{100:api.nvim__id_array(ar}{1: }|
+      {1:~                           }{100:r: any[])\n  -> any[]}{1: }|
+      {1:~                           }{100:\n}{4:                   }{1: }|
+      {1:~                                                 }|*14
+      {5:-- INSERT --}                                      |
+    ]])
+  end)
+
+  it('omnifunc works without enable() #38252', function()
+    local completion_list = {
+      isIncomplete = false,
+      items = {
+        { label = 'hello' },
+        { label = 'hallo' },
+      },
+    }
+    exec_lua(function()
+      local server = _G._create_server({
+        capabilities = {
+          completionProvider = {
+            triggerCharacters = { '.' },
+          },
+        },
+        handlers = {
+          ['textDocument/completion'] = function(_, _, callback)
+            callback(nil, completion_list)
+          end,
+        },
+      })
+      local bufnr = vim.api.nvim_get_current_buf()
+      local id = vim.lsp.start({
+        name = 'dummy',
+        cmd = server.cmd,
+      })
+      if id then
+        vim.lsp.buf_attach_client(bufnr, id)
+        vim.bo[bufnr].omnifunc = 'v:lua.vim.lsp.omnifunc'
+      end
+    end)
+    feed('ih<C-x><C-o>')
+    wait_for_pum()
+    feed('<C-y>')
+    eq('hallo', n.api.nvim_get_current_line())
   end)
 end)
 
