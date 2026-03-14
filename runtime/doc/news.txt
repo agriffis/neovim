@@ -31,6 +31,11 @@ LSP
 • |vim.lsp.buf.selection_range()| now accepts an integer which specifies its
   direction, rather than a string `'outer'` or `'inner'`.
 
+DIAGNOSTICS
+
+• |vim.diagnostic.Opts.Status|.text was removed in favour of
+  |vim.diagnostic.Opts.Status|.format.
+
 OPTIONS
 
 • `'completefuzzycollect'` and `'isexpand'` have been removed.
@@ -484,7 +489,8 @@ REMOVED FEATURES                                                 *news-removed*
 
 These deprecated features were removed.
 
-• todo
+• |vim.treesitter.get_parser()| instead of throwing an error
+  `get_parser()` now always returns nil when it fails to create a parser.
 
 ==============================================================================
 DEPRECATIONS                                                *news-deprecations*

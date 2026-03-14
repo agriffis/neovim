@@ -86,8 +86,8 @@ local function get_error_entry(err, node)
   local start_line, start_col = node:range()
   local line_offset, col_offset, msg = err:gmatch('.-:%d+: Query error at (%d+):(%d+)%. ([^:]+)')() ---@type string, string, string
   start_line, start_col =
-    start_line + vim._ensure_integer(line_offset) - 1,
-    start_col + vim._ensure_integer(col_offset) - 1
+    start_line + vim._assert_integer(line_offset) - 1,
+    start_col + vim._assert_integer(col_offset) - 1
   local end_line, end_col = start_line, start_col
   if msg:match('^Invalid syntax') or msg:match('^Impossible') then
     -- Use the length of the underlined node
@@ -180,7 +180,7 @@ function M.lint(buf, opts)
       is_first_lang = i == 1,
     }
 
-    local parser = assert(vim.treesitter.get_parser(buf, nil, { error = false }))
+    local parser = assert(vim.treesitter.get_parser(buf, nil))
     parser:parse()
     parser:for_each_tree(function(tree, ltree)
       if ltree:lang() == 'query' then
