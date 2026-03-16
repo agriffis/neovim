@@ -680,7 +680,9 @@ void terminal_close(Terminal **termpp, int status)
     // only need to call the close callback to clean up the terminal object.
     only_destroy = true;
     // Buffer may be reused so delete the "[Process exited]" msg
-    extmark_del_id(buf, (uint32_t)-1, term->exitmsg_id);
+    if (buf) {
+      extmark_del_id(buf, (uint32_t)-1, term->exitmsg_id);
+    }
   } else {
     // flush any pending changes to the buffer
     if (!exiting) {
@@ -943,12 +945,18 @@ bool terminal_enter(void)
   // Don't fire TextChangedT from changes in Normal mode.
   curbuf->b_last_changedtick_i = buf_get_changedtick(curbuf);
 
+  // Don't let autocommands free the terminal now!
+  s->term->refcount++;
   apply_autocmds(EVENT_TERMENTER, NULL, NULL, false, curbuf);
   may_trigger_modechanged();
-
-  s->state.execute = terminal_execute;
-  s->state.check = terminal_check;
-  state_enter(&s->state);
+  s->term->refcount--;
+  if (s->term->buf_handle == 0) {
+    s->close = true;  // skip entering and close
+  } else {
+    s->state.execute = terminal_execute;
+    s->state.check = terminal_check;
+    state_enter(&s->state);
+  }
 
   if (!s->got_bsl_o) {
     restart_edit = 0;
