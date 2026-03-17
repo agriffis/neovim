@@ -1673,6 +1673,17 @@ function vim.api.nvim_load_context(dict) end
 --- @return any
 function vim.api.nvim_notify(msg, log_level, opts) end
 
+--- Opens a new tabpage.
+---
+--- @param buffer integer Buffer to open in the first window of the new tabpage.
+--- Use 0 for current buffer.
+--- @param enter boolean Enter the tabpage (make it the current tabpage).
+--- @param config vim.api.keyset.tabpage_config Configuration for the new tabpage. Keys:
+--- - after: Position to insert tabpage (default: -1; after current).
+---          0 = first, N = after Nth.
+--- @return integer # Tabpage handle of the created tabpage
+function vim.api.nvim_open_tabpage(buffer, enter, config) end
+
 --- Open a terminal instance in a buffer
 ---
 --- By default (and currently the only option) the terminal will not be
@@ -2496,6 +2507,8 @@ function vim.api.nvim_win_set_buf(window, buffer) end
 --- Reconfigures the layout and properties of a window.
 ---
 --- - Updates only the given keys; unspecified (`nil`) keys will not be changed.
+--- - Can move a window to another tabpage.
+--- - Can transform a window to/from a float.
 --- - Keys `row` / `col` / `relative` must be specified together.
 --- - Cannot move the last window in a tabpage to a different one.
 ---
@@ -2511,7 +2524,7 @@ function vim.api.nvim_win_set_buf(window, buffer) end
 --- @param config vim.api.keyset.win_config Map defining the window configuration, see [nvim_open_win()]
 function vim.api.nvim_win_set_config(window, config) end
 
---- Sets the (1,0)-indexed cursor position in the window. `api-indexing`
+--- Sets the (1,0)-indexed cursor position (byte offset) in the window. `api-indexing`
 --- This scrolls the window even if it is not the current one.
 ---
 --- @param window integer `window-ID`, or 0 for current window

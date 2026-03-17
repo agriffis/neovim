@@ -165,9 +165,10 @@ API
 • |nvim_echo()| can create |Progress| messages
 • |nvim_get_commands()| returns `preview` and `callback` as Lua functions if
   they were so specified in `nvim_create_user_command()`.
+• |nvim_open_tabpage()| can open a new |tab-page|.
 • |nvim_open_win()| floating windows can show a 'statusline'. Plugins can use
   `style='minimal'` or `:setlocal statusline=` to hide the statusline.
-• |nvim_win_set_config()| can move windows to other tab pages as floats.
+• |nvim_win_set_config()| can move |floating-windows| to other tabpages.
 • Added experimental |nvim__exec_lua_fast()| to allow remote API clients to
   execute code while nvim is blocking for input.
 • |vim.secure.trust()| accepts `path` for the `allow` action.
@@ -375,9 +376,11 @@ OPTIONS
 • |g:clipboard| accepts a string name to force any builtin clipboard tool.
 • 'busy' sets a buffer "busy" status. Indicated in the default statusline.
 • 'pumborder' adds a border to the popup menu.
-• |g:clipboard| autodetection only selects tmux when running inside tmux
+• |g:clipboard| autodetection only selects tmux when running inside tmux.
 • 'statusline' allows "stacking" highlight groups (groups inherit from
   previous highlight attributes)
+• 'messagesopt' added progress:c to control if progress messages are shown in
+  cmdline.
 
 PERFORMANCE
 
@@ -461,6 +464,7 @@ VIMSCRIPT
 • |chdir()| allows optionally specifying a scope argument.
 • |cmdcomplete_info()| gets current cmdline completion info.
 • |getcompletiontype()| gets command-line completion type for any string.
+• |has()| gained two new system dependent feature flags, |android| and |termux|.
 • |prompt_getinput()| gets current user-input in prompt-buffer.
 • |wildtrigger()| triggers command-line expansion.
 • |v:vim_did_init| is set after sourcing |init.vim| but before |load-plugins|.

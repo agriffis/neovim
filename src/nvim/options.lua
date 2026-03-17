@@ -5774,8 +5774,8 @@ local options = {
     {
       abbreviation = 'mopt',
       cb = 'did_set_messagesopt',
-      defaults = 'hit-enter,history:500',
-      values = { 'hit-enter', 'wait:', 'history:' },
+      defaults = 'hit-enter,history:500,progress:c',
+      values = { 'hit-enter', 'wait:', 'history:', 'progress:' },
       flags = true,
       deny_duplicates = true,
       desc = [=[
@@ -5797,6 +5797,11 @@ local options = {
         		|:messages| history.  The maximum value is 10000.
         		Setting it to zero clears the message history.
         		This item must always be present.
+        progress:{s}
+        		Determines where to show progress messages.
+        		Valid values are:
+        		    empty: progress messages are hidden in cmdline.
+        		    "c": progress messages are shown in cmdline.
       ]=],
       full_name = 'messagesopt',
       list = 'onecommacolon',
@@ -9677,10 +9682,11 @@ local options = {
       cb = 'did_set_title_icon',
       defaults = false,
       desc = [=[
-        When on, the title of the window will be set to the value of
-        'titlestring' (if it is not empty), or to:
+        If enabled, Nvim will update the (GUI or terminal) window title. The
+        format is configured by 'titlestring'. By default it looks like: >
         	filename [+=-] (path) - Nvim
-        Where:
+        <
+        where: >
         	filename	the name of the file being edited
         	-		indicates the file cannot be modified, 'ma' off
         	+		indicates the file was modified
@@ -9688,6 +9694,7 @@ local options = {
         	=+		indicates the file is read-only and modified
         	(path)		is the path of the file being edited
         	- Nvim		the server name |v:servername| or "Nvim"
+        <
       ]=],
       full_name = 'title',
       scope = { 'global' },
@@ -9735,31 +9742,31 @@ local options = {
       cb = 'did_set_titlestring',
       defaults = '',
       desc = [=[
-        When this option is not empty, it will be used for the title of the
-        window.  This happens only when the 'title' option is on.
+        Formats the window title, enabled by the 'title' option.
 
-        When this option contains printf-style '%' items, they will be
-        expanded according to the rules used for 'statusline'.  If it contains
-        an invalid '%' format, the value is used as-is and no error or warning
-        will be given when the value is set.
+        Contains printf-style "%" items, expanded according to the rules of
+        'statusline'.  If a "%" format is invalid, it is used as-is and no
+        error will be given.
 
-        The default behaviour is equivalent to: >vim
+        The default (empty) behaviour is equivalent to: >vim
             set titlestring=%t%(\ %M%)%(\ \(%{expand(\"%:~:h\")}\)%)%a\ -\ Nvim
         <
-        This option cannot be set in a modeline when 'modelineexpr' is off.
-
         Example: >vim
             auto BufEnter * let &titlestring = hostname() .. "/" .. expand("%:p")
             set title titlestring=%<%F%=%l/%L-%P titlelen=70
-        <	The value of 'titlelen' is used to align items in the middle or right
-        of the available space.
-        Some people prefer to have the file name first: >vim
+        <	The value of 'titlelen' is used to align items in the middle
+        or right of the available space.
+
+        Example: to have the file name first: >vim
             set titlestring=%t%(\ %M%)%(\ (%{expand(\"%:~:.:h\")})%)%(\ %a%)
-        <	Note the use of "%{ }" and an expression to get the path of the file,
-        without the file name.  The "%( %)" constructs are used to add a
+        <	Note the use of "%{ }" and an expression to get the path of
+        the file, without the file name.  The "%( %)" constructs add a
         separating space only when needed.
+
         NOTE: Use of special characters in 'titlestring' may cause the display
         to be garbled (e.g., when it contains a CR or NL character).
+
+        This option cannot be set in a modeline when 'modelineexpr' is off.
       ]=],
       full_name = 'titlestring',
       modelineexpr = true,
