@@ -366,6 +366,8 @@ OPTIONS
 • 'completeopt' flag "nearest" sorts completion results by distance to cursor.
 • 'diffanchors' specifies addresses to anchor a diff.
 • 'diffopt' `inline:` configures diff highlighting for changes within a line.
+• 'diffopt' with `inline:word` now automatically merges adjacent diff blocks
+  separated by gaps and punctuation by 5 bytes to improve readability.
 • 'fillchars' has new flag "foldinner".
 • 'fsync' and 'grepformat' are now |global-local| options.
 • 'listchars' has new flag "leadtab".
@@ -417,6 +419,8 @@ TERMINAL
 • |nvim_open_term()| can be called with a non-empty buffer. The buffer
   contents are piped to the PTY and displayed as terminal output.
 • CSI 3 J (the sequence to clear terminal scrollback) is now supported.
+• DEC private mode 2026 (synchronized output) is now supported. Applications
+  running in |:terminal| can batch screen updates to avoid tearing.
 • A suspended PTY process is now indicated by "[Process suspended]" at the
   bottom-left of the buffer and can be resumed by pressing a key.
 • On terminal exit, "[Process exited]" is shown as virtual text (instead of
