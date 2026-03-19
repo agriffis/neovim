@@ -1556,7 +1556,7 @@ static void deferred_event(void **argv)
 /// @param event event that occurred
 /// @param fname filename, NULL or empty means use actual file name
 /// @param fname_io filename to use for <afile> on cmdline
-/// @param force When true, ignore autocmd_busy
+/// @param force Ignore autocmd_busy (force "++nested" behavior)
 /// @param buf Buffer for <abuf>
 ///
 /// @return true if some commands were executed.
@@ -1571,7 +1571,7 @@ bool apply_autocmds(event_T event, char *fname, char *fname_io, bool force, buf_
 /// @param event event that occurred
 /// @param fname NULL or empty means use actual file name
 /// @param fname_io fname to use for <afile> on cmdline
-/// @param force When true, ignore autocmd_busy
+/// @param force Ignore autocmd_busy (force "++nested" behavior)
 /// @param buf Buffer for <abuf>
 /// @param exarg Ex command arguments
 ///
@@ -1590,7 +1590,7 @@ bool apply_autocmds_exarg(event_T event, char *fname, char *fname_io, bool force
 /// @param event event that occurred
 /// @param fname NULL or empty means use actual file name
 /// @param fname_io fname to use for <afile> on cmdline
-/// @param force When true, ignore autocmd_busy
+/// @param force Ignore autocmd_busy (force "++nested" behavior)
 /// @param buf Buffer for <abuf>
 /// @param[in,out] retval caller's retval
 ///
@@ -1643,7 +1643,7 @@ bool trigger_cursorhold(void) FUNC_ATTR_PURE FUNC_ATTR_WARN_UNUSED_RESULT
 /// @param fname filename, NULL or empty means use actual file name
 /// @param fname_io filename to use for <afile> on cmdline,
 ///                 NULL means use `fname`.
-/// @param force When true, ignore autocmd_busy
+/// @param force Ignore autocmd_busy (force "++nested" behavior)
 /// @param group autocmd group ID or AUGROUP_ALL
 /// @param buf Buffer for <abuf>
 /// @param eap Ex command arguments
@@ -2733,12 +2733,13 @@ void do_autocmd_focusgained(bool gained)
   recursive = false;
 }
 
-void do_filetype_autocmd(buf_T *buf, bool force)
+/// @return Whether any FileType autocommands were executed.
+bool do_filetype_autocmd(buf_T *buf, bool force)
 {
   static int ft_recursive = 0;
 
   if (ft_recursive > 0 && !force) {
-    return;  // disallow recursion
+    return false;  // disallow recursion
   }
 
   int secure_save = secure;
@@ -2751,8 +2752,10 @@ void do_filetype_autocmd(buf_T *buf, bool force)
   buf->b_did_filetype = true;
   // Only pass true for "force" when it is true or
   // used recursively, to avoid endless recurrence.
-  apply_autocmds(EVENT_FILETYPE, buf->b_p_ft, buf->b_fname, force || ft_recursive == 1, buf);
+  bool ret
+    = apply_autocmds(EVENT_FILETYPE, buf->b_p_ft, buf->b_fname, force || ft_recursive == 1, buf);
   ft_recursive--;
 
   secure = secure_save;
+  return ret;
 }
