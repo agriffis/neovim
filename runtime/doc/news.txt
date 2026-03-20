@@ -199,6 +199,7 @@ DEFAULTS
   Unset 'exrc' to stop further search.
 • Mappings:
   • |grt| in Normal mode maps to |vim.lsp.buf.type_definition()|
+  • |grx| in Normal mode maps to |vim.lsp.codelens.run()|
 • 'shada' default now excludes "/tmp/" and "/private/" paths to reduce clutter in |:oldfiles|.
 • Enabled treesitter highlighting for Markdown files
 
@@ -330,6 +331,7 @@ LSP
 • Support for `workspace/codeLens/refresh`:
   https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeLens_refresh
 • |gx| opens `textDocument/documentLink` items found at cursor.
+• |vim.lsp.get_configs()| can get all LSP configs matching certain conditions.
 
 LUA
 
