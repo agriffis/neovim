@@ -423,7 +423,11 @@ end
 
 --- Get LSP configs.
 ---
---- Note: Will eagerly evaluate config files in `'runtimepath'` if necessary.
+--- WARNING:
+--- - May eagerly (prematurely!) evaluate config files in 'runtimepath'.
+--- - Configs may be in a partial state if they have async properties such as `on_dir()`.
+---
+--- @since 14
 --- @param filter? vim.lsp.get_configs.Filter
 --- @return vim.lsp.Config[]: List of |vim.lsp.Config| objects
 function lsp.get_configs(filter)
@@ -585,7 +589,7 @@ end
 --- ```lua
 --- vim.lsp.config('lua_ls', {
 ---   root_dir = function(bufnr, on_dir)
----     if not vim.fn.bufname(bufnr):match('%.txt$') then
+---     if vim.fs.ext(vim.fn.bufname(bufnr)) ~= 'txt' then
 ---       on_dir(vim.fn.getcwd())
 ---     end
 ---   end
