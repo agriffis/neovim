@@ -139,7 +139,7 @@ To remove or override BUFFER-LOCAL defaults, define a |LspAttach| handler: >lua
         -- Unset 'omnifunc'
         vim.bo[ev.buf].omnifunc = nil
         -- Unmap K
-        vim.keymap.del('n', 'K', { buffer = ev.buf })
+        vim.keymap.del('n', 'K', { buf = ev.buf })
         -- Disable document colors
         vim.lsp.document_color.enable(false, { bufnr = ev.buf })
       end,
@@ -826,6 +826,14 @@ Lua module: vim.lsp                                                 *lsp-core*
                            if not found, find the first ancestor containing
                            ".git": >
                            root_markers = { { 'stylua.toml', '.luarc.json' }, '.git' }
+<
+      • {buftypes}?      (`string[]`) *lsp-buftypes* Buffer types the client
+                         will attach to, or `nil` for normal (empty `buftype`)
+                         buffers only (default `{ '' }`). Set this to restrict
+                         attachment to specific buffer types such as `help`: >lua
+                             vim.lsp.config('vimdoc_ls', {
+                               buftypes = { 'help' },
+                             })
 <
 
 

@@ -29,7 +29,7 @@ The purpose of this guide is to introduce the different ways of interacting
 with Nvim through Lua (the "API"). This API consists of three different
 layers:
 
-1. The "Vim API" inherited from Vim: |Ex-commands| and |vimscript-functions|
+1. The "Vim API" inherited from Vim: |Ex-command|s and |vimscript-functions|
    as well as |user-function|s in Vimscript. These are accessed through
    |vim.cmd()| and |vim.fn| respectively, which are discussed under
    |lua-guide-vimscript| below.
@@ -426,12 +426,12 @@ want to defer the loading to the time when the mapping is executed (as for
 The fourth, optional, argument is a table with keys that modify the behavior
 of the mapping such as those from |:map-arguments|. The following are the most
 useful options:
-• `buffer`: If given, only set the mapping for the buffer with the specified
+• `buf`: If given, only set the mapping for the buffer with the specified
   number; `0` or `true` means the current buffer. >lua
     -- set mapping for the current buffer
-    vim.keymap.set('n', '<Leader>pl1', require('plugin').action, { buffer = true })
+    vim.keymap.set('n', '<Leader>pl1', require('plugin').action, { buf = true })
     -- set mapping for the buffer number 4
-    vim.keymap.set('n', '<Leader>pl1', require('plugin').action, { buffer = 4 })
+    vim.keymap.set('n', '<Leader>pl1', require('plugin').action, { buf = 4 })
 <
 • `silent`: If set to `true`, suppress output such as error messages. >lua
     vim.keymap.set('n', '<Leader>pl1', require('plugin').action, { silent = true })
@@ -467,7 +467,7 @@ Removing mappings                                       *lua-guide-mappings-del*
 A specific mapping can be removed with |vim.keymap.del()|:
 >lua
     vim.keymap.del('n', '<Leader>ex1')
-    vim.keymap.del({'n', 'c'}, '<Leader>ex2', {buffer = true})
+    vim.keymap.del({'n', 'c'}, '<Leader>ex2', { buf = true })
 <
 See also:
 • `vim.api.`|nvim_get_keymap()|:     return all global mapping
@@ -532,7 +532,7 @@ For example, this allows you to set buffer-local mappings for some filetypes:
     vim.api.nvim_create_autocmd("FileType", {
       pattern = "lua",
       callback = function(ev)
-        vim.keymap.set('n', 'K', vim.lsp.buf.hover, { buffer = ev.buf })
+        vim.keymap.set('n', 'K', vim.lsp.buf.hover, { buf = ev.buf })
       end
     })
 <

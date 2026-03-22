@@ -17,7 +17,7 @@ get an idea of what lurks beneath: >vim
     :lua vim.print(package.loaded)
 
 Nvim includes a "standard library" |lua-stdlib| for Lua.  It complements the
-"editor stdlib" (|vimscript-functions| + |Ex-commands|) and the |API|, all of
+"editor stdlib" (|vimscript-functions| + |Ex-command|s) and the |API|, all of
 which can be used from Lua code (|lua-vimscript| |vim.api|). These three
 namespaces form the Nvim programming interface.
 
@@ -1231,7 +1231,7 @@ vim.wo[{winid}][{bufnr}]                                              *vim.wo*
 Lua module: vim                                                      *lua-vim*
 
 vim.cmd({command})                                                 *vim.cmd()*
-    Executes Vimscript (|Ex-commands|).
+    Executes Vimscript (|Ex-command|s).
 
     Can be indexed with a command name to get a function, thus you can write
     `vim.cmd.echo(…)` instead of `vim.cmd{cmd='echo',…}`.
@@ -3598,15 +3598,15 @@ vim.keymap.del({modes}, {lhs}, {opts})                      *vim.keymap.del()*
     Remove an existing mapping. Examples: >lua
         vim.keymap.del('n', 'lhs')
 
-        vim.keymap.del({'n', 'i', 'v'}, '<leader>w', { buffer = 5 })
+        vim.keymap.del({'n', 'i', 'v'}, '<leader>w', { buf = 5 })
 <
 
     Parameters: ~
       • {modes}  (`string|string[]`)
       • {lhs}    (`string`)
       • {opts}   (`table?`) A table with the following fields:
-                 • {buffer}? (`integer|boolean`) Remove a mapping from the
-                   given buffer. When `0` or `true`, use the current buffer.
+                 • {buf}? (`integer|boolean`) Remove a mapping from the given
+                   buffer. When `0` or `true`, use the current buffer.
 
     See also: ~
       • |vim.keymap.set()|
@@ -3618,7 +3618,7 @@ vim.keymap.set({modes}, {lhs}, {rhs}, {opts})               *vim.keymap.set()*
         -- Map "x" to a Lua function:
         vim.keymap.set('n', 'x', function() print('real lua function') end)
         -- Map "<leader>x" to multiple modes for the current buffer:
-        vim.keymap.set({'n', 'v'}, '<leader>x', vim.lsp.buf.references, { buffer = true })
+        vim.keymap.set({'n', 'v'}, '<leader>x', vim.lsp.buf.references, { buf = true })
         -- Map <Tab> to an expression (|:map-<expr>|):
         vim.keymap.set('i', '<Tab>', function()
           return vim.fn.pumvisible() == 1 and '<C-n>' or '<Tab>'
@@ -3652,7 +3652,7 @@ vim.keymap.set({modes}, {lhs}, {rhs}, {opts})               *vim.keymap.set()*
                    below).
 
                  Also accepts:
-                 • {buffer}? (`integer|boolean`) Creates buffer-local mapping,
+                 • {buf}? (`integer|boolean`) Creates buffer-local mapping,
                    `0` or `true` for current buffer.
                  • {remap}? (`boolean`, default: `false`) Make the mapping
                    recursive. Inverse of {noremap}.
@@ -5399,25 +5399,37 @@ To enable this feature (default opts shown): >lua
         ---@type string|table<string, 'cmd'|'msg'|'pager'> Default message target
         ---or table mapping |ui-messages| kinds and triggers to a target.
         targets = 'cmd',
-        timeout = 4000, -- Time a message is visible in the message window.
+        cmd = { -- Options related to messages in the cmdline window.
+          height = 0.5 -- Maximum height while expanded for messages beyond 'cmdheight'.
+        },
+        dialog = { -- Options related to dialog window.
+          height = 0.5, -- Maximum height.
+        },
+        msg = { -- Options related to msg window.
+          height = 0.5, -- Maximum height.
+          timeout = 4000, -- Time a message is visible in the message window.
+        },
+        pager = { -- Options related to message window.
+          height = 1, -- Maximum height.
+        },
       },
     })
 <
 
 There are four special windows/buffers for presenting messages and cmdline:
 • "cmd": Cmdline. Also used for 'showcmd', 'showmode', 'ruler', and messages
-  if 'cmdheight' > 0.
-• "msg": Message window, shows messages when 'cmdheight' == 0.
+  by default.
+• "msg": Message window, shows fleeting messages useful for 'cmdheight' == 0.
 • "pager": Pager window, shows |:messages| and certain messages that are never
   "collapsed".
 • "dialog": Dialog window, shows modal prompts that expect user input.
 
-The buffer 'filetype' is to the above-listed id ("cmd", "msg", …). Handle
-the |FileType| event to configure any local options for these windows and
-their respective buffers.
+The buffer 'filetype' is set to the above-listed id ("cmd", "msg", …).
+Handle the |FileType| event to configure any local options for these windows
+and their respective buffers.
 
-Unlike the legacy |hit-enter| prompt, messages that overflow the cmdline area
-are instead "collapsed", followed by a `[+x]` "spill" indicator, where `x`
+Unlike the legacy |hit-enter| prompt, messages exceeding 'cmdheight' are
+instead "collapsed", followed by a `[+x]` "spill" indicator, where `x`
 indicates the spilled lines. To see the full messages, do either:
 • ENTER immediately after a message from interactive |:| cmdline.
 • |g<| at any time.
