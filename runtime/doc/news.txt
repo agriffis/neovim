@@ -26,6 +26,11 @@ EXPERIMENTS
 
 • todo
 
+LUA
+
+• |vim.net.request()| does not set the response body to `true` if an output
+  buffer is supplied.
+
 LSP
 
 • |vim.lsp.buf.selection_range()| now accepts an integer which specifies its
@@ -124,6 +129,8 @@ OPTIONS
 PLUGINS
 
 • Removed "shellmenu" plugin, an old menu-based quasi-snippet plugin for shell scripts.
+• |tohtml| is now an "opt-in" plugin. Use |:packadd| to activate it: >
+  :packadd nvim.tohtml
 
 TREESITTER
 
@@ -134,6 +141,8 @@ TREESITTER
   `metadata[capture_id].offset`. The offset will be applied in
   |vim.treesitter.get_range()|, which should be preferred over reading
   metadata directly for retrieving node ranges.
+• The "all" option to |Query:iter_matches()|, which was introduced in Nvim
+  0.11 to aid in transitioning to the new behavior, has been removed.
 
 TUI
 
