@@ -965,10 +965,7 @@ vim.go.cb = vim.go.clipboard
 --- used.  The command-line will cover the last line of the screen when
 --- shown.
 ---
---- WARNING: `cmdheight=0` is EXPERIMENTAL. Expect some unwanted behaviour.
---- Some 'shortmess' flags and similar mechanism might fail to take effect,
---- causing unwanted hit-enter prompts.  Some informative messages, both
---- from Nvim itself and plugins, will not be displayed.
+--- WARNING: `cmdheight=0` is EXPERIMENTAL. Works better with `ui2` enabled.
 ---
 --- @type integer
 vim.o.cmdheight = 1
@@ -3807,7 +3804,6 @@ vim.go.js = vim.go.joinspaces
 --- 		the action occurred.
 ---
 ---   clean         Remove unloaded buffers from the jumplist.
---- 		EXPERIMENTAL: this flag may change in the future.
 ---
 --- @type string
 vim.o.jumpoptions = "clean"
@@ -6527,7 +6523,7 @@ vim.bo.spf = vim.bo.spellfile
 --- encoding is used, Vim doesn't check it.
 --- How the related spell files are found is explained here: `spell-load`.
 ---
---- If the `spellfile.lua` plugin is active and you use a language name
+--- If the `package-spellfile` plugin is active and you use a language name
 --- for which Vim cannot find the .spl file in 'runtimepath' the plugin
 --- will ask you if you want to download the file.
 ---
@@ -6994,7 +6990,7 @@ vim.wo.stc = vim.wo.statuscolumn
 ---
 ---
 --- @type string
-vim.o.statusline = "%<%f %h%w%m%r %{% v:lua.require('vim._core.util').term_exitcode() %}%=%{% luaeval('(package.loaded[''vim.ui''] and vim.ui.progress_status()) or '''' ')%}%{% &showcmdloc == 'statusline' ? '%-10.S ' : '' %}%{% exists('b:keymap_name') ? '<'..b:keymap_name..'> ' : '' %}%{% &busy > 0 ? '◐ ' : '' %}%{% luaeval('(package.loaded[''vim.diagnostic''] and next(vim.diagnostic.count()) and vim.diagnostic.status() .. '' '') or '''' ') %}%{% &ruler ? ( &rulerformat == '' ? '%-14.(%l,%c%V%) %P' : &rulerformat ) : '' %}"
+vim.o.statusline = "%<%f %h%w%m%r %{% v:lua.require('vim._core.util').term_exitcode() %}%=%{% luaeval('(package.loaded[''vim.ui''] and vim.api.nvim_get_current_win() == tonumber(vim.g.actual_curwin or -1) and vim.ui.progress_status()) or '''' ')%}%{% &showcmdloc == 'statusline' ? '%-10.S ' : '' %}%{% exists('b:keymap_name') ? '<'..b:keymap_name..'> ' : '' %}%{% &busy > 0 ? '◐ ' : '' %}%{% luaeval('(package.loaded[''vim.diagnostic''] and next(vim.diagnostic.count()) and vim.diagnostic.status() .. '' '') or '''' ') %}%{% &ruler ? ( &rulerformat == '' ? '%-14.(%l,%c%V%) %P' : &rulerformat ) : '' %}"
 vim.o.stl = vim.o.statusline
 vim.wo.statusline = vim.o.statusline
 vim.wo.stl = vim.wo.statusline
