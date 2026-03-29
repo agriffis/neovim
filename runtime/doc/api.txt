@@ -1573,6 +1573,8 @@ nvim_set_hl({ns_id}, {name}, {val})                            *nvim_set_hl()*
                    exists.
                  • link: Name of highlight group to link to. |:hi-link|
                  • sp: color name or "#RRGGBB"
+                 • update: boolean (default false) Update specified attributes
+                   only, leave others unchanged.
                  • altfont: boolean
                  • blink: boolean
                  • bold: boolean
@@ -1590,8 +1592,6 @@ nvim_set_hl({ns_id}, {name}, {val})                            *nvim_set_hl()*
                  • underdotted: boolean
                  • underdouble: boolean
                  • underline: boolean
-                 • update: boolean false by default; true updates only
-                   specified attributes, leaving others unchanged.
 
 nvim_set_hl_ns({ns_id})                                     *nvim_set_hl_ns()*
     Set active namespace for highlights defined with |nvim_set_hl()|. This can
@@ -1687,6 +1687,20 @@ nvim_strwidth({text})                                        *nvim_strwidth()*
 
     Return: ~
         (`integer`) Number of cells
+
+nvim__chan_set_detach({detach})                      *nvim__chan_set_detach()*
+    WARNING: This feature is experimental/unstable.
+
+    Sets the detach flag for the channel.
+
+    Detached channels do not trigger self-exit when they are closed.
+
+    Attributes: ~
+        |RPC| only
+        Since: 0.12.0
+
+    Parameters: ~
+      • {detach}  (`boolean`) New detach value for the channel.
 
 nvim__complete_set({index}, {opts})                     *nvim__complete_set()*
     WARNING: This feature is experimental/unstable.
