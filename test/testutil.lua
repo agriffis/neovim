@@ -393,10 +393,10 @@ end
 
 local architecture = uv.os_uname().machine
 
---- @param s 'x86_64'|'arm64'
+--- @param s 'x86_64'|'arm64'|'s390x'
 --- @return boolean
 function M.is_arch(s)
-  if not (s == 'x86_64' or s == 'arm64') then
+  if not (s == 'x86_64' or s == 'arm64' or s == 's390x') then
     error('unknown architecture: ' .. tostring(s))
   end
   return s == architecture

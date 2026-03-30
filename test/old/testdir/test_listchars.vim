@@ -422,7 +422,7 @@ func Test_listchars()
 
   " Test leadtab with pipe character
   normal ggdG
-  set listchars=tab:>-,leadtab:\|\ 
+  let &listchars = 'tab:>-,leadtab:| '
   call append(0, ["\ttext"])
   let expected = ['|       text']
   call Check_listchars(expected, 1, 12)
@@ -430,7 +430,7 @@ func Test_listchars()
 
   " Test leadtab with unicode bar
   normal ggdG
-  set listchars=tab:>-,leadtab:│\ 
+  let &listchars = 'tab:>-,leadtab:│ '
   call append(0, ["\ttext"])
   let expected = ['│       text']
   call Check_listchars(expected, 1, 12)

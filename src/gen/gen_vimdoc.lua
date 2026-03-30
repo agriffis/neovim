@@ -807,7 +807,7 @@ local function render_fun(fun, classes, cfg)
 
   if internal or fun.since then
     local since = assert(tonumber(fun.since or (internal and 0)), 'invalid @since on ' .. fun.name)
-    local nvim_api = nvim_api_info()
+    local nvim_api = false and nvim_api_info()
     _ = nvim_api -- Disable prerelease "WARNING" doc, in preparation for for upcoming release.
 
     if

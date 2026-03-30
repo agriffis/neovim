@@ -102,6 +102,10 @@ local function init_test_repo(repo_name)
   repos_src[repo_name] = 'file://' .. path
 
   git_cmd({ 'init' }, repo_name)
+  if t.is_arch('s390x') then
+    -- Ensure default branch is 'main' even if git is too old for `init.defaultBranch`.
+    git_cmd({ 'symbolic-ref', 'HEAD', 'refs/heads/main' }, repo_name)
+  end
 end
 
 local function git_add_commit(msg, repo_name)

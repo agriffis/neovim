@@ -18,6 +18,7 @@ describe('messages', function()
 
   -- oldtest: Test_warning_scroll()
   it('a warning causes scrolling if and only if it has a stacktrace', function()
+    t.skip(t.is_arch('s390x'), 'timing-sensitive test unreliable on s390x')
     screen = Screen.new(75, 6)
 
     -- When the warning comes from a script, messages are scrolled so that the

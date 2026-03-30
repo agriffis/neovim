@@ -242,6 +242,14 @@ func CheckNotValgrind()
   endif
 endfunc
 
+" Command to check for not running on s390x (too slow for some timing tests)
+command CheckNotS390 call CheckNotS390()
+func CheckNotS390()
+  if has('unix') && trim(system('uname -m')) == 's390x'
+    throw 'Skipped: does not work well on s390x'
+  endif
+endfunc
+
 " Command to check for X11 based GUI
 command CheckX11BasedGui call CheckX11BasedGui()
 func CheckX11BasedGui()

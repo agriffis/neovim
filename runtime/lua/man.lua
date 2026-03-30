@@ -471,6 +471,9 @@ local function format_candidate(path, psect)
     return ''
   end
   local name, sect = parse_path(path)
+  if not name or not sect then
+    return ''
+  end
   if sect == psect then
     return name
   elseif sect:match(psect .. '.+$') then -- invalid extensions
@@ -642,11 +645,13 @@ function M.goto_tag(pattern, _, _)
 
   for _, path in ipairs(paths) do
     local pname, psect = parse_path(path)
-    ret[#ret + 1] = {
-      name = pname,
-      filename = ('man://%s(%s)'):format(pname, psect),
-      cmd = '1',
-    }
+    if pname and psect then
+      ret[#ret + 1] = {
+        name = pname,
+        filename = ('man://%s(%s)'):format(pname, psect),
+        cmd = '1',
+      }
+    end
   end
 
   return ret
@@ -745,6 +750,9 @@ function M.open_page(count, smods, args)
   end
 
   name, sect = parse_path(path)
+  if not name or not sect then
+    return 'no manual entry for ' .. (name or path)
+  end
   local buf = api.nvim_get_current_buf()
   local save_tfu = vim.bo[buf].tagfunc
   vim.bo[buf].tagfunc = "v:lua.require'man'.goto_tag"

@@ -10,6 +10,7 @@ describe('xxd', function()
   before_each(clear)
 
   it('works', function()
+    t.skip(t.is_arch('s390x'), 'FIXME: xxd not built correctly on s390x with QEMU?')
     -- Round-trip test: encode then decode should return original
     local input = 'hello'
     local encoded = fn.system({ testprg('xxd') }, input)

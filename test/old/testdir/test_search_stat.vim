@@ -493,6 +493,8 @@ endfunc
 func Test_search_stat_option()
   " Asan causes wrong results, because the search times out
   CheckNotAsan
+  " s390x is too slow, search times out
+  CheckNotS390
   " Mark the test as flaky as the search may still occasionally time out
   let g:test_is_flaky = 1
 

@@ -5494,6 +5494,7 @@ describe('LSP', function()
 
     it('connects to lsp server via rpc.connect using hostname', function()
       skip(is_os('bsd'), 'issue with host resolution in ci')
+      skip(t.is_arch('s390x'), 'issue with host resolution in ci')
       exec_lua(create_tcp_echo_server)
       exec_lua(function()
         local port = _G._create_tcp_server('::1')
@@ -6017,6 +6018,7 @@ describe('LSP', function()
               not is_ci() and fn.executable('inotifywait') == 0,
               'inotify-tools not installed and not on CI'
             )
+            skip(t.is_arch('s390x'), 'inotifywait not available on s390x CI')
           end
 
           if watchfunc == 'watch' then
