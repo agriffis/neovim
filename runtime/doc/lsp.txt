@@ -816,7 +816,7 @@ Lua module: vim.lsp                                                 *lsp-core*
                              })
                              vim.lsp.config('…', {
                                filetypes = { 'my_filetype1', 'my_filetype2' },
-                             }
+                             })
 <
       • {reuse_client}?  (`fun(client: vim.lsp.Client, config: vim.lsp.ClientConfig): boolean`)
                          Predicate which decides if a client should be
@@ -1329,10 +1329,10 @@ the current buffer.
 *vim.lsp.ListOpts*
 
     Fields: ~
-      • {on_list}?  (`fun(t: vim.lsp.LocationOpts.OnList)`) list-handler
-                    replacing the default handler. Called for any non-empty
-                    result. This table can be used with |setqflist()| or
-                    |setloclist()|. E.g.: >lua
+      • {on_list}?  (`fun(t: vim.lsp.ListOpts.OnList)`) list-handler replacing
+                    the default handler. Called for any non-empty result. This
+                    table can be used with |setqflist()| or |setloclist()|.
+                    E.g.: >lua
                         local function on_list(options)
                           vim.fn.setqflist({}, ' ', options)
                           vim.cmd.cfirst()
@@ -1347,15 +1347,7 @@ the current buffer.
                         vim.lsp.buf.references(nil, { loclist = false })
 <
 
-*vim.lsp.LocationOpts*
-    Extends: |vim.lsp.ListOpts|
-
-
-    Fields: ~
-      • {reuse_win}?  (`boolean`) Jump to existing window if buffer is already
-                      open.
-
-*vim.lsp.LocationOpts.OnList*
+*vim.lsp.ListOpts.OnList*
 
     Fields: ~
       • {items}     (`vim.quickfix.entry[]`) See |setqflist-what|
@@ -1429,13 +1421,13 @@ declaration({opts})                                *vim.lsp.buf.declaration()*
         |vim.lsp.buf.definition()| instead.
 
     Parameters: ~
-      • {opts}  (`vim.lsp.LocationOpts?`) See |vim.lsp.LocationOpts|.
+      • {opts}  (`vim.lsp.ListOpts?`) See |vim.lsp.ListOpts|.
 
 definition({opts})                                  *vim.lsp.buf.definition()*
     Jumps to the definition of the symbol under the cursor.
 
     Parameters: ~
-      • {opts}  (`vim.lsp.LocationOpts?`) See |vim.lsp.LocationOpts|.
+      • {opts}  (`vim.lsp.ListOpts?`) See |vim.lsp.ListOpts|.
 
 document_highlight()                        *vim.lsp.buf.document_highlight()*
     Send request to the server to resolve document highlights for the current
@@ -1521,7 +1513,7 @@ implementation({opts})                          *vim.lsp.buf.implementation()*
     quickfix window.
 
     Parameters: ~
-      • {opts}  (`vim.lsp.LocationOpts?`) See |vim.lsp.LocationOpts|.
+      • {opts}  (`vim.lsp.ListOpts?`) See |vim.lsp.ListOpts|.
 
 incoming_calls()                                *vim.lsp.buf.incoming_calls()*
     Lists all the call sites of the symbol under the cursor in the |quickfix|
@@ -1598,7 +1590,7 @@ type_definition({opts})                        *vim.lsp.buf.type_definition()*
     Jumps to the definition of the type of the symbol under the cursor.
 
     Parameters: ~
-      • {opts}  (`vim.lsp.LocationOpts?`) See |vim.lsp.LocationOpts|.
+      • {opts}  (`vim.lsp.ListOpts?`) See |vim.lsp.ListOpts|.
 
 typehierarchy({kind})                            *vim.lsp.buf.typehierarchy()*
     Lists all the subtypes or supertypes of the symbol under the cursor in the
@@ -1760,7 +1752,7 @@ Lua module: vim.lsp.client                                        *lsp-client*
       • {cmd_env}?             (`table`) Environment variables passed to the
                                LSP process on spawn. Non-string values are
                                coerced to string. Example: >lua
-                                   { PORT = 8080; HOST = '0.0.0.0'; }
+                                   { PORT = 8080, HOST = '0.0.0.0' }
 <
       • {commands}?            (`table<string,fun(command: lsp.Command, ctx: table)>`)
                                Map of client-defined commands overriding the
