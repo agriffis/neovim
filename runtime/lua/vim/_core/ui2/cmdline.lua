@@ -96,7 +96,7 @@ function M.cmdline_show(content, pos, firstc, prompt, indent, level, hl_id)
   if M.level == 0 and ui.msg.cmd_on_key then
     M.expand, M.dialog, ui.msg.cmd_on_key = 1, true, nil
     api.nvim_win_set_config(ui.wins.cmd, { border = 'none' })
-    ui.msg.expand_msg('cmd')
+    ui.msg.expand_msg('cmd', 'dialog')
   elseif ui.msg.cmd.msg_row ~= -1 and M.expand == 0 then
     ui.msg.msg_clear()
   end
@@ -121,23 +121,22 @@ function M.cmdline_special_char(c, shift)
   end)
 end
 
-local curpos = { 0, 0 } -- Last drawn cursor position.
 --- Set the cmdline cursor position.
 ---
 ---@param pos integer
 --@param level integer
 function M.cmdline_pos(pos)
+  local curpos = api.nvim_win_get_cursor(ui.wins.cmd)
   pos = #fn.strtrans(cmdbuff:sub(1, pos))
   if curpos[1] ~= M.erow + 1 or curpos[2] ~= promptlen + pos then
-    curpos[1], curpos[2] = M.erow + 1, promptlen + pos
     -- Add matchparen highlighting to non-prompt part of cmdline.
     if pos > 0 and fn.exists('#matchparen#CursorMoved') == 1 then
-      api.nvim_win_set_cursor(ui.wins.cmd, { curpos[1], curpos[2] - 1 })
+      api.nvim_win_set_cursor(ui.wins.cmd, { M.erow + 1, promptlen + pos - 1 })
       vim._with({ win = ui.wins.cmd, wo = { eventignorewin = '' } }, function()
         api.nvim_exec_autocmds('CursorMoved', {})
       end)
     end
-    api.nvim_win_set_cursor(ui.wins.cmd, curpos)
+    api.nvim_win_set_cursor(ui.wins.cmd, { M.erow + 1, promptlen + pos })
   end
 end
 
@@ -176,7 +175,7 @@ function M.cmdline_hide(level, abort)
     end
   end)
 
-  M.prompt, M.level, curpos[1], curpos[2] = false, 0, 0, 0
+  M.prompt, M.level = false, 0
   win_config(ui.wins.cmd, true, ui.cmdheight)
 end
 

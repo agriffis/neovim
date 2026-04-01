@@ -113,6 +113,8 @@ local wanted_termkeys = {
   { 'select', false },
   { 'suspend', true },
   { 'undo', true },
+  { 'left', true },
+  { 'right', true },
 }
 
 local db = '/tmp/nvim_terminfo'
@@ -123,8 +125,7 @@ if vim.uv.fs_stat(db) == nil then
   end
   sys('curl -O ' .. url)
   sys('gunzip -f terminfo.src.gz')
-  sys(('cat terminfo.src | tic -x -o "%s" -'):format(db))
-  sys(('cat scripts/windows.ti | tic -x -o "%s" -'):format(db))
+  sys(('cat terminfo.src scripts/windows.ti | tic -x -o "%s" -'):format(db))
   sys('rm -f terminfo.src')
 else
   print('using cached terminfo in ' .. db)

@@ -32,7 +32,9 @@ runtime/doc/os_risc.txt
 runtime/doc/os_unix.txt
 runtime/doc/os_vms.txt
 runtime/doc/pi_logipat.txt
+runtime/doc/print.txt
 runtime/doc/quotes.txt
+runtime/doc/test_urls.vim
 runtime/doc/testing.txt
 runtime/doc/todo.txt
 runtime/doc/usr_52.txt
