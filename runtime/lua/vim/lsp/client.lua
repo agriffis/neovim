@@ -30,6 +30,16 @@ local all_clients = {}
 --- Callback which can modify parameters before they are sent to the server. Invoked before LSP
 --- "initialize" phase (after `cmd` is invoked), where `params` is the parameters being sent to the
 --- server and `config` is the config passed to |vim.lsp.start()|.
+---
+--- Hint: use |vim.tbl_deep_extend()| to set nested fields easily.
+--- ```lua
+--- before_init = function(_, config)
+---   config.settings = vim.tbl_deep_extend('force',
+---     config.settings,
+---     { tailwindCSS = { experimental = { configFile = find_tailwind_global_css() } } }
+---   )
+--- end
+--- ```
 --- @field before_init? fun(params: lsp.InitializeParams, config: vim.lsp.ClientConfig)
 ---
 --- Map overriding the default capabilities defined by |vim.lsp.protocol.make_client_capabilities()|,
@@ -45,7 +55,7 @@ local all_clients = {}
 --- a table with member functions `request`, `notify`, `is_closing` and `terminate`.
 --- See |vim.lsp.rpc.request()|, |vim.lsp.rpc.notify()|.
 --- For TCP there is a builtin RPC client factory: |vim.lsp.rpc.connect()|
---- @field cmd string[]|fun(dispatchers: vim.lsp.rpc.Dispatchers, config: vim.lsp.ClientConfig): vim.lsp.rpc.PublicClient
+--- @field cmd string[]|fun(dispatchers: vim.lsp.rpc.Dispatchers, config: vim.lsp.ClientConfig): vim.lsp.rpc.Client
 ---
 --- Directory to launch the `cmd` process. Not related to `root_dir`.
 --- (default: cwd)
@@ -199,7 +209,7 @@ local all_clients = {}
 ---
 --- RPC client object, for low level interaction with the client.
 --- See |vim.lsp.rpc.start()|.
---- @field rpc vim.lsp.rpc.PublicClient
+--- @field rpc vim.lsp.rpc.Client
 ---
 --- Response from the server sent on `initialize` describing the server's capabilities.
 --- @field server_capabilities lsp.ServerCapabilities?
