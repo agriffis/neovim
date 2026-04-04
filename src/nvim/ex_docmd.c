@@ -8197,6 +8197,11 @@ static void ex_terminal(exarg_T *eap)
 {
   char ex_cmd[1024];
   size_t len = 0;
+  const int scroll_save = msg_scroll;
+
+  msg_scroll = false;         // don't scroll here
+  autowrite_all();
+  msg_scroll = scroll_save;
 
   if (cmdmod.cmod_tab > 0 || cmdmod.cmod_split != 0) {
     bool multi_mods = false;
