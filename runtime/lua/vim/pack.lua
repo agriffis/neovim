@@ -253,14 +253,15 @@ local function git_cmd(cmd, cwd)
   return (stdout:gsub('\n+$', ''))
 end
 
-local git_version = vim.version.parse('1')
+--- @type vim.Version
+local git_version
 
 local function git_ensure_exec()
   local ok, sys = pcall(vim.system, { 'git', 'version' })
   if not ok then
     error('No `git` executable')
   end
-  git_version = vim.version.parse(sys:wait().stdout)
+  git_version = vim.version.parse(sys:wait().stdout) --[[@as vim.Version]]
 end
 
 --- @async
@@ -499,8 +500,16 @@ local function new_progress_report(action)
   end)
 end
 
-local n_threads = 2 * #(uv.cpu_info() or { {} })
 local copcall = package.loaded.jit and pcall or require('coxpcall').pcall
+
+local function async_join_run_wait(funs)
+  local n_threads = 2 * (uv.available_parallelism() or 1)
+  --- @async
+  local function joined_f()
+    async.join(n_threads, funs)
+  end
+  async.run(joined_f):wait()
+end
 
 --- Execute function in parallel for each non-errored plugin in the list
 --- @param plug_list vim.pack.Plug[]
@@ -536,13 +545,7 @@ local function run_list(plug_list, f, progress_action)
 
   -- Run async in parallel but wait for all to finish/timeout
   report_progress('begin', 0, '(0/%d)', #funs)
-
-  --- @async
-  local function joined_f()
-    async.join(n_threads, funs)
-  end
-  async.run(joined_f):wait()
-
+  async_join_run_wait(funs)
   report_progress('end', 100, '(%d/%d)', #funs, #funs)
 end
 
@@ -913,6 +916,7 @@ local function lock_sync(confirm, specs)
     table.sort(to_install, function(a, b)
       return a.spec.name < b.spec.name
     end)
+    git_ensure_exec()
     install_list(to_install, confirm)
     lock_write()
   end
@@ -1407,11 +1411,7 @@ local function add_p_data_info(p_data_list)
       p_data.tags = git_get_tags(path)
     end
   end
-  --- @async
-  local function joined_f()
-    async.join(n_threads, funs)
-  end
-  async.run(joined_f):wait()
+  async_join_run_wait(funs)
 end
 
 --- Gets |vim.pack| plugin info, optionally filtered by `names`.
@@ -1468,6 +1468,7 @@ function M.get(names, opts)
   end
 
   if opts.info then
+    git_ensure_exec()
     add_p_data_info(res)
   end
 
