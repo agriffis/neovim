@@ -17,7 +17,9 @@ These changes may require adaptations in your config or plugins.
 
 API
 
-• todo
+• |nvim_create_autocmd()|, |nvim_exec_autocmds()| and |nvim_clear_autocmds()|
+  no longer treat an empty non-nil pattern as nil.
+• |nvim_clear_autocmds()| no longer treats an empty array event as nil.
 
 DIAGNOSTICS
 
@@ -37,7 +39,7 @@ LSP
 
 LUA
 
-• todo
+• Added `__eq` metamethod to |vim.VersionRange|.
 
 OPTIONS
 
@@ -98,6 +100,9 @@ LUA
 
 • |vim.filetype.inspect()| returns a copy of the internal tables used for
   filetype detection.
+• Added `__eq` metamethod to |vim.VersionRange|. 2 distinct but representing
+the same range instances now compare equal.
+
 
 OPTIONS
 
@@ -142,6 +147,12 @@ CHANGED FEATURES                                                 *news-changed*
 These existing features changed their behavior.
 
 • |:Open| with no arguments uses the current file.
+• The "buffer" key was renamed to "buf" in these functions (but the old name
+  "buffer" is still accepted, for backwards compatibility):
+  • |nvim_clear_autocmds()|
+  • |nvim_create_autocmd()|
+  • |nvim_exec_autocmds()|
+  • |nvim_get_autocmds()|
 
 ==============================================================================
 REMOVED FEATURES                                                 *news-removed*
