@@ -20,6 +20,7 @@ API
 • |nvim_create_autocmd()|, |nvim_exec_autocmds()| and |nvim_clear_autocmds()|
   no longer treat an empty non-nil pattern as nil.
 • |nvim_clear_autocmds()| no longer treats an empty array event as nil.
+• `stdpath("log")` moved to `stdpath("state")/logs`.
 
 DIAGNOSTICS
 
@@ -63,6 +64,9 @@ API
 • |vim.lsp.buf.declaration()|, |vim.lsp.buf.definition()|, |vim.lsp.buf.definition()|,
   and |vim.lsp.buf.implementation()| now follows 'switchbuf'.
 
+• |vim.net.request()| opts field now accepts a headers table, with custom
+header support.
+
 BUILD
 
 • todo
@@ -77,7 +81,7 @@ DIAGNOSTICS
 
 EDITOR
 
-• todo
+• |:log| for opening log files
 
 EVENTS
 
@@ -94,7 +98,7 @@ LSP
     https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_codeLens
   • `textDocument/bar` …
     https://microsoft.github.io/language-server-protocol/specification/#textDocument_colorPresentation
-• todo
+• Support for nested snippets.
 
 LUA
 

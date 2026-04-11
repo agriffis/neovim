@@ -20,15 +20,14 @@ else
 endif
 
 # Tests using runtest.vim.
-NEW_TESTS_ALOT := test_alot_utf8 test_alot test_alot_latin
-NEW_TESTS_IN_ALOT := $(shell sed -n '/^source/ s/^source //; s/\.vim$$//p' $(addsuffix .vim,$(NEW_TESTS_ALOT)))
+NEW_TESTS_IN_ALOT := $(shell sed -n '/^source/ s/^source //; s/\.vim$$//p' test_alot.vim))
 # Ignored tests.
 # test_largefile: uses too much resources to run on CI.
 NEW_TESTS_IGNORE := \
   test_largefile \
 
 NEW_TESTS := $(sort $(basename $(notdir $(wildcard test_*.vim))))
-NEW_TESTS_RES := $(addsuffix .res,$(filter-out $(NEW_TESTS_ALOT) $(NEW_TESTS_IN_ALOT) $(NEW_TESTS_IGNORE),$(NEW_TESTS)) $(NEW_TESTS_ALOT))
+NEW_TESTS_RES := $(addsuffix .res,$(filter-out test_alot $(NEW_TESTS_IN_ALOT) $(NEW_TESTS_IGNORE),$(NEW_TESTS)) test_alot)
 
 
 ifdef VALGRIND_GDB

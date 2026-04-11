@@ -14,6 +14,11 @@ local M = {}
 ---
 ---Buffer to save the response body to.
 ---@field outbuf? integer
+---
+---Table of custom headers to send with the request.
+---Supports basic key/value header formats and empty headers as supported by curl.
+---Does not support @filename style, internal header deletion (e.g: 'Header:').
+---@field headers? table<string, string>
 
 ---@class vim.net.request.Response
 ---
@@ -47,6 +52,11 @@ local M = {}
 ---   outbuf = 0,
 --- })
 --- job:close()
+---
+--- -- Add custom headers in the request
+--- vim.net.request('https://neovim.io/charter/', {
+---   headers = { Authorization = 'Bearer XYZ' },
+--- })
 --- ```
 ---
 --- @param url string The URL for the request.
@@ -74,6 +84,25 @@ function M.request(url, opts, on_response)
 
   if opts.outpath then
     vim.list_extend(args, { '--output', opts.outpath })
+  end
+
+  if opts.headers then
+    vim.validate('opts.headers', opts.headers, 'table', true)
+    for key, value in pairs(opts.headers) do
+      if type(key) ~= 'string' or type(value) ~= 'string' then
+        error('headers keys and values must be strings')
+      end
+
+      if key:match(':$') or key:match(';$') or key:match('^@') then
+        error('header keys must not start with @ or end with : and ;')
+      end
+
+      if value == '' then
+        vim.list_extend(args, { '-H', key .. ';' })
+      else
+        vim.list_extend(args, { '-H', key .. ': ' .. value })
+      end
+    end
   end
 
   table.insert(args, url)
