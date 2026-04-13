@@ -334,6 +334,29 @@ describe('API: set highlight', function()
     eq(nil, hl.underdouble)
     eq(true, hl.bold)
   end)
+
+  it('can set font', function()
+    local ns = api.nvim_create_namespace('test_font')
+    api.nvim_set_hl(ns, 'TestFont', { fg = '#ff0000', font = 'Courier New 10' })
+    local hl = api.nvim_get_hl(ns, { name = 'TestFont' })
+    eq('Courier New 10', hl.font)
+    eq(16711680, hl.fg)
+
+    api.nvim_set_hl(ns, 'TestFont', { font = 'Monaco' })
+    hl = api.nvim_get_hl(ns, { name = 'TestFont' })
+    eq('Monaco', hl.font)
+
+    -- Clear font with "NONE"
+    api.nvim_set_hl(ns, 'TestFont', { font = 'NONE' })
+    hl = api.nvim_get_hl(ns, { name = 'TestFont' })
+    eq(nil, hl.font)
+
+    -- global namespace
+    api.nvim_set_hl(0, 'TestFontGlobal', { bg = '#00ff00', font = 'JetBrains Mono' })
+    hl = api.nvim_get_hl(0, { name = 'TestFontGlobal' })
+    eq('JetBrains Mono', hl.font)
+    eq(65280, hl.bg)
+  end)
 end)
 
 describe('API: get highlight', function()
@@ -608,6 +631,22 @@ describe('API: get highlight', function()
     local hl = { link = 'Bar', fg = tonumber('00ff00', 16), bold = true, cterm = { bold = true } }
     api.nvim_set_hl(0, 'Foo', hl)
     eq(hl, api.nvim_get_hl(0, { name = 'Foo', link = true }))
+  end)
+
+  it('link_global resolves in global namespace', function()
+    local ns = api.nvim_create_namespace('hl_test')
+    api.nvim_set_hl(0, 'GlTarget', { fg = '#ff0000' })
+    api.nvim_set_hl(ns, 'GlSource', { link_global = fn.hlID('GlTarget') })
+    eq({ link = 'GlTarget' }, api.nvim_get_hl(ns, { name = 'GlSource' }))
+
+    -- when both link and link_global are given, link_global wins
+    api.nvim_set_hl(0, 'OtherTarget', { fg = '#00ff00' })
+    api.nvim_set_hl(
+      ns,
+      'GlSource',
+      { link = fn.hlID('OtherTarget'), link_global = fn.hlID('GlTarget') }
+    )
+    eq({ link = 'GlTarget' }, api.nvim_get_hl(ns, { name = 'GlSource' }))
   end)
 
   it("doesn't contain unset groups", function()

@@ -20,13 +20,13 @@ local api = vim.api
 ---
 --- Example:
 --- ```lua
---- local pos1 = vim.pos(3, 5)
---- local pos2 = vim.pos(4, 0)
+--- local pos1 = vim.pos(vim.api.nvim_get_current_buf(), 3, 5)
+--- local pos2 = vim.pos(vim.api.nvim_get_current_buf(), 4, 0)
 ---
 --- -- Create a range from two positions.
 --- local range1 = vim.range(pos1, pos2)
 --- -- Or create a range from four integers representing start and end positions.
---- local range2 = vim.range(3, 5, 4, 0)
+--- local range2 = vim.range(vim.api.nvim_get_current_buf(), 3, 5, 4, 0)
 ---
 --- -- Because `vim.Range` is end exclusive, `range1` and `range2` both represent
 --- -- a range starting at the row 3, column 5 and ending at where the row 3 ends

@@ -18,8 +18,8 @@ local validate = vim.validate
 ---
 --- Example:
 --- ```lua
---- local pos1 = vim.pos(3, 5)
---- local pos2 = vim.pos(4, 0)
+--- local pos1 = vim.pos(vim.api.nvim_get_current_buf(), 3, 5)
+--- local pos2 = vim.pos(vim.api.nvim_get_current_buf(), 4, 0)
 ---
 --- -- Operators are overloaded for comparing two `vim.Pos` objects.
 --- if pos1 < pos2 then
@@ -127,7 +127,7 @@ end
 --- local pos = vim.pos(buf, 3, 5)
 ---
 --- -- Convert to LSP position, you can call it in a method style.
---- local lsp_pos = pos:lsp('utf-16')
+--- local lsp_pos = pos:to_lsp('utf-16')
 --- ```
 ---@param position_encoding lsp.PositionEncodingKind
 function Pos:to_lsp(position_encoding)

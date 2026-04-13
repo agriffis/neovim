@@ -604,7 +604,6 @@ function lsp.enable(name, enable)
   validate('name', name, { 'string', 'table' })
 
   local names = vim._ensure_list(name) --[[@as string[] ]]
-  local configs = {} --- @type table<string,{resolved_config:vim.lsp.Config?}>
 
   -- Check for errors, and abort with no side-effects if there is one.
   for _, nm in ipairs(names) do
@@ -615,13 +614,13 @@ function lsp.enable(name, enable)
     -- Raise error if `lsp.config[nm]` raises an error, instead of waiting for
     -- the error to be triggered by `lsp_enable_callback()`.
     if enable ~= false then
-      configs[nm] = { resolved_config = lsp.config[nm] }
+      _ = lsp.config[nm]
     end
   end
 
   -- Now that there can be no errors, enable/disable all names.
   for _, nm in ipairs(names) do
-    lsp._enabled_configs[nm] = enable ~= false and configs[nm] or nil
+    lsp._enabled_configs[nm] = enable ~= false and {} or nil
   end
 
   if not next(lsp._enabled_configs) then
@@ -883,42 +882,7 @@ end
 ---Buffer lifecycle handler for textDocument/didSave
 --- @param bufnr integer
 local function text_document_did_save_handler(bufnr)
-  bufnr = vim._resolve_bufnr(bufnr)
-  local uri = vim.uri_from_bufnr(bufnr)
-  local text = vim.func._memoize('concat', lsp._buf_get_full_text)
-  for _, client in ipairs(lsp.get_clients({ bufnr = bufnr })) do
-    local name = api.nvim_buf_get_name(bufnr)
-    local old_name = changetracking._get_and_set_name(client, bufnr, name)
-    if old_name and name ~= old_name then
-      client:notify('textDocument/didClose', {
-        textDocument = {
-          uri = vim.uri_from_fname(old_name),
-        },
-      })
-      client:notify('textDocument/didOpen', {
-        textDocument = {
-          version = 0,
-          uri = uri,
-          languageId = client.get_language_id(bufnr, vim.bo[bufnr].filetype),
-          text = lsp._buf_get_full_text(bufnr),
-        },
-      })
-      util.buf_versions[bufnr] = 0
-    end
-    local save_capability = vim.tbl_get(client.server_capabilities, 'textDocumentSync', 'save')
-    if save_capability then
-      local included_text --- @type string?
-      if type(save_capability) == 'table' and save_capability.includeText then
-        included_text = text(bufnr)
-      end
-      client:notify('textDocument/didSave', {
-        textDocument = {
-          uri = uri,
-        },
-        text = included_text,
-      })
-    end
-  end
+  changetracking._send_did_save(bufnr)
 end
 
 --- @type table<integer,true>

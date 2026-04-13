@@ -329,7 +329,7 @@ error('Cannot require a meta file')
 --- @field special? integer|string
 --- @field sp? integer|string
 --- @field link? integer|string
---- @field global_link? integer|string
+--- @field link_global? integer|string
 --- @field fallback? boolean
 --- @field blend? integer
 --- @field fg_indexed? boolean
@@ -337,6 +337,7 @@ error('Cannot require a meta file')
 --- @field force? boolean
 --- @field update? boolean
 --- @field url? string
+--- @field font? string
 
 --- @class vim.api.keyset.highlight_cterm
 --- @field bold? boolean

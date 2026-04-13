@@ -1191,7 +1191,7 @@ static void clear_region(TUIData *tui, int top, int bot, int left, int right, in
       cursor_goto(tui, row, left);
       if (tui->can_clear_attr && right == tui->width) {
         terminfo_out(tui, kTerm_clr_eol);
-      } else if (tui->can_erase_chars && tui->can_clear_attr && width >= 5) {
+      } else if (tui->can_erase_chars && tui->can_clear_attr) {
         terminfo_print_num1(tui, kTerm_erase_chars, width);
       } else {
         print_spaces(tui, width);

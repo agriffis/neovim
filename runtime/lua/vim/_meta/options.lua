@@ -3850,7 +3850,7 @@ vim.go.km = vim.go.keymodel
 ---   which is now deprecated.)
 --- - ":help!" performs `:help!` (DWIM) on the `WORD` at cursor.
 --- - If the value starts with ":", it is invoked as an Ex command
----   prefixed with [count].
+---   and [count] is passed as the first argument, if present.
 --- - If "man" or "man -s", [count] is the manpage section number.
 ---
 --- See `option-backslash` about including spaces and backslashes.
@@ -6757,8 +6757,8 @@ vim.wo.stc = vim.wo.statuscolumn
 --- ```
 ---
 --- All fields except {item} are optional.  Use "%%" to show a literal "%"
---- char.  Setting this option to empty (`:set statusline=`) sets its
---- value to the default.
+--- char.  Setting to empty (`:set statusline=`) sets the global value to
+--- the default.
 ---
 --- 						*stl-%!*
 --- When the option starts with "%!" then it is used as an expression,

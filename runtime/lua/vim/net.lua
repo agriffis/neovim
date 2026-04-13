@@ -15,9 +15,8 @@ local M = {}
 ---Buffer to save the response body to.
 ---@field outbuf? integer
 ---
----Table of custom headers to send with the request.
----Supports basic key/value header formats and empty headers as supported by curl.
----Does not support @filename style, internal header deletion (e.g: 'Header:').
+---Custom headers to send with the request. Supports basic key/value headers and empty headers as
+---supported by curl. Does not support "@filename" style, internal header deletion ("Header:").
 ---@field headers? table<string, string>
 
 ---@class vim.net.request.Response
@@ -30,12 +29,12 @@ local M = {}
 ---
 --- Examples:
 --- ```lua
---- -- Write response body to file
+--- -- Write response body to file.
 --- vim.net.request('https://neovim.io/charter/', {
 ---   outpath = 'vision.html',
 --- })
 ---
---- -- Process the response
+--- -- Process the response.
 --- vim.net.request(
 ---   'https://api.github.com/repos/neovim/neovim',
 ---   {},
@@ -46,14 +45,14 @@ local M = {}
 ---   end
 --- )
 ---
---- -- Write to both file and current buffer, but cancel it
+--- -- Write to both file and current buffer, but cancel it.
 --- local job = vim.net.request('https://neovim.io/charter/', {
 ---   outpath = 'vision.html',
 ---   outbuf = 0,
 --- })
 --- job:close()
 ---
---- -- Add custom headers in the request
+--- -- Add custom headers in the request.
 --- vim.net.request('https://neovim.io/charter/', {
 ---   headers = { Authorization = 'Bearer XYZ' },
 --- })
@@ -64,7 +63,7 @@ local M = {}
 --- @param on_response? fun(err: string?, response: vim.net.request.Response?)
 --- Callback invoked on request completion. The `body` field in the response
 --- parameter contains the raw response data (text or binary).
---- @return { close: fun() } # Table with method to cancel, similar to [vim.SystemObj].
+--- @return { close: fun() } # Object with `close()` method which cancels the request.
 function M.request(url, opts, on_response)
   vim.validate('url', url, 'string')
   vim.validate('opts', opts, 'table', true)
