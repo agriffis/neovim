@@ -15,7 +15,7 @@
 # include <tlhelp32.h>
 #endif
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 # include <string.h>
 # include <sys/types.h>
 # include <sys/user.h>

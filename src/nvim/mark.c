@@ -1810,7 +1810,7 @@ void set_last_cursor(win_T *win)
   }
 }
 
-#if defined(EXITFREE)
+#ifdef EXITFREE
 void free_all_marks(void)
 {
   int i;

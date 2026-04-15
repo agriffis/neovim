@@ -545,6 +545,9 @@ Dict nvim_parse_expression(String expr, String flags, Boolean highlight, Arena *
           .ret_node_p = &children_array.items[0],
         }));
       } else if (node->next != NULL) {
+        // ret_node_p + 1 is valid: we're in a children_array (root node never
+        // has "next"). kv_size > 1 confirms we're not at root.
+        assert(kv_size(ast_conv_stack) > 1);
         kvi_push(ast_conv_stack, ((ExprASTConvStackItem) {
           .node_p = &node->next,
           .ret_node_p = cur_item.ret_node_p + 1,

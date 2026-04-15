@@ -6,7 +6,7 @@
 # For more information, see http://appimage.org/
 ########################################################################
 
-# App arch, used by generate_appimage.
+# App arch
 if [ -z "$ARCH" ]; then
   ARCH="$(arch)"
   export ARCH
@@ -15,8 +15,8 @@ ARCH_OUTPUT=$ARCH
 
 TAG=$1
 
-# App name, used by generate_appimage.
-APP=nvim
+# App name
+APP=org.neovim.nvim
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 APP_BUILD_DIR="$ROOT_DIR/build"
@@ -54,7 +54,7 @@ chmod +x "$APP_BUILD_DIR"/linuxdeploy-"$ARCH".AppImage
 
 # metainfo is not packaged automatically by linuxdeploy
 mkdir -p "$APP_DIR/usr/share/metainfo/"
-cp "$ROOT_DIR/runtime/nvim.appdata.xml" "$APP_DIR/usr/share/metainfo/"
+cp "$ROOT_DIR/runtime/$APP.appdata.xml" "$APP_DIR/usr/share/metainfo/"
 
 cd "$APP_DIR" || exit
 
@@ -93,7 +93,7 @@ fi
 #   - Expects: $ARCH, $APP, $VERSION env vars
 #   - Expects: ./$APP.AppDir/ directory
 #   - Produces: ./nvim-linux-$ARCH_OUTPUT.appimage
-./linuxdeploy-"$ARCH".AppImage --appdir $APP.AppDir -d "$ROOT_DIR"/runtime/nvim.desktop -i \
+./linuxdeploy-"$ARCH".AppImage --appdir $APP.AppDir -d "$ROOT_DIR/runtime/$APP.desktop" -i \
 "$ROOT_DIR/runtime/nvim.png" --output appimage
 
 # Moving the final executable to a different folder so it isn't in the

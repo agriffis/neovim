@@ -7,7 +7,7 @@
     https://github.com/flathub/io.neovim.nvim
 -->
 <component type="desktop-application">
-  <id>io.neovim.nvim</id>
+  <id>org.neovim.nvim</id>
   <translation type="gettext">nvim</translation>
   <project_license>Apache-2.0</project_license>
   <metadata_license>CC0-1.0</metadata_license>
@@ -17,6 +17,10 @@
   <description>
     <p>Neovim is a refactor of the Vim text editor designed to encourage new features, advanced UIs, and powerful extensions.</p>
   </description>
+
+  <developer id="org.neovim">
+    <name>Neovim contributors</name>
+  </developer>
 
   <screenshots>
     <screenshot type="default">
@@ -71,7 +75,7 @@
   </releases>
 
   <content_rating type="oars-1.1"/>
-  <launchable type="desktop-id">nvim.desktop</launchable>
+  <launchable type="desktop-id">org.neovim.nvim.desktop</launchable>
   <url type="homepage">https://neovim.io/</url>
   <url type="bugtracker">https://github.com/neovim/neovim/issues</url>
   <url type="faq">https://neovim.io/doc/user/faq.html</url>

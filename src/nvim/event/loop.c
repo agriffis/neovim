@@ -131,7 +131,7 @@ void loop_on_put(MultiQueue *queue, void *data)
   }
 }
 
-#if !defined(EXITFREE)
+#ifndef EXITFREE
 static void loop_walk_cb(uv_handle_t *handle, void *arg)
 {
   if (!uv_is_closing(handle)) {
@@ -173,7 +173,7 @@ bool loop_close(Loop *loop, bool wait)
       log_uv_handles(&loop->uv);
       break;
     }
-#if defined(EXITFREE)
+#ifdef EXITFREE
     (void)didstop;
 #else
     if (!didstop) {

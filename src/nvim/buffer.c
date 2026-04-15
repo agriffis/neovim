@@ -1730,7 +1730,7 @@ static void enter_buffer(buf_T *buf)
   // Stop Visual mode before changing curbuf.  Assumes curbuf and curwin->w_buffer is valid; if not,
   // buf_freeall() should've done this already!
   if (VIsual_active
-#if defined(EXITFREE)
+#ifdef EXITFREE
       && !entered_free_all_mem
 #endif
       ) {
@@ -3177,7 +3177,7 @@ int buflist_add(char *fname, int flags)
   return 0;
 }
 
-#if defined(BACKSLASH_IN_FILENAME)
+#ifdef BACKSLASH_IN_FILENAME
 /// Adjust slashes in file names.  Called after 'shellslash' was set.
 void buflist_slash_adjust(void)
 {
@@ -3498,7 +3498,7 @@ void resettitle(void)
   ui_call_set_title(cstr_as_string(lasttitle));
 }
 
-#if defined(EXITFREE)
+#ifdef EXITFREE
 void free_titles(void)
 {
   xfree(lasttitle);

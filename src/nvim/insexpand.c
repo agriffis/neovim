@@ -2629,7 +2629,7 @@ static bool ins_compl_stop(const int c, const int prev_mode, bool retval)
       do_c_expr_indent();
       want_cindent = false;                 // don't do it again
     }
-  } else {
+  } else if (!compl_autocomplete || compl_used_match) {
     const int prev_col = curwin->w_cursor.col;
 
     // put the cursor on the last char, for 'tw' formatting
@@ -6400,7 +6400,7 @@ static unsigned quote_meta(char *dest, char *src, int len)
   return m;
 }
 
-#if defined(EXITFREE)
+#ifdef EXITFREE
 void free_insexpand_stuff(void)
 {
   API_CLEAR_STRING(compl_orig_text);

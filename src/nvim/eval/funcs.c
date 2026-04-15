@@ -158,7 +158,6 @@ PRAGMA_DIAG_PUSH_IGNORE_IMPLICIT_FALLTHROUGH
 PRAGMA_DIAG_POP
 PRAGMA_DIAG_POP
 
-static const char *e_invalwindow = N_("E957: Invalid window number");
 static const char e_invalid_submatch_number_nr[]
   = N_("E935: Invalid submatch number: %d");
 static const char e_string_list_or_blob_required[]
@@ -2711,7 +2710,7 @@ static void f_has(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     "find_in_path",
     "float",
     "folding",
-#if defined(UNIX)
+#ifdef UNIX
     "fork",
 #endif
     "gettext",
@@ -2757,7 +2756,7 @@ static void f_has(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     "statusline",
     "spell",
     "syntax",
-#if !defined(UNIX)
+#ifndef UNIX
     "system",
 #endif
     "tablineat",

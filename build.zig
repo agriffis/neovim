@@ -102,7 +102,10 @@ pub fn build(b: *std.Build) !void {
         }
     }
     if (!system_integration_options.uv) {
-        if (b.lazyDependency("libuv", .{ .target = target, .optimize = optimize })) |dep| {
+        // NOTE: libuv on Windows depends on Windows SDK when compiled with .Debug mode
+        // https://github.com/neovim/neovim/issues/36889
+        const optimize_uv = if (optimize == .Debug and target.result.os.tag == .windows) .ReleaseSafe else optimize;
+        if (b.lazyDependency("libuv", .{ .target = target, .optimize = optimize_uv })) |dep| {
             libuv = dep.artifact("uv");
             libluv = try build_lua.build_libluv(b, target, optimize, lua, libuv.?, use_luajit);
 

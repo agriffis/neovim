@@ -2085,7 +2085,7 @@ int vim_regsub_multi(regmmatch_T *rmp, linenr_T lnum, char *source, char *dest, 
 #define MAX_REGSUB_NESTING 4
 static char *eval_result[MAX_REGSUB_NESTING] = { NULL, NULL, NULL, NULL };
 
-#if defined(EXITFREE)
+#ifdef EXITFREE
 void free_resub_eval_result(void)
 {
   for (int i = 0; i < MAX_REGSUB_NESTING; i++) {
@@ -16117,7 +16117,7 @@ void vim_regfree(regprog_T *prog)
   }
 }
 
-#if defined(EXITFREE)
+#ifdef EXITFREE
 void free_regexp_stuff(void)
 {
   ga_clear(&regstack);

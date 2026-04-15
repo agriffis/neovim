@@ -1,3 +1,7 @@
+--- @meta
+-- This file is NOT generated, edit it directly.
+error('Cannot require a meta file')
+
 --- @class vim.fn.sign
 --- @field group string
 --- @field id integer
@@ -197,7 +201,7 @@
 --- @field priority? integer
 
 --- @class vim.fn.sign_placelist.list.item
---- @field buf integer|string
+--- @field buffer integer|string
 --- @field group? string
 --- @field id? integer
 --- @field lnum? integer|string
@@ -205,11 +209,11 @@
 --- @field priority? integer
 
 --- @class vim.fn.sign_unplace.dict
---- @field buf? integer|string
+--- @field buffer? integer|string
 --- @field id? integer
 
 --- @class vim.fn.sign_unplacelist.list.item
---- @field buf? integer|string
+--- @field buffer? integer|string
 --- @field group? string
 --- @field id? integer
 

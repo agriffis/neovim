@@ -12,7 +12,7 @@
 #     - CMakeLists.txt: Unset NVIM_VERSION_PRERELEASE
 #     - CMakeLists.txt: Unset NVIM_API_PRERELEASE
 #     - Create test/functional/fixtures/api_level_N.mpack
-#     - Add date and version to runtime/nvim.appdata.xml
+#     - Add date and version to runtime/org.neovim.nvim.appdata.xml
 #     - Tag the commit.
 #   Create the "version bump" commit:
 #     - CMakeLists.txt: Set NVIM_VERSION_PRERELEASE to "-dev"
@@ -64,8 +64,8 @@ _do_release_commit() {
   fi
 
   $__sed -i.bk 's,(<releases>),\1\
-    <release date="'"${__DATE}"'" version="'"${__VERSION}"'"/>,' runtime/nvim.appdata.xml
-  git add runtime/nvim.appdata.xml
+    <release date="'"${__DATE}"'" version="'"${__VERSION}"'"/>,' runtime/org.neovim.nvim.appdata.xml
+  git add runtime/org.neovim.nvim.appdata.xml
 
   if ! test "$ARG1" = '--use-current-commit' ; then
     echo "Building changelog since ${__LAST_TAG}..."
@@ -81,7 +81,7 @@ _do_bump_commit() {
   $__sed -i.bk 's/(NVIM_VERSION_PRERELEASE) ""/\1 "-dev"/' CMakeLists.txt
   $__sed -i.bk 's/set\((NVIM_VERSION_PATCH) [[:digit:]]/set(\1 ?/' CMakeLists.txt
   rm -f CMakeLists.txt.bk
-  rm -f runtime/nvim.appdata.xml.bk
+  rm -f runtime/org.neovim.nvim.appdata.xml.bk
   nvim +'/NVIM_VERSION' +1new +'exe "norm! iUpdate version numbers!!!"' \
     -O CMakeLists.txt
 

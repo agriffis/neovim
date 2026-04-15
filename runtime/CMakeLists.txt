@@ -105,7 +105,7 @@ install_helper(
 
 if(NOT APPLE)
   install_helper(
-    FILES ${CMAKE_CURRENT_SOURCE_DIR}/nvim.desktop
+    FILES ${CMAKE_CURRENT_SOURCE_DIR}/org.neovim.nvim.desktop
     DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications)
 endif()
 
