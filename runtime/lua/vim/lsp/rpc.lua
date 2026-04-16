@@ -149,8 +149,8 @@ end
 --- Dispatchers for LSP message types.
 --- @class vim.lsp.rpc.Dispatchers
 --- @inlinedoc
---- @field notification fun(method: vim.lsp.protocol.Method.ClientToServer.Notification, params: table)
---- @field server_request fun(method: vim.lsp.protocol.Method.ClientToServer.Request, params: table): any?, lsp.ResponseError?
+--- @field notification fun(method: vim.lsp.protocol.Method.ServerToClient, params: table)
+--- @field server_request fun(method: vim.lsp.protocol.Method.ServerToClient, params: table): any?, lsp.ResponseError?
 --- @field on_exit fun(code: integer, signal: integer)
 --- @field on_error fun(code: integer, err: any)
 
@@ -158,7 +158,7 @@ end
 local default_dispatchers = {
   --- Default dispatcher for notifications sent to an LSP server.
   ---
-  ---@param method vim.lsp.protocol.Method The invoked LSP method
+  ---@param method vim.lsp.protocol.Method.ServerToClient The invoked LSP method
   ---@param params table Parameters for the invoked LSP method
   notification = function(method, params)
     log.debug('notification', method, params)
@@ -166,7 +166,7 @@ local default_dispatchers = {
 
   --- Default dispatcher for requests sent to an LSP server.
   ---
-  ---@param method vim.lsp.protocol.Method The invoked LSP method
+  ---@param method vim.lsp.protocol.Method.ServerToClient The invoked LSP method
   ---@param params table Parameters for the invoked LSP method
   ---@return any result (always nil for the default dispatchers)
   ---@return lsp.ResponseError error `vim.lsp.protocol.ErrorCodes.MethodNotFound`
@@ -274,7 +274,7 @@ end
 
 ---@package
 --- Sends a notification to the LSP server.
----@param method vim.lsp.protocol.Method The invoked LSP method
+---@param method vim.lsp.protocol.Method.ClientToServer.Notification The invoked LSP method
 ---@param params any Parameters for the invoked LSP method
 ---@return boolean `true` if notification could be sent, `false` if not
 function Client:notify(method, params)
@@ -299,7 +299,7 @@ end
 ---@package
 --- Sends a request to the LSP server and runs {callback} upon response. |vim.lsp.rpc.request()|
 ---
----@param method vim.lsp.protocol.Method The invoked LSP method
+---@param method vim.lsp.protocol.Method.ClientToServer.Request The invoked LSP method
 ---@param params table? Parameters for the invoked LSP method
 ---@param callback fun(err?: lsp.ResponseError, result: any, message_id: integer) Callback to invoke
 ---@param notify_reply_callback? fun(message_id: integer) Callback to invoke as soon as a request is no longer pending
