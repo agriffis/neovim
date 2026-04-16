@@ -2353,7 +2353,7 @@ describe('vim.diagnostic', function()
         })
 
         vim.api.nvim_buf_set_lines(_G.diagnostic_bufnr, 2, 5, false, {})
-        vim.api.nvim_exec_autocmds('CursorMoved', { buffer = _G.diagnostic_bufnr })
+        vim.api.nvim_exec_autocmds('CursorMoved', { buf = _G.diagnostic_bufnr })
         return _G.get_virt_text_extmarks(_G.diagnostic_ns)
       end)
 
@@ -2878,7 +2878,7 @@ describe('vim.diagnostic', function()
       local result = exec_lua(function()
         local changed_diags --- @type vim.Diagnostic[]?
         vim.api.nvim_create_autocmd('DiagnosticChanged', {
-          buffer = _G.diagnostic_bufnr,
+          buf = _G.diagnostic_bufnr,
           callback = function(ev)
             --- @type vim.Diagnostic[]
             changed_diags = ev.data.diagnostics
@@ -3492,7 +3492,7 @@ describe('vim.diagnostic', function()
       )
 
       eq(
-        '.../diagnostic.lua:0: prefix: expected string|table|function, got number',
+        '.../_float.lua:0: prefix: expected string|table|function, got number',
         pcall_err(exec_lua, [[ vim.diagnostic.open_float({ prefix = 42 }) ]])
       )
     end)
@@ -3549,7 +3549,7 @@ describe('vim.diagnostic', function()
       )
 
       eq(
-        '.../diagnostic.lua:0: suffix: expected string|table|function, got number',
+        '.../_float.lua:0: suffix: expected string|table|function, got number',
         pcall_err(exec_lua, [[ vim.diagnostic.open_float({ suffix = 42 }) ]])
       )
     end)

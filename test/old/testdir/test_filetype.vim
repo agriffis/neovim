@@ -2839,6 +2839,16 @@ func Test_inc_file()
   call assert_equal('bitbake', &filetype)
   bwipe!
 
+  call writefile(['FOO_BAR[baz] = "foobar"'], 'Xfile.inc')
+  split Xfile.inc
+  call assert_equal('bitbake', &filetype)
+  bwipe!
+
+  call writefile(['FOO_BAR_foo/bar[baz/bazzer] = "foobar"'], 'Xfile.inc')
+  split Xfile.inc
+  call assert_equal('bitbake', &filetype)
+  bwipe!
+
   call writefile(['MACHINEOVERRIDES =. "qemuall:"'], 'Xfile.inc')
   split Xfile.inc
   call assert_equal('bitbake', &filetype)

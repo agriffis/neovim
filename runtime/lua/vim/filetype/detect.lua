@@ -936,7 +936,11 @@ function M.inc(path, bufnr)
     elseif findany(line, { '^%s{', '^%s%(%*' }) or matchregex(line, pascal_keywords) then
       return 'pascal'
     elseif
-      findany(line, { '^%s*inherit ', '^%s*require ', '^%s*%u[%w_:${}/]*%s+%??[?:+.]?=.? ' })
+      matchregex(line, [[\<\%(require\|inherit\)\>]])
+      or matchregex(
+        line,
+        [=[[A-Z][A-Za-z0-9_:${}/]*\(\[[A-Za-z0-9_:/]\+\]\)*\s\+\%(??\|[?:+.]\)\?=.\? ]=]
+      )
     then
       return 'bitbake'
     end

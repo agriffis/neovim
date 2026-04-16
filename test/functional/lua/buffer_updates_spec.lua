@@ -8,7 +8,6 @@ local api = n.api
 local fn = n.fn
 local clear = n.clear
 local eq = t.eq
-local fail = t.fail
 local exec_lua = n.exec_lua
 local feed = n.feed
 local expect_events = t.expect_events
@@ -507,7 +506,7 @@ describe('lua: nvim_buf_attach on_bytes', function()
       for _, event in ipairs(events) do
         for _, elem in ipairs(event) do
           if type(elem) == 'number' and elem < 0 then
-            fail(string.format('Received event has negative values'))
+            error('Received event has negative values')
           end
         end
 
@@ -1820,7 +1819,7 @@ describe('nvim_buf_attach on_detach', function()
       _G.events = {}
       vim.api.nvim_buf_attach(1, false, { on_detach = _G.on_detach })
       vim.api.nvim_create_autocmd('BufUnload', {
-        buffer = 1,
+        buf = 1,
         once = true,
         callback = function()
           vim.api.nvim_buf_attach(1, false, {
@@ -1893,7 +1892,7 @@ it('nvim_buf_attach from buf_freeall autocommands does not leak', function()
   exec_lua(function()
     local b = vim.api.nvim_create_buf(true, true)
     vim.api.nvim_create_autocmd('BufWipeout', {
-      buffer = b,
+      buf = b,
       once = true,
       callback = function()
         vim.api.nvim_buf_attach(b, false, {})

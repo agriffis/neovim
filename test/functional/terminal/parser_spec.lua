@@ -80,14 +80,14 @@ describe(':terminal', function()
 
     send_osc_with_terminator(BEL)
     --- @type string
-    assert.same(
+    assert.eq(
       { sequence = OSC_PREFIX .. '10;?', terminator = BEL },
       exec_lua([[return _G.osc10_response]])
     )
 
     send_osc_with_terminator(ST)
     --- @type string
-    assert.same(
+    assert.eq(
       { sequence = OSC_PREFIX .. '10;?', terminator = ST },
       exec_lua([[return _G.osc10_response]])
     )

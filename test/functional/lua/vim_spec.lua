@@ -834,6 +834,26 @@ describe('lua stdlib', function()
     )
   end)
 
+  it('vim._copy', function()
+    ok(exec_lua([[
+      local inner = { x = 1 }
+      local mt = { tag = true }
+      local a = setmetatable({ inner = inner }, mt)
+      local b = vim._copy(a)
+
+      local c = vim.empty_dict()
+      c.inner = inner
+      local d = vim._copy(c)
+
+      return b ~= a
+        and b.inner == inner
+        and getmetatable(b) == mt
+        and d ~= c
+        and d.inner == inner
+        and not vim.islist(d)
+    ]]))
+  end)
+
   it('vim.pesc', function()
     eq('foo%-bar', exec_lua([[return vim.pesc('foo-bar')]]))
     eq('foo%%%-bar', exec_lua([[return vim.pesc(vim.pesc('foo-bar'))]]))
@@ -1249,10 +1269,17 @@ describe('lua stdlib', function()
     eq(true, exec_lua [[ return vim.deep_equal({a={b=1}}, {a={b=1}}) ]])
     eq(true, exec_lua [[ return vim.deep_equal({a={b={nil}}}, {a={b={}}}) ]])
     eq(true, exec_lua [[ return vim.deep_equal({a=1, [5]=5}, {nil,nil,nil,nil,5,a=1}) ]])
+    eq(
+      true,
+      exec_lua [[ local shared = {}; return vim.deep_equal({ 1, shared, 1, shared }, { 1, {}, 1, {} }) ]]
+    )
+    -- cyclic table
+    eq(true, exec_lua [[ local a,b={},{}; a[1]=a; b[1]=b; return vim.deep_equal(a, b) ]])
     eq(false, exec_lua [[ return vim.deep_equal(1, {nil,nil,nil,nil,5,a=1}) ]])
     eq(false, exec_lua [[ return vim.deep_equal(1, 3) ]])
     eq(false, exec_lua [[ return vim.deep_equal(nil, 3) ]])
     eq(false, exec_lua [[ return vim.deep_equal({a=1}, {a=2}) ]])
+    eq(false, exec_lua [[ local a,b={},{}; a[1]=a; b[1]={}; return vim.deep_equal(a, b) ]])
   end)
 
   it('vim.list_extend', function()

@@ -199,7 +199,7 @@ describe('vim.net.request', function()
       return result
     ]])
 
-    assert.is_table(headers)
+    t.eq('table', type(headers), 'Expected headers to be a table')
     -- httpbingo.org/request returns each header as a list in the returned value
     t.eq(headers.Authorization[1], 'Bearer test-token', 'Expected Authorization header')
     t.eq(headers['X-Custom-Header'][1], 'custom-value', 'Expected X-Custom-Header')

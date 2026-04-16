@@ -86,7 +86,7 @@
 /// vim.api.nvim_open_win(0, false, { split = 'left', win = 0, })
 /// ```
 ///
-/// @param buffer Buffer to display, or 0 for current buffer
+/// @param buf Buffer to display, or 0 for current buffer
 /// @param enter  Enter the window (make it the current window)
 /// @param config Map defining the window configuration. Keys:
 ///   - anchor: Decides which corner of the float to place at (row,col):
@@ -202,14 +202,14 @@
 /// @param[out] err Error details, if any
 ///
 /// @return |window-ID|, or 0 on error
-Window nvim_open_win(Buffer buffer, Boolean enter, Dict(win_config) *config, Error *err)
+Window nvim_open_win(Buffer buf, Boolean enter, Dict(win_config) *config, Error *err)
   FUNC_API_SINCE(6) FUNC_API_TEXTLOCK_ALLOW_CMDWIN
 {
-  buf_T *buf = find_buffer_by_handle(buffer, err);
-  if (!buf) {
+  buf_T *b = find_buffer_by_handle(buf, err);
+  if (!b) {
     return 0;
   }
-  if ((cmdwin_type != 0 && enter) || buf == cmdwin_buf) {
+  if ((cmdwin_type != 0 && enter) || b == cmdwin_buf) {
     api_set_error(err, kErrorTypeException, "%s", e_cmdwin);
     return 0;
   }
@@ -305,7 +305,7 @@ Window nvim_open_win(Buffer buffer, Boolean enter, Dict(win_config) *config, Err
   // event. In each case, `wp` should already be valid in `tp`, so switch_win should not fail.
   // Also, autocommands may free the `buf` to switch to, so store a bufref to check.
   bufref_T bufref;
-  set_bufref(&bufref, buf);
+  set_bufref(&bufref, b);
   if (!fconfig.noautocmd) {
     switchwin_T switchwin;
     const int result = switch_win_noblock(&switchwin, wp, tp, true);
@@ -320,7 +320,7 @@ Window nvim_open_win(Buffer buffer, Boolean enter, Dict(win_config) *config, Err
     goto_tabpage_win(tp, wp);
     tp = win_find_tabpage(wp);
   }
-  if (tp && bufref_valid(&bufref) && buf != wp->w_buffer) {
+  if (tp && bufref_valid(&bufref) && b != wp->w_buffer) {
     // win_set_buf temporarily makes `wp` the curwin to set the buffer.
     // If not entering `wp`, block Enter and Leave events. (cringe)
     const bool au_no_enter_leave = curwin != wp && !fconfig.noautocmd;
@@ -328,7 +328,7 @@ Window nvim_open_win(Buffer buffer, Boolean enter, Dict(win_config) *config, Err
       autocmd_no_enter++;
       autocmd_no_leave++;
     }
-    win_set_buf(wp, buf, err);
+    win_set_buf(wp, b, err);
     if (!fconfig.noautocmd) {
       tp = win_find_tabpage(wp);
     }
@@ -753,50 +753,50 @@ restore_curwin:
 ///
 /// @see |nvim_open_win()|
 ///
-/// @param      window  |window-ID|, or 0 for current window
+/// @param      win  |window-ID|, or 0 for current window
 /// @param      config  Map defining the window configuration, see [nvim_open_win()]
 /// @param[out] err     Error details, if any
-void nvim_win_set_config(Window window, Dict(win_config) *config, Error *err)
+void nvim_win_set_config(Window win, Dict(win_config) *config, Error *err)
   FUNC_API_SINCE(6)
 {
-  win_T *win = find_window_by_handle(window, err);
-  if (!win) {
+  win_T *w = find_window_by_handle(win, err);
+  if (!w) {
     return;
   }
 
-  bool was_split = !win->w_floating;
+  bool was_split = !w->w_floating;
   bool has_split = HAS_KEY_X(config, split);
   bool has_vertical = HAS_KEY_X(config, vertical);
-  WinStyle old_style = win->w_config.style;
+  WinStyle old_style = w->w_config.style;
   // reuse old values, if not overridden
-  WinConfig fconfig = win->w_config;
+  WinConfig fconfig = w->w_config;
 
   bool to_split = config->relative.size == 0
                   && !(HAS_KEY_X(config, external) && config->external)
                   && (has_split || has_vertical || was_split);
 
-  if (!parse_win_config(win, config, &fconfig, !was_split || to_split, err)) {
+  if (!parse_win_config(w, config, &fconfig, !was_split || to_split, err)) {
     return;
   }
 
   if (to_split) {
-    if (!win_config_split(win, config, &fconfig, err)) {
+    if (!win_config_split(w, config, &fconfig, err)) {
       return;
     }
   } else {
-    if (!win_config_float_tp(win, config, &fconfig, err)) {
+    if (!win_config_float_tp(w, config, &fconfig, err)) {
       return;
     }
   }
 
   if (fconfig.style == kWinStyleMinimal && old_style != fconfig.style) {
-    win_set_minimal_style(win);
-    didset_window_options(win, true);
-    changed_window_setting(win);
+    win_set_minimal_style(w);
+    didset_window_options(w, true);
+    changed_window_setting(w);
   }
   if (fconfig._cmdline_offset < INT_MAX) {
-    cmdline_win = win;
-  } else if (win == cmdline_win && fconfig._cmdline_offset == INT_MAX) {
+    cmdline_win = w;
+  } else if (w == cmdline_win && fconfig._cmdline_offset == INT_MAX) {
     cmdline_win = NULL;
   }
 }
@@ -849,10 +849,10 @@ static void config_put_bordertext(Dict(win_config) *config, WinConfig *fconfig,
 ///
 /// For non-floating windows, `relative` is empty.
 ///
-/// @param      window |window-ID|, or 0 for current window
+/// @param      win |window-ID|, or 0 for current window
 /// @param[out] err Error details, if any
 /// @return     Map defining the window configuration, see |nvim_open_win()|
-Dict(win_config) nvim_win_get_config(Window window, Arena *arena, Error *err)
+Dict(win_config) nvim_win_get_config(Window win, Arena *arena, Error *err)
   FUNC_API_SINCE(6)
 {
   /// Keep in sync with FloatRelative in buffer_defs.h
@@ -868,7 +868,7 @@ Dict(win_config) nvim_win_get_config(Window window, Arena *arena, Error *err)
 
   Dict(win_config) rv = KEYDICT_INIT;
 
-  win_T *wp = find_window_by_handle(window, err);
+  win_T *wp = find_window_by_handle(win, err);
   if (!wp) {
     return rv;
   }
