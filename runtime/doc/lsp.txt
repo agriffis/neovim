@@ -1403,31 +1403,36 @@ the current buffer.
 *vim.lsp.ListOpts*
 
     Fields: ~
-      • {on_list}?  (`fun(t: vim.lsp.ListOpts.OnList)`) list-handler replacing
-                    the default handler. Called for any non-empty result. This
-                    table can be used with |setqflist()| or |setloclist()|.
-                    E.g.: >lua
-                        local function on_list(options)
-                          vim.fn.setqflist({}, ' ', options)
-                          vim.cmd.cfirst()
+      • {on_list}?  (`fun(what: vim.fn.setqflist.what)`) list-handler
+                    replacing the default handler. Called for any non-empty
+                    result. When `loclist == false` (the default), the default
+                    handler is as follows: >lua
+                        local function on_list(what)
+                          vim.fn.setqflist({}, ' ', what)
+                          if
+                            #what.items == 1
+                            and what.context.method ~= 'textDocument/implementation'
+                            and what.context.method ~= 'textDocument/references'
+                          then
+                            local tagstack = { { tagname = tagname, from = from } }
+                            vim.fn.settagstack(vim.fn.win_getid(win), { items = tagstack }, 't')
+                            vim.cmd('cfirst')
+                          else
+                            vim.cmd('botright copen')
+                          end
                         end
 
                         vim.lsp.buf.definition({ on_list = on_list })
                         vim.lsp.buf.references(nil, { on_list = on_list })
 <
+
+                    See |setqflist-what| for the structure of the `what`
+                    parameter.
       • {loclist}?  (`boolean`) Whether to use the |location-list| or the
                     |quickfix| list in the default handler. >lua
                         vim.lsp.buf.definition({ loclist = true })
                         vim.lsp.buf.references(nil, { loclist = false })
 <
-
-*vim.lsp.ListOpts.OnList*
-
-    Fields: ~
-      • {items}     (`vim.quickfix.entry[]`) See |setqflist-what|
-      • {title}?    (`string`) Title for the list.
-      • {context}?  (`{ bufnr: integer, method: string }`) Subset of `ctx`
-                    from |lsp-handler|.
 
 *vim.lsp.buf.hover.Opts*
     Extends: |vim.lsp.util.open_floating_preview.Opts|
@@ -1774,7 +1779,7 @@ Lua module: vim.lsp.client                                        *lsp-client*
                                 See |Client:stop()|.
       • {is_stopped}            (`fun(self: vim.lsp.Client): boolean`) See
                                 |Client:is_stopped()|.
-      • {exec_cmd}              (`fun(self: vim.lsp.Client, command: lsp.Command, context: {bufnr?: integer}?, handler: lsp.Handler?)`)
+      • {exec_cmd}              (`fun(self: vim.lsp.Client, cmd: lsp.Command, context: {bufnr?: integer}?, handler: lsp.Handler?)`)
                                 See |Client:exec_cmd()|.
       • {on_attach}             (`fun(self: vim.lsp.Client, bufnr: integer)`)
                                 See |Client:on_attach()|.
@@ -1946,12 +1951,12 @@ Client:cancel_request({id})                          *Client:cancel_request()*
     See also: ~
       • |Client:notify()|
 
-Client:exec_cmd({command}, {context}, {handler})           *Client:exec_cmd()*
+Client:exec_cmd({cmd}, {context}, {handler})               *Client:exec_cmd()*
     Execute a lsp command, either via client command function (if available)
     or via workspace/executeCommand (if supported by the server)
 
     Parameters: ~
-      • {command}  (`lsp.Command`)
+      • {cmd}      (`lsp.Command`)
       • {context}  (`{bufnr?: integer}?`)
       • {handler}  (`lsp.Handler?`) only called if a server command
 
