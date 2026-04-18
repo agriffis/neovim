@@ -252,10 +252,23 @@ describe('API: set highlight', function()
 
   it('does not segfault on invalid group name #20009', function()
     eq(
-      "Invalid highlight name: 'foo bar'",
+      'Vim:E5248: Invalid character in group name',
       pcall_err(api.nvim_set_hl, 0, 'foo bar', { bold = true })
     )
     assert_alive()
+  end)
+
+  it('can be silenced if there are too many groups #38930', function()
+    local n_groups = vim.tbl_count(api.nvim_get_hl(0, {}))
+    local has_fail = false
+    for i = n_groups + 1, 20000 do
+      local _, msg = pcall(api.nvim_set_hl, 0, 'New_' .. i, { fg = '#000000' })
+      local is_fail = type(msg) == 'string'
+        and msg:find('Too many highlight and syntax groups$') ~= nil
+      has_fail = has_fail or is_fail
+    end
+    eq('', exec_capture('messages'))
+    eq(true, has_fail)
   end)
 
   it('update=true sets only specified keys', function()

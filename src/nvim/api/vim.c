@@ -92,10 +92,15 @@
 /// Gets a highlight group by name
 ///
 /// similar to |hlID()|, but allocates a new ID if not present.
-Integer nvim_get_hl_id_by_name(String name)
+/// @param[out] err Error details, if any
+Integer nvim_get_hl_id_by_name(String name, Error *err)
   FUNC_API_SINCE(7)
 {
-  return syn_check_group(name.data, name.size);
+  int ret;
+  TRY_WRAP(err, {
+    ret = syn_check_group(name.data, name.size);
+  });
+  return ret;
 }
 
 /// Gets all or specific highlight groups in a namespace.
@@ -173,10 +178,13 @@ DictAs(get_hl_info) nvim_get_hl(Integer ns_id, Dict(get_highlight) *opts, Arena 
 void nvim_set_hl(uint64_t channel_id, Integer ns_id, String name, Dict(highlight) *val, Error *err)
   FUNC_API_SINCE(7)
 {
-  int hl_id = syn_check_group(name.data, name.size);
-  VALIDATE_S((hl_id != 0), "highlight name", name.data, {
-    return;
+  int hl_id;
+  TRY_WRAP(err, {
+    hl_id = syn_check_group(name.data, name.size);
   });
+  if (ERROR_SET(err) || hl_id == 0) {
+    return;
+  }
   int link_id = -1;
 
   // Setting URLs directly through highlight attributes is not supported
@@ -1373,6 +1381,9 @@ Boolean nvim_paste(uint64_t channel_id, String data, Boolean crlf, Integer phase
   });
   if (phase == -1 || phase == 1) {  // Start of paste-stream.
     cancelled = false;
+    if (curbuf->terminal) {
+      terminal_set_streamed_paste(curbuf->terminal, true);
+    }
   } else if (cancelled) {
     // Skip remaining chunks.  Report error only once per "stream".
     goto theend;
@@ -1385,6 +1396,9 @@ Boolean nvim_paste(uint64_t channel_id, String data, Boolean crlf, Integer phase
   // vim.paste() decides if client should cancel.
   if (ERROR_SET(err) || (rv.type == kObjectTypeBoolean && !rv.data.boolean)) {
     cancelled = true;
+  }
+  if ((phase == -1 || phase == 3 || cancelled) && curbuf->terminal) {
+    terminal_set_streamed_paste(curbuf->terminal, false);
   }
   if (!cancelled && (phase == -1 || phase == 1)) {
     paste_store(channel_id, kFalse, NULL_STRING, crlf);
