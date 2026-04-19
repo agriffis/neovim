@@ -152,7 +152,7 @@ install -p -m 644 %{SOURCE1} %{buildroot}%{_datadir}/nvim/sysinit.vim
 install -p -m 644 %{SOURCE2} %{buildroot}%{_datadir}/nvim/template.spec
 
 desktop-file-install --dir=%{buildroot}%{_datadir}/applications \
-    runtime/nvim.desktop
+    runtime/org.neovim.nvim.desktop
 install -d -m0755 %{buildroot}%{_datadir}/pixmaps
 install -m0644 runtime/nvim.png %{buildroot}%{_datadir}/pixmaps/nvim.png
 
@@ -180,7 +180,7 @@ find %{buildroot}%{_datadir} \( -name "*.bat" -o -name "*.awk" \) \
 %{_libdir}/nvim/parser/*.so
 
 %{_mandir}/man1/nvim.1*
-%{_datadir}/applications/nvim.desktop
+%{_datadir}/applications/org.neovim.nvim.desktop
 %{_datadir}/pixmaps/nvim.png
 %{_datadir}/icons/hicolor/128x128/apps/nvim.png
 
