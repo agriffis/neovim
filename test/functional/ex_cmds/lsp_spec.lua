@@ -29,7 +29,7 @@ describe(':lsp', function()
       env = { VIMRUNTIME = 'non-existent' },
     }
     t.matches(
-      [[Vim%(lsp%):Lua: .*module 'vim%.lsp' not found:]],
+      [[Vim%(lsp%):E%d+: .*module 'vim%.lsp' not found:]],
       vim.split(t.pcall_err(n.command, 'lsp enable dummy'), '\n')[1]
     )
   end)

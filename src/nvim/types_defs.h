@@ -31,9 +31,10 @@ typedef double float_T;
 
 typedef struct MsgpackRpcRequestHandler MsgpackRpcRequestHandler;
 
+/// vimfn metatdata defined in `src/nvim/eval.lua`.
 typedef union {
   float_T (*func_float)(float_T);
-  const MsgpackRpcRequestHandler *func_api;  // Vimscript bridge to API fn.
+  const MsgpackRpcRequestHandler *func_api;  // Vimscript bridge to API fn (eval=true in eval.lua).
   const char *func_lua;  ///< Lua-implemented vimfn.
   void *null;
 } EvalFuncData;

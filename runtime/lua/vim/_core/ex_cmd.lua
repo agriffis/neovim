@@ -2,6 +2,10 @@ local api = vim.api
 local fs = vim.fs
 local util = require('vim._core.util')
 
+--- Parsed ex command arguments for builtin commands, passed from C via `nlua_call_excmd`.
+--- Inherits fields from user command args: args, bang, line1, line2, range, count, reg, smods.
+--- @class vim._core.ExCmdArgs : vim.api.keyset.create_user_command.command_args
+
 local M = {}
 
 --- @param msg string
@@ -151,9 +155,9 @@ local actions = {
 local available_subcmds = vim.tbl_keys(actions)
 
 --- Implements command: `:lsp {subcmd} {name}?`.
---- @param args string
-M.ex_lsp = function(args)
-  local fargs = api.nvim_parse_cmd('lsp ' .. args, {}).args
+--- @param eap vim._core.ExCmdArgs
+M.ex_lsp = function(eap)
+  local fargs = api.nvim_parse_cmd('lsp ' .. eap.args, {}).args
   if not fargs then
     return
   end
@@ -192,11 +196,11 @@ end
 local log_dir = vim.fn.stdpath('log')
 
 --- Implements command: `:log {file}`.
---- @param filename string
---- @param mods string
-M.ex_log = function(filename, mods)
+--- @param eap vim._core.ExCmdArgs
+M.ex_log = function(eap)
+  local filename = eap.args
   if filename == '' then
-    util.wrapped_edit(log_dir, mods)
+    util.wrapped_edit(log_dir, eap.smods)
   else
     local path --- @type string
     -- Special case for NVIM_LOG_FILE
@@ -210,7 +214,7 @@ M.ex_log = function(filename, mods)
       echo_err(("No such log file: '%s'"):format(path))
       return
     end
-    util.wrapped_edit(path, mods)
+    util.wrapped_edit(path, eap.smods)
     vim.cmd.normal { 'G', bang = true }
   end
 end
