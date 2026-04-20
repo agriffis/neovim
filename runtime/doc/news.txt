@@ -128,7 +128,8 @@ EDITOR
 
 EVENTS
 
-• todo
+• |:delmarks| now triggers the |MarkSet| autocommand with line==col==0, same
+  as |nvim_buf_del_mark()|
 
 HIGHLIGHTS
 
@@ -155,7 +156,7 @@ the same range instances now compare equal.
 
 OPTIONS
 
-• todo
+• 'winpinned' prevents window from closing unless specifically targeted.
 
 PERFORMANCE
 

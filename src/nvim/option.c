@@ -2393,7 +2393,7 @@ static const char *did_set_modified(optset_T *args)
     save_file_ff(buf);  // Buffer is unchanged
   }
   redraw_titles();
-  buf->b_modified_was_set = (int)args->os_newval.boolean;
+  buf->b_modified_was_set = !!(int)args->os_newval.boolean;
   return NULL;
 }
 
@@ -4859,6 +4859,8 @@ void *get_varp_from(vimoption_T *p, buf_T *buf, win_T *win)
     return &(win->w_p_wfh);
   case kOptWinfixwidth:
     return &(win->w_p_wfw);
+  case kOptWinpinned:
+    return &(win->w_p_wp);
   case kOptPreviewwindow:
     return &(win->w_p_pvw);
   case kOptLhistory:
