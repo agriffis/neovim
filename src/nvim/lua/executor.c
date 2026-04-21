@@ -194,38 +194,18 @@ static void nlua_push_eap(lua_State *lstate, exarg_T *eap, const cmdmod_T *cmod)
   lua_pushstring(lstate, reg);
   lua_setfield(lstate, -2, "reg");
 
+  // Push pre-split args as "fargs" list, if available (set by the command-line parser).
+  if (eap->args != NULL && eap->argc > 0) {
+    lua_createtable(lstate, (int)eap->argc, 0);
+    for (size_t i = 0; i < eap->argc; i++) {
+      lua_pushlstring(lstate, eap->args[i], eap->arglens[i]);
+      lua_rawseti(lstate, -2, (int)i + 1);
+    }
+    lua_setfield(lstate, -2, "fargs");
+  }
+
   nlua_push_cmdmod(lstate, cmod);
   lua_setfield(lstate, -2, "smods");
-}
-
-/// Calls Lua to implement an excmd. Passes `eap` + `cmdmod` to Lua as a dict arg, which is arranged
-/// to match the Lua type `vim.api.keyset.create_user_command.command_args`.
-///
-/// @param module  Lua module name, e.g. "vim._core.ex_cmd".
-/// @param func    Function name in the module, e.g. "ex_log".
-/// @param eap     Excmd args.
-/// @param cmod    Excmd mods.
-void nlua_call_excmd(const char *module, const char *func, exarg_T *eap, const cmdmod_T *cmod)
-{
-  lua_State *const lstate = global_lstate;
-
-  lua_getglobal(lstate, "require");
-  lua_pushstring(lstate, module);
-  if (lua_pcall(lstate, 1, 1, 0) != 0) {
-    semsg("E5108: %s", lua_tostring(lstate, -1));
-    lua_pop(lstate, 1);
-    return;
-  }
-  lua_getfield(lstate, -1, func);
-  lua_remove(lstate, -2);
-
-  lua_newtable(lstate);
-  nlua_push_eap(lstate, eap, cmod);
-
-  if (nlua_pcall(lstate, 1, 0)) {
-    semsg("E5108: %s", lua_tostring(lstate, -1));
-    lua_pop(lstate, 1);
-  }
 }
 
 #if __has_feature(address_sanitizer)
@@ -1788,6 +1768,47 @@ void nlua_call_vimfn(const char *module, const char *func, typval_T *argvars, ty
   nlua_typval_exec(buf, strlen(buf), module, argvars, argcount, false, rettv);
 }
 
+/// Calls Lua to implement an excmd. Passes `eap` + `cmdmod` to Lua as a dict arg, which is arranged
+/// to match the Lua type `vim.api.keyset.create_user_command.command_args`.
+///
+/// @param module  Lua module name, e.g. "vim._core.ex_cmd".
+/// @param func    Function name in the module, e.g. "ex_log".
+/// @param eap     Excmd info, passed as Lua arg1.
+/// @param cmod    Excmd mods, included in Lua arg1.
+/// @param extra   (Optional) Passed as Lua arg2.
+/// @return true on success, false on error (message already emitted).
+bool nlua_call_excmd(const char *module, const char *func, exarg_T *eap, const cmdmod_T *cmod,
+                     typval_T *extra)
+{
+  lua_State *const lstate = global_lstate;
+
+  lua_getglobal(lstate, "require");
+  lua_pushstring(lstate, module);
+  if (lua_pcall(lstate, 1, 1, 0) != 0) {
+    nlua_error(lstate, "E5108: %s");
+    return false;
+  }
+  lua_getfield(lstate, -1, func);
+  lua_remove(lstate, -2);
+
+  lua_newtable(lstate);
+  nlua_push_eap(lstate, eap, cmod);
+
+  int nargs = 1;
+  if (extra) {
+    nlua_push_typval(lstate, extra, 0);
+    nargs = 2;
+  }
+
+  if (nlua_pcall(lstate, nargs, 0)) {
+    // Not "E5108" because this is a logical/application error, not a "Lua error".
+    emsg(lua_tostring(lstate, -1));
+    lua_pop(lstate, 1);
+    return false;
+  }
+  return true;
+}
+
 /// Checks if a LuaRef refers to a function.
 bool nlua_ref_is_function(LuaRef ref)
 {
@@ -2417,21 +2438,19 @@ int nlua_do_ucmd(ucmd_T *cmd, exarg_T *eap, bool preview)
     lua_setfield(lstate, -2, "count");
   }
 
-  lua_newtable(lstate);  // f-args table
-  lua_pushstring(lstate, eap->arg);  // for f-args splitting below
-
-  // Split args by unescaped whitespace |<f-args>| (nargs dependent)
+  // Override fargs for user command-specific splitting (nlua_push_eap already set it
+  // for the eap->args!=NULL case, but user commands need special handling for nargs).
   if (cmd->uc_argt & EX_NOSPC) {
-    if ((cmd->uc_argt & EX_NEEDARG) || strlen(eap->arg)) {
-      // For commands where nargs is 1 or "?" and argument is passed, fargs = { args }
+    // nargs=1 or "?": fargs is the whole arg as a single element, or empty.
+    lua_createtable(lstate, 1, 0);
+    if ((cmd->uc_argt & EX_NEEDARG) || *eap->arg != NUL) {
+      lua_pushstring(lstate, eap->arg);
       lua_rawseti(lstate, -2, 1);
-    } else {
-      // if nargs = "?" and no argument is passed, fargs = {}
-      lua_pop(lstate, 1);  // Pop the reference of opts.args
     }
+    lua_setfield(lstate, -2, "fargs");
   } else if (eap->args == NULL) {
-    // For commands with more than one possible argument, split if argument list isn't available.
-    lua_pop(lstate, 1);  // Pop the reference of opts.args
+    // Pre-split args not available: tokenize eap->arg by unescaped whitespace.
+    lua_newtable(lstate);
     size_t length = strlen(eap->arg);
     size_t end = 0;
     size_t len = 0;
@@ -2447,15 +2466,9 @@ int nlua_do_ucmd(ucmd_T *cmd, exarg_T *eap, bool preview)
       }
     }
     xfree(buf);
-  } else {
-    // If argument list is available, just use it.
-    lua_pop(lstate, 1);
-    for (size_t i = 0; i < eap->argc; i++) {
-      lua_pushlstring(lstate, eap->args[i], eap->arglens[i]);
-      lua_rawseti(lstate, -2, (int)i + 1);
-    }
+    lua_setfield(lstate, -2, "fargs");
   }
-  lua_setfield(lstate, -2, "fargs");
+  // else: eap->args was available, nlua_push_eap already set fargs.
 
   char nargs[2];
   if (cmd->uc_argt & EX_EXTRA) {

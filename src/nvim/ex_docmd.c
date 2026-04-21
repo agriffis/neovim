@@ -6259,7 +6259,7 @@ static void ex_syncbind(exarg_T *eap)
     FOR_ALL_WINDOWS_IN_TAB(wp, curtab) {
       if (wp->w_p_scb && wp->w_buffer) {
         linenr_T y = plines_m_win_fill(wp, 1, wp->w_buffer->b_ml.ml_line_count)
-                     - get_scrolloff_value(curwin);
+                     - (int)get_scrolloff_value(curwin);
         vtopline = MIN(vtopline, y);
       }
     }
@@ -8197,23 +8197,11 @@ void set_pressedreturn(bool val)
 /// ":checkhealth [plugins]"
 static void ex_checkhealth(exarg_T *eap)
 {
-  Error err = ERROR_INIT;
-  MAXSIZE_TEMP_ARRAY(args, 2);
-
-  char mods[1024];
-  size_t mods_len = 0;
-  mods[0] = NUL;
-
-  if (cmdmod.cmod_tab > 0 || cmdmod.cmod_split != 0) {
-    bool multi_mods = false;
-    mods_len = add_win_cmd_modifiers(mods, &cmdmod, &multi_mods);
-    assert(mods_len < sizeof(mods));
-  }
-  ADD_C(args, STRING_OBJ(((String){ .data = mods, .size = mods_len })));
-  ADD_C(args, CSTR_AS_OBJ(eap->arg));
-
-  NLUA_EXEC_STATIC("vim.health._check(...)", args, kRetNilBool, NULL, &err);
-  if (!ERROR_SET(&err)) {
+  // Suppress the Lua error (E5108) so the VIMRUNTIME diagnostic is the primary error.
+  emsg_off++;
+  bool ok = nlua_call_excmd("vim.health", "_check", eap, &cmdmod, NULL);
+  emsg_off--;
+  if (ok) {
     return;
   }
 
@@ -8228,79 +8216,46 @@ static void ex_checkhealth(exarg_T *eap)
       emsg(_("E5009: Invalid 'runtimepath'"));
     }
   }
-  semsg_multiline("emsg", err.msg);
-  api_clear_error(&err);
 }
 
 static void ex_terminal(exarg_T *eap)
 {
-  char ex_cmd[1024];
-  size_t len = 0;
   const int scroll_save = msg_scroll;
-
-  msg_scroll = false;         // don't scroll here
+  msg_scroll = false;
   autowrite_all();
   msg_scroll = scroll_save;
 
-  if (cmdmod.cmod_tab > 0 || cmdmod.cmod_split != 0) {
-    bool multi_mods = false;
-    // ex_cmd must be a null-terminated string before passing to add_win_cmd_modifiers
-    ex_cmd[0] = NUL;
-    len = add_win_cmd_modifiers(ex_cmd, &cmdmod, &multi_mods);
-    assert(len < sizeof(ex_cmd));
-    int result = snprintf(ex_cmd + len, sizeof(ex_cmd) - len, " new");
-    assert(result > 0);
-    len += (size_t)result;
+  if (*eap->arg != NUL) {
+    nlua_call_excmd("vim._core.ex_cmd", "ex_terminal", eap, &cmdmod, NULL);
   } else {
-    int result = snprintf(ex_cmd, sizeof(ex_cmd), "enew%s", eap->forceit ? "!" : "");
-    assert(result > 0);
-    len += (size_t)result;
-  }
-
-  assert(len < sizeof(ex_cmd));
-
-  if (*eap->arg != NUL) {  // Run {cmd} in 'shell'.
-    char *name = vim_strsave_escaped(eap->arg, "\"\\");
-    snprintf(ex_cmd + len, sizeof(ex_cmd) - len,
-             " | call jobstart(\"%s\",{'term':v:true})", name);
-    xfree(name);
-  } else {  // No {cmd}: run the job with tokenized 'shell'.
+    // No cmd given, run 'shell'.
     if (*p_sh == NUL) {
       emsg(_(e_shellempty));
       return;
     }
-
+    // Tokenize 'shell' via shell_build_argv (handles quoting) and pass as arg2.
     char **argv = shell_build_argv(NULL, NULL);
-    char **p = argv;
-    char tempstring[512];
-    char shell_argv[512] = { 0 };
-
-    while (*p != NULL) {
-      char *escaped = vim_strsave_escaped(*p, "\"\\");
-      snprintf(tempstring, sizeof(tempstring), ",\"%s\"", escaped);
-      xfree(escaped);
-      xstrlcat(shell_argv, tempstring, sizeof(shell_argv));
-      p++;
+    typval_T shell_tv;
+    tv_list_alloc_ret(&shell_tv, 0);
+    for (char **p = argv; *p; p++) {
+      tv_list_append_allocated_string(shell_tv.vval.v_list, *p);
     }
-    shell_free_argv(argv);
-
-    snprintf(ex_cmd + len, sizeof(ex_cmd) - len,
-             " | call jobstart([%s], {'term':v:true})", shell_argv + 1);
+    xfree(argv);
+    nlua_call_excmd("vim._core.ex_cmd", "ex_terminal", eap, &cmdmod, &shell_tv);
+    tv_clear(&shell_tv);
   }
-
-  do_cmdline_cmd(ex_cmd);
 }
 
 /// ":log {name}"
 static void ex_log(exarg_T *eap)
 {
-  nlua_call_excmd("vim._core.ex_cmd", "ex_log", eap, &cmdmod);
+  nlua_call_excmd("vim._core.ex_cmd", "ex_log", eap, &cmdmod, NULL);
 }
 
 /// ":lsp {subcmd} {clients}"
 static void ex_lsp(exarg_T *eap)
 {
-  nlua_call_excmd("vim._core.ex_cmd", "ex_lsp", eap, &cmdmod);
+  nlua_call_excmd("vim._core.ex_cmd", "ex_lsp", eap, &cmdmod, NULL);
 }
 
 /// ":fclose"

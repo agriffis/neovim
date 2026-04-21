@@ -387,14 +387,15 @@ local function progress_report(len)
   end
 end
 
---- Runs the specified healthchecks.
---- Runs all discovered healthchecks if plugin_names is empty.
+--- Runs the specified healthchecks, or all discovered healthchecks if eap.args is empty.
 ---
---- @param mods string command modifiers that affect splitting a window.
---- @param plugin_names string glob of plugin names, split on whitespace. For example, using
----                            `:checkhealth vim.* nvim` will healthcheck `vim.lsp`, `vim.treesitter`
----                            and `nvim` modules.
-function M._check(mods, plugin_names)
+--- Specified healthchecks are given as plugin names, split on whitespace. For example using
+--- `:checkhealth vim.* nvim` will check `vim.lsp`, `vim.treesitter` and `nvim` modules.
+---
+--- @param eap vim._core.ExCmdArgs
+function M._check(eap)
+  local plugin_names = eap.args
+  local smods = eap.smods
   local healthchecks = plugin_names == '' and get_healthcheck('*') or get_healthcheck(plugin_names)
 
   local emptybuf = vim.fn.bufnr('$') == 1 and vim.fn.getline(1) == '' and 1 == vim.fn.line('$')
@@ -421,8 +422,14 @@ function M._check(mods, plugin_names)
     -- When no command modifiers are used:
     -- - If the current buffer is empty, open healthcheck directly.
     -- - If not specified otherwise open healthcheck in a tab.
-    local buf_cmd = #mods > 0 and (mods .. ' sbuffer') or emptybuf and 'buffer' or 'tab sbuffer'
-    vim.cmd(buf_cmd .. ' ' .. bufnr)
+    local has_mods = smods.tab > 0 or smods.split ~= '' or smods.horizontal or smods.vertical
+    if has_mods then
+      vim.cmd.sbuffer { bufnr, mods = smods }
+    elseif emptybuf then
+      vim.cmd.buffer(bufnr)
+    else
+      vim.cmd.sbuffer { bufnr, mods = { tab = 1 } }
+    end
   end
 
   if vim.fn.bufexists('health://') == 1 then

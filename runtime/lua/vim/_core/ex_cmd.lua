@@ -233,4 +233,27 @@ function M.log_complete()
   return names
 end
 
+--- `:terminal [cmd]`
+--- @param eap vim._core.ExCmdArgs
+--- @param shell_argv? string[] Tokenized 'shell' from C (shell_build_argv), for the no-cmd case.
+M.ex_terminal = function(eap, shell_argv)
+  local smods = eap.smods
+  local has_mods = (smods.tab or 0) > 0
+    or (smods.split or '') ~= ''
+    or smods.horizontal
+    or smods.vertical
+
+  if has_mods then
+    vim.cmd.new { mods = smods }
+  else
+    vim.cmd.enew { bang = eap.bang }
+  end
+
+  if shell_argv then -- No `cmd`, run 'shell'.
+    vim.fn.jobstart(shell_argv, { term = true })
+  else -- Run [cmd] in 'shell'.
+    vim.fn.jobstart(eap.args, { term = true })
+  end
+end
+
 return M
