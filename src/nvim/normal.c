@@ -2912,9 +2912,10 @@ static void nv_zet(cmdarg_T *cap)
       int n = curwin->w_view_width - win_col_off(curwin);
       if (col + siso < n) {
         col = 0;
-      } else {
-        // TODO(zeertzjq): check for overflow
+      } else if (siso - n < INT_MAX - col) {
         col = (int)(col + siso - n + 1);
+      } else {
+        col = INT_MAX;
       }
       if (curwin->w_leftcol != col) {
         curwin->w_leftcol = col;
@@ -3297,6 +3298,15 @@ static void nv_Zet(cmdarg_T *cap)
   // "ZQ": equivalent to ":q!" (Elvis compatible).
   case 'Q':
     do_cmdline_cmd("q!");
+    break;
+
+  // "ZR": restart. With count, restart without checking for changes.
+  case 'R':
+    if (cap->count0 >= 1) {
+      do_cmdline_cmd("restart +qall!");
+    } else {
+      do_cmdline_cmd("restart");
+    }
     break;
 
   default:

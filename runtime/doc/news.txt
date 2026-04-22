@@ -65,6 +65,8 @@ API
 • |nvim_create_autocmd()|, |nvim_exec_autocmds()| and |nvim_clear_autocmds()|
   no longer treat an empty non-nil pattern as nil.
 • |nvim_clear_autocmds()| no longer treats an empty array event as nil.
+• |ui-messages| `msg_show.bufwrite` and `msg_show.completion` messages are now
+  `msg_show.progress` events.
 
 DIAGNOSTICS
 
@@ -111,7 +113,7 @@ API
 
 BUILD
 
-• todo
+• Building using "zig build" requires zig 0.16.x.
 
 DEFAULTS
 
@@ -125,6 +127,7 @@ EDITOR
 
 • |gf| and |<cfile>| support `file://…` URIs.
 • |:log| opens log files.
+• |ZR| restarts Nvim (|:restart|).
 
 EVENTS
 
@@ -156,6 +159,7 @@ the same range instances now compare equal.
 
 OPTIONS
 
+• 'scrolloffpad' allows vertically centering cursor at the end of file.
 • 'winpinned' prevents window from closing unless specifically targeted.
 
 PERFORMANCE

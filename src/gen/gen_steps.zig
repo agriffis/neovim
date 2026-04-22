@@ -5,6 +5,7 @@ pub const SourceItem = struct { name: []u8, api_export: bool };
 
 pub fn nvim_gen_sources(
     b: *std.Build,
+    io: std.Io,
     nlua0: *std.Build.Step.Compile,
     nvim_sources: *std.ArrayList(SourceItem),
     nvim_headers: *std.ArrayList([]u8),
@@ -85,15 +86,15 @@ pub fn nvim_gen_sources(
         }
 
         // Dynamically add all Lua _core/ modules (like CMakeLists.txt does)
-        if (b.build_root.handle.openDir("runtime/lua/vim/_core", .{ .iterate = true })) |core_dir_handle| {
+        if (b.build_root.handle.openDir(io, "runtime/lua/vim/_core", .{ .iterate = true })) |core_dir_handle| {
             var core_dir = core_dir_handle;
-            defer core_dir.close();
+            defer core_dir.close(io);
 
             var iter = core_dir.iterate();
             var core_files = try std.ArrayList([]const u8).initCapacity(b.allocator, 0);
             defer core_files.deinit(b.allocator);
 
-            while (try iter.next()) |entry| {
+            while (try iter.next(io)) |entry| {
                 if (entry.kind == .file and std.mem.endsWith(u8, entry.name, ".lua")) {
                     const module_name = try b.allocator.dupe(u8, entry.name[0 .. entry.name.len - 4]);
                     try core_files.append(b.allocator, module_name);
