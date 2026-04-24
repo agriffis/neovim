@@ -1579,6 +1579,7 @@ int do_set(char *arg, int opt_flags)
           arg++;
           // Only for :set command set global value of local options.
           set_options_default(opt_flags);
+          didset_options_all();
           didset_options();
           didset_options2();
           ui_refresh_options();
@@ -1825,6 +1826,26 @@ static void didset_options2(void)
   tabstop_set(curbuf->b_p_vsts, &curbuf->b_p_vsts_array);
   xfree(curbuf->b_p_vts_array);
   tabstop_set(curbuf->b_p_vts,  &curbuf->b_p_vts_array);
+}
+
+/// Repair UI state after `:set all&`.
+///
+/// `set_options_default` resets option values via `set_option_default` and
+/// `set_option_direct` without invoking per-option `did_set` callbacks, so
+/// UI-derived state (cursor shape, statusline, tabline) can get out of sync.
+/// This function patches the known cases.
+///
+/// Note: We intentionally do not replay all `did_set` callbacks
+/// (`opt_did_set_cb`) because they have order-dependent side effects and
+/// old/new transition logic that does not hold when values are already reset.
+static void didset_options_all(void)
+{
+  const char *errmsg = parse_shape_opt(SHAPE_CURSOR);
+  assert(errmsg == NULL);
+  (void)errmsg;
+  last_status(false);
+  win_float_update_statusline();
+  win_new_screen_rows();
 }
 
 /// Check for string options that are NULL (normally only termcap options).
