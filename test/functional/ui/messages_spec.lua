@@ -3613,7 +3613,7 @@ describe('progress-message', function()
 
     eq(
       "Conflict: title/source/status/percent/data not allowed with kind='echo'",
-      t.pcall_err(api.nvim_echo, { { 'test-message' } }, false, { percent = 10 })
+      t.pcall_err(api.nvim_echo, { { 'test-message' } }, false, { percent = 0 })
     )
 
     eq(
