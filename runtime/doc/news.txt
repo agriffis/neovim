@@ -157,6 +157,8 @@ LSP
 LUA
 
 • |vim.net.request()| can specify custom headers by passing `opts.headers`.
+• |writefile()| treats Lua strings as "blob", so it can be used to write
+  binary data.
 • |vim.filetype.inspect()| returns a copy of the internal tables used for
   filetype detection.
 • Added `__eq` metamethod to |vim.VersionRange|. 2 distinct but representing
@@ -177,6 +179,8 @@ PERFORMANCE
   Lua.
 • The table holding LSP data is now cleared using `table.clear`,
   thus reducing GC and memory reallocation during each data reset.
+• When parsing the received Content-Length messages,
+  the RPC client will no longer allocate extra strings.
 
 PLUGINS
 
@@ -193,6 +197,8 @@ TERMINAL
 TREESITTER
 
 • |v_]N| |v_[N| expand selection to sibling treesitter node.
+• |treesitter-highlight-conceal| can be removed by adding a `@noconceal`
+  capture.
 
 TUI
 
