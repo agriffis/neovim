@@ -472,17 +472,17 @@ end
 ---
 ---@since 11
 ---@param opts table|nil Optional options table with the following possible keys:
----                      - lang (string|nil): The language of the source buffer. If omitted, detect
----                        from the filetype of the source buffer.
 ---                      - bufnr (integer|nil): Buffer to draw the tree into. If omitted, a new
 ---                        buffer is created.
----                      - winid (integer|nil): Window id to display the tree buffer in. If omitted,
----                        a new window is created with {command}.
 ---                      - command (string|nil): Vimscript command to create the window. Default
 ---                        value is "60vnew". Only used when {winid} is nil.
+---                      - lang (string|nil): The language of the source buffer. If omitted, detect
+---                        from the filetype of the source buffer.
 ---                      - title (string|fun(bufnr:integer):string|nil): Title of the window. If a
 ---                        function, it accepts the buffer number of the source buffer as its only
 ---                        argument and should return a string.
+---                      - winid (integer|nil): Window id to display the tree buffer in. If omitted,
+---                        a new window is created with {command}.
 function M.inspect_tree(opts)
   ---@diagnostic disable-next-line: invisible
   M.dev.inspect_tree(opts)

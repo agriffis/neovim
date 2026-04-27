@@ -186,6 +186,9 @@ gx			Opens the current filepath, URL (decided by
 			If the mark is "=", a line of dashes is printed
 			around the current line.
 
+			If the 'number' or 'relativenumber' option is set,
+			absolute line numbers will be included in the output.
+
 							*:z!*
 :[range]z![+-^.=][count]
 			Like ":z", but when [count] is not specified, it

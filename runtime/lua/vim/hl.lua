@@ -157,12 +157,12 @@ local yank_ns = api.nvim_create_namespace('nvim.hlyank')
 --- ```
 ---
 --- @param opts table|nil Optional parameters
+---              - event     event structure (default vim.v.event)
 ---              - higroup   highlight group for yanked region (default "IncSearch")
----              - timeout   time in ms before highlight is cleared (default 150)
 ---              - on_macro  highlight when executing macro (default false)
 ---              - on_visual highlight when yanking visual selection (default true)
----              - event     event structure (default vim.v.event)
 ---              - priority  integer priority (default |vim.hl.priorities|`.user`)
+---              - timeout   time in ms before highlight is cleared (default 150)
 function M.on_yank(opts)
   vim.validate('opts', opts, 'table', true)
   opts = opts or {}

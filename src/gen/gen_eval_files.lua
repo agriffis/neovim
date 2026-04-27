@@ -328,6 +328,7 @@ local function get_api_keysets_meta()
   lint.lint_names('src/nvim/api/keysets_defs.h', nil, keysets)
 
   for _, k in ipairs(keysets) do
+    util.sort_by_key(k.keys)
     local params = {}
     for _, key in ipairs(k.keys) do
       local pty = k.types[key] or 'any'

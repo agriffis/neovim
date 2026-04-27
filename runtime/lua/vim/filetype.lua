@@ -245,6 +245,7 @@ local extension = {
   adb = 'ada',
   tdf = 'ahdl',
   aidl = 'aidl',
+  a68 = 'algol68',
   aml = 'aml',
   run = 'ampl',
   g4 = 'antlr4',
