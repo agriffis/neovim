@@ -3203,6 +3203,7 @@ static void expand_by_function(int type, char *base, Callback *cb)
   assert(curbuf != NULL);
 
   const bool is_cpt_function = (cb != NULL);
+  const bool use_sandbox = is_cpt_function && was_set_insecurely(curwin, kOptComplete, OPT_LOCAL);
   if (!is_cpt_function) {
     char *funcname = get_complete_funcname(type);
     if (*funcname == NUL) {
@@ -3224,9 +3225,16 @@ static void expand_by_function(int type, char *base, Callback *cb)
   // switching to another window, it should not be needed and may end up in
   // Insert mode in another buffer.
   textlock++;
+  if (use_sandbox) {
+    sandbox++;
+  }
 
   // Call a function, which returns a list or dict.
-  if (callback_call(cb, 2, args, &rettv)) {
+  const bool called = callback_call(cb, 2, args, &rettv);
+  if (use_sandbox) {
+    sandbox--;
+  }
+  if (called) {
     switch (rettv.v_type) {
     case VAR_LIST:
       matchlist = rettv.vval.v_list;
@@ -5796,6 +5804,7 @@ static int get_userdefined_compl_info(colnr_T curs_col, Callback *cb, int *start
   const int save_State = State;
 
   const bool is_cpt_function = (cb != NULL);
+  const bool use_sandbox = is_cpt_function && was_set_insecurely(curwin, kOptComplete, OPT_LOCAL);
   if (!is_cpt_function) {
     // Call 'completefunc' or 'omnifunc' or 'thesaurusfunc' and get pattern
     // length as a string
@@ -5816,7 +5825,13 @@ static int get_userdefined_compl_info(colnr_T curs_col, Callback *cb, int *start
 
   pos_T pos = curwin->w_cursor;
   textlock++;
+  if (use_sandbox) {
+    sandbox++;
+  }
   colnr_T col = (colnr_T)callback_call_retnr(cb, 2, args);
+  if (use_sandbox) {
+    sandbox--;
+  }
   textlock--;
 
   State = save_State;

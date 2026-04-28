@@ -81,6 +81,8 @@ EDITOR
 
 EVENTS
 
+• |BufModifiedSet| has been removed. Use the |OptionSet| event with pattern
+  "modified" instead.
 • todo
 
 LSP
@@ -163,7 +165,9 @@ LUA
 • |vim.filetype.inspect()| returns a copy of the internal tables used for
   filetype detection.
 • Added `__eq` metamethod to |vim.VersionRange|. 2 distinct but representing
-the same range instances now compare equal.
+  the same range instances now compare equal.
+• Documentation for |vim.fn| now points to preferred Lua alternatives when
+  available.
 
 OPTIONS
 
@@ -213,7 +217,7 @@ UI
 VIMSCRIPT
 
 • |v:exitreason| is set before |QuitPre|.
-• |v:starttime| is the process start time (monotonic nanoseconds).
+• |v:starttime| is the process start time (nanoseconds from UNIX epoch).
 
 ==============================================================================
 CHANGED FEATURES                                                 *news-changed*
