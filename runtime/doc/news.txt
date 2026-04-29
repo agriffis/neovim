@@ -50,6 +50,7 @@ UI
 
 • todo
 • `vim.ui.img` experimental module added to display images within neovim.
+• `:checkhealth vim.ui.img` reports terminal graphics protocol support.
 
 VIMSCRIPT
 
@@ -178,6 +179,9 @@ OPTIONS
 
 PERFORMANCE
 
+• |treesitter-highlight| performance on large injection-heavy files improves
+  by 50% to 100% by reusing edited child-tree ranges.
+
 • Nvim architecture allows pure-Lua implementations of some `vim.fn`
   functions, which skips the Vimscript <=> Lua "bridge" (no data
   conversion/marshalling) entirely, if the `vim.fn` function is called from
@@ -212,7 +216,10 @@ TUI
 
 UI
 
-• todo
+• |:tselect| delegates to |vim.ui.select()| instead of a bespoke internal
+  selection routine.
+• |z=| (spell suggest) delegates to |vim.ui.select()| instead of a bespoke
+  internal selection routine.
 
 VIMSCRIPT
 

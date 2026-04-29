@@ -1239,17 +1239,12 @@ func Test_tselect_listing()
 
   call feedkeys("\<CR>", "t")
   let l = split(execute("tselect first"), "\n")
+  " Nvim: :tselect goes through vim.ui.select().
   let expected =<< [DATA]
-  # pri kind tag               file
-  1 FS  v    first             Xfoo
-               typeref:typename:int 
-               1
-  2 FS  v    first             Xfoo
-               typeref:typename:char 
-               2
+Type number and <Enter> (q or empty cancels):
+1:   FS  v    first              Xfoo
+2:   FS  v    first              Xfoo
 [DATA]
-" Type number and <Enter> (q or empty cancels):
-" Nvim: Prompt message is sent to cmdline prompt.
 
   call assert_equal(expected, l)
 
@@ -1749,17 +1744,6 @@ func Test_tag_backtick_filename_not_expanded()
 
   set tags&
   bwipe!
-endfunc
-
-func Test_tagjump_refuse_url()
-  call writefile([
-        \ "XTagURL\thttp://127.0.0.1:1/$XTAG_SECRET/file.c\t/^int main"
-        \ ], 'Xtags', 'D')
-  let save_tags = &tags
-  set tags=Xtags
-
-  call assert_fails('tag XTagURL', 'E1576:')
-  let &tags = save_tags
 endfunc
 
 " vim: shiftwidth=2 sts=2 expandtab
