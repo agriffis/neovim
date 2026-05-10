@@ -4,7 +4,7 @@
                             NVIM REFERENCE MANUAL
 
 
-LSP client/framework                                     *lsp* *LSP*
+LSP client/framework                                     *lsp* *LSP* *vim.lsp*
 
 Nvim supports the Language Server Protocol (LSP), which means it acts as
 a client to LSP servers and includes a Lua framework `vim.lsp` for building
@@ -1447,6 +1447,8 @@ the current buffer.
 
                     See |setqflist-what| for the structure of the `what`
                     parameter.
+      • {pos}       (`vim.Pos`, default: cursor position) Position on a buffer
+                    to request.
 
 *vim.lsp.buf.hover.Opts*
     Extends: |vim.lsp.util.open_floating_preview.Opts|
@@ -1657,9 +1659,11 @@ rename({new_name}, {opts})                              *vim.lsp.buf.rename()*
 
                                                *vim.lsp.buf.selection_range()*
 selection_range({direction}, {timeout_ms})
-    Perform an incremental selection at the cursor position based on ranges
-    given by the LSP. The `direction` parameter specifies the number of times
-    to expand the selection. Negative values will shrink the selection.
+                                                   *lsp-incremental-selection*
+
+    Expands or contracts a |Visual| selection at cursor, based on ranges given
+    by LSP. The `direction` parameter specifies the number of times to expand
+    the selection. Negative values will shrink the selection.
 
     Parameters: ~
       • {direction}   (`integer`)
@@ -1723,7 +1727,8 @@ Lua module: vim.lsp.client                                        *lsp-client*
 *vim.lsp.Client*
 
     Fields: ~
-      • {attached_buffers}      (`table<integer,true>`)
+      • {attached_buffers}      (`table<integer,string>`) Each buffer's last
+                                used `languageId`.
       • {cancel_request}        (`fun(self: vim.lsp.Client, id: integer): boolean`)
                                 See |Client:cancel_request()|.
       • {capabilities}          (`lsp.ClientCapabilities`) Capabilities
@@ -2071,10 +2076,10 @@ Client:stop({force})                                           *Client:stop()*
     Parameters: ~
       • {force}  (`integer|boolean?`) (default: `self.exit_timeout`) Decides
                  whether to force-stop the server.
+                 • `false`: Do not force-stop after "shutdown" request.
                  • `nil`: Defaults to `exit_timeout` from
                    |vim.lsp.ClientConfig|.
                  • `true`: Force-stop after "shutdown" request.
-                 • `false`: Do not force-stop after "shutdown" request.
                  • number: Wait up to `force` milliseconds before force-stop.
 
 Client:supports_method({method}, {bufnr})           *Client:supports_method()*
@@ -2572,7 +2577,6 @@ The `vim.lsp.log` module provides logging for the Nvim LSP client.
 When debugging language servers, it is helpful to enable extra-verbose logging
 of the LSP client RPC events. Example: >lua
     vim.lsp.log.set_level 'trace'
-    vim.lsp.log.set_format_func(vim.inspect)
 <
 
 Then try to run the language server, and open the log with: >vim

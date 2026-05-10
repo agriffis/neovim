@@ -1400,7 +1400,7 @@ func Test_shortmess_F3()
   if has('nanotime')
     sleep 10m
   else
-    sleep 2
+    sleep 3
   endif
   call writefile(['bar'], 'X_dummy')
   bprev
@@ -1410,7 +1410,7 @@ func Test_shortmess_F3()
   if has('nanotime')
     sleep 10m
   else
-    sleep 2
+    sleep 3
   endif
   call writefile(['baz'], 'X_dummy')
   checktime
@@ -2629,6 +2629,8 @@ func Test_string_option_revert_on_failure()
         \ ['selection', 'exclusive', 'a123'],
         \ ['selectmode', 'cmd', 'a123'],
         \ ['sessionoptions', 'options', 'a123'],
+        \ ['shellpipe', '>%s', "%s%s%s"],
+        \ ['shellredir', '>%s', "%s%s%s"],
         \ ['shortmess', 'w', '2'],
         \ ['showbreak', '>>', "\x01"],
         \ ['showcmdloc', 'statusline', 'a123'],

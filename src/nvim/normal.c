@@ -3622,7 +3622,7 @@ bool get_visual_text(cmdarg_T *cap, char **pp, size_t *lenp)
 static void nv_tagpop(cmdarg_T *cap)
 {
   if (!checkclearopq(cap->oap)) {
-    do_tag("", DT_POP, cap->count1, false, true);
+    do_tag(NULL, "", DT_POP, cap->count1, false, true);
   }
 }
 
@@ -5877,7 +5877,7 @@ static void set_op_var(int optype)
 
 /// Handle linewise operator "dd", "yy", etc.
 ///
-/// "_" is is a strange motion command that helps make operators more logical.
+/// "_" is a strange motion command that helps make operators more logical.
 /// It is actually implemented, but not documented in the real Vi.  This motion
 /// command actually refers to "the current line".  Commands like "dd" and "yy"
 /// are really an alternate form of "d_" and "y_".  It does accept a count, so

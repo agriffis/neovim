@@ -969,6 +969,25 @@ describe('lua stdlib', function()
     eq(false, exec_lua('return vim.islist({1, 2, nil, 4})'))
     eq(false, exec_lua('return vim.islist({nil, 2, 3, 4})'))
     eq(false, exec_lua('return vim.islist({1, [1.5]=2, [3]=3})'))
+    eq(
+      false,
+      exec_lua([[
+        local t = setmetatable({ 1, [3] = 3 }, {
+          __index = function()
+            return 2
+          end,
+        })
+        return vim.islist(t)
+      ]])
+    )
+  end)
+
+  it('vim.isnil', function()
+    eq(true, exec_lua('return vim.isnil(nil)'))
+    eq(true, exec_lua('return vim.isnil(vim.NIL)'))
+    eq(false, exec_lua('return vim.isnil(true)'))
+    eq(false, exec_lua('return vim.isnil(false)'))
+    eq(false, exec_lua('return vim.isnil({})'))
   end)
 
   it('vim.tbl_isempty', function()
@@ -2548,6 +2567,26 @@ describe('lua stdlib', function()
       end)
     end)
 
+    it('lets CTRL-C interrupt a Lua loop', function()
+      api.nvim_set_var('channel', api.nvim_get_chan_info(0).id)
+      exec_lua([[
+        function _G.Loop()
+          vim.rpcnotify(vim.g.channel, 'ready')
+          while true do
+            local _, code = vim.wait(0, nil, 0)
+            if code == -2 then
+              vim.rpcnotify(vim.g.channel, 'wait', code)
+              return
+            end
+          end
+        end
+      ]])
+      feed(':lua _G.Loop()<CR>')
+      eq({ 'notification', 'ready', {} }, next_msg(500))
+      feed('<C-C>')
+      eq({ 'notification', 'wait', { -2 } }, next_msg(500))
+    end)
+
     it('fails in fast callbacks #26122', function()
       local screen = Screen.new(80, 10)
       exec_lua([[
@@ -2965,8 +3004,8 @@ describe('lua stdlib', function()
     )
   end)
 
-  it('vim.F.if_nil', function()
-    local function if_nil(...)
+  it('vim.nonnil', function()
+    local function nonnil(...)
       return exec_lua(
         [[
         local args = {...}
@@ -2976,7 +3015,7 @@ describe('lua stdlib', function()
             args[i] = nil
           end
         end
-        return vim.F.if_nil(unpack(args, 1, nargs))
+        return vim.nonnil(unpack(args, 1, nargs))
       ]],
         ...
       )
@@ -2986,12 +3025,33 @@ describe('lua stdlib', function()
     local b = NIL
     local c = 42
     local d = false
-    eq(42, if_nil(a, c))
-    eq(false, if_nil(d, b))
-    eq(42, if_nil(a, b, c, d))
-    eq(false, if_nil(d))
-    eq(false, if_nil(d, c))
-    eq(NIL, if_nil(a))
+    eq(42, nonnil(a, c))
+    eq(false, nonnil(d, b))
+    eq(42, nonnil(a, b, c, d))
+    eq(false, nonnil(d))
+    eq(false, nonnil(d, c))
+    eq(NIL, nonnil(a))
+  end)
+
+  it('vim.npcall', function()
+    -- No error
+    eq(
+      { '123', 'test' },
+      exec_lua(function()
+        local function swap_args(a, b)
+          return b, a
+        end
+        return { vim.npcall(swap_args, 'test', '123') }
+      end)
+    )
+
+    -- Error
+    eq(
+      nil,
+      exec_lua(function()
+        return vim.npcall(error, 'error')
+      end)
+    )
   end)
 
   it('lpeg', function()

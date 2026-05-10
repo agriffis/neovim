@@ -49,9 +49,6 @@ TREESITTER
 UI
 
 • todo
-• `vim.ui.img` experimental module added to display images within neovim.
-• `:checkhealth vim.ui.img` reports terminal graphics protocol support.
-• `vim.ui.img.del(math.huge)` clears all images.
 
 VIMSCRIPT
 
@@ -73,7 +70,8 @@ API
 
 DIAGNOSTICS
 
-• todo
+• `vim.diagnostic.Opts.Status.format` no longer accepts the table mapping
+  from severity to text. Use `vim.diagnostic.Opts.Signs.text` instead.
 
 EDITOR
 
@@ -88,7 +86,7 @@ EVENTS
 
 LSP
 
-• todo
+• `client.attached_buffers[buf]` now stores `languageId` string (was boolean).
 
 LUA
 
@@ -118,6 +116,7 @@ API
   shape when an unfocused float is on top of the cursor.
 • |nvim_echo()| distinguishes zero percent from omitted percent for Progress
   events.
+• |nvim_create_user_command()| accepts `desc` for Vimscript commands.
 
 BUILD
 
@@ -129,10 +128,13 @@ DEFAULTS
 
 DIAGNOSTICS
 
-• todo
+• |vim.diagnostic.status()| uses the severity names defined by the `signs`
+  field of |vim.diagnostic.config()|, if any.
 
 EDITOR
 
+• |:command-completion-customlist| can return a list of dictionaries with
+  kind/menu/info/abbr for the popup menu.
 • |gf| and |<cfile>| support `file://…` URIs.
 • |:log| opens log files.
 • |ZR| restarts Nvim (|:restart|).
@@ -154,13 +156,20 @@ LSP
     "preselect". https://microsoft.github.io/language-server-protocol/specification/#completionClientCapabilities
   • `textDocument/foldingRange` |vim.lsp.foldtext()| highlights collapsed text.
     https://microsoft.github.io/language-server-protocol/specification/#textDocument_foldingRange
-• |vim.lsp.buf.declaration()|, |vim.lsp.buf.definition()|, |vim.lsp.buf.definition()|,
-  and |vim.lsp.buf.implementation()| now follows 'switchbuf'.
+• |vim.lsp.buf.declaration()|, |vim.lsp.buf.definition()|,
+  |vim.lsp.buf.type_definition()|, and |vim.lsp.buf.implementation()|
+  now follows 'switchbuf'.
+• |vim.lsp.buf.declaration()|, |vim.lsp.buf.definition()|,
+  |vim.lsp.buf.type_definition()|, and |vim.lsp.buf.implementation()|
+  now supports passing arbitrary positions.
 • Support for nested snippets.
 
 LUA
 
+• |vim.ui.img| can display images. Use `:checkhealth img` to confirm your
+  terminal supports it.
 • |vim.net.request()| can specify custom headers by passing `opts.headers`.
+• |vim.net.request()| can now accept  `method` param overload for multiple HTTP methods.
 • |writefile()| treats Lua strings as "blob", so it can be used to write
   binary data.
 • |vim.filetype.inspect()| returns a copy of the internal tables used for
@@ -169,12 +178,20 @@ LUA
   the same range instances now compare equal.
 • Documentation for |vim.fn| now points to preferred Lua alternatives when
   available.
+• |vim.list.unique()| and |vim.list.bisect()| now support passing a string
+  as a shorthand of a `key`
+• |vim.isnil()| tests if a value is `nil` or |vim.NIL|.
+• |vim.nonnil()| returns the first argument which is not nil.
+• |vim.npcall()| calls the function `fn` in protected-mode like |pcall()|,
+  but returns `nil` on error.
+• |vim.pos| can now convert between positions and buffer offsets.
+• |vim.log| for easily creating loggers.
 
 OPTIONS
 
-• 'ttyfast' can be disabled during startup by setting the environment variable
-  `NVIM_NOTTYFAST` to disable automatic background detection.
+• 'ttyfast' can be disabled during startup by setting |$NVIM_NOTTYFAST|.
 • 'scrolloffpad' allows vertically centering cursor at the end of file.
+• 'shortmess' flag |shm-u| silences undo/redo messages.
 • 'winpinned' prevents window from closing unless specifically targeted.
 
 PERFORMANCE
@@ -208,6 +225,8 @@ TREESITTER
 • |v_]N| |v_[N| expand selection to sibling treesitter node.
 • |treesitter-highlight-conceal| can be removed by adding a `@noconceal`
   capture.
+• |vim.treesitter.select()| starts or adjusts a visual selection at cursor,
+  based on tree nodes.
 
 TUI
 
@@ -216,15 +235,18 @@ TUI
 
 UI
 
-• |:tselect| delegates to |vim.ui.select()| instead of a bespoke internal
-  selection routine.
-• |z=| (spell suggest) delegates to |vim.ui.select()| instead of a bespoke
-  internal selection routine.
+• These builtin "picker" menus delegate to |vim.ui.select()|:
+  • :browse oldfiles
+  • |:recover|
+  • |:tselect|
+  • |z=| (spell suggest)
 
 VIMSCRIPT
 
 • |v:exitreason| is set before |QuitPre|.
 • |v:starttime| is the process start time (nanoseconds since UNIX epoch).
+• |v:useractive| indicates user activity.
+• |serverlist()| with `info=true` returns details for each server (own + peers).
 
 ==============================================================================
 CHANGED FEATURES                                                 *news-changed*
@@ -244,8 +266,9 @@ REMOVED FEATURES                                                 *news-removed*
 
 These deprecated features were removed.
 
-• |vim.lsp.buf.declaration()|, |vim.lsp.buf.definition()|, |vim.lsp.buf.definition()|,
-  and |vim.lsp.buf.implementation()| no longer accept the `reuse_win` option.
+• |vim.lsp.buf.declaration()|, |vim.lsp.buf.definition()|,
+  |vim.lsp.buf.type_definition()|, and |vim.lsp.buf.implementation()|
+  no longer accept the `reuse_win` option.
 
 ==============================================================================
 DEPRECATIONS                                                *news-deprecations*

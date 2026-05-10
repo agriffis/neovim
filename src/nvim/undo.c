@@ -1565,36 +1565,48 @@ void u_read_undo(char *name, const uint8_t *hash, const char *orig_name FUNC_ATT
         goto error;
       }
     }
-    for (int j = 0; j < num_head; j++) {
-      if (uhp_table[j] != NULL
-          && uhp_table[j]->uh_seq == uhp->uh_next.seq) {
-        uhp->uh_next.ptr = uhp_table[j];
-        SET_FLAG(j);
-        break;
+    {
+      const int seq = uhp->uh_next.seq;
+      uhp->uh_next.ptr = NULL;
+      for (int j = 0; j < num_head; j++) {
+        if (uhp_table[j] != NULL && i != j && uhp_table[j]->uh_seq == seq) {
+          uhp->uh_next.ptr = uhp_table[j];
+          SET_FLAG(j);
+          break;
+        }
       }
     }
-    for (int j = 0; j < num_head; j++) {
-      if (uhp_table[j] != NULL
-          && uhp_table[j]->uh_seq == uhp->uh_prev.seq) {
-        uhp->uh_prev.ptr = uhp_table[j];
-        SET_FLAG(j);
-        break;
+    {
+      const int seq = uhp->uh_prev.seq;
+      uhp->uh_prev.ptr = NULL;
+      for (int j = 0; j < num_head; j++) {
+        if (uhp_table[j] != NULL && i != j && uhp_table[j]->uh_seq == seq) {
+          uhp->uh_prev.ptr = uhp_table[j];
+          SET_FLAG(j);
+          break;
+        }
       }
     }
-    for (int j = 0; j < num_head; j++) {
-      if (uhp_table[j] != NULL
-          && uhp_table[j]->uh_seq == uhp->uh_alt_next.seq) {
-        uhp->uh_alt_next.ptr = uhp_table[j];
-        SET_FLAG(j);
-        break;
+    {
+      const int seq = uhp->uh_alt_next.seq;
+      uhp->uh_alt_next.ptr = NULL;
+      for (int j = 0; j < num_head; j++) {
+        if (uhp_table[j] != NULL && i != j && uhp_table[j]->uh_seq == seq) {
+          uhp->uh_alt_next.ptr = uhp_table[j];
+          SET_FLAG(j);
+          break;
+        }
       }
     }
-    for (int j = 0; j < num_head; j++) {
-      if (uhp_table[j] != NULL
-          && uhp_table[j]->uh_seq == uhp->uh_alt_prev.seq) {
-        uhp->uh_alt_prev.ptr = uhp_table[j];
-        SET_FLAG(j);
-        break;
+    {
+      const int seq = uhp->uh_alt_prev.seq;
+      uhp->uh_alt_prev.ptr = NULL;
+      for (int j = 0; j < num_head; j++) {
+        if (uhp_table[j] != NULL && i != j && uhp_table[j]->uh_seq == seq) {
+          uhp->uh_alt_prev.ptr = uhp_table[j];
+          SET_FLAG(j);
+          break;
+        }
       }
     }
     if (old_header_seq > 0 && old_idx < 0 && uhp->uh_seq == old_header_seq) {
@@ -1880,7 +1892,9 @@ static void u_doit(int startcount, bool quiet, bool do_buf_event)
         curbuf->b_u_curhead = curbuf->b_u_oldhead;
         beep_flush();
         if (count == startcount - 1) {
-          msg(_("Already at oldest change"), 0);
+          if (!shortmess(SHM_UNDO)) {
+            msg(_("Already at oldest change"), 0);
+          }
           return;
         }
         break;
@@ -1891,7 +1905,9 @@ static void u_doit(int startcount, bool quiet, bool do_buf_event)
       if (curbuf->b_u_curhead == NULL || get_undolevel(curbuf) <= 0) {
         beep_flush();  // nothing to redo
         if (count == startcount - 1) {
-          msg(_("Already at newest change"), 0);
+          if (!shortmess(SHM_UNDO)) {
+            msg(_("Already at newest change"), 0);
+          }
           return;
         }
         break;
@@ -2112,10 +2128,12 @@ void undo_time(int step, bool sec, bool file, bool absolute)
     }
 
     if (closest == closest_start) {
-      if (step < 0) {
-        msg(_("Already at oldest change"), 0);
-      } else {
-        msg(_("Already at newest change"), 0);
+      if (!shortmess(SHM_UNDO)) {
+        if (step < 0) {
+          msg(_("Already at oldest change"), 0);
+        } else {
+          msg(_("Already at newest change"), 0);
+        }
       }
       return;
     }
@@ -2545,7 +2563,8 @@ static void u_undo_end(bool did_undo, bool absolute, bool quiet)
 
   if (quiet
       || global_busy        // no messages until global is finished
-      || !messaging()) {    // 'lazyredraw' set, don't do messages now
+      || !messaging()       // 'lazyredraw' set, don't do messages now
+      || shortmess(SHM_UNDO)) {
     return;
   }
 

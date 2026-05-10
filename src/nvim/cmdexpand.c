@@ -346,7 +346,7 @@ int nextwild(expand_T *xp, int type, int options, bool escape)
     cmdline_orig = cstrn_to_string(ccline->cmdbuff, (size_t)ccline->cmdlen);
   }
 
-  if (p != NULL && !got_int && !(options & WILD_NOSELECT)) {
+  if (p != NULL && !got_int && !(options & (WILD_NOSELECT | WILD_NOINSERT))) {
     size_t plen = strlen(p);
     int difflen = (int)plen - (int)(xp->xp_pattern_len);
     if (ccline->cmdlen + difflen + 4 > ccline->cmdbufflen) {
@@ -373,7 +373,8 @@ int nextwild(expand_T *xp, int type, int options, bool escape)
 
   if (xp->xp_numfiles <= 0 && p == NULL) {
     beep_flush();
-  } else if (xp->xp_numfiles == 1 && !(options & WILD_NOSELECT) && !wild_navigate) {
+  } else if (xp->xp_numfiles == 1 && !(options & (WILD_NOSELECT | WILD_NOINSERT))
+             && !wild_navigate) {
     // free expanded pattern
     ExpandOne(xp, NULL, NULL, 0, WILD_FREE);
   }
@@ -385,7 +386,7 @@ int nextwild(expand_T *xp, int type, int options, bool escape)
 
 /// Create completion popup menu with items from "matches".
 static void cmdline_pum_create(CmdlineInfo *ccline, expand_T *xp, char **matches, int numMatches,
-                               bool showtail, bool noselect)
+                               bool showtail, bool cmdline_unchanged)
 {
   assert(numMatches >= 0);
   // Add all the completion matches
@@ -393,17 +394,18 @@ static void cmdline_pum_create(CmdlineInfo *ccline, expand_T *xp, char **matches
   compl_match_arraysize = numMatches;
   for (int i = 0; i < numMatches; i++) {
     compl_match_array[i] = (pumitem_T){
-      .pum_text = SHOW_MATCH(i),
-      .pum_info = NULL,
-      .pum_extra = NULL,
-      .pum_kind = NULL,
+      .pum_text = (xp->xp_files_abbr != NULL && xp->xp_files_abbr[i] != NULL)
+                  ? xp->xp_files_abbr[i] : SHOW_MATCH(i),
+      .pum_info = xp->xp_files_info != NULL ? xp->xp_files_info[i] : NULL,
+      .pum_extra = xp->xp_files_menu != NULL ? xp->xp_files_menu[i] : NULL,
+      .pum_kind = xp->xp_files_kind != NULL ? xp->xp_files_kind[i] : NULL,
       .pum_user_abbr_hlattr = -1,
       .pum_user_kind_hlattr = -1,
     };
   }
 
   // Compute the popup menu starting column
-  char *endpos = showtail ? showmatches_gettail(xp->xp_pattern, noselect) : xp->xp_pattern;
+  char *endpos = showtail ? showmatches_gettail(xp->xp_pattern, cmdline_unchanged) : xp->xp_pattern;
   if (ui_has(kUICmdline) && cmdline_win == NULL) {
     compl_startcol = (int)(endpos - ccline->cmdbuff);
   } else {
@@ -871,6 +873,26 @@ static char *find_longest_match(expand_T *xp, int options)
   return xmemdupz(xp->xp_files[0], len);
 }
 
+void free_xp_files_extra(expand_T *xp, int numfiles)
+{
+  if (xp->xp_files_abbr != NULL) {
+    FreeWild(numfiles, xp->xp_files_abbr);
+    xp->xp_files_abbr = NULL;
+  }
+  if (xp->xp_files_kind != NULL) {
+    FreeWild(numfiles, xp->xp_files_kind);
+    xp->xp_files_kind = NULL;
+  }
+  if (xp->xp_files_menu != NULL) {
+    FreeWild(numfiles, xp->xp_files_menu);
+    xp->xp_files_menu = NULL;
+  }
+  if (xp->xp_files_info != NULL) {
+    FreeWild(numfiles, xp->xp_files_info);
+    xp->xp_files_info = NULL;
+  }
+}
+
 /// Do wildcard expansion on the string "str".
 /// Chars that should not be expanded must be preceded with a backslash.
 /// Return a pointer to allocated memory containing the new string.
@@ -933,6 +955,7 @@ char *ExpandOne(expand_T *xp, char *str, char *orig, int options, int mode)
   // free old names
   if (xp->xp_numfiles != -1 && mode != WILD_ALL && mode != WILD_LONGEST) {
     FreeWild(xp->xp_numfiles, xp->xp_files);
+    free_xp_files_extra(xp, xp->xp_numfiles);
     xp->xp_numfiles = -1;
     XFREE_CLEAR(xp->xp_orig);
 
@@ -1023,6 +1046,7 @@ void ExpandInit(expand_T *xp)
 void ExpandCleanup(expand_T *xp)
 {
   if (xp->xp_numfiles >= 0) {
+    free_xp_files_extra(xp, xp->xp_numfiles);
     FreeWild(xp->xp_numfiles, xp->xp_files);
     xp->xp_numfiles = -1;
   }
@@ -1070,7 +1094,7 @@ static void showmatches_oneline(expand_T *xp, char **matches, int numMatches, in
         // Expansion was done before and special characters
         // were escaped, need to halve backslashes.  Also
         // $HOME has been replaced with ~/.
-        char *exp_path = expand_env_save_opt(matches[j], true);
+        char *exp_path = expand_env_save_opt(matches[j], true, NULL);
         char *path = exp_path != NULL ? exp_path : matches[j];
         char *halved_slash = backslash_halve_save(path);
         isdir = os_isdir(halved_slash);
@@ -1103,7 +1127,7 @@ static void showmatches_oneline(expand_T *xp, char **matches, int numMatches, in
 /// Display completion matches.
 /// Returns EXPAND_NOTHING when the character that triggered expansion should be
 ///   inserted as a normal character.
-int showmatches(expand_T *xp, bool display_wildmenu, bool display_list, bool noselect)
+int showmatches(expand_T *xp, bool display_wildmenu, bool display_list, int wim_flags_arg)
 {
   CmdlineInfo *const ccline = get_cmdline_info();
   int numMatches;
@@ -1112,6 +1136,9 @@ int showmatches(expand_T *xp, bool display_wildmenu, bool display_list, bool nos
   int lines;
   int columns;
   bool showtail;
+  bool noselect = (wim_flags_arg & kOptWimFlagNoselect);
+  bool noinsert = (wim_flags_arg & kOptWimFlagNoinsert);
+  bool cmdline_unchanged = noselect || noinsert;
 
   if (xp->xp_numfiles == -1) {
     set_expand_context(xp);
@@ -1131,7 +1158,7 @@ int showmatches(expand_T *xp, bool display_wildmenu, bool display_list, bool nos
   }
 
   if (cmdline_compl_use_pum(display_wildmenu && !display_list)) {
-    cmdline_pum_create(ccline, xp, matches, numMatches, showtail, noselect);
+    cmdline_pum_create(ccline, xp, matches, numMatches, showtail, cmdline_unchanged);
     compl_selected = noselect ? -1 : 0;
     pum_clear();
     cmdline_pum_display(true);
@@ -1207,6 +1234,7 @@ int showmatches(expand_T *xp, bool display_wildmenu, bool display_list, bool nos
 
   if (xp->xp_numfiles == -1) {
     FreeWild(numMatches, matches);
+    free_xp_files_extra(xp, numMatches);
   }
 
   return EXPAND_OK;
@@ -1582,7 +1610,9 @@ static void set_context_for_wildcard_arg(exarg_T *eap, const char *arg, bool use
       in_quote = !in_quote;
       // An argument can contain just about everything, except
       // characters that end the command and white space.
-    } else if (c == '|' || c == '\n' || c == '"' || ascii_iswhite(c)) {
+    } else if (c == '|' || c == '\n' || c == '"'
+               || (ascii_iswhite(c) && (!(eap != NULL && (eap->argt & EX_NOSPC))
+                                        || usefilter))) {
       len = 0;  // avoid getting stuck when space is in 'isfname'
       while (*p != NUL) {
         c = utf_ptr2char(p);
@@ -2705,7 +2735,7 @@ static int expand_files_and_dirs(expand_T *xp, char *pat, char ***matches, int *
 
   int ret = FAIL;
   if (xp->xp_context == EXPAND_FINDFUNC) {
-    ret = expand_findfunc(pat, matches, numMatches);
+    ret = expand_findfunc(xp, pat, matches, numMatches);
   } else {
     if (xp->xp_context == EXPAND_FILES) {
       flags |= EW_FILE;
@@ -3530,6 +3560,87 @@ static int ExpandUserDefined(const char *const pat, expand_T *xp, regmatch_T *re
   return OK;
 }
 
+void expand_process_user_list(list_T *retlist, char ***matches, int *numMatches, expand_T *xp)
+{
+  garray_T ga;
+  garray_T ga_abbr;
+  garray_T ga_kind;
+  garray_T ga_menu;
+  garray_T ga_info;
+  bool have_extra = false;
+  ga_init(&ga, sizeof(char *), 3);
+  ga_init(&ga_abbr, sizeof(char *), 3);
+  ga_init(&ga_kind, sizeof(char *), 3);
+  ga_init(&ga_menu, sizeof(char *), 3);
+  ga_init(&ga_info, sizeof(char *), 3);
+  // Loop over the items in the list.
+  TV_LIST_ITER_CONST(retlist, li, {
+    const typval_T *tv = TV_LIST_ITEM_TV(li);
+    char *p = NULL;
+    char *abbr = NULL;
+    char *kind = NULL;
+    char *menu = NULL;
+    char *info = NULL;
+
+    if (tv->v_type == VAR_STRING) {
+      if (tv->vval.v_string == NULL) {
+        continue;  // Skip NULL strings
+      }
+      p = xstrdup(tv->vval.v_string);
+    } else if (tv->v_type == VAR_DICT && tv->vval.v_dict != NULL) {
+      dict_T *d = tv->vval.v_dict;
+      char *word = tv_dict_get_string(d, "word", false);
+
+      if (word == NULL) {
+        continue;  // "word" is required
+      }
+      p = xstrdup(word);
+      abbr = tv_dict_get_string(d, "abbr", true);
+      kind = tv_dict_get_string(d, "kind", true);
+      menu = tv_dict_get_string(d, "menu", true);
+      info = tv_dict_get_string(d, "info", true);
+      if (abbr != NULL || kind != NULL || menu != NULL || info != NULL) {
+        have_extra = true;
+      }
+    } else {
+      continue;  // Skip other types
+    }
+
+    GA_APPEND(char *, &ga, p);
+    GA_APPEND(char *, &ga_abbr, abbr);
+    GA_APPEND(char *, &ga_kind, kind);
+    GA_APPEND(char *, &ga_menu, menu);
+    GA_APPEND(char *, &ga_info, info);
+  });
+
+  *matches = ga.ga_data;
+  *numMatches = ga.ga_len;
+  if (have_extra && ga.ga_len > 0) {
+    xp->xp_files_abbr = (char **)ga_abbr.ga_data;
+    xp->xp_files_kind = (char **)ga_kind.ga_data;
+    xp->xp_files_menu = (char **)ga_menu.ga_data;
+    xp->xp_files_info = (char **)ga_info.ga_data;
+  } else {
+    // No extra info collected; free the placeholder NULL entries.
+    for (int i = 0; i < ga_abbr.ga_len; i++) {
+      xfree(((char **)ga_abbr.ga_data)[i]);
+    }
+    xfree(ga_abbr.ga_data);
+    for (int i = 0; i < ga_kind.ga_len; i++) {
+      xfree(((char **)ga_kind.ga_data)[i]);
+    }
+    xfree(ga_kind.ga_data);
+    for (int i = 0; i < ga_menu.ga_len; i++) {
+      xfree(((char **)ga_menu.ga_data)[i]);
+    }
+    xfree(ga_menu.ga_data);
+    for (int i = 0; i < ga_info.ga_len; i++) {
+      xfree(((char **)ga_info.ga_data)[i]);
+    }
+    xfree(ga_info.ga_data);
+  }
+}
+
 /// Expand names with a list returned by a function defined by the user.
 static int ExpandUserList(expand_T *xp, char ***matches, int *numMatches)
 {
@@ -3540,26 +3651,12 @@ static int ExpandUserList(expand_T *xp, char ***matches, int *numMatches)
     return FAIL;
   }
 
-  garray_T ga;
-  ga_init(&ga, (int)sizeof(char *), 3);
-  // Loop over the items in the list.
-  TV_LIST_ITER_CONST(retlist, li, {
-    if (TV_LIST_ITEM_TV(li)->v_type != VAR_STRING
-        || TV_LIST_ITEM_TV(li)->vval.v_string == NULL) {
-      continue;  // Skip non-string items and empty strings.
-    }
-    char *p = xstrdup(TV_LIST_ITEM_TV(li)->vval.v_string);
-
-    GA_APPEND(char *, &ga, p);
-  });
+  expand_process_user_list(retlist, matches, numMatches, xp);
   tv_list_unref(retlist);
-
-  *matches = ga.ga_data;
-  *numMatches = ga.ga_len;
   return OK;
 }
 
-static int ExpandUserLua(expand_T *xp, int *num_file, char ***file)
+static int ExpandUserLua(expand_T *xp, int *numMatches, char ***matches)
 {
   typval_T rettv = TV_INITIAL_VALUE;
   nlua_call_user_expand_func(xp, &rettv);
@@ -3570,21 +3667,8 @@ static int ExpandUserLua(expand_T *xp, int *num_file, char ***file)
 
   list_T *const retlist = rettv.vval.v_list;
 
-  garray_T ga;
-  ga_init(&ga, (int)sizeof(char *), 3);
-  // Loop over the items in the list.
-  TV_LIST_ITER_CONST(retlist, li, {
-    if (TV_LIST_ITEM_TV(li)->v_type != VAR_STRING
-        || TV_LIST_ITEM_TV(li)->vval.v_string == NULL) {
-      continue;  // Skip non-string items and empty strings.
-    }
-
-    GA_APPEND(char *, &ga, xstrdup(TV_LIST_ITEM_TV(li)->vval.v_string));
-  });
+  expand_process_user_list(retlist, matches, numMatches, xp);
   tv_list_unref(retlist);
-
-  *file = ga.ga_data;
-  *num_file = ga.ga_len;
   return OK;
 }
 

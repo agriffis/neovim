@@ -376,13 +376,27 @@ end
 
 vim.list = {}
 
----TODO(ofseed): memoize, string value support, type alias.
 ---@generic T
----@param v T
----@param key? fun(v: T): any
----@return any
-local function key_fn(v, key)
-  return key and key(v) or v
+---@param key? string|fun(val: T): any
+---@return fun(v: T): any
+local function make_key_fn(key)
+  vim.validate('key', key, { 'string', 'function' }, true)
+
+  if not key then
+    return function(v)
+      return v
+    end
+  end
+
+  if type(key) == 'string' then
+    local field = key
+    ---@param v any
+    key = function(v)
+      return v and v[field]
+    end
+  end
+
+  return key
 end
 
 --- Removes duplicate values from a |lua-list| in-place.
@@ -392,6 +406,7 @@ end
 ---
 --- Accepts an optional `key` argument, which if provided is called for each
 --- value in the list to compute a hash key for uniqueness comparison.
+--- If `key` is a string, it is used as the field name to index each value.
 --- This is useful for deduplicating table values or complex objects.
 --- If `key` returns `nil` for a value, that value will be considered unique,
 --- even if multiple values return `nil`.
@@ -404,18 +419,19 @@ end
 --- -- t is now {1, 2, 3}
 ---
 --- local t = { {id=1}, {id=2}, {id=1} }
---- vim.list.unique(t, function(x) return x.id end)
+--- vim.list.unique(t, 'id')
 --- -- t is now { {id=1}, {id=2} }
 --- ```
 ---
 --- @since 14
 --- @generic T
 --- @param t T[]
---- @param key? fun(x: T): any Optional hash function to determine uniqueness of values
+--- @param key? string|fun(x: T): any Optional field name or hash function to determine uniqueness of values
 --- @return T[] : The deduplicated list
 --- @see |Iter:unique()|
 function vim.list.unique(t, key)
   vim.validate('t', t, 'table')
+  local key_fn = make_key_fn(key)
   local seen = {} --- @type table<any,boolean>
 
   local finish = #t
@@ -423,7 +439,7 @@ function vim.list.unique(t, key)
   local j = 1
   for i = 1, finish do
     local v = t[i]
-    local vh = key_fn(v, key)
+    local vh = key_fn(v)
     if not seen[vh] then
       t[j] = v
       if vh ~= nil then
@@ -452,7 +468,8 @@ end
 ---@field hi? integer
 ---
 --- Optional, compare the return value instead of the {val} itself if provided.
----@field key? fun(val: any): any
+--- If a string, index each value by this field name.
+---@field key? string|fun(val: any): any
 ---
 --- Specifies the search variant.
 ---   - "lower": returns the first position
@@ -465,18 +482,18 @@ end
 ---@generic T
 ---@param t T[]
 ---@param val T
----@param key? fun(val: any): any
 ---@param lo integer
 ---@param hi integer
+---@param key_fn fun(val: any): any
 ---@return integer i in range such that `t[j]` < {val} for all j < i,
 ---                and `t[j]` >= {val} for all j >= i,
 ---                or return {hi} if no such index is found.
-local function lower_bound(t, val, lo, hi, key)
+local function lower_bound(t, val, lo, hi, key_fn)
   local bit = require('bit') -- Load bitop on demand
-  local val_key = key_fn(val, key)
+  local val_key = key_fn(val)
   while lo < hi do
     local mid = bit.rshift(lo + hi, 1) -- Equivalent to floor((lo + hi) / 2)
-    if key_fn(t[mid], key) < val_key then
+    if key_fn(t[mid]) < val_key then
       lo = mid + 1
     else
       hi = mid
@@ -488,18 +505,18 @@ end
 ---@generic T
 ---@param t T[]
 ---@param val T
----@param key? fun(val: any): any
 ---@param lo integer
 ---@param hi integer
+---@param key_fn fun(val: any): any
 ---@return integer i in range such that `t[j]` <= {val} for all j < i,
 ---                and `t[j]` > {val} for all j >= i,
 ---                or return {hi} if no such index is found.
-local function upper_bound(t, val, lo, hi, key)
+local function upper_bound(t, val, lo, hi, key_fn)
   local bit = require('bit') -- Load bitop on demand
-  local val_key = key_fn(val, key)
+  local val_key = key_fn(val)
   while lo < hi do
     local mid = bit.rshift(lo + hi, 1) -- Equivalent to floor((lo + hi) / 2)
-    if val_key < key_fn(t[mid], key) then
+    if val_key < key_fn(t[mid]) then
       hi = mid
     else
       lo = mid + 1
@@ -553,12 +570,12 @@ function vim.list.bisect(t, val, opts)
   opts = opts or {}
   local lo = opts.lo or 1
   local hi = opts.hi or #t + 1
-  local key = opts.key
+  local key_fn = make_key_fn(opts.key)
 
   if opts.bound == 'upper' then
-    return upper_bound(t, val, lo, hi, key)
+    return upper_bound(t, val, lo, hi, key_fn)
   else
-    return lower_bound(t, val, lo, hi, key)
+    return lower_bound(t, val, lo, hi, key_fn)
   end
 end
 
@@ -643,8 +660,8 @@ end
 ---
 ---@param behavior 'error'|'keep'|'force'|fun(key:any, prev_value:any?, value:any): any Decides what to do if a key is found in more than one map:
 ---      - "error": raise an error
----      - "keep":  use value from the leftmost map
 ---      - "force": use value from the rightmost map
+---      - "keep":  use value from the leftmost map
 ---      - If a function, it receives the current key, the previous value in the currently merged table (if present), the current value and should
 ---        return the value for the given key in the merged table.
 ---@param ... table Two or more tables
@@ -676,8 +693,8 @@ end
 ---@generic T2: table
 ---@param behavior 'error'|'keep'|'force'|fun(key:any, prev_value:any?, value:any): any Decides what to do if a key is found in more than one map:
 ---      - "error": raise an error
----      - "keep":  use value from the leftmost map
 ---      - "force": use value from the rightmost map
+---      - "keep":  use value from the leftmost map
 ---      - If a function, it receives the current key, the previous value in the currently merged table (if present), the current value and should
 ---        return the value for the given key in the merged table.
 ---@param ... T2 Two or more tables
@@ -960,13 +977,22 @@ function vim.islist(t)
   for _ in
     pairs(t--[[@as table<any,any>]])
   do
-    if t[j] == nil then
+    if rawget(t, j) == nil then
       return false
     end
     j = j + 1
   end
 
   return true
+end
+
+--- Tests if `t` is `nil` or |vim.NIL|.
+---
+--- @since 15
+--- @param t? any
+--- @return boolean `true` if `nil` or |vim.NIL|, else `false`.
+function vim.isnil(t)
+  return t == nil or t == vim.NIL
 end
 
 --- Counts the number of non-nil values in table `t`.
@@ -1545,7 +1571,7 @@ local get_context_state = function(context)
 
       -- Do not override already set state and fall back to `vim.NIL` for
       -- state `nil` values (which still needs restoring later)
-      res[sc][name] = vim.F.if_nil(res[sc][name], vim[sc][name], vim.NIL)
+      res[sc][name] = vim.nonnil(res[sc][name], vim[sc][name], vim.NIL)
 
       -- Always track global option value to properly restore later.
       -- This matters for at least `o` and `wo` (which might set either/both
@@ -1669,14 +1695,14 @@ function vim._with(context, f)
   return vim._with_c(context, callback)
 end
 
---- @param bufnr? integer
+--- @param buf? integer
 --- @return integer
-function vim._resolve_bufnr(bufnr)
-  if bufnr == nil or bufnr == 0 then
+function vim._resolve_bufnr(buf)
+  if buf == nil or buf == 0 then
     return vim.api.nvim_get_current_buf()
   end
-  vim.validate('bufnr', bufnr, 'number')
-  return bufnr
+  vim.validate('buf', buf, 'number')
+  return buf
 end
 
 --- @generic T
@@ -1720,5 +1746,50 @@ end
 
 -- Use max 32-bit signed int value to avoid overflow on 32-bit systems. #31633
 vim._maxint = 2 ^ 32 - 1
+
+--- Returns the first argument which is not nil.
+---
+--- If all arguments are nil, returns nil.
+---
+--- Example:
+---
+--- ```lua
+--- local a = nil
+--- local b = nil
+--- local c = 42
+--- local d = true
+--- assert(vim.nonnil(a, b, c, d) == 42)
+--- ```
+---
+--- @since 15
+--- @generic T
+--- @param ... T
+--- @return T
+function vim.nonnil(...)
+  local nargs = select('#', ...)
+  for i = 1, nargs do
+    local v = select(i, ...)
+    if v ~= nil then
+      return v
+    end
+  end
+  return nil
+end
+
+--- Calls the function `fn` in `protected mode` like |pcall()|, but returns
+--- `nil` on error.
+---
+--- @since 15
+--- @generic T
+--- @param fn fun(...):T
+--- @param ... any?
+--- @return T ...
+function vim.npcall(fn, ...)
+  return (function(success, ...)
+    if success then
+      return ...
+    end
+  end)(pcall(fn, ...))
+end
 
 return vim

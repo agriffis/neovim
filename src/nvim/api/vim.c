@@ -864,10 +864,10 @@ Union(Integer, String) nvim_echo(ArrayOf(Tuple(String, *HLGroupID)) chunks, Bool
     goto error;
   });
 
-  VALIDATE_EXP((!is_progress || strequal(opts->status.data, "success")
-                || strequal(opts->status.data, "failed")
-                || strequal(opts->status.data, "running")
-                || strequal(opts->status.data, "cancel")),
+  VALIDATE_EXP(!is_progress || strequal(opts->status.data, "success")
+               || strequal(opts->status.data, "failed")
+               || strequal(opts->status.data, "running")
+               || strequal(opts->status.data, "cancel"),
                "status", "success|failed|running|cancel", opts->status.data, {
     goto error;
   });
@@ -878,13 +878,16 @@ Union(Integer, String) nvim_echo(ArrayOf(Tuple(String, *HLGroupID)) chunks, Bool
     goto error;
   });
 
-  VALIDATE_R((!is_progress || opts->source.size != 0), "opts.source", {
+  VALIDATE_R(!is_progress || opts->source.size != 0, "opts.source", {
+    goto error;
+  });
+  VALIDATE_S(!is_progress || !strequal(opts->source.data, "nvim"), "source", opts->source.data, {
     goto error;
   });
 
   // Message-id may be user-defined only if String, not Integer.
-  VALIDATE(opts->id.type != kObjectTypeInteger || msg_id_exists(opts->id.data.integer),
-           "Invalid 'id': %" PRId64, opts->id.data.integer, {
+  VALIDATE_INT(opts->id.type != kObjectTypeInteger || msg_id_exists(opts->id.data.integer),
+               "id", opts->id.data.integer, {
     goto error;
   });
 
@@ -915,10 +918,6 @@ Union(Integer, String) nvim_echo(ArrayOf(Tuple(String, *HLGroupID)) chunks, Bool
   if (opts->verbose) {
     verbose_leave();
     verbose_stop();  // flush now
-  }
-
-  if (is_progress) {
-    do_autocmd_progress(id, hl_msg, &msg_data);
   }
 
   if (!needs_clear) {
@@ -1631,9 +1630,9 @@ ArrayOf(DictAs(get_keymap)) nvim_get_keymap(String mode, Arena *arena)
 /// @param  rhs   Right-hand-side |{rhs}| of the mapping.
 /// @param  opts  Optional parameters map: Accepts all |:map-arguments| as keys except [<buffer>],
 ///               values are booleans (default false). Also:
-///               - "noremap" disables |recursive_mapping|, like |:noremap|
-///               - "desc" human-readable description.
 ///               - "callback" Lua function called in place of {rhs}.
+///               - "desc" human-readable description.
+///               - "noremap" disables |recursive_mapping|, like |:noremap|
 ///               - "replace_keycodes" (boolean) When "expr" is true, replace keycodes in the
 ///                 resulting string (see |nvim_replace_termcodes()|). Returning nil from the Lua
 ///                 "callback" is equivalent to returning an empty string.
@@ -1686,22 +1685,22 @@ ArrayOf(Object, 2) nvim_get_api_info(uint64_t channel_id, Arena *arena)
 /// @param name Client short-name. Sets the `client.name` field of |nvim_get_chan_info()|.
 /// @param version  Dict describing the version, with these
 ///     (optional) keys:
+///     - "commit" hash or similar identifier of commit
 ///     - "major" major version (defaults to 0 if not set, for no release yet)
 ///     - "minor" minor version
 ///     - "patch" patch number
 ///     - "prerelease" string describing a prerelease, like "dev" or "beta1"
-///     - "commit" hash or similar identifier of commit
 /// @param type Must be one of the following values. Client libraries should
 ///     default to "remote" unless overridden by the user.
-///     - "remote" remote client connected "Nvim flavored" MessagePack-RPC (responses
-///                must be in reverse order of requests). |msgpack-rpc|
-///     - "msgpack-rpc" remote client connected to Nvim via fully MessagePack-RPC
-///                     compliant protocol.
-///     - "ui" gui frontend
 ///     - "embedder" application using Nvim as a component (for example,
 ///                  IDE/editor implementing a vim mode).
 ///     - "host" plugin host, typically started by nvim
+///     - "msgpack-rpc" remote client connected to Nvim via fully MessagePack-RPC
+///                     compliant protocol.
 ///     - "plugin" single plugin, started by nvim
+///     - "remote" remote client connected "Nvim flavored" MessagePack-RPC (responses
+///                must be in reverse order of requests). |msgpack-rpc|
+///     - "ui" gui frontend
 /// @param methods Builtin methods in the client. For a host, this does not
 ///     include plugin methods which will be discovered later.
 ///     The key should be the method name, the values are dicts with
@@ -1716,11 +1715,11 @@ ArrayOf(Object, 2) nvim_get_api_info(uint64_t channel_id, Arena *arena)
 ///
 /// @param attributes Arbitrary string:string map of informal client properties.
 ///     Suggested keys:
-///     - "pid":     Process id.
-///     - "website": Client homepage URL (e.g. GitHub repository)
 ///     - "license": License description ("Apache 2", "GPLv3", "MIT", …)
 ///     - "logo":    URI or path to image, preferably small logo or icon.
 ///                  .png or .svg format is preferred.
+///     - "pid":     Process id.
+///     - "website": Client homepage URL (e.g. GitHub repository)
 ///
 /// @param[out] err Error details, if any
 void nvim_set_client_info(uint64_t channel_id, String name, Dict version, String type, Dict methods,
