@@ -762,36 +762,6 @@ function vim.deep_equal(a, b)
   return deep_equal(a, b)
 end
 
---- Add the reverse lookup values to an existing table.
---- For example:
---- `tbl_add_reverse_lookup { A = 1 } == { [1] = 'A', A = 1 }`
----
---- Note that this *modifies* the input.
----@deprecated
----@param o table Table to add the reverse to
----@return table o
-function vim.tbl_add_reverse_lookup(o)
-  vim.deprecate('vim.tbl_add_reverse_lookup', nil, '0.12')
-
-  --- @cast o table<any,any>
-  --- @type any[]
-  local keys = vim.tbl_keys(o)
-  for _, k in ipairs(keys) do
-    local v = o[k]
-    if o[v] then
-      error(
-        string.format(
-          'The reverse lookup found an existing value for %q while processing key %q',
-          tostring(v),
-          tostring(k)
-        )
-      )
-    end
-    o[v] = k
-  end
-  return o
-end
-
 --- Gets a (nested) value from table `o` given by a sequence of keys `...`, or `nil` if not found.
 ---
 --- Note: To _set_ deeply nested keys, see |vim.tbl_deep_extend()|.
@@ -946,12 +916,6 @@ function vim.isarray(t)
     end
     return getmetatable(t) ~= vim._empty_dict_mt
   end
-end
-
---- @deprecated
-function vim.tbl_islist(t)
-  vim.deprecate('vim.tbl_islist', 'vim.islist', '0.12')
-  return vim.islist(t)
 end
 
 --- Tests if `t` is a "list": a table indexed _only_ by contiguous integers starting from 1 (what

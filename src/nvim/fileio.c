@@ -3299,7 +3299,7 @@ void forward_slash(char *fname)
 /// Path to Nvim's own temp dir. Ends in a slash.
 static char *vim_tempdir = NULL;
 #ifdef HAVE_DIRFD_AND_FLOCK
-DIR *vim_tempdir_dp = NULL;  ///< File descriptor of temp dir
+static DIR *vim_tempdir_dp = NULL;  ///< File descriptor of temp dir
 #endif
 
 /// Creates a directory for private use by this instance of Nvim, trying each of

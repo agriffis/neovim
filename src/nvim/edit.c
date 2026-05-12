@@ -4046,7 +4046,7 @@ static bool ins_tab(void)
       // Skip over the spaces we need.
       cstype = init_charsize_arg(&csarg, curwin, 0, ptr);
       while (vcol < want_vcol && *ptr == ' ') {
-        vcol += win_charsize(cstype, vcol, ptr, (uint8_t)(' '), &csarg).width;
+        vcol += win_charsize(cstype, vcol, ptr, ' ', &csarg).width;
         ptr++;
         repl_off++;
       }

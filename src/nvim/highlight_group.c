@@ -67,9 +67,9 @@ enum {
 static garray_T highlight_ga = GA_EMPTY_INIT_VALUE;
 
 // arena for object with same lifetime as highlight_ga (aka hl_table)
-Arena highlight_arena = ARENA_EMPTY;
+static Arena highlight_arena = ARENA_EMPTY;
 
-Map(cstr_t, int) highlight_unames = MAP_INIT;
+static Map(cstr_t, int) highlight_unames = MAP_INIT;
 
 /// The "term", "cterm" and "gui" arguments can be any combination of the
 /// following names, separated by commas (but no spaces!).

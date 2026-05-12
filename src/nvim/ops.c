@@ -2463,11 +2463,11 @@ bool do_addsub(int op_type, pos_T *pos, int length, linenr_T Prenum1)
     }
     if (do_bin
         && do_hex
-        && !((col > 0
-              && (ptr[col] == 'X' || ptr[col] == 'x')
-              && ptr[col - 1] == '0'
-              && !utf_head_off(ptr, ptr + col - 1)
-              && ascii_isxdigit(ptr[col + 1])))) {
+        && !(col > 0
+             && (ptr[col] == 'X' || ptr[col] == 'x')
+             && ptr[col - 1] == '0'
+             && !utf_head_off(ptr, ptr + col - 1)
+             && ascii_isxdigit(ptr[col + 1]))) {
       // In case of binary/hexadecimal pattern overlap match, rescan
 
       col = curwin->w_cursor.col;

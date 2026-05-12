@@ -165,6 +165,7 @@ static sattr_T msg_ext_last_attr = -1;
 static int msg_ext_last_hl_id;
 
 static bool msg_ext_history = false;  ///< message was added to history
+static bool msg_ext_append = false;  ///< message appended to previous message line
 
 static int msg_grid_pos_at_flush = 0;
 
@@ -1706,9 +1707,14 @@ void msg_ext_set_kind(const char *msg_kind)
   redir_col = msg_ext_append ? redir_col : 0;
 }
 
+void msg_ext_set_append(bool append)
+{
+  msg_ext_ui_flush();
+  msg_ext_append = append;
+}
+
 void msg_ext_set_trigger(const char *trigger)
 {
-  // Don't change the trigger of an existing batch:
   msg_ext_ui_flush();
   msg_ext_trigger = trigger;
 }
@@ -2446,7 +2452,7 @@ static void msg_puts_display(const char *str, int maxlen, int hl_id, int recurse
     const char *lastline = xmemrchr(str, '\n', len);
     maxlen -= (int)(lastline ? (lastline - str) : 0);
     const char *p = lastline ? lastline + 1 : str;
-    int col = (int)(maxlen < 0 ? mb_string2cells(p) : mb_string2cells_len(p, (size_t)(maxlen)));
+    int col = (int)(maxlen < 0 ? mb_string2cells(p) : mb_string2cells_len(p, (size_t)maxlen));
     msg_col = (lastline ? 0 : msg_col) + col;
 
     return;
@@ -3318,8 +3324,8 @@ void msg_clr_eos_force(void)
   if (ui_has(kUIMessages)) {
     return;
   }
-  int msg_startcol = (cmdmsg_rl) ? 0 : msg_col;
-  int msg_endcol = (cmdmsg_rl) ? Columns - msg_col : Columns;
+  int msg_startcol = cmdmsg_rl ? 0 : msg_col;
+  int msg_endcol = cmdmsg_rl ? Columns - msg_col : Columns;
 
   // TODO(bfredl): ugly, this state should already been validated at this
   // point. But msg_clr_eos() is called in a lot of places.

@@ -2482,10 +2482,13 @@ static char ex_error_buf[MSG_BUF_LEN];
 /// @return an error message with argument included.
 /// Uses a static buffer, only the last error will be kept.
 /// "msg" will be translated, caller should use N_().
-char *ex_errmsg(const char *const msg, const char *const arg)
-  FUNC_ATTR_NONNULL_ALL
+char *ex_errmsg(const char *const msg, ...)
+  FUNC_ATTR_NONNULL_ALL FUNC_ATTR_PRINTF(1, 2)
 {
-  vim_snprintf(ex_error_buf, MSG_BUF_LEN, _(msg), arg);
+  va_list ap;
+  va_start(ap, msg);
+  vim_vsnprintf(ex_error_buf, MSG_BUF_LEN, _(msg), ap);
+  va_end(ap);
   return ex_error_buf;
 }
 
@@ -3089,7 +3092,7 @@ bool checkforcmd(char **pp, const char *cmd, int len)
   int i;
 
   for (i = 0; cmd[i] != NUL; i++) {
-    if ((cmd)[i] != (*pp)[i]) {
+    if (cmd[i] != (*pp)[i]) {
       break;
     }
   }
@@ -3199,7 +3202,7 @@ char *find_ex_command(exarg_T *eap, int *full)
       // :delete with the 'l' flag.  Same for 'p'.
       int i;
       for (i = 0; i < len; i++) {
-        if (eap->cmd[i] != ("delete")[i]) {
+        if (eap->cmd[i] != "delete"[i]) {
           break;
         }
       }

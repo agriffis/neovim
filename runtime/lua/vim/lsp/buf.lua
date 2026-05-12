@@ -521,27 +521,6 @@ function M.signature_help(config)
   end)
 end
 
---- @deprecated
---- Retrieves the completion items at the current cursor position. Can only be
---- called in Insert mode.
----
----@param context table (context support not yet implemented) Additional information
---- about the context in which a completion was triggered (how it was triggered,
---- and by which trigger character, if applicable)
----
----@see vim.lsp.protocol.CompletionTriggerKind
-function M.completion(context)
-  validate('context', context, 'table', true)
-  vim.deprecate('vim.lsp.buf.completion', 'vim.lsp.completion.trigger', '0.12')
-  return lsp.buf_request(
-    0,
-    'textDocument/completion',
-    client_positional_params({
-      context = context,
-    })
-  )
-end
-
 ---@param bufnr integer
 ---@param mode "v"|"V"
 ---@return table {start={row,col}, end={row,col}} using (1, 0) indexing
@@ -1424,22 +1403,6 @@ function M.code_action(opts)
   end, function(results)
     on_code_action_results(results, opts)
   end)
-end
-
---- @deprecated
---- Executes an LSP server command.
---- @param command_params lsp.ExecuteCommandParams
---- @see https://microsoft.github.io/language-server-protocol/specifications/specification-current/#workspace_executeCommand
-function M.execute_command(command_params)
-  validate('command', command_params.command, 'string')
-  validate('arguments', command_params.arguments, 'table', true)
-  vim.deprecate('execute_command', 'client:exec_cmd', '0.12')
-  command_params = {
-    command = command_params.command,
-    arguments = command_params.arguments,
-    workDoneToken = command_params.workDoneToken,
-  }
-  lsp.buf_request(0, 'workspace/executeCommand', command_params)
 end
 
 ---@type { index: integer, ranges: lsp.Range[] }?

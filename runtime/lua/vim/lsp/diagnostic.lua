@@ -318,37 +318,6 @@ function M.on_diagnostic(error, result, ctx)
   end
 end
 
---- Get the diagnostics by line
----
---- Marked private as this is used internally by the LSP subsystem, but
---- most users should instead prefer |vim.diagnostic.get()|.
----
----@param bufnr integer|nil The buffer number
----@param line_nr integer|nil The line number
----@param opts {severity?:lsp.DiagnosticSeverity}?
----         - severity: (lsp.DiagnosticSeverity)
----             - Only return diagnostics with this severity.
----@param client_id integer|nil the client id
----@return table Table with map of line number to list of diagnostics.
----              Structured: { [1] = {...}, [5] = {.... } }
----@private
-function M.get_line_diagnostics(bufnr, line_nr, opts, client_id)
-  vim.deprecate('vim.lsp.diagnostic.get_line_diagnostics', 'vim.diagnostic.get', '0.12')
-  local diag_opts = {} --- @type vim.diagnostic.GetOpts
-
-  if opts and opts.severity then
-    diag_opts.severity = severity_lsp_to_vim(opts.severity)
-  end
-
-  if client_id then
-    diag_opts.namespace = M.get_namespace(client_id)
-  end
-
-  diag_opts.lnum = line_nr or (api.nvim_win_get_cursor(0)[1] - 1)
-
-  return M.from(vim.diagnostic.get(bufnr, diag_opts))
-end
-
 --- Clear diagnostics from pull based clients
 local function clear(bufnr)
   for _, namespace in pairs(client_pull_namespaces) do

@@ -1166,12 +1166,6 @@ function lsp.get_clients(filter)
   return clients
 end
 
----@deprecated
-function lsp.get_active_clients(filter)
-  vim.deprecate('vim.lsp.get_active_clients()', 'vim.lsp.get_clients()', '0.12')
-  return lsp.get_clients(filter)
-end
-
 -- Minimum time before warning about LSP exit_timeout on Nvim exit.
 local min_warn_exit_timeout = 100
 
@@ -1535,21 +1529,6 @@ function lsp.client_is_stopped(client_id)
   return not lsp.get_client_by_id(client_id)
 end
 
---- Gets a map of client_id:client pairs for the given buffer, where each value
---- is a |vim.lsp.Client| object.
----
----@param bufnr integer? Buffer handle, or 0 for current
----@return table result is table of (client_id, client) pairs
----@deprecated Use |vim.lsp.get_clients()| instead.
-function lsp.buf_get_clients(bufnr)
-  vim.deprecate('vim.lsp.buf_get_clients()', 'vim.lsp.get_clients()', '0.12')
-  local result = {} --- @type table<integer,vim.lsp.Client>
-  for _, client in ipairs(lsp.get_clients({ bufnr = vim._resolve_bufnr(bufnr) })) do
-    result[client.id] = client
-  end
-  return result
-end
-
 --- Log level dictionary with reverse lookup as well.
 ---
 --- Can be used to lookup the number from the name or the
@@ -1589,42 +1568,6 @@ function lsp.get_log_path()
   vim.deprecate('vim.lsp.get_log_path()', 'vim.lsp.log.get_filename()', '0.13')
 
   return log.get_filename()
-end
-
----@nodoc
---- Invokes a function for each LSP client attached to a buffer.
----
----@param bufnr integer Buffer number
----@param fn function Function to run on each client attached to buffer
----                   {bufnr}. The function takes the client, client ID, and
----                   buffer number as arguments.
----@deprecated use lsp.get_clients({ bufnr = bufnr }) with regular loop
-function lsp.for_each_buffer_client(bufnr, fn)
-  vim.deprecate(
-    'vim.lsp.for_each_buffer_client()',
-    'lsp.get_clients({ bufnr = bufnr }) with regular loop',
-    '0.12'
-  )
-  bufnr = vim._resolve_bufnr(bufnr)
-
-  for _, client in pairs(lsp.get_clients({ bufnr = bufnr })) do
-    fn(client, client.id, bufnr)
-  end
-end
-
---- @deprecated
---- Function to manage overriding defaults for LSP handlers.
----@param handler (lsp.Handler) See |lsp-handler|
----@param override_config (table) Table containing the keys to override behavior of the {handler}
-function lsp.with(handler, override_config)
-  vim.deprecate(
-    'vim.lsp.with()',
-    'Pass the configuration to equivalent functions in `vim.lsp.buf`',
-    '0.12'
-  )
-  return function(err, result, ctx, config)
-    return handler(err, result, ctx, vim.tbl_deep_extend('force', config or {}, override_config))
-  end
 end
 
 --- Map of client-defined handlers implementing custom (off-spec) commands which a server may

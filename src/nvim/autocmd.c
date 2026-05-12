@@ -2535,7 +2535,7 @@ theend:
 bool aupat_is_buflocal(const char *pat, int patlen)
   FUNC_ATTR_PURE
 {
-  return patlen >= 8 && strncmp(pat, "<buffer", 7) == 0 && (pat)[patlen - 1] == '>';
+  return patlen >= 8 && strncmp(pat, "<buffer", 7) == 0 && pat[patlen - 1] == '>';
 }
 
 int aupat_get_buflocal_nr(const char *pat, int patlen)
@@ -2547,7 +2547,7 @@ int aupat_get_buflocal_nr(const char *pat, int patlen)
     return curbuf->b_fnum;
   }
 
-  if (patlen > 9 && (pat)[7] == '=') {
+  if (patlen > 9 && pat[7] == '=') {
     // "<buffer=abuf>"
     if (patlen == 13 && STRNICMP(pat, "<buffer=abuf>", 13) == 0) {
       return autocmd_bufnr;

@@ -4545,7 +4545,7 @@ int makeset(FILE *fd, int opt_flags, int local_only)
           // the syntax file.
           if (opt_idx == kOptSyntax || opt_idx == kOptFiletype) {
             if (fprintf(fd, "if &%s != '%s'", opt->fullname,
-                        *(char **)(varp)) < 0
+                        *(char **)varp) < 0
                 || put_eol(fd) < 0) {
               return FAIL;
             }
@@ -6214,7 +6214,7 @@ static void option_value2string(vimoption_T *opt, int opt_flags)
                (int64_t)(*(OptInt *)varp));
     }
   } else {  // string
-    varp = *(char **)(varp);
+    varp = *(char **)varp;
 
     if (opt->flags & kOptFlagExpand) {
       home_replace(NULL, varp, NameBuff, MAXPATHL, false);
