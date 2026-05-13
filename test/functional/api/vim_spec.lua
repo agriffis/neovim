@@ -1555,29 +1555,53 @@ describe('API', function()
       )
     end)
     it('inserts text', function()
+      exec([[
+        let g:pre_event = []
+        let g:post_event = []
+        au TextPutPre * let g:pre_event = copy(v:event)
+        au TextPutPost * let g:post_event = copy(v:event)
+      ]])
       -- linewise
-      api.nvim_put({ 'line 1', 'line 2', 'line 3' }, 'l', true, true)
+      local lines = { 'line 1', 'line 2', 'line 3' }
+      local expected_event = {
+        regcontents = lines,
+        regname = '_',
+        operator = 'p',
+        regtype = 'V',
+        visual = false,
+      }
+      api.nvim_put(lines, 'l', true, true)
       expect([[
 
         line 1
         line 2
         line 3]])
       eq({ 0, 4, 1, 0 }, fn.getpos('.'))
+      eq(expected_event, api.nvim_get_var('pre_event'))
+      eq(expected_event, api.nvim_get_var('post_event'))
       command('%delete _')
       -- charwise
+      expected_event.regtype = 'v'
       api.nvim_put({ 'line 1', 'line 2', 'line 3' }, 'c', true, false)
       expect([[
         line 1
         line 2
         line 3]])
       eq({ 0, 1, 1, 0 }, fn.getpos('.')) -- follow=false
+      eq(expected_event, api.nvim_get_var('pre_event'))
+      eq(expected_event, api.nvim_get_var('post_event'))
       -- blockwise
-      api.nvim_put({ 'AA', 'BB' }, 'b', true, true)
+      lines = { 'AA', 'BB' }
+      expected_event.regcontents = lines
+      expected_event.regtype = '\0222'
+      api.nvim_put(lines, 'b', true, true)
       expect([[
         lAAine 1
         lBBine 2
         line 3]])
       eq({ 0, 2, 4, 0 }, fn.getpos('.'))
+      eq(expected_event, api.nvim_get_var('pre_event'))
+      eq(expected_event, api.nvim_get_var('post_event'))
       command('%delete _')
       -- Empty lines list.
       api.nvim_put({}, 'c', true, true)
@@ -1590,19 +1614,27 @@ describe('API', function()
       ]])
       api.nvim_put({ 'AB' }, 'c', true, true)
       -- after=false, follow=true
-      api.nvim_put({ 'line 1', 'line 2' }, 'c', false, true)
+      lines = { 'line 1', 'line 2' }
+      expected_event.regcontents = lines
+      expected_event.regtype = 'v'
+      expected_event.operator = 'P'
+      api.nvim_put(lines, 'c', false, true)
       expect([[
         Aline 1
         line 2B]])
       eq({ 0, 2, 7, 0 }, fn.getpos('.'))
+      eq(expected_event, api.nvim_get_var('pre_event'))
+      eq(expected_event, api.nvim_get_var('post_event'))
       command('%delete _')
       api.nvim_put({ 'AB' }, 'c', true, true)
       -- after=false, follow=false
-      api.nvim_put({ 'line 1', 'line 2' }, 'c', false, false)
+      api.nvim_put(lines, 'c', false, false)
       expect([[
         Aline 1
         line 2B]])
       eq({ 0, 1, 2, 0 }, fn.getpos('.'))
+      eq(expected_event, api.nvim_get_var('pre_event'))
+      eq(expected_event, api.nvim_get_var('post_event'))
       eq('', api.nvim_eval('v:errmsg'))
     end)
 

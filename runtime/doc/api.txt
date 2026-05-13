@@ -1871,6 +1871,15 @@ nvim__redraw({opts})                                          *nvim__redraw()*
     See also: ~
       • |:redraw|
 
+                                                *nvim__set_restart_on_crash()*
+nvim__set_restart_on_crash({progpath}, {argv})
+    WARNING: This feature is experimental/unstable.
+
+
+    Parameters: ~
+      • {progpath}  (`string`)
+      • {argv}      (`any[]`)
+
 nvim__stats()                                                  *nvim__stats()*
     WARNING: This feature is experimental/unstable.
 

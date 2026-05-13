@@ -207,6 +207,8 @@ error('Cannot require a meta file')
 --- |'TextChangedI'
 --- |'TextChangedP'
 --- |'TextChangedT'
+--- |'TextPutPost'
+--- |'TextPutPre'
 --- |'TextYankPost'
 --- |'UIEnter'
 --- |'UILeave'

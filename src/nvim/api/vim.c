@@ -906,6 +906,7 @@ Union(Integer, String) nvim_echo(ArrayOf(Tuple(String, *HLGroupID)) chunks, Bool
     msg_didany = true;
     msg_no_more = true;
   }
+  msg_ext_no_fast();
   id = msg_multihl(opts->id, hl_msg, kind, history, opts->err, &msg_data, &needs_clear);
   if (opts->_truncate) {
     msg_no_more = false;
@@ -1461,7 +1462,7 @@ void nvim_put(ArrayOf(String) lines, String type, Boolean after, Boolean follow,
   TRY_WRAP(err, {
     bool VIsual_was_active = VIsual_active;
     msg_silent++;  // Avoid "N more lines" message.
-    do_put(0, reg, after ? FORWARD : BACKWARD, 1, follow ? PUT_CURSEND : 0);
+    do_put('_', reg, after ? FORWARD : BACKWARD, 1, follow ? PUT_CURSEND : 0);
     msg_silent--;
     VIsual_active = VIsual_was_active;
   });
@@ -2573,4 +2574,9 @@ void nvim__redraw(Dict(redraw) *opts, Error *err)
 
   RedrawingDisabled = save_rd;
   p_lz = save_lz;
+}
+
+void nvim__set_restart_on_crash(String progpath, Array argv)
+{
+  ui_call__set_restart_on_crash_exit(progpath, argv);
 }

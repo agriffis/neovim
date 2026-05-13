@@ -167,6 +167,12 @@ function vim.api.nvim__screenshot(path) end
 
 --- WARNING: This feature is experimental/unstable.
 ---
+--- @param progpath string
+--- @param argv any[]
+function vim.api.nvim__set_restart_on_crash(progpath, argv) end
+
+--- WARNING: This feature is experimental/unstable.
+---
 --- Gets internal stats.
 ---
 --- @return table<string,any> # Map of various internal stats.
