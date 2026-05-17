@@ -168,6 +168,7 @@ typedef struct {
   String scope;
   Window win;
   Buffer buf;
+  Tabpage tab;
   String filetype;
 } Dict(option);
 

@@ -1952,6 +1952,52 @@ describe('API', function()
         'Invalid value for option \'scrolloff\': expected number, got string "wrong"',
         pcall_err(api.nvim_set_option_value, 'scrolloff', 'wrong', {})
       )
+      local tab1 = api.nvim_get_current_tabpage()
+      eq(
+        "Conflict: 'tab' not allowed with 'win', 'buf', 'filetype' or 'scope'",
+        pcall_err(
+          api.nvim_get_option_value,
+          'cmdheight',
+          { tab = tab1, win = api.nvim_get_current_win() }
+        )
+      )
+      eq(
+        "Conflict: 'tab' not allowed with 'win', 'buf', 'filetype' or 'scope'",
+        pcall_err(api.nvim_get_option_value, 'cmdheight', {
+          tab = tab1,
+          scope = 'local',
+        })
+      )
+      eq(
+        "Conflict: 'tab' not allowed with 'shiftwidth'",
+        pcall_err(api.nvim_get_option_value, 'shiftwidth', { tab = tab1 })
+      )
+      eq(
+        "Conflict: 'tab' not allowed with this function",
+        pcall_err(api.nvim_set_option_value, 'cmdheight', 2, { tab = tab1 })
+      )
+      eq(
+        "Conflict: 'tab' not allowed with this function",
+        pcall_err(api.nvim_get_option_info2, 'cmdheight', { tab = tab1 })
+      )
+      eq(
+        "Conflict: 'filetype' not allowed with 'scope', 'buf', 'win' or 'tab'",
+        pcall_err(api.nvim_get_option_value, 'cmdheight', { filetype = 'c', tab = 0 })
+      )
+    end)
+
+    it("tabpage-local 'cmdheight' #31140", function()
+      api.nvim_set_option_value('cmdheight', 1, {})
+      local tab1 = api.nvim_get_current_tabpage()
+      eq(1, api.nvim_get_option_value('cmdheight', { tab = 0 }))
+      eq(1, api.nvim_get_option_value('cmdheight', { tab = tab1 }))
+      eq(1, api.nvim_get_option_value('cmdheight', {}))
+      command('tabnew')
+      local tab2 = api.nvim_get_current_tabpage()
+      api.nvim_set_option_value('cmdheight', 4, {})
+      eq(4, api.nvim_get_option_value('cmdheight', { tab = tab2 }))
+      eq(1, api.nvim_get_option_value('cmdheight', { tab = tab1 }))
+      eq(4, api.nvim_get_option_value('cmdheight', {}))
     end)
 
     it('can get local values when global value is set', function()

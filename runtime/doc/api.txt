@@ -3559,6 +3559,8 @@ nvim_get_option_value({name}, {opts})                *nvim_get_option_value()*
                   autocommands for the corresponding filetype.
                 • scope: One of "global" or "local". Analogous to |:setglobal|
                   and |:setlocal|, respectively.
+                • tab: |tab-ID| for tab-local options. Currently only supports
+                  "cmdheight". Tabpage `0` means the current tabpage.
                 • win: |window-ID|. Used for getting window local options.
 
     Return: ~

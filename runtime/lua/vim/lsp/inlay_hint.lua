@@ -100,12 +100,9 @@ local function refresh(bufnr, client_id)
   do
     client:request('textDocument/inlayHint', {
       textDocument = util.make_text_document_params(bufnr),
-      range = util._make_line_range_params(
-        bufnr,
-        0,
-        api.nvim_buf_line_count(bufnr) - 1,
-        client.offset_encoding
-      ),
+      range = vim
+        .range(bufnr, 0, 0, api.nvim_buf_line_count(bufnr), 0)
+        :to_lsp(client.offset_encoding),
     }, nil, bufnr)
   end
 end

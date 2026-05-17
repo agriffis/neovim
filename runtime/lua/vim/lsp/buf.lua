@@ -38,17 +38,21 @@ local function ctx_is_valid(ctx)
   then
     return false
   end
+  ---@type lsp.Position?
   local p = ctx.params and ctx.params.position
   if not p then
     return true
   end
 
-  local cur = api.nvim_win_get_cursor(0)
   local c = lsp.get_client_by_id(ctx.client_id)
   local enc = c and c.offset_encoding
+  if not enc then
+    return false
+  end
 
-  return cur[1] - 1 == p.line and enc and cur[2] == util._get_line_byte_from_position(bufnr, p, enc)
-    or false
+  local cur_pos = vim.pos.cursor(bufnr, api.nvim_win_get_cursor(0))
+  local pos = vim.pos.lsp(bufnr, p, enc)
+  return cur_pos == pos
 end
 
 --- @class vim.lsp.buf.hover.Opts : vim.lsp.util.open_floating_preview.Opts
@@ -162,19 +166,15 @@ function M.hover(config)
       else
         vim.list_extend(contents, util.convert_input_to_markdown_lines(result.contents))
       end
-      local range = result.range
-      if range then
-        local start = range.start
-        local end_ = range['end']
-        local start_idx = util._get_line_byte_from_position(bufnr, start, client.offset_encoding)
-        local end_idx = util._get_line_byte_from_position(bufnr, end_, client.offset_encoding)
+      if result.range then
+        local range = vim.range.lsp(bufnr, result.range, client.offset_encoding)
 
         vim.hl.range(
           bufnr,
           hover_ns,
           'LspReferenceTarget',
-          { start.line, start_idx },
-          { end_.line, end_idx },
+          { range.start_row, range.start_col },
+          { range.end_row, range.end_col },
           { priority = vim.hl.priorities.user }
         )
       end
@@ -739,12 +739,13 @@ function M.rename(new_name, opts)
   --- @param range lsp.Range
   --- @param position_encoding 'utf-8'|'utf-16'|'utf-32'
   local function get_text_at_range(range, position_encoding)
+    local vim_range = vim.range.lsp(bufnr, range, position_encoding)
     return api.nvim_buf_get_text(
       bufnr,
-      range.start.line,
-      util._get_line_byte_from_position(bufnr, range.start, position_encoding),
-      range['end'].line,
-      util._get_line_byte_from_position(bufnr, range['end'], position_encoding),
+      vim_range.start_row,
+      vim_range.start_col,
+      vim_range.end_row,
+      vim_range.end_col,
       {}
     )[1]
   end
@@ -787,26 +788,21 @@ function M.rename(new_name, opts)
           return
         end
 
-        local range ---@type lsp.Range?
+        local range ---@type vim.Range?
         if result.start then
           ---@cast result lsp.Range
-          range = result
+          range = vim.range.lsp(bufnr, result, client.offset_encoding)
         elseif result.range then
           ---@cast result { range: lsp.Range, placeholder: string }
-          range = result.range
+          range = vim.range.lsp(bufnr, result.range, client.offset_encoding)
         end
         if range then
-          local start = range.start
-          local end_ = range['end']
-          local start_idx = util._get_line_byte_from_position(bufnr, start, client.offset_encoding)
-          local end_idx = util._get_line_byte_from_position(bufnr, end_, client.offset_encoding)
-
           vim.hl.range(
             bufnr,
             rename_ns,
             'LspReferenceTarget',
-            { start.line, start_idx },
-            { end_.line, end_idx },
+            { range.start_row, range.start_col },
+            { range.end_row, range.end_col },
             { priority = vim.hl.priorities.user }
           )
         end

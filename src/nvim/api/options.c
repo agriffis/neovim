@@ -17,17 +17,41 @@
 #include "nvim/memory.h"
 #include "nvim/memory_defs.h"
 #include "nvim/option.h"
+#include "nvim/option_vars.h"
 #include "nvim/types_defs.h"
 #include "nvim/vim_defs.h"
 #include "nvim/window.h"
 
 #include "api/options.c.generated.h"
 
-static int validate_option_value_args(Dict(option) *opts, char *name, OptIndex *opt_idxp,
-                                      int *opt_flags, OptScope *scope, void **from, char **filetype,
-                                      Error *err)
+static int validate_option_value_args(Dict(option) *opts, char *name, bool allow_tab,
+                                      OptIndex *opt_idxp, int *opt_flags, OptScope *scope,
+                                      void **from, char **filetype, Error *err)
 {
 #define HAS_KEY_X(d, v) HAS_KEY(d, option, v)
+  // Validate incompatible argument combinations first, then resolve handles and scope.
+  VALIDATE_CON(!HAS_KEY_X(opts, filetype)
+               || (!HAS_KEY_X(opts, scope) && !HAS_KEY_X(opts, buf)
+                   && !HAS_KEY_X(opts, win) && !HAS_KEY_X(opts, tab)),
+               "filetype", "'scope', 'buf', 'win' or 'tab'", {
+    return FAIL;
+  });
+
+  VALIDATE_CON(!HAS_KEY_X(opts, tab) || allow_tab, "tab", "this function", {
+    return FAIL;
+  });
+
+  VALIDATE_CON(!HAS_KEY_X(opts, tab)
+               || (!HAS_KEY_X(opts, win) && !HAS_KEY_X(opts, buf)
+                   && !HAS_KEY_X(opts, filetype) && !HAS_KEY_X(opts, scope)),
+               "tab", "'win', 'buf', 'filetype' or 'scope'", {
+    return FAIL;
+  });
+
+  VALIDATE_CON(!(HAS_KEY_X(opts, win) && HAS_KEY_X(opts, buf)), "buf", "win", {
+    return FAIL;
+  });
+
   if (HAS_KEY_X(opts, scope)) {
     if (!strcmp(opts->scope.data, "local")) {
       *opt_flags = OPT_LOCAL;
@@ -55,8 +79,7 @@ static int validate_option_value_args(Dict(option) *opts, char *name, OptIndex *
   }
 
   if (HAS_KEY_X(opts, buf)) {
-    VALIDATE(!(HAS_KEY_X(opts, scope) && *opt_flags == OPT_GLOBAL), "%s",
-             "cannot use both global 'scope' and 'buf'", {
+    VALIDATE_CON(!(HAS_KEY_X(opts, scope) && *opt_flags == OPT_GLOBAL), "buf", "global scope", {
       return FAIL;
     });
     *opt_flags = OPT_LOCAL;
@@ -67,23 +90,21 @@ static int validate_option_value_args(Dict(option) *opts, char *name, OptIndex *
     }
   }
 
-  VALIDATE((!HAS_KEY_X(opts, filetype)
-            || !(HAS_KEY_X(opts, buf) || HAS_KEY_X(opts, scope) || HAS_KEY_X(opts, win))),
-           "%s", "cannot use 'filetype' with 'scope', 'buf' or 'win'", {
-    return FAIL;
-  });
-
-  VALIDATE((!HAS_KEY_X(opts, win) || !HAS_KEY_X(opts, buf)),
-           "%s", "cannot use both 'buf' and 'win'", {
-    return FAIL;
-  });
-
   *opt_idxp = find_option(name);
   if (*opt_idxp == kOptInvalid) {
     // unknown option
     api_set_error(err, kErrorTypeValidation, "Unknown option '%s'", name);
-  } else if (*scope == kOptScopeBuf || *scope == kOptScopeWin) {
-    // if 'buf' or 'win' is passed, make sure the option supports it
+    return FAIL;
+  }
+
+  // The only tab-local option is 'cmdheight'.
+  // TODO(justinmk): introduce kOptScopeTab into option metadata, then use option_has_scope below.
+  VALIDATE_CON(!HAS_KEY_X(opts, tab) || (*opt_idxp == kOptCmdheight), "tab", name, {
+    return FAIL;
+  });
+
+  // If 'buf' or 'win' is passed, make sure the option supports it.
+  if (*scope == kOptScopeBuf || *scope == kOptScopeWin) {
     if (!option_has_scope(*opt_idxp, *scope)) {
       char *tgt = *scope == kOptScopeBuf ? "buf" : "win";
       char *global = option_has_scope(*opt_idxp, kOptScopeGlobal) ? "global " : "";
@@ -93,6 +114,7 @@ static int validate_option_value_args(Dict(option) *opts, char *name, OptIndex *
 
       api_set_error(err, kErrorTypeValidation, "'%s' cannot be passed for %s%soption '%s'",
                     tgt, global, req, name);
+      return FAIL;
     }
   }
 
@@ -194,6 +216,8 @@ static void wipe_ft_buf(buf_T *buf)
 ///                    autocommands for the corresponding filetype.
 ///                  - scope: One of "global" or "local". Analogous to
 ///                  |:setglobal| and |:setlocal|, respectively.
+///                  - tab: |tab-ID| for tab-local options. Currently only
+///                    supports "cmdheight". Tabpage `0` means the current tabpage.
 ///                  - win: |window-ID|. Used for getting window local options.
 /// @param[out] err  Error details, if any
 /// @return          Option value
@@ -206,9 +230,18 @@ Object nvim_get_option_value(String name, Dict(option) *opts, Error *err)
   void *from = NULL;
   char *filetype = NULL;
 
-  if (!validate_option_value_args(opts, name.data, &opt_idx, &opt_flags, &scope, &from,
+  if (!validate_option_value_args(opts, name.data, true, &opt_idx, &opt_flags, &scope, &from,
                                   &filetype, err)) {
     return (Object)OBJECT_INIT;
+  }
+
+  if (HAS_KEY(opts, option, tab)) {
+    tabpage_T *tab = find_tab_by_handle(opts->tab, err);
+    if (ERROR_SET(err)) {
+      return (Object)OBJECT_INIT;
+    }
+    const OptInt ch = (tab == curtab) ? p_ch : tab->tp_ch_used;
+    return optval_as_object(NUMBER_OPTVAL(ch));
   }
 
   aco_save_T aco;
@@ -277,7 +310,8 @@ void nvim_set_option_value(uint64_t channel_id, String name, Object value, Dict(
   int opt_flags = 0;
   OptScope scope = kOptScopeGlobal;
   void *to = NULL;
-  if (!validate_option_value_args(opts, name.data, &opt_idx, &opt_flags, &scope, &to, NULL,
+  // TODO(justinmk): support tab-local option.
+  if (!validate_option_value_args(opts, name.data, false, &opt_idx, &opt_flags, &scope, &to, NULL,
                                   err)) {
     return;
   }
@@ -365,7 +399,8 @@ DictAs(get_option_info) nvim_get_option_info2(String name, Dict(option) *opts, A
   int opt_flags = 0;
   OptScope scope = kOptScopeGlobal;
   void *from = NULL;
-  if (!validate_option_value_args(opts, name.data, &opt_idx, &opt_flags, &scope, &from, NULL,
+  // TODO(justinmk): support tab-local option.
+  if (!validate_option_value_args(opts, name.data, false, &opt_idx, &opt_flags, &scope, &from, NULL,
                                   err)) {
     return (Dict)ARRAY_DICT_INIT;
   }

@@ -1258,8 +1258,12 @@ end
 
 --- @type vim.filetype.mapfn
 function M.mm(_, bufnr)
+  if vim.g.filetype_mm then
+    return vim.g.filetype_mm
+  end
+
   for _, line in ipairs(getlines(bufnr, 1, 20)) do
-    if matchregex(line, [[\c^\s*\(#\s*\(include\|import\)\>\|@import\>\|/\*\)]]) then
+    if matchregex(line, [[\c^\s*\(//\|#\s*\(include\|import\)\>\|@import\>\|/\*\)]]) then
       return 'objcpp'
     end
   end
