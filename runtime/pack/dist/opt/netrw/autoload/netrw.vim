@@ -1,7 +1,7 @@
 " Creator:    Charles E Campbell
 " Previous Maintainer: Luca Saccarola <github.e41mv@aleeas.com>
 " Maintainer: This runtime file is looking for a new maintainer.
-" Last Change: 2026 May 14
+" Last Change: 2026 May 17
 " Copyright:  Copyright (C) 2016 Charles E. Campbell {{{1
 "             Permission is hereby granted to use and distribute this code,
 "             with or without modifications, provided that this copyright
@@ -2707,7 +2707,7 @@ endfunction
 
 "  s:NetrwBookHistHandler: {{{2
 "    0: (user: <mb>)   bookmark current directory
-"    1: (user: <gb>)   change to the bookmarked directory
+"    1: (user: <gb>)   change to the bookmarked path
 "    2: (user: <qb>)   list bookmarks
 "    3: (browsing)     records current directory history
 "    4: (user: <u>)    go up   (previous) directory, using history
@@ -2737,11 +2737,33 @@ function s:NetrwBookHistHandler(chg,curdir)
         endtry
 
     elseif a:chg == 1
-        " change to the bookmarked directory
-        if exists("g:netrw_bookmarklist[v:count-1]")
-            exe "NetrwKeepj e ".fnameescape(g:netrw_bookmarklist[v:count-1])
+        " change to bookmarked path
+        if exists("g:netrw_bookmarklist") && !empty(g:netrw_bookmarklist)
+            let len_bookmarklist = len(g:netrw_bookmarklist)
+            let bookmark_num = v:count
+
+            " v:count value is set to zero if no count (prefix) is given to the `gb` map
+            if bookmark_num == 0
+                " list bookmarks and prompt for a bookmark number
+                let goto_list = [" # | Goto Bookmark:"]
+                let i = 0
+                while i < len_bookmarklist
+                    call add(goto_list, printf("%3d| %s", i + 1, g:netrw_bookmarklist[i]))
+                    let i += 1
+                endwhile
+                let bookmark_num = inputlist(goto_list)
+            endif
+
+            if bookmark_num > 0
+                if bookmark_num <= len_bookmarklist
+                    exe "NetrwKeepj e " . fnameescape(g:netrw_bookmarklist[bookmark_num - 1])
+                else
+                    echomsg "Sorry, bookmark#" . bookmark_num . " doesn't exist!"
+                endif
+            endif
+            " Exit silently if user cancels with `q` or empty after inputlist()
         else
-            echomsg "Sorry, bookmark#".v:count." doesn't exist!"
+            echo "Bookmark list is empty."
         endif
 
     elseif a:chg == 2
@@ -2842,16 +2864,38 @@ function s:NetrwBookHistHandler(chg,curdir)
         endif
 
     elseif a:chg == 6
-        if exists("s:netrwmarkfilelist_{curbufnr}")
+        if exists("s:netrwmarkfilelist_{curbufnr}") && !empty(s:netrwmarkfilelist_{curbufnr})
             call s:NetrwBookmark(1)
             echo "removed marked files from bookmarks"
+        elseif exists("g:netrw_bookmarklist") && !empty(g:netrw_bookmarklist)
+            let len_bookmarklist = len(g:netrw_bookmarklist)
+            let bookmark_num = v:count
+
+            " v:count value is set to zero if no count (prefix) is given to the `gb` map
+            if bookmark_num == 0
+                " list bookmarks and prompt for a bookmark number
+                let goto_list = [" # | Delete Bookmark:"]
+                let i = 0
+                while i < len_bookmarklist
+                    call add(goto_list, printf("%3d| %s", i + 1, g:netrw_bookmarklist[i]))
+                    let i += 1
+                endwhile
+                let bookmark_num = inputlist(goto_list)
+            endif
+
+            if bookmark_num > 0
+                if bookmark_num <= len_bookmarklist
+                    let bookmark_path = g:netrw_bookmarklist[bookmark_num - 1]
+                    call s:MergeBookmarks()
+                    NetrwKeepj call remove(g:netrw_bookmarklist, bookmark_num - 1)
+                    echo "removed " . bookmark_path . " from g:netrw_bookmarklist."
+                else
+                    echomsg "Sorry, bookmark#" . bookmark_num . " doesn't exist!"
+                endif
+            endif
+            " Exit silently if user cancels with `q` or empty after inputlist()
         else
-            " delete the v:count'th bookmark
-            let iremove = v:count
-            let dremove = g:netrw_bookmarklist[iremove - 1]
-            call s:MergeBookmarks()
-            NetrwKeepj call remove(g:netrw_bookmarklist,iremove-1)
-            echo "removed ".dremove." from g:netrw_bookmarklist"
+            echo "Bookmark list is empty."
         endif
 
         try
@@ -2935,7 +2979,7 @@ function s:NetrwBookHistSave()
         while ( first || cnt != g:netrw_dirhistcnt )
             let lastline= lastline + 1
             if exists("g:netrw_dirhist_{cnt}")
-                call setline(lastline,'let g:netrw_dirhist_'.cnt."='".g:netrw_dirhist_{cnt}."'")
+                call setline(lastline,'let g:netrw_dirhist_'.cnt.'='.string(g:netrw_dirhist_{cnt}))
             endif
             let first   = 0
             let cnt     = ( cnt - 1 ) % g:netrw_dirhistmax
@@ -4413,10 +4457,10 @@ endfunction
 
 "  s:NetrwHome: this function determines a "home" for saving bookmarks and history {{{2
 function s:NetrwHome()
-    if has('nvim')
-        let home = netrw#fs#PathJoin(stdpath('state'), 'netrw')
-    elseif exists('g:netrw_home')
+    if exists('g:netrw_home')
         let home = expand(g:netrw_home)
+    elseif has('nvim')
+        let home = netrw#fs#PathJoin(stdpath('state'), 'netrw')
     elseif exists('$MYVIMDIR')
         let home = expand('$MYVIMDIR')->substitute('/$', '', '')
     else

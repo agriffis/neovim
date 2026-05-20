@@ -1801,14 +1801,14 @@ Object nlua_call_ref(LuaRef ref, const char *name, Array args, LuaRetMode mode, 
 
 static int mode_ret(LuaRetMode mode)
 {
-  return mode == kRetMulti ? LUA_MULTRET : 1;
+  return (mode == kRetMulti || mode == kRetMultiStack) ? LUA_MULTRET : 1;
 }
 
 /// Like nlua_call_ref, but with an option to run in fast (api-fast) context.
 Object nlua_call_ref_ctx(bool fast, LuaRef ref, const char *name, Array args, LuaRetMode mode,
                          Arena *arena, Error *err)
 {
-  lua_State *const lstate = global_lstate;
+  lua_State *const lstate = active_lstate;
   int top = lua_gettop(lstate);
   nlua_pushref(lstate, ref);
   int nargs = (int)args.size;
@@ -1844,7 +1844,7 @@ Object nlua_call_ref_ctx(bool fast, LuaRef ref, const char *name, Array args, Lu
 static Object nlua_call_pop_retval(lua_State *lstate, LuaRetMode mode, Arena *arena, int pretop,
                                    Error *err)
 {
-  if (mode != kRetMulti && lua_isnil(lstate, -1)) {
+  if (mode != kRetMulti && mode != kRetMultiStack && lua_isnil(lstate, -1)) {
     lua_pop(lstate, 1);
     return NIL;
   }
@@ -1878,6 +1878,9 @@ static Object nlua_call_pop_retval(lua_State *lstate, LuaRetMode mode, Arena *ar
     }
     res.size = (size_t)nres;
     return ARRAY_OBJ(res);
+  case kRetMultiStack:
+    ;
+    return NIL;
   }
   UNREACHABLE;
 }
@@ -2392,7 +2395,9 @@ int nlua_do_ucmd(ucmd_T *cmd, exarg_T *eap, bool preview)
   char nargs[2];
   if (cmd->uc_argt & EX_EXTRA) {
     if (cmd->uc_argt & EX_NOSPC) {
-      if (cmd->uc_argt & EX_NEEDARG) {
+      if (cmd->uc_argt & EX_ARGSPACE) {
+        nargs[0] = '_';
+      } else if (cmd->uc_argt & EX_NEEDARG) {
         nargs[0] = '1';
       } else {
         nargs[0] = '?';

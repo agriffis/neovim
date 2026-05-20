@@ -168,6 +168,13 @@ local function apply_snippet(item)
   end
 end
 
+local function fallback_filtertext(item, word, prefix, match)
+  if item.filterText and not match(word, prefix) and match(item.filterText, prefix) then
+    return item.filterText
+  end
+  return word
+end
+
 --- Returns text that should be inserted when a selecting completion item. The
 --- precedence is as follows: textEdit.newText > insertText > label
 ---
@@ -200,20 +207,17 @@ local function get_completion_word(item, prefix, match)
           item.filterText and vim.fn.match(item.label, '^\\k') == -1 and item.filterText
           or item.label
         )
-      if item.filterText and not match(word, prefix) then
-        return item.filterText
-      else
-        return word
-      end
+      return fallback_filtertext(item, word, prefix, match)
     else
       return item.label
     end
   elseif item.textEdit then
     local word = item.textEdit.newText
     word = string.gsub(word, '\r\n?', '\n')
-    return word:match('([^\n]*)') or word
+    word = word:match('([^\n]*)') or word
+    return fallback_filtertext(item, word, prefix, match)
   elseif item.insertText and item.insertText ~= '' then
-    return item.insertText
+    return fallback_filtertext(item, item.insertText, prefix, match)
   end
   return item.label
 end

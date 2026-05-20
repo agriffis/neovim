@@ -2954,24 +2954,26 @@ vim.glob.to_lpeg({pattern})                               *vim.glob.to_lpeg()*
 ==============================================================================
 Lua module: vim.hl                                                    *vim.hl*
 
-vim.hl.on_yank({opts})                                      *vim.hl.on_yank()*
-    Highlight the yanked text during a |TextYankPost| event.
+vim.hl.hl_op({opts})                                          *vim.hl.hl_op()*
+    Highlights the affected text region during a |TextYankPost| or
+    |TextPutPost| event.
 
-    Add the following to your `init.vim`: >vim
-        autocmd TextYankPost * silent! lua vim.hl.on_yank {higroup='Visual', timeout=300}
+    Add this to your `init.vim`: >vim
+        autocmd TextYankPost * silent! lua vim.hl.hl_op {higroup='Visual', timeout=300}
+        autocmd TextPutPost  * silent! lua vim.hl.hl_op {higroup='Visual', timeout=300}
 <
 
     Parameters: ~
       • {opts}  (`table?`) Optional parameters
-                • event event structure (default vim.v.event)
-                • higroup highlight group for yanked region (default
-                  "IncSearch")
-                • on_macro highlight when executing macro (default false)
-                • on_visual highlight when yanking visual selection (default
-                  true)
-                • priority integer priority (default
-                  |vim.hl.priorities|`.user`)
-                • timeout time in ms before highlight is cleared (default 150)
+                • event (default vim.v.event) Event structure.
+                • higroup (default "IncSearch") Highlight group for the text
+                  region.
+                • on_macro (default false) Highlight during |macro| execution.
+                • on_visual (default true) Highlight during |Visual| mode.
+                • priority (default |vim.hl.priorities|`.user`) Integer
+                  priority.
+                • timeout (default 150) Time in ms before highlight is
+                  cleared.
 
 vim.hl.priorities                                          *vim.hl.priorities*
     Table with default priorities used for highlighting:
@@ -2980,7 +2982,7 @@ vim.hl.priorities                                          *vim.hl.priorities*
     • `semantic_tokens`: `125`, used for LSP semantic token highlighting
     • `diagnostics`: `150`, used for code analysis such as diagnostics
     • `user`: `200`, used for user-triggered highlights such as LSP document
-      symbols or `on_yank` autocommands
+      symbols or `hl_op` autocommands
 
                                                               *vim.hl.range()*
 vim.hl.range({buf}, {ns}, {higroup}, {start}, {finish}, {opts})
@@ -4508,17 +4510,32 @@ by |vim.Pos| objects.
 cursor({buf}, {pos})                                        *vim.pos.cursor()*
     Creates a new |vim.Pos| from cursor position (see |api-indexing|).
 
+    Example: >lua
+        local cursor_pos = vim.api.nvim_win_get_cursor(0)
+        local pos = vim.pos.lsp(0, cursor_pos)
+<
+
     Parameters: ~
       • {buf}  (`integer`)
-      • {pos}  (`[integer, integer]`)
+      • {pos}  (`[integer, integer]`) (lnum, col) tuple
+
+    Return: ~
+        (`vim.Pos`) See |vim.Pos|.
 
 extmark({buf}, {row}, {col})                               *vim.pos.extmark()*
     Creates a new |vim.Pos| from extmark position (see |api-indexing|).
+
+    Example: >lua
+        local pos = vim.pos.extmark(0, 3, 5)
+<
 
     Parameters: ~
       • {buf}  (`integer`)
       • {row}  (`integer`)
       • {col}  (`integer`)
+
+    Return: ~
+        (`vim.Pos`) See |vim.Pos|.
 
 lsp({buf}, {pos}, {position_encoding})                         *vim.pos.lsp()*
     Creates a new |vim.Pos| from `lsp.Position`.
@@ -4537,8 +4554,38 @@ lsp({buf}, {pos}, {position_encoding})                         *vim.pos.lsp()*
       • {pos}                (`lsp.Position`)
       • {position_encoding}  (`lsp.PositionEncodingKind`)
 
+    Return: ~
+        (`vim.Pos`) See |vim.Pos|.
+
+mark({buf}, {lnum}, {col})                                    *vim.pos.mark()*
+    Creates a new |vim.Pos| from mark position (see |api-indexing|).
+
+    Example: >lua
+        local mark_info = vim.api.nvim_get_mark('M', {})
+        local lnum, col, buf, name = unpack(mark_info)
+
+        if lnum == 0 and col == 0 and buf == 0 then
+          return -- mark 'M' is not set.
+        end
+
+        local pos = vim.pos.mark(buf, lnum, col)
+<
+
+    Parameters: ~
+      • {buf}   (`integer`)
+      • {lnum}  (`integer`)
+      • {col}   (`integer`)
+
+    Return: ~
+        (`vim.Pos`) See |vim.Pos|.
+
 offset({buf}, {offset})                                     *vim.pos.offset()*
-    Creates a new |vim.Pos| from buffer offset.
+    Creates a new |vim.Pos| from buffer (bytes) offset.
+
+    Example: >lua
+        local offset = vim.api.nvim_buf_get_offset(0, vim.api.nvim_buf_line_count(0))
+        local pos = vim.pos.offset(0, offset)
+<
 
     Parameters: ~
       • {buf}     (`integer`)
@@ -4550,22 +4597,37 @@ offset({buf}, {offset})                                     *vim.pos.offset()*
 to_cursor({pos})                                         *vim.pos.to_cursor()*
     Converts |vim.Pos| to cursor position (see |api-indexing|).
 
+    Example: >lua
+        local pos = vim.pos(0, 3, 5)
+
+        -- Convert to cursor position, you can call it in a method style.
+        local cursor_pos = { pos:to_cursor() }
+        vim.api.nvim_win_set_cursor(0, cursor_pos)
+<
+
     Parameters: ~
       • {pos}  (`vim.Pos`) See |vim.Pos|.
 
     Return (multiple): ~
-        (`integer`)
-        (`integer`)
+        (`integer`) lnum
+        (`integer`) col
 
 to_extmark({pos})                                       *vim.pos.to_extmark()*
     Converts |vim.Pos| to extmark position (see |api-indexing|).
 
+    Example: >lua
+        local pos = vim.pos(0, 3, 5)
+
+        -- Convert to extmark position, you can call it in a method style.
+        local extmark_pos = pos:to_extmark()
+<
+
     Parameters: ~
       • {pos}  (`vim.Pos`) See |vim.Pos|.
 
     Return (multiple): ~
-        (`integer`)
-        (`integer`)
+        (`integer`) row
+        (`integer`) col
 
 to_lsp({pos}, {position_encoding})                          *vim.pos.to_lsp()*
     Converts |vim.Pos| to `lsp.Position`.
@@ -4581,8 +4643,40 @@ to_lsp({pos}, {position_encoding})                          *vim.pos.to_lsp()*
       • {pos}                (`vim.Pos`) See |vim.Pos|.
       • {position_encoding}  (`lsp.PositionEncodingKind`)
 
+    Return: ~
+        (`lsp.Position`)
+
+to_mark({pos})                                             *vim.pos.to_mark()*
+    Converts |vim.Pos| to mark position (see |api-indexing|).
+
+    Example: >lua
+        local pos = vim.pos(0, 3, 5)
+
+        -- Convert to mark position, you can call it in a method style.
+        local lnum, col = pos:to_mark()
+        vim.api.nvim_buf_set_mark(0, 'M', lnum, col, {})
+<
+
+    Parameters: ~
+      • {pos}  (`vim.Pos`) See |vim.Pos|.
+
+    Return (multiple): ~
+        (`integer`) lnum
+        (`integer`) col
+
 to_offset({pos})                                         *vim.pos.to_offset()*
-    Converts |vim.Pos| to buffer offset.
+    Converts |vim.Pos| to buffer (bytes) offset.
+
+    Example: >lua
+        local p1 = vim.pos(0, 3, 5)
+        local p2 = vim.pos(0, 4, 0)
+
+        -- Convert to buffer offset, you can call it in a method style.
+        local offset1 = p1:to_offset()
+        local offset2 = p2:to_offset()
+        -- Can be used to calculate the distance between two locations.
+        local distance = offset2 - offset1
+<
 
     Parameters: ~
       • {pos}  (`vim.Pos`) See |vim.Pos|.
@@ -4638,22 +4732,6 @@ Provides operations to compare, calculate, and convert ranges represented by
       • {start_row}  (`integer`) 0-based byte index.
 
 
-cursor({buf}, {start_pos}, {end_pos})                     *vim.range.cursor()*
-    Creates a new |vim.Range| from mark-like range (see |api-indexing|).
-
-    Example: >lua
-        local start = vim.api.nvim_win_get_cursor(0)
-        -- move the cursor
-        local end_ = vim.api.nvim_win_get_cursor(0)
-
-        local range = vim.range.cursor(0, start, end_)
-<
-
-    Parameters: ~
-      • {buf}        (`integer`)
-      • {start_pos}  (`[integer, integer]`)
-      • {end_pos}    (`[integer, integer]`)
-
                                                          *vim.range.extmark()*
 extmark({buf}, {start_row}, {start_col}, {end_row}, {end_col})
     Creates a new |vim.Range| from extmark range (see |api-indexing|).
@@ -4668,6 +4746,9 @@ extmark({buf}, {start_row}, {start_col}, {end_row}, {end_col})
       • {start_col}  (`integer`)
       • {end_row}    (`integer`)
       • {end_col}    (`integer`)
+
+    Return: ~
+        (`vim.Range`) See |vim.Range|.
 
 has({outer}, {inner})                                        *vim.range.has()*
     Checks whether {outer} range contains {inner} range or position.
@@ -4717,18 +4798,31 @@ lsp({buf}, {range}, {position_encoding})                     *vim.range.lsp()*
       • {range}              (`lsp.Range`)
       • {position_encoding}  (`lsp.PositionEncodingKind`)
 
-to_cursor({range})                                     *vim.range.to_cursor()*
-    Converts |vim.Range| to mark-like range (see |api-indexing|).
+    Return: ~
+        (`vim.Range`) See |vim.Range|.
+
+                                                            *vim.range.mark()*
+mark({buf}, {start_lnum}, {start_col}, {end_lnum}, {end_col})
+    Creates a new |vim.Range| from "mark-indexed" range (see |api-indexing|).
 
     Example: >lua
-        local range = vim.range(0, 3, 5, 4, 0)
+        -- A range represented by marks may be end-inclusive (decided by 'selection' option).
+        local start_lnum, start_col = unpack(api.nvim_buf_get_mark(bufnr, '<'))
+        local end_lnum, end_col = unpack(api.nvim_buf_get_mark(bufnr, '>'))
 
-        -- Convert to cursor range, you can call it in a method style.
-        local cursor_range = range:to_cursor()
+        -- Create an end-exclusive range.
+        local range = vim.range.mark(0, start_lnum, start_col, end_lnum, end_col)
 <
 
     Parameters: ~
-      • {range}  (`vim.Range`) See |vim.Range|.
+      • {buf}         (`integer`)
+      • {start_lnum}  (`integer`)
+      • {start_col}   (`integer`)
+      • {end_lnum}    (`integer`)
+      • {end_col}     (`integer`)
+
+    Return: ~
+        (`vim.Range`) See |vim.Range|.
 
 to_extmark({range})                                   *vim.range.to_extmark()*
     Converts |vim.Range| to extmark range (see |api-indexing|).
@@ -4742,6 +4836,12 @@ to_extmark({range})                                   *vim.range.to_extmark()*
 
     Parameters: ~
       • {range}  (`vim.Range`) See |vim.Range|.
+
+    Return (multiple): ~
+        (`integer`) start_row
+        (`integer`) start_col
+        (`integer`) end_row
+        (`integer`) end_col
 
 to_lsp({range}, {position_encoding})                      *vim.range.to_lsp()*
     Converts |vim.Range| to `lsp.Range`.
@@ -4759,6 +4859,25 @@ to_lsp({range}, {position_encoding})                      *vim.range.to_lsp()*
 
     Return: ~
         (`lsp.Range`)
+
+to_mark({range})                                         *vim.range.to_mark()*
+    Converts |vim.Range| to extmark range (see |api-indexing|).
+
+    Example: >lua
+        local range = vim.range(0, 3, 5, 4, 0)
+
+        -- Convert to mark range, you can call it in a method style.
+        local start_lnum, start_col, end_lnum, end_col = range:to_mark()
+<
+
+    Parameters: ~
+      • {range}  (`vim.Range`) See |vim.Range|.
+
+    Return (multiple): ~
+        (`integer`) start_lnum
+        (`integer`) start_col
+        (`integer`) end_lnum
+        (`integer`) end_col
 
 
 ==============================================================================
@@ -5332,7 +5451,8 @@ vim.ui.input({opts}, {on_confirm})                            *vim.ui.input()*
     work until `on_confirm`.
 
     Example: >lua
-        vim.ui.input({ prompt = 'Enter value for shiftwidth: ' }, function(input)
+        local opts = { prompt = 'Enter value for shiftwidth: ', scope = 'buffer' }
+        vim.ui.input(opts, function(input)
             vim.o.shiftwidth = tonumber(input)
         end)
 <
@@ -5347,6 +5467,14 @@ vim.ui.input({opts}, {on_confirm})                            *vim.ui.input()*
                       • {highlight}? (`function`) Function that will be used
                         for highlighting user inputs.
                       • {prompt}? (`string`) Text of the prompt
+                      • {scope}?
+                        (`'cursor'|'line'|'buffer'|'window'|'tabpage'|'editor'|'project'`)
+                        Input scope, as in "This input is for something at
+                        cursor/line/etc scope". Can be used by `vim.ui.input`
+                        implementations to tweak behavior and presentation.
+                        For example, the input may adjust the floating window
+                        position: near the cursor if `cursor`, in window
+                        corner if `buffer` or `window`, etc.
       • {on_confirm}  (`fun(input?: string)`) Called once the user confirms or
                       abort the input. `input` is what the user typed (it
                       might be an empty string if nothing was entered), or

@@ -337,7 +337,9 @@ func Test_netrw_parse_special_char_user()
   call assert_equal(result.path, 'test.txt')
 endfunction
 
-func Test_netrw_empty_buffer_fastpath_wipe()
+" Note: Test_netrw_a_empty_buffer_fastpath_wipe() should run before
+"       any other tests that open a netrw buffer (e.g, :Explore).
+func Test_netrw_a_empty_buffer_fastpath_wipe()
   " SetUp() may have opened some buffers
   let previous = bufnr('$')
   let g:netrw_fastbrowse=0
@@ -724,7 +726,44 @@ func Test_netrw_bookmark_marked_file()
 
   let g:netrw_keepdir = save_keepdir
   if save_bookmarklist is v:null
-    unlet g:netrw_bookmarklist
+    unlet! g:netrw_bookmarklist
+  else
+    let g:netrw_bookmarklist = save_bookmarklist
+  endif
+
+  bw!
+endfunc
+
+" Typing gb or mB without a count should prompt
+" for a bookmark number through an inputlist().
+" Expected dialog output (gb): # | Goto Bookmark:
+"                               1| /foo/bar/baz
+"
+" Expected dialog output (mB): # | Delete Bookmark:
+"                               1| /foo/bar/baz
+func Test_netrw_bookmark_goto_delete_prompt()
+  let save_home = g:netrw_home
+  let save_bookmarklist = exists('g:netrw_bookmarklist') ? g:netrw_bookmarklist : v:null
+
+  let g:netrw_home = getcwd()
+  let g:netrw_bookmarklist = ['/foo/bar/baz']
+  Explore .
+
+  " Inject 'q' to cancel the inputlist() prompt
+  call feedkeys('q', 't')
+  let dialog_out = execute('normal gb')
+  call assert_match('Goto Bookmark:', dialog_out)
+
+  call feedkeys('q', 't')
+  let dialog_out = execute('normal mB')
+  call assert_match('Delete Bookmark:', dialog_out)
+
+  " Tear down
+  call delete(g:netrw_home . '/.netrwbook')
+  call delete(g:netrw_home . '/.netrwhist')
+  let g:netrw_home = save_home
+  if save_bookmarklist is v:null
+    unlet! g:netrw_bookmarklist
   else
     let g:netrw_bookmarklist = save_bookmarklist
   endif
@@ -767,4 +806,25 @@ function Test_netrw_NetrwMaps_CR_dirname()
   unlet! g:netrw_pwn
   bw!
 endfunction
+
+func Test_netrw_injection()
+  let g:netrw_home       = getcwd()
+  let savefile           = g:netrw_home . '/.netrwhist'
+  let g:netrw_dirhistmax = 10
+  let g:netrw_dirhistcnt = 1
+  let g:netrw_dirhist_1  = "x'|let g:injected = 1|let y='z"
+  call delete(savefile)
+  try
+    call netrw#Call('NetrwBookHistSave')
+    call assert_true(filereadable(savefile), savefile . ' must be written')
+    unlet g:netrw_dirhist_1
+    execute 'source ' . fnameescape(savefile)
+    call assert_false(exists("g:injected"), 'injected statement must not execute')
+    call assert_equal("x'|let g:injected = 1|let y='z", g:netrw_dirhist_1, 'dirname must round-trip')
+  finally
+    call delete(savefile)
+    unlet! g:netrw_home g:netrw_dirhistmax g:netrw_dirhistcnt g:netrw_dirhist_1 g:injected
+  endtry
+endfunc
+
 " vim:ts=8 sts=2 sw=2 et

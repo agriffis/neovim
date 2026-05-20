@@ -1160,7 +1160,7 @@ int do_doautocmd(char *arg_start, bool do_msg, bool *did_something)
   // Loop over the events.
   while (*arg && !ends_excmd(*arg) && !ascii_iswhite(*arg)) {
     if (apply_autocmds_group(event_name2nr(arg, &arg), fname, NULL, true, group,
-                             curbuf, NULL, NULL)) {
+                             curbuf, NULL, NULL, false)) {
       nothing_done = false;
     }
   }
@@ -1179,7 +1179,7 @@ int do_doautocmd(char *arg_start, bool do_msg, bool *did_something)
 void ex_doautoall(exarg_T *eap)
 {
   int retval = OK;
-  aco_save_T aco;
+  aco_save_T aco = { 0 };
   char *arg = eap->arg;
   int call_do_modelines = check_nomodeline(&arg);
   bufref_T bufref;
@@ -1357,9 +1357,24 @@ void aucmd_prepbuf(aco_save_T *aco, buf_T *buf)
 /// Cleanup after executing autocommands for a (hidden) buffer.
 /// Restore the window as it was (if possible).
 ///
+/// If `aco` was zero-initialized, then `aucmd_restbuf` may be safely called even if `aucmd_prepbuf`
+/// was skipped:
+///
+///      aco_save_T aco = { 0 };
+///      if (some_condition) {
+///        aucmd_prepbuf(&aco, buf);
+///      }
+///      ...
+///      aucmd_restbuf(&aco);  // no-op if aucmd_prepbuf was skipped.
+///
 /// @param aco  structure holding saved values
 void aucmd_restbuf(aco_save_T *aco)
 {
+  // NULL br_buf means `aucmd_prepbuf` was never called on this `aco`.
+  if (aco->new_curbuf.br_buf == NULL) {
+    return;
+  }
+
   if (aco->use_aucmd_win_idx >= 0) {
     win_T *awp = aucmd_win[aco->use_aucmd_win_idx].auc_win;
 
@@ -1534,9 +1549,9 @@ static void deferred_event(void **argv)
     }
     tv_dict_set_keys_readonly(v_event);
 
-    aco_save_T aco;
+    aco_save_T aco = { 0 };
     aucmd_prepbuf(&aco, buf);
-    apply_autocmds_group(event, fname, fname_io, false, group, buf, eap, data);
+    apply_autocmds_group(event, fname, fname_io, false, group, buf, eap, data, false);
     aucmd_restbuf(&aco);
 
     restore_v_event(v_event, &save_v_event);
@@ -1560,7 +1575,7 @@ static void deferred_optionset_modified(void **argv)
     bool new_val = (bool)(uintptr_t)argv[1];
     OptVal old = BOOLEAN_OPTVAL(!new_val);
     OptVal new = BOOLEAN_OPTVAL(new_val);
-    aco_save_T aco;
+    aco_save_T aco = { 0 };
     aucmd_prepbuf(&aco, buf);
     apply_optionset_autocmd_now(kOptModified, OPT_LOCAL, old, old, old, new, NULL);
     aucmd_restbuf(&aco);
@@ -1591,7 +1606,7 @@ void aucmd_defer_modified(buf_T *buf, bool new_val)
 /// @return true if some commands were executed.
 bool apply_autocmds(event_T event, char *fname, char *fname_io, bool force, buf_T *buf)
 {
-  return apply_autocmds_group(event, fname, fname_io, force, AUGROUP_ALL, buf, NULL, NULL);
+  return apply_autocmds_group(event, fname, fname_io, force, AUGROUP_ALL, buf, NULL, NULL, false);
 }
 
 /// Like apply_autocmds(), but with extra "eap" argument.  This takes care of
@@ -1608,7 +1623,7 @@ bool apply_autocmds(event_T event, char *fname, char *fname_io, bool force, buf_
 bool apply_autocmds_exarg(event_T event, char *fname, char *fname_io, bool force, buf_T *buf,
                           exarg_T *eap)
 {
-  return apply_autocmds_group(event, fname, fname_io, force, AUGROUP_ALL, buf, eap, NULL);
+  return apply_autocmds_group(event, fname, fname_io, force, AUGROUP_ALL, buf, eap, NULL, false);
 }
 
 /// Like apply_autocmds(), but handles the caller's retval.  If the script
@@ -1631,7 +1646,8 @@ bool apply_autocmds_retval(event_T event, char *fname, char *fname_io, bool forc
     return false;
   }
 
-  bool did_cmd = apply_autocmds_group(event, fname, fname_io, force, AUGROUP_ALL, buf, NULL, NULL);
+  bool did_cmd = apply_autocmds_group(event, fname, fname_io, force, AUGROUP_ALL, buf, NULL, NULL,
+                                      false);
   if (did_cmd && aborting()) {
     *retval = FAIL;
   }
@@ -1676,10 +1692,11 @@ bool trigger_cursorhold(void) FUNC_ATTR_PURE FUNC_ATTR_WARN_UNUSED_RESULT
 /// @param group autocmd group ID or AUGROUP_ALL
 /// @param buf Buffer for <abuf>
 /// @param eap Ex command arguments
+/// @param with_buf Run callbacks with "buf" as the current buffer
 ///
 /// @return true if some commands were executed.
 bool apply_autocmds_group(event_T event, char *fname, char *fname_io, bool force, int group,
-                          buf_T *buf, exarg_T *eap, Object *data)
+                          buf_T *buf, exarg_T *eap, Object *data, bool with_buf)
 {
   char *sfname = NULL;  // short file name
   bool retval = false;
@@ -1691,6 +1708,9 @@ bool apply_autocmds_group(event_T event, char *fname, char *fname_io, bool force
   save_redo_T save_redo;
   const bool save_KeyTyped = KeyTyped;
   ESTACK_CHECK_DECLARATION;
+  aco_save_T aco = { 0 };
+  bool save_changed = false;
+  buf_T *old_curbuf = NULL;
 
   // Quickly return if there are no autocommands for this event or
   // autocommands are blocked.
@@ -1760,9 +1780,6 @@ bool apply_autocmds_group(event_T event, char *fname, char *fname_io, bool force
   char *save_autocmd_match = autocmd_match;
   int save_autocmd_busy = autocmd_busy;
   int save_autocmd_nested = autocmd_nested;
-  bool save_changed = curbuf->b_changed;
-  buf_T *old_curbuf = curbuf;
-
   // Set the file name to be used for <afile>.
   // Make a copy to avoid that changing a buffer name or directory makes it
   // invalid.
@@ -1859,6 +1876,13 @@ bool apply_autocmds_group(event_T event, char *fname, char *fname_io, bool force
     retval = false;
     goto BYPASS_AU;
   }
+
+  if (with_buf && buf != NULL && buf != curbuf) {
+    aucmd_prepbuf(&aco, buf);
+  }
+
+  save_changed = curbuf->b_changed;
+  old_curbuf = curbuf;
 
 #ifdef BACKSLASH_IN_FILENAME
   // Replace all backslashes with forward slashes. This makes the
@@ -2053,6 +2077,8 @@ BYPASS_AU:
     curbuf->b_au_did_filetype = true;
   }
 
+  aucmd_restbuf(&aco);
+
   return retval;
 }
 
@@ -2061,7 +2087,7 @@ void do_termresponse_autocmd(const String sequence)
   MAXSIZE_TEMP_DICT(data, 1);
   PUT_C(data, "sequence", STRING_OBJ(sequence));
   apply_autocmds_group(EVENT_TERMRESPONSE, NULL, NULL, true, AUGROUP_ALL, NULL, NULL,
-                       &DICT_OBJ(data));
+                       &DICT_OBJ(data), false);
   termresponse_changed = true;
 }
 
