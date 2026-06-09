@@ -5472,15 +5472,16 @@ vim.o.scbk = vim.o.scrollback
 vim.bo.scrollback = vim.o.scrollback
 vim.bo.scbk = vim.bo.scrollback
 
---- See also `scroll-binding`.  When this option is set, scrolling the
---- current window also scrolls other scrollbind windows (windows that
---- also have this option set).  This option is useful for viewing the
---- differences between two versions of a file, see 'diff'.
---- See 'scrollopt' for options that determine how this option should be
---- interpreted.
---- This option is mostly reset when splitting a window to edit another
---- file.  This means that ":split | edit file" results in two windows
---- with scroll-binding, but ":split file" does not.
+--- Enables synchronized scrolling (in all windows with this option set).
+--- Useful for comparing two versions of a file, see 'diff'.
+--- Behavior is controlled by 'scrollopt'. See `scroll-binding`.
+---
+--- This option is (usually) reset when splitting a window to edit another
+--- file: ":split | edit file" results in two windows with scroll-binding,
+--- but ":split file" does not.
+---
+--- Note: Consider calling `:syncbind` on `WinResized`, `WinEnter` events
+--- (scoped to relevant buffers).
 ---
 --- @type boolean
 vim.o.scrollbind = false
@@ -8175,7 +8176,10 @@ vim.go.wim = vim.go.wildmode
 --- 		is not supported for file and directory names and
 --- 		instead wildcard expansion is used.
 ---   pum		Display the completion matches using the popup menu in
---- 		the same style as the `ins-completion-menu`.
+--- 		the same style as the `ins-completion-menu`.  When an
+--- 		info popup is shown next to the menu, it can be
+--- 		scrolled by moving the mouse pointer on top of it and
+--- 		using the scroll wheel.
 ---   tagfile	When using CTRL-D to list matching tags, the kind of
 --- 		tag and the file of the tag is listed.	Only one match
 --- 		is displayed per line.  Often used tag kinds are:

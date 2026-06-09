@@ -127,23 +127,22 @@ API
   • |nvim_get_option_info2()|
   • |nvim_get_option_value()|
   • |nvim_set_option_value()|
+• |nvim_buf_set_extmark()| `virt_lines_overflow` accepts "wrap" to enable
+  wrapping onto extra rows and "auto" which enables horizontal scrolling when
+  'nowrap' is set and wrapping when 'wrap' is set.
 
 BUILD
 
 • Building using "zig build" requires zig 0.16.x.
-
 • zig build: "-Dcross" option was removed. Often cross-compilation is now
-detected, so e.g. from a linux host
-
+  detected, so e.g. from a linux host: >
    zig build -Dtarget=aarch64-macos
-
-will automatically compile a host Lua for use during build.
-
-The new "-Dhost={target_string}" option can be used to override the used host.
-use "-Dhost=native" to force cross-compiling or "-Dhost=" (empty string) to
-assume that target binaries can run on the host during the build process (e.g.
-if target is x86 on a x86_64 system, or if emulation set up with binfmt or
-similar)
+<  will automatically compile a host Lua for use during build.
+• zig build: The new "-Dhost={target_string}" option can be used to override
+  the used host. Use "-Dhost=native" to force cross-compiling or "-Dhost="
+  (empty string) to assume that target binaries can run on the host during the
+  build process (e.g. if target is x86 on a x86_64 system, or if emulation set
+  up with binfmt or similar).
 
 DEFAULTS
 
