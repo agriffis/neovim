@@ -139,10 +139,24 @@ char *path_tail_with_sep(char *fname)
   return tail;
 }
 
-/// Finds the path tail (or executable) in an invocation.
+/// Finds the executable name (path tail) in a program invocation.
 ///
-/// @param[in]  invocation A program invocation in the form:
-///                        "path/to/exe [args]".
+/// The invocation starts with an executable path, optionally followed
+/// by arguments.
+///
+/// Parsing rules:
+/// - A space outside double quotes ends the executable path.
+/// - Within quoted segments, a backslash skips the following character.
+///   Note: on Windows, `\` is treated firstly as a path separator. In
+///   practice, this rule should be rarely needed anyway.
+///
+/// Examples:
+/// - "path/foo/bash --login" => "bash"
+/// - "path/foo bar/bash --login" => "foo"
+/// - "\"path/foo bar/bash\" --login" => "bash"
+/// - "\"path/foo\\\" bar/bash\" --login" => "bash"
+///
+/// @param[in]  invocation Program invocation string.
 /// @param[out] len Stores the length of the executable name.
 ///
 /// @post if `len` is not null, stores the length of the executable name.
@@ -152,17 +166,25 @@ const char *invocation_path_tail(const char *invocation, size_t *len)
   FUNC_ATTR_NONNULL_RET FUNC_ATTR_NONNULL_ARG(1)
 {
   const char *tail = get_past_head(invocation);
+  const char *tail_end = tail;
   const char *p = tail;
-  while (*p != NUL && *p != ' ') {
-    bool was_sep = vim_ispathsep_nocolon(*p);
-    MB_PTR_ADV(p);
-    if (was_sep) {
-      tail = p;  // Now tail points one past the separator.
+  bool inquote = false;
+  while (*p != NUL && (inquote || *p != ' ')) {
+    int l = utfc_ptr2len(p);
+    if (vim_ispathsep_nocolon(*p)) {
+      tail = p + 1;  // Now tail points one past the separator.
+    } else if (*p == '\\' && inquote) {
+      p++;
+    } else if (*p == '"') {
+      inquote ^= 1;
+    } else {
+      tail_end = p + l;
     }
+    p += l;
   }
 
   if (len != NULL) {
-    *len = (size_t)(p - tail);
+    *len = (size_t)(tail_end - tail);
   }
 
   return tail;
@@ -687,7 +709,9 @@ static size_t do_path_expand(garray_T *gap, const char *path, size_t wildoff, in
       s = p + 1;
     } else if (path_end >= path + wildoff
 #ifdef MSWIN
-               && vim_strchr("*?[~", (uint8_t)(*path_end)) != NULL
+               // "~" not included here, we want to treat it as literal.
+               // The "~/" case is already handled in `gen_expand_wildcards`.
+               && vim_strchr("*?[", (uint8_t)(*path_end)) != NULL
 #else
                && (vim_strchr("*?[{~$", (uint8_t)(*path_end)) != NULL
                    || (!p_fic && (flags & EW_ICASE) && mb_isalpha(utf_ptr2char(path_end))))
