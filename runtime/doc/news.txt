@@ -76,6 +76,9 @@ DIAGNOSTICS
 
 • `vim.diagnostic.Opts.Status.format` no longer accepts the table mapping
   from severity to text. Use `vim.diagnostic.Opts.Signs.text` instead.
+• `current_line` property of |vim.diagnostic.Opts.VirtualLines| and
+  |vim.diagnostic.Opts.VirtualText| is now applied on |CursorHold| event.
+  Make sure your 'updatetime' is reasonable.
 
 EDITOR
 
@@ -174,6 +177,11 @@ EDITOR
   real-time, instead of only on |FocusGained|/|:checktime|.
 • During |complete()|-triggered completion, CTRL-N and CTRL-P are now subject
   to insert-mode mappings.
+• Multi-byte characters, translated by 'langmap', now invoke correct
+  mappings.
+  Example: >vim
+    set langmap=õ]
+<    Typing õõ in |Normal-mode| now invokes a mapping bound to ]].
 
 EVENTS
 
