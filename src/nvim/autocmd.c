@@ -106,6 +106,7 @@ static bool autocmd_nested = false;
 static bool autocmd_include_groups = false;
 
 static bool termresponse_changed = false;
+static uint64_t termresponse_chan_id = 0;
 
 // Map of autocmd group names and ids.
 //  name -> ID
@@ -762,7 +763,7 @@ void do_autocmd(exarg_T *eap, char *arg_in, int forceit)
   char *arg = arg_in;
   char *envpat = NULL;
   char *cmd;
-  bool need_free = false;
+  bool cmd_need_free = false;
   bool nested = false;
   bool once = false;
   int group;
@@ -831,7 +832,7 @@ void do_autocmd(exarg_T *eap, char *arg_in, int forceit)
     }
 
     if (invalid_flags) {
-      return;
+      goto err_exit;
     }
 
     // Find the start of the commands.
@@ -839,9 +840,9 @@ void do_autocmd(exarg_T *eap, char *arg_in, int forceit)
     if (*cmd != NUL) {
       cmd = expand_sfile(cmd);
       if (cmd == NULL) {  // some error
-        return;
+        goto err_exit;
       }
-      need_free = true;
+      cmd_need_free = true;
     }
   }
 
@@ -878,7 +879,8 @@ void do_autocmd(exarg_T *eap, char *arg_in, int forceit)
     }
   }
 
-  if (need_free) {
+err_exit:
+  if (cmd_need_free) {
     xfree(cmd);
   }
   xfree(envpat);
@@ -1352,6 +1354,10 @@ void aucmd_prepbuf(aco_save_T *aco, buf_T *buf)
     // disable the Visual area, position may be invalid in another buffer
     VIsual_active = false;
   }
+  if (autocmd_save.save_aucmd == NULL) {
+    autocmd_save = *aco;
+    autocmd_save.save_aucmd = aco;
+  }
 }
 
 /// Cleanup after executing autocommands for a (hidden) buffer.
@@ -1373,6 +1379,9 @@ void aucmd_restbuf(aco_save_T *aco)
   // NULL br_buf means `aucmd_prepbuf` was never called on this `aco`.
   if (aco->new_curbuf.br_buf == NULL) {
     return;
+  }
+  if (autocmd_save.save_aucmd == aco) {
+    autocmd_save.save_aucmd = NULL;
   }
 
   if (aco->use_aucmd_win_idx >= 0) {
@@ -1464,7 +1473,6 @@ win_found:
         curbuf->b_nwindows++;
       }
 
-      curwin->w_redr_status = true;
       curwin = save_curwin;
       curbuf = curwin->w_buffer;
       prevwin = win_find_by_handle(aco->save_prevwin_handle);
@@ -2078,13 +2086,15 @@ BYPASS_AU:
   return retval;
 }
 
-void do_termresponse_autocmd(const String sequence)
+void do_termresponse_autocmd(const String sequence, uint64_t channel_id)
 {
-  MAXSIZE_TEMP_DICT(data, 1);
+  MAXSIZE_TEMP_DICT(data, 2);
   PUT_C(data, "sequence", STRING_OBJ(sequence));
+  PUT_C(data, "chan", INTEGER_OBJ((Integer)channel_id));
   apply_autocmds_group(EVENT_TERMRESPONSE, NULL, NULL, true, AUGROUP_ALL, NULL, NULL,
                        &DICT_OBJ(data), false);
   termresponse_changed = true;
+  termresponse_chan_id = channel_id;
 }
 
 // Block triggering autocommands until unblock_autocmd() is called.
@@ -2094,6 +2104,7 @@ void block_autocmds(void)
   // Detect if v:termresponse is set while blocked.
   if (!is_autocmd_blocked()) {
     termresponse_changed = false;
+    termresponse_chan_id = 0;
   }
   autocmd_blocked++;
 }
@@ -2108,7 +2119,7 @@ void unblock_autocmds(void)
   if (!is_autocmd_blocked() && termresponse_changed && has_event(EVENT_TERMRESPONSE)) {
     // Copied to a new allocation, as termresponse may be freed during the event.
     const String sequence = cstr_to_string(get_vim_var_str(VV_TERMRESPONSE));
-    do_termresponse_autocmd(sequence);
+    do_termresponse_autocmd(sequence, termresponse_chan_id);
     api_free_string(sequence);
   }
 }

@@ -9,6 +9,7 @@
 #include "nvim/api/private/defs.h"
 #include "nvim/api/private/helpers.h"
 #include "nvim/ascii_defs.h"
+#include "nvim/autocmd.h"
 #include "nvim/buffer.h"
 #include "nvim/buffer_defs.h"
 #include "nvim/charset.h"
@@ -77,6 +78,7 @@ void win_redr_status(win_T *wp)
       || (wild_menu_showing != 0 && !ui_has(kUIWildmenu))) {
     return;
   }
+
   busy = true;
   wp->w_redr_status = false;
   if (wp->w_status_height == 0 && !(is_stl_global && wp == curwin)) {
@@ -243,6 +245,11 @@ static void win_redr_custom(win_T *wp, bool draw_winbar, bool draw_ruler, bool u
     return;
   }
   entered = true;
+
+  // Restore actual curwin before redrawing.
+  if (autocmd_save.save_aucmd != NULL && curwin->handle != autocmd_save.save_curwin_handle) {
+    aucmd_restbuf(&autocmd_save);
+  }
 
   // setup environment for the task at hand
   if (wp == NULL) {
@@ -421,6 +428,11 @@ static void win_redr_custom(win_T *wp, bool draw_winbar, bool draw_ruler, bool u
 
 theend:
   entered = false;
+
+  // Restore temporary autocmd curwin.
+  if (autocmd_save.save_aucmd != NULL && curwin->handle == autocmd_save.new_curwin_handle) {
+    aucmd_prepbuf(&autocmd_save, autocmd_save.new_curbuf.br_buf);
+  }
 }
 
 void win_redr_winbar(win_T *wp)
