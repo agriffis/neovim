@@ -1595,9 +1595,11 @@ format({opts})                                          *vim.lsp.buf.format()*
                   default: current selection in visual mode, `nil` in other
                   modes, formatting the full buffer) Range to format. Table
                   must contain `start` and `end` keys with {row,col} tuples
-                  using (1,0) indexing. Can also be a list of tables that
-                  contain `start` and `end` keys as described above, in which
-                  case `textDocument/rangesFormatting` support is required.
+                  using (1,0) indexing. The end column can be -1 to format
+                  through the end of the line. Can also be a list of tables
+                  that contain `start` and `end` keys as described above, in
+                  which case `textDocument/rangesFormatting` support is
+                  required.
                 • {timeout_ms}? (`integer`, default: `1000`) Time in
                   milliseconds to block for formatting requests. No effect if
                   async=true.
@@ -2386,9 +2388,11 @@ enable({enable}, {filter})                       *vim.lsp.inlay_hint.enable()*
 
     Parameters: ~
       • {enable}  (`boolean?`) true/nil to enable, false to disable
-      • {filter}  (`table?`) Optional filters |kwargs|, or `nil` for all.
-                  • {bufnr} (`integer?`) Buffer number, or 0 for current
-                    buffer, or nil for all.
+      • {filter}  (`table?`) Optional filters |kwargs|,
+                  • {bufnr}? (`integer`, default: all) Buffer number, or 0 for
+                    current buffer, or nil for all.
+                  • {client_id}? (`integer`, default: all) Client ID, or nil
+                    for all.
 
 get({filter})                                       *vim.lsp.inlay_hint.get()*
     Get the list of inlay hints, (optionally) restricted by buffer or range.
@@ -2432,9 +2436,11 @@ is_enabled({filter})                         *vim.lsp.inlay_hint.is_enabled()*
         Since: 0.10.0
 
     Parameters: ~
-      • {filter}  (`table?`) Optional filters |kwargs|, or `nil` for all.
-                  • {bufnr} (`integer?`) Buffer number, or 0 for current
-                    buffer, or nil for all.
+      • {filter}  (`table?`) Optional filters |kwargs|,
+                  • {bufnr}? (`integer`, default: all) Buffer number, or 0 for
+                    current buffer, or nil for all.
+                  • {client_id}? (`integer`, default: all) Client ID, or nil
+                    for all.
 
     Return: ~
         (`boolean`)

@@ -5012,6 +5012,16 @@ static void ex_restart(exarg_T *eap)
     if (i > 0 && strequal(arg, "--")) {
       break;
     }
+    // Drop "-S [file]". It conflicts with :restart and usually isn't wanted for :restart!
+    if (i > 0 && strequal(arg, "-S")) {
+      if (li->li_next != NULL) {
+        const char *next_arg = tv_get_string(TV_LIST_ITEM_TV(li->li_next));
+        if (next_arg[0] != '-') {
+          li = li->li_next;
+        }
+      }
+      continue;
+    }
     // Drop "-s <scriptfile>": skip the scriptfile arg too.
     if (i > 0 && strequal(arg, "-s")) {
       li = li->li_next;
@@ -6067,14 +6077,14 @@ static void ex_resize(exarg_T *eap)
     } else if (n == 0 && eap->arg[0] == NUL) {  // default is very wide
       n = Columns;
     }
-    win_setwidth_win(n, wp);
+    win_setwidth_win(n, wp, true);
   } else {
     if (*eap->arg == '-' || *eap->arg == '+') {
       n += wp->w_height;
     } else if (n == 0 && eap->arg[0] == NUL) {  // default is very high
       n = Rows - 1;
     }
-    win_setheight_win(n, wp);
+    win_setheight_win(n, wp, true);
   }
 }
 

@@ -2504,6 +2504,24 @@ function vim.api.nvim_win_hide(win) end
 --- @return boolean # true if the window is valid, false otherwise
 function vim.api.nvim_win_is_valid(win) end
 
+--- Resizes a window, anchored to a given edge.
+---
+--- The window first takes space from the non-anchored side, and only then from the anchored side.
+--- The "anchor" decides the fixed edge, so a window can grow or shrink in any direction.
+---
+--- Can set height, width (only for a vertical split), or both. The "anchor" applies to the matching
+--- axis (top/bottom for height, left/right for width); the other axis uses its default anchor.
+---
+--- @param win integer `window-ID`, or 0 for current window
+--- @param width integer New width (columns), or -1 for "no change".
+--- @param height integer New height (rows), or -1 for "no change".
+--- @param opts vim.api.keyset.win_resize Optional parameters.
+--- - anchor: Edge that stays fixed while the opposite edge moves; the
+---   neighbor on the moving side is resized first. One of:
+---   - "top" (default) or "bottom"
+---   - "left" (default) or "right"
+function vim.api.nvim_win_resize(win, width, height, opts) end
+
 --- Sets the current buffer in a window.
 ---
 --- Note: As a side-effect, this executes `BufEnter` and `BufLeave` autocommands.
@@ -2538,10 +2556,9 @@ function vim.api.nvim_win_set_config(win, config) end
 --- @param pos [integer, integer] (row, col) tuple representing the new position
 function vim.api.nvim_win_set_cursor(win, pos) end
 
---- Sets the window height.
----
---- @param win integer `window-ID`, or 0 for current window
---- @param height integer Height as a count of rows
+--- @deprecated
+--- @param win integer
+--- @param height integer
 function vim.api.nvim_win_set_height(win, height) end
 
 --- Set highlight namespace for a window. This will use highlights defined with
@@ -2567,11 +2584,9 @@ function vim.api.nvim_win_set_option(window, name, value) end
 --- @param value any Variable value
 function vim.api.nvim_win_set_var(win, name, value) end
 
---- Sets the window width. This will only succeed if the screen is split
---- vertically.
----
---- @param win integer `window-ID`, or 0 for current window
---- @param width integer Width as a count of columns
+--- @deprecated
+--- @param win integer
+--- @param width integer
 function vim.api.nvim_win_set_width(win, width) end
 
 --- Computes the number of screen lines occupied by a range of text in a given window.
