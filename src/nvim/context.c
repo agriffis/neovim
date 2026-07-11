@@ -341,7 +341,7 @@ static void ctx_cwd_restore(CtxSwitch *cs)
   XFREE_CLEAR(cs->cs_cwd);
 }
 
-/// Return true if "win" is an active entry in ctx_win[] (the pool of temporary scratch windows).
+/// Return true if `win` is an active entry in ctx_win[] (the pool of temporary scratch windows).
 bool is_ctx_win(win_T *win)
 {
   for (int i = 0; i < CTX_WIN_COUNT; i++) {
@@ -352,11 +352,12 @@ bool is_ctx_win(win_T *win)
   return false;
 }
 
-/// Prepares a temporary "autocmd window" showing `buf`: allocated (or reused) from the `ctx_win[]`
-/// pool, appended to the window list of the current tabpage, and entered, all without side effects
-/// (autocommands, chdir, redraw).  Records what ctx_restore() needs to undo it in `cs`.
+/// Prepares a temporary "autocmd window" showing `buf`: allocated/reused from the `ctx_win[]` pool
+/// and appended to the window list of curtab. Records what ctx_restore() needs to undo in `cs`.
 ///
-/// @return  the entered autocmd window (the new curwin).
+/// Window lifecycle only: does not enter the window, no side effects (autocmds, chdir, redraw).
+///
+/// @return  the prepared autocmd window.
 static win_T *ctx_win_prep(CtxSwitch *cs, buf_T *buf)
 {
   bool need_append = true;  // Append `cw_win` to the window list.
@@ -387,36 +388,26 @@ static win_T *ctx_win_prep(CtxSwitch *cs, buf_T *buf)
   buf->b_nwindows++;
   win_init_empty(cw_win);  // set cursor and topline to safe values
 
-  // Make sure w_localdir, tp_localdir and globaldir are NULL to avoid a
-  // chdir() in win_enter_ext().
+  // Make sure w_localdir, tp_localdir, globaldir are NULL: the switched-to code runs in the actual
+  // cwd (no chdir on switch), and a pooled tmp-window must not carry a stale w_localdir.
   XFREE_CLEAR(cw_win->w_localdir);
   cs->cs_tp_localdir = curtab->tp_localdir;
   curtab->tp_localdir = NULL;
   cs->cs_globaldir = globaldir;
   globaldir = NULL;
 
-  block_autocmds();  // We don't want BufEnter/WinEnter autocommands.
   if (need_append) {
     win_append(lastwin, cw_win, NULL);
     pmap_put(int)(&window_handles, cw_win->handle, cw_win);
     win_config_float(cw_win, cw_win->w_config);
   }
-  // Prevent chdir() call in win_enter_ext(), through do_autochdir()
-  const int save_acd = p_acd;
-  p_acd = false;
-  // no redrawing and don't set the window title
-  RedrawingDisabled++;
-  win_enter(cw_win, false);
-  RedrawingDisabled--;
-  p_acd = save_acd;
-  unblock_autocmds();
 
   return cw_win;
 }
 
-/// Removes the temporary "autocmd window" prepared by ctx_win_prep() from the window list (entering
-/// it first if needed), and releases its pool slot.  Caller must restore curwin (the removed window
-/// is curwin) and the directory state saved in "cs".
+/// Removes the temp win (FKA "autocmd win") prepared by ctx_win_prep() from the window list
+/// (entering it if needed), and releases its pool slot. Caller must restore curwin (the removed
+/// window is curwin) and the directory state saved in "cs".
 ///
 /// @return  the removed autocmd window.
 static win_T *ctx_win_rest(CtxSwitch *cs)
@@ -541,9 +532,12 @@ bool ctx_switch(CtxSwitch *cs, win_T *wp, tabpage_T *tp, buf_T *buf, CtxSwitchFl
 
   if (buf != NULL) {
     if (wp == NULL) {
-      // No window shows "buf": prepare an autocmd window.  Anything related to a window (e.g.,
-      // setting folds) may have unexpected results.
+      // No window shows `buf`: prepare a temp window. Anything related to a window (e.g., setting
+      // folds) may have unexpected results.
       wp = ctx_win_prep(cs, buf);
+      // Leave the window we entered "from".
+      leaving_window(curwin);
+      prevwin = curwin;
     }
     assert(win_valid(wp));
   } else if (!win_valid(wp)) {
@@ -562,6 +556,20 @@ bool ctx_switch(CtxSwitch *cs, win_T *wp, tabpage_T *tp, buf_T *buf, CtxSwitchFl
     check_cursor(curwin);
   }
   return true;
+}
+
+/// Restores curwin/curbuf and prevwin. If the saved window no longer exists, enters `fallback`.
+static void ctx_restore_curwin(CtxSwitch *cs, win_T *fallback)
+{
+  win_T *save_curwin = win_find_by_handle(cs->cs_curwin);
+  if (save_curwin == NULL) {
+    save_curwin = fallback;  // Hmm, original window disappeared.
+  }
+  if (save_curwin != NULL) {
+    curwin = save_curwin;
+    curbuf = curwin->w_buffer;
+  }
+  prevwin = win_find_by_handle(cs->cs_prevwin);
 }
 
 /// Undoes ctx_switch(): restores the previous location (if possible) and the kept state.
@@ -597,31 +605,18 @@ void ctx_restore(CtxSwitch *cs)
       }
     }
 
-    // Look up the window by handle: the user code may have closed it, and
-    // its memory been reused for another window.
-    win_T *const save_curwin = win_find_by_handle(cs->cs_curwin);
-    if (save_curwin != NULL) {
-      curwin = save_curwin;
-      curbuf = curwin->w_buffer;
-    }
+    ctx_restore_curwin(cs, NULL);
   } else if (cs->cs_ctxwin_idx >= 0) {
     win_T *cwp = ctx_win_rest(cs);
 
-    win_T *const save_curwin = win_find_by_handle(cs->cs_curwin);
-    if (save_curwin != NULL) {
-      curwin = save_curwin;
-    } else {
-      // Hmm, original window disappeared.  Just use the first one.
-      curwin = firstwin;
-    }
-    curbuf = curwin->w_buffer;
-    // May need to restore insert mode for a prompt buffer.
+    ctx_restore_curwin(cs, firstwin);
+    // May need to restore insert-mode for a prompt buffer.
+    // Pairs with the leaving_window() in ctx_switch().
     entering_window(curwin);
     if (bt_prompt(curbuf)) {
       curbuf->b_prompt_insert = cs->cs_prompt_insert;
     }
 
-    prevwin = win_find_by_handle(cs->cs_prevwin);
     vars_clear(&cwp->w_vars->dv_hashtab);         // free all w: variables
     hash_init(&cwp->w_vars->dv_hashtab);          // re-use the hashtab
 
@@ -641,29 +636,21 @@ void ctx_restore(CtxSwitch *cs)
       curwin->w_topfill = 0;
     }
   } else {
-    // Restore curwin.  Use the window ID, a window may have been closed
-    // and the memory re-used for another one.
-    win_T *const save_curwin = win_find_by_handle(cs->cs_curwin);
-    if (save_curwin != NULL) {
-      // Restore the buffer which was previously edited by curwin, if it was
-      // changed, we are still the same window and the buffer is valid.
-      if (curwin->handle == cs->cs_new_curwin
-          && curbuf != cs->cs_new_curbuf.br_buf
-          && bufref_valid(&cs->cs_new_curbuf)
-          && cs->cs_new_curbuf.br_buf->b_ml.ml_mfp != NULL) {
-        if (curwin->w_s == &curbuf->b_s) {
-          curwin->w_s = &cs->cs_new_curbuf.br_buf->b_s;
-        }
-        curbuf->b_nwindows--;
-        curbuf = cs->cs_new_curbuf.br_buf;
-        curwin->w_buffer = curbuf;
-        curbuf->b_nwindows++;
+    // Restore the buffer previously edited by curwin.
+    if (curwin->handle == cs->cs_new_curwin
+        && curbuf != cs->cs_new_curbuf.br_buf
+        && bufref_valid(&cs->cs_new_curbuf)
+        && cs->cs_new_curbuf.br_buf->b_ml.ml_mfp != NULL) {
+      if (curwin->w_s == &curbuf->b_s) {
+        curwin->w_s = &cs->cs_new_curbuf.br_buf->b_s;
       }
-
-      curwin = save_curwin;
-      curbuf = curwin->w_buffer;
-      prevwin = win_find_by_handle(cs->cs_prevwin);
+      curbuf->b_nwindows--;
+      curbuf = cs->cs_new_curbuf.br_buf;
+      curwin->w_buffer = curbuf;
+      curbuf->b_nwindows++;
     }
+
+    ctx_restore_curwin(cs, NULL);
   }
 
   if (!cs->cs_same_win) {

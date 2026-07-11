@@ -2494,12 +2494,14 @@ static void win_equal_rec(win_T *next_curwin, bool current, frame_T *topfr, int 
   }
 }
 
+/// Called when `win` stops being curwin: closing, switching, or leaving its tabpage. Pairs with
+/// entering_window(). Only matters for a prompt buffer...
+///
+/// @see win_enter
 void leaving_window(win_T *const win)
   FUNC_ATTR_NONNULL_ALL
 {
-  // Only matters for a prompt window.
-  // Don't do mode changes for a prompt buffer in an autocommand window, as
-  // it's only used temporarily during an autocommand.
+  // Not for a ctx window: it shows its buffer only temporarily.
   if (!bt_prompt(win->w_buffer) || is_ctx_win(win)) {
     return;
   }
@@ -2523,12 +2525,14 @@ void leaving_window(win_T *const win)
   }
 }
 
+/// Called when `win` becomes curwin: switching to it, entering its tabpage, or ctx_restore().
+/// Pairs with leaving_window(). Only matters for a prompt buffer...
+///
+/// @see win_enter
 void entering_window(win_T *const win)
   FUNC_ATTR_NONNULL_ALL
 {
-  // Only matters for a prompt window.
-  // Don't do mode changes for a prompt buffer in an autocommand window, as
-  // it's only used temporarily during an autocommand.
+  // Not for a ctx window: it shows its buffer only temporarily.
   if (!bt_prompt(win->w_buffer) || is_ctx_win(win)) {
     return;
   }
@@ -2579,7 +2583,7 @@ void close_windows(buf_T *buf, bool keep_curwin)
   RedrawingDisabled++;
 
   // Start from lastwin to close floating windows with the same buffer first.
-  // When the autocommand window is involved win_close() may need to print an error message.
+  // When the ctx window is involved win_close() may need to print an error message.
   for (win_T *wp = lastwin; wp != NULL && (is_ctx_win(lastwin) || !one_window(wp, NULL));) {
     if (wp->w_buffer == buf && (!keep_curwin || wp != curwin)
         && !(win_locked(wp) || wp->w_buffer->b_locked > 0)) {
@@ -2648,7 +2652,7 @@ bool one_window(win_T *win, tabpage_T *tp)
 }
 
 /// Check if floating windows in tabpage `tp` can be closed.
-/// Do not call this when the autocommand window is in use!
+/// Do not call this when the ctx window is in use!
 ///
 /// @param tp tabpage to check. Must be NULL for the current tabpage.
 /// @return true if all floating windows can be closed
@@ -7328,15 +7332,47 @@ int set_winbar_win(win_T *wp, bool make_room, bool valid_cursor)
   return OK;
 }
 
+/// Add or remove window bars from all windows in the current tab.
+///
+/// @param make_room Whether to resize frames to make room for winbar.
+/// @param valid_cursor Whether the cursor is valid and should be used while resizing.
+/// @return false if a window failed to make room for winbar.
+static bool set_winbar_curtab(bool make_room, bool valid_cursor)
+{
+  FOR_ALL_WINDOWS_IN_TAB(wp, curtab) {
+    if (set_winbar_win(wp, make_room, valid_cursor) == FAIL) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /// Add or remove window bars from all windows in tab depending on the value of 'winbar'.
 ///
 /// @param make_room Whether to resize frames to make room for winbar.
 void set_winbar(bool make_room)
 {
-  FOR_ALL_WINDOWS_IN_TAB(wp, curtab) {
-    if (set_winbar_win(wp, make_room, true) == FAIL) {
-      break;
+  set_winbar_curtab(make_room, true);
+}
+
+/// Add or remove window bars from all windows in all tabs depending on the value of 'winbar'.
+///
+/// @param make_room Whether to resize frames to make room for winbar.
+void set_winbar_all(bool make_room)
+{
+  (void)set_winbar_curtab(make_room, true);
+
+  FOR_ALL_TABS(tp) {
+    if (tp == curtab) {
+      continue;
     }
+
+    switchwin_T switchwin;
+    // Use a no-display switch so the hidden tab's frame and window globals are active.
+    if (switch_win(&switchwin, tp->tp_curwin, tp, true) == OK) {
+      (void)set_winbar_curtab(make_room, false);
+    }
+    restore_win(&switchwin, true);
   }
 }
 

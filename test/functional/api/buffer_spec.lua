@@ -2392,6 +2392,32 @@ describe('api/buf', function()
       os.remove(new_name)
     end)
 
+    it('directory buffer-name always ends with slash', function()
+      local cwd = t.fix_slashes(fn.getcwd())
+      local dir = 'Xtest_dir_name'
+      t.mkdir(dir)
+      finally(function()
+        n.rmdir(dir)
+      end)
+      api.nvim_buf_set_name(0, dir)
+      eq(cwd .. '/' .. dir .. '/', t.fix_slashes(api.nvim_buf_get_name(0)))
+    end)
+
+    it('directory buffer-name preserves symbolic link path', function()
+      t.skip(t.is_os('win'), 'N/A for Windows')
+      local cwd = t.fix_slashes(fn.getcwd())
+      local target = 'Xtest_dir_target'
+      local link = 'Xtest_dir_link'
+      t.mkdir(target)
+      assert(vim.uv.fs_symlink(assert(vim.uv.fs_realpath(target)), link, { dir = true }))
+      finally(function()
+        os.remove(link)
+        n.rmdir(target)
+      end)
+      api.nvim_buf_set_name(0, link .. '/')
+      eq(cwd .. '/' .. link .. '/', t.fix_slashes(api.nvim_buf_get_name(0)))
+    end)
+
     describe("with 'autochdir'", function()
       local topdir
       local oldbuf
@@ -2553,6 +2579,21 @@ describe('api/buf', function()
   end)
 
   describe('nvim_buf_call', function()
+    it('window keeps the buffer when the callback closes the original window', function()
+      local origin = api.nvim_get_current_win()
+      local other_buf = api.nvim_create_buf(true, false)
+      local other_win = api.nvim_open_win(other_buf, false, { split = 'right' })
+      exec_lua(function()
+        vim.api.nvim_buf_call(other_buf, function()
+          vim.api.nvim_win_close(origin, true)
+          vim.cmd('enew') -- switch the context window away from other_buf
+        end)
+      end)
+      -- Original window is gone: stay in the nvim_buf_call window, but buffer is restored.
+      eq(other_win, api.nvim_get_current_win())
+      eq(other_buf, api.nvim_win_get_buf(other_win))
+    end)
+
     it('preserves visual-mode, unless the callback ended it', function()
       -- Same-buffer: Visual survives untouched.
       command('normal! v')
