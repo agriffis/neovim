@@ -62,7 +62,6 @@
 #include "nvim/fuzzy.h"
 #include "nvim/garray.h"
 #include "nvim/garray_defs.h"
-#include "nvim/getchar.h"
 #include "nvim/gettext_defs.h"
 #include "nvim/globals.h"
 #include "nvim/hashtab.h"
@@ -70,6 +69,7 @@
 #include "nvim/help.h"
 #include "nvim/indent.h"
 #include "nvim/indent_c.h"
+#include "nvim/input.h"
 #include "nvim/insexpand.h"
 #include "nvim/main.h"
 #include "nvim/map_defs.h"
@@ -225,13 +225,13 @@ bool buf_ensure_loaded(buf_T *buf)
     return true;
   }
 
-  aco_save_T aco = { 0 };
+  CtxSwitch aco = { 0 };
 
   // Make sure the buffer is in a window.
-  aucmd_prepbuf(&aco, buf);
+  ctx_switch(&aco, NULL, NULL, buf, 0);
   // status can be OK or NOTDONE (which also means ok/done)
   int status = open_buffer(false, NULL, 0);
-  aucmd_restbuf(&aco);
+  ctx_restore(&aco);
   return (status != FAIL);
 }
 
@@ -436,10 +436,10 @@ int open_buffer(bool read_stdin, exarg_T *eap, int flags_arg)
   // The autocommands may have changed the current buffer.  Apply the
   // modelines to the correct buffer, if it still exists and is loaded.
   if (bufref_valid(&old_curbuf) && old_curbuf.br_buf->b_ml.ml_mfp != NULL) {
-    aco_save_T aco = { 0 };
+    CtxSwitch aco = { 0 };
 
     // Go to the buffer that was opened, make sure it is in a window.
-    aucmd_prepbuf(&aco, old_curbuf.br_buf);
+    ctx_switch(&aco, NULL, NULL, old_curbuf.br_buf, 0);
     do_modelines(0);
     curbuf->b_flags &= ~(BF_CHECK_RO | BF_NEVERLOADED);
 
@@ -449,7 +449,7 @@ int open_buffer(bool read_stdin, exarg_T *eap, int flags_arg)
     }
 
     // restore curwin/curbuf and a few other things
-    aucmd_restbuf(&aco);
+    ctx_restore(&aco);
   }
 
   return retval;
@@ -1490,15 +1490,15 @@ static int do_buffer_ext(int action, int start, int dir, int count, int flags)
         // Switch to buf's holder window without entering it: caller keeps focus,
         // BufEnter doesn't fire for the deleted buffer.
         // curwin must be floating: buf != curbuf, yet firstwin (the last non-float) shows buf.
-        // Also firstwin is valid in curtab, so switch_win_noblock should not fail.
+        // Also firstwin is valid in curtab, so ctx_switch should not fail.
         assert(curwin->w_floating);
-        switchwin_T switchwin;
-        const int rv = switch_win_noblock(&switchwin, firstwin, curtab, true);
-        assert(rv == OK);
+        CtxSwitch switchwin;
+        const bool rv = ctx_switch(&switchwin, firstwin, curtab, NULL, kCtxNoDisplay);
+        assert(rv);
         (void)rv;
         // retry (recurse)
         do_buffer_ext(action, start, dir, count, flags);
-        restore_win_noblock(&switchwin, true);
+        ctx_restore(&switchwin);
       }
 
       if (buf != curbuf && bufref_valid(&bufref) && buf->b_nwindows <= 0) {
@@ -2038,6 +2038,7 @@ buf_T *buflist_new(char *ffname_arg, char *sfname_arg, linenr_T lnum, int flags)
     assert(sfname != NULL);
     buf->b_ffname = ffname;
     buf->b_sfname = xstrdup(sfname);
+    TO_SLASH(buf->b_sfname);
   }
 
   clear_wininfo(buf);
@@ -3119,6 +3120,7 @@ int setfname(buf_T *buf, char *ffname_arg, char *sfname_arg, bool message)
     }
     sfname = xstrdup(sfname);
 #ifdef CASE_INSENSITIVE_FILENAME
+    TO_SLASH(sfname);
     path_fix_case(sfname);            // set correct case for short file name
 #endif
     if (buf->b_sfname != buf->b_ffname) {
@@ -3223,22 +3225,6 @@ int buflist_add(char *fname, int flags)
   }
   return 0;
 }
-
-#ifdef BACKSLASH_IN_FILENAME
-/// Adjust slashes in file names.  Called after 'shellslash' was set.
-void buflist_slash_adjust(void)
-{
-  FOR_ALL_BUFFERS(bp) {
-    if (bp->b_ffname != NULL) {
-      slash_adjust(bp->b_ffname);
-    }
-    if (bp->b_sfname != NULL) {
-      slash_adjust(bp->b_sfname);
-    }
-  }
-}
-
-#endif
 
 /// Set alternate cursor position for the current buffer and window "win".
 /// Also save the local window option values.
@@ -3471,10 +3457,17 @@ void maketitle(void)
       }
     } else {
       // Format: "fname + (path) (1 of 2) - Nvim".
+#ifdef MSWIN
+      int p_ssl_save = p_ssl;
+      p_ssl = true;
+#endif
       char *default_titlestring = "%t%( %M%)%( (%{expand('%:p:~:h')})%)%a - Nvim";
       build_stl_str_hl(curwin, buf, sizeof(buf), default_titlestring,
                        kOptTitlestring, 0, 0, maxlen, NULL, NULL, NULL, NULL);
       title_str = buf;
+#ifdef MSWIN
+      p_ssl = p_ssl_save;
+#endif
     }
   }
   bool mustset = value_change(title_str, &lasttitle);
@@ -4201,8 +4194,8 @@ bool buf_contents_changed(buf_T *buf)
   prep_exarg(&ea, buf);
 
   // Set curwin/curbuf to buf and save a few things.
-  aco_save_T aco = { 0 };
-  aucmd_prepbuf(&aco, newbuf);
+  CtxSwitch aco = { 0 };
+  ctx_switch(&aco, NULL, NULL, newbuf, 0);
 
   // We don't want to trigger autocommands now, they may have nasty
   // side-effects like wiping buffers
@@ -4226,7 +4219,7 @@ bool buf_contents_changed(buf_T *buf)
   xfree(ea.cmd);
 
   // restore curwin/curbuf and a few other things
-  aucmd_restbuf(&aco);
+  ctx_restore(&aco);
 
   if (curbuf != newbuf) {  // safety check
     wipe_buffer(newbuf, false);

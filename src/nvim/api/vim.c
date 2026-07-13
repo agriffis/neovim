@@ -37,14 +37,14 @@
 #include "nvim/ex_docmd.h"
 #include "nvim/ex_eval.h"
 #include "nvim/fold.h"
-#include "nvim/getchar.h"
-#include "nvim/getchar_defs.h"
 #include "nvim/globals.h"
 #include "nvim/grid.h"
 #include "nvim/grid_defs.h"
 #include "nvim/highlight.h"
 #include "nvim/highlight_defs.h"
 #include "nvim/highlight_group.h"
+#include "nvim/input.h"
+#include "nvim/input_defs.h"
 #include "nvim/insexpand.h"
 #include "nvim/keycodes.h"
 #include "nvim/log.h"
@@ -695,12 +695,8 @@ void nvim_set_current_dir(String dir, Error *err)
     return;
   });
 
-  char string[MAXPATHL];
-  memcpy(string, dir.data, dir.size);
-  string[dir.size] = NUL;
-
   TRY_WRAP(err, {
-    changedir_func(string, kCdScopeGlobal);
+    changedir_func(dir.data, kCdScopeGlobal);
   });
 }
 
@@ -1074,7 +1070,7 @@ Buffer nvim_create_buf(Boolean listed, Boolean scratch, Error *err)
 
     // Only strictly needed for scratch, but could just as well be consistent
     // and do this now. Buffer is created NOW, not when it later first happens
-    // to reach a window or aucmd_prepbuf() ..
+    // to reach a window or ctx_switch() ..
     buf_copy_options(buf, BCO_ENTER | BCO_NOHELP);
 
     if (scratch) {

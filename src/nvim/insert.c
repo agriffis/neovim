@@ -1,4 +1,4 @@
-// edit.c: functions for Insert mode
+// insert.c: functions for Insert mode
 
 #include <assert.h>
 #include <ctype.h>
@@ -17,11 +17,11 @@
 #include "nvim/buffer_defs.h"
 #include "nvim/change.h"
 #include "nvim/charset.h"
+#include "nvim/context.h"
 #include "nvim/cursor.h"
 #include "nvim/decoration.h"
 #include "nvim/digraph.h"
 #include "nvim/drawscreen.h"
-#include "nvim/edit.h"
 #include "nvim/errors.h"
 #include "nvim/eval.h"
 #include "nvim/eval/typval_defs.h"
@@ -33,7 +33,6 @@
 #include "nvim/extmark_defs.h"
 #include "nvim/fileio.h"
 #include "nvim/fold.h"
-#include "nvim/getchar.h"
 #include "nvim/gettext_defs.h"
 #include "nvim/globals.h"
 #include "nvim/grid.h"
@@ -43,6 +42,8 @@
 #include "nvim/highlight_group.h"
 #include "nvim/indent.h"
 #include "nvim/indent_c.h"
+#include "nvim/input.h"
+#include "nvim/insert.h"
 #include "nvim/insexpand.h"
 #include "nvim/keycodes.h"
 #include "nvim/macros_defs.h"
@@ -106,7 +107,7 @@ typedef struct {
   bool nomove;
 } InsertState;
 
-#include "edit.c.generated.h"
+#include "insert.c.generated.h"
 enum {
   BACKSPACE_CHAR = 1,
   BACKSPACE_WORD = 2,
@@ -1458,13 +1459,13 @@ void ins_redraw(bool ready)
   if (ready && has_event(EVENT_TEXTCHANGEDI)
       && curbuf->b_last_changedtick_i != buf_get_changedtick(curbuf)
       && !pum_visible()) {
-    aco_save_T aco = { 0 };
+    CtxSwitch aco = { 0 };
     varnumber_T tick = buf_get_changedtick(curbuf);
 
     // save and restore curwin and curbuf, in case the autocmd changes them
-    aucmd_prepbuf(&aco, curbuf);
+    ctx_switch(&aco, NULL, NULL, curbuf, 0);
     apply_autocmds(EVENT_TEXTCHANGEDI, NULL, NULL, false, curbuf);
-    aucmd_restbuf(&aco);
+    ctx_restore(&aco);
     curbuf->b_last_changedtick_i = buf_get_changedtick(curbuf);
     if (tick != buf_get_changedtick(curbuf)) {  // see ins_apply_autocmds()
       u_save(curwin->w_cursor.lnum,
@@ -1478,13 +1479,13 @@ void ins_redraw(bool ready)
   if (ready && has_event(EVENT_TEXTCHANGEDP)
       && curbuf->b_last_changedtick_pum != buf_get_changedtick(curbuf)
       && pum_visible()) {
-    aco_save_T aco = { 0 };
+    CtxSwitch aco = { 0 };
     varnumber_T tick = buf_get_changedtick(curbuf);
 
     // save and restore curwin and curbuf, in case the autocmd changes them
-    aucmd_prepbuf(&aco, curbuf);
+    ctx_switch(&aco, NULL, NULL, curbuf, 0);
     apply_autocmds(EVENT_TEXTCHANGEDP, NULL, NULL, false, curbuf);
-    aucmd_restbuf(&aco);
+    ctx_restore(&aco);
     curbuf->b_last_changedtick_pum = buf_get_changedtick(curbuf);
     if (tick != buf_get_changedtick(curbuf)) {  // see ins_apply_autocmds()
       u_save(curwin->w_cursor.lnum,

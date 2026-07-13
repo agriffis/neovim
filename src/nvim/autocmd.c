@@ -25,14 +25,14 @@
 #include "nvim/ex_docmd.h"
 #include "nvim/ex_eval.h"
 #include "nvim/fileio.h"
-#include "nvim/getchar.h"
-#include "nvim/getchar_defs.h"
 #include "nvim/gettext_defs.h"
 #include "nvim/globals.h"
 #include "nvim/grid.h"
 #include "nvim/grid_defs.h"
 #include "nvim/hashtab.h"
 #include "nvim/highlight_defs.h"
+#include "nvim/input.h"
+#include "nvim/input_defs.h"
 #include "nvim/insexpand.h"
 #include "nvim/lua/executor.h"
 #include "nvim/main.h"
@@ -789,18 +789,9 @@ void do_autocmd(exarg_T *eap, char *arg_in, int forceit)
       *cmd++ = NUL;
     }
 
-    // Expand environment variables in the pattern.  Set 'shellslash', we want
-    // forward slashes here.
+    // Expand environment variables in the pattern.
     if (vim_strchr(pat, '$') != NULL || vim_strchr(pat, '~') != NULL) {
-#ifdef BACKSLASH_IN_FILENAME
-      int p_ssl_save = p_ssl;
-
-      p_ssl = true;
-#endif
       envpat = expand_env_save(pat);
-#ifdef BACKSLASH_IN_FILENAME
-      p_ssl = p_ssl_save;
-#endif
       if (envpat != NULL) {
         pat = envpat;
       }
@@ -1173,7 +1164,7 @@ int do_doautocmd(char *arg_start, bool do_msg, bool *did_something)
 void ex_doautoall(exarg_T *eap)
 {
   int retval = OK;
-  aco_save_T aco = { 0 };
+  CtxSwitch aco = { 0 };
   char *arg = eap->arg;
   int call_do_modelines = check_nomodeline(&arg);
   bufref_T bufref;
@@ -1191,7 +1182,7 @@ void ex_doautoall(exarg_T *eap)
     }
 
     // Find a window for this buffer and save some values.
-    aucmd_prepbuf(&aco, buf);
+    ctx_switch(&aco, NULL, NULL, buf, 0);
     set_bufref(&bufref, buf);
 
     // execute the autocommands for this buffer
@@ -1205,7 +1196,7 @@ void ex_doautoall(exarg_T *eap)
     }
 
     // restore the current window
-    aucmd_restbuf(&aco);
+    ctx_restore(&aco);
 
     // Stop if there is some error or buffer was deleted.
     if (retval == FAIL || !bufref_valid(&bufref)) {
@@ -1236,19 +1227,6 @@ bool check_nomodeline(char **argp)
     return false;
   }
   return true;
-}
-
-// TODO(justinmk): legacy shim, use ctx_switch() directly.
-void aucmd_prepbuf(aco_save_T *aco, buf_T *buf)
-{
-  ctx_switch(aco, NULL, NULL, buf, 0);
-}
-
-// TODO(justinmk): legacy shim, use ctx_restore() directly.  If `aco` was zero-initialized, this may
-// be safely called even if aucmd_prepbuf() was skipped.
-void aucmd_restbuf(aco_save_T *aco)
-{
-  ctx_restore(aco);
 }
 
 /// Schedules an autocommand event, to be executed at the next event-loop tick.
@@ -1313,10 +1291,10 @@ static void deferred_event(void **argv)
     }
     tv_dict_set_keys_readonly(v_event);
 
-    aco_save_T aco = { 0 };
-    aucmd_prepbuf(&aco, buf);
+    CtxSwitch aco = { 0 };
+    ctx_switch(&aco, NULL, NULL, buf, 0);
     apply_autocmds_group(event, fname, fname_io, false, group, buf, eap, data, false);
-    aucmd_restbuf(&aco);
+    ctx_restore(&aco);
 
     restore_v_event(v_event, &save_v_event);
   }
@@ -1339,10 +1317,10 @@ static void deferred_optionset_modified(void **argv)
     bool new_val = (bool)(uintptr_t)argv[1];
     OptVal old = BOOLEAN_OPTVAL(!new_val);
     OptVal new = BOOLEAN_OPTVAL(new_val);
-    aco_save_T aco = { 0 };
-    aucmd_prepbuf(&aco, buf);
+    CtxSwitch aco = { 0 };
+    ctx_switch(&aco, NULL, NULL, buf, 0);
     apply_optionset_autocmd_now(kOptModified, OPT_LOCAL, old, old, old, new, NULL);
-    aucmd_restbuf(&aco);
+    ctx_restore(&aco);
   }
 }
 
@@ -1472,7 +1450,7 @@ bool apply_autocmds_group(event_T event, char *fname, char *fname_io, bool force
   save_redo_T save_redo;
   const bool save_KeyTyped = KeyTyped;
   ESTACK_CHECK_DECLARATION;
-  aco_save_T aco = { 0 };
+  CtxSwitch aco = { 0 };
   bool save_changed = false;
   buf_T *old_curbuf = NULL;
 
@@ -1596,7 +1574,7 @@ bool apply_autocmds_group(event_T event, char *fname, char *fname_io, bool force
     }
     fname = xstrdup(fname);  // make a copy, so we can change it
   } else {
-    sfname = xstrdup(fname);
+    sfname = TO_SLASH_SAVE(fname);
     // Don't try expanding the following events.
     if (event == EVENT_CMDLINECHANGED
         || event == EVENT_CMDLINEENTER
@@ -1629,7 +1607,7 @@ bool apply_autocmds_group(event_T event, char *fname, char *fname_io, bool force
         || event == EVENT_WINCLOSED
         || event == EVENT_WINRESIZED
         || event == EVENT_WINSCROLLED) {
-      fname = xstrdup(fname);
+      fname = TO_SLASH_SAVE(fname);
       autocmd_fname_full = true;  // don't expand it later
     } else {
       fname = FullName_save(fname, false);
@@ -1642,20 +1620,11 @@ bool apply_autocmds_group(event_T event, char *fname, char *fname_io, bool force
   }
 
   if (with_buf && buf != NULL && buf != curbuf) {
-    aucmd_prepbuf(&aco, buf);
+    ctx_switch(&aco, NULL, NULL, buf, 0);
   }
 
   save_changed = curbuf->b_changed;
   old_curbuf = curbuf;
-
-#ifdef BACKSLASH_IN_FILENAME
-  // Replace all backslashes with forward slashes. This makes the
-  // autocommand patterns portable between Unix and Windows.
-  if (sfname != NULL) {
-    forward_slash(sfname);
-  }
-  forward_slash(fname);
-#endif
 
   // Set the name to be used for <amatch>.
   autocmd_match = fname;
@@ -1841,7 +1810,7 @@ BYPASS_AU:
     curbuf->b_au_did_filetype = true;
   }
 
-  aucmd_restbuf(&aco);
+  ctx_restore(&aco);
 
   return retval;
 }
@@ -2092,14 +2061,6 @@ bool has_autocmd(event_T event, char *sfname, buf_T *buf)
     return false;
   }
 
-#ifdef BACKSLASH_IN_FILENAME
-  // Replace all backslashes with forward slashes. This makes the
-  // autocommand patterns portable between Unix and Windows.
-  sfname = xstrdup(sfname);
-  forward_slash(sfname);
-  forward_slash(fname);
-#endif
-
   AutoCmdVec *const acs = &autocmds[(int)event];
   for (size_t i = 0; i < kv_size(*acs); i++) {
     AutoPat *const ap = kv_A(*acs, i).pat;
@@ -2113,9 +2074,6 @@ bool has_autocmd(event_T event, char *sfname, buf_T *buf)
   }
 
   xfree(fname);
-#ifdef BACKSLASH_IN_FILENAME
-  xfree(sfname);
-#endif
 
   return retval;
 }

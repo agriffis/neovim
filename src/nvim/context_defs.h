@@ -89,7 +89,3 @@ typedef struct {
   bool cs_apply_acd;              ///< re-apply 'autochdir' on ctx_restore()
   char *cs_save_sfname;           ///< saved b_sfname (kCtxKeepCwd)
 } CtxSwitch;
-
-// TODO(justinmk): legacy aliases, to avoid churn. They will be unalived soooon.
-typedef CtxSwitch aco_save_T;
-typedef CtxSwitch switchwin_T;

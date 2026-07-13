@@ -8,8 +8,8 @@
 #include "nvim/event/loop.h"
 #include "nvim/ex_cmds_defs.h"
 #include "nvim/ex_eval_defs.h"
-#include "nvim/getchar_defs.h"
 #include "nvim/iconv_defs.h"
+#include "nvim/input_defs.h"
 #include "nvim/macros_defs.h"
 #include "nvim/menu_defs.h"
 #include "nvim/os/os_defs.h"
@@ -760,12 +760,6 @@ EXTERN bool no_hlsearch INIT( = false);
 
 EXTERN bool typebuf_was_filled INIT( = false);     // received text from client
                                                    // or from feedkeys()
-
-#ifdef BACKSLASH_IN_FILENAME
-EXTERN char psepc INIT( = '\\');            // normal path separator character
-EXTERN char psepcN INIT( = '/');            // abnormal path separator character
-EXTERN char pseps[2] INIT( = { '\\', 0 });  // normal path separator string
-#endif
 
 // Set to kTrue when an operator is being executed with virtual editing
 // kNone when no operator is being executed, kFalse otherwise.

@@ -24,10 +24,10 @@
 #include "nvim/cmdexpand.h"
 #include "nvim/cmdexpand_defs.h"
 #include "nvim/cmdhist.h"
+#include "nvim/context.h"
 #include "nvim/cursor.h"
 #include "nvim/digraph.h"
 #include "nvim/drawscreen.h"
-#include "nvim/edit.h"
 #include "nvim/errors.h"
 #include "nvim/eval.h"
 #include "nvim/eval/typval.h"
@@ -43,11 +43,12 @@
 #include "nvim/extmark.h"
 #include "nvim/garray.h"
 #include "nvim/garray_defs.h"
-#include "nvim/getchar.h"
 #include "nvim/gettext_defs.h"
 #include "nvim/globals.h"
 #include "nvim/highlight_defs.h"
 #include "nvim/highlight_group.h"
+#include "nvim/input.h"
+#include "nvim/insert.h"
 #include "nvim/keycodes.h"
 #include "nvim/lua/executor.h"
 #include "nvim/macros_defs.h"
@@ -2488,22 +2489,22 @@ static buf_T *cmdpreview_open_buf(void)
   }
 
   // Rename preview buffer.
-  aco_save_T aco = { 0 };
-  aucmd_prepbuf(&aco, cmdpreview_buf);
+  CtxSwitch aco = { 0 };
+  ctx_switch(&aco, NULL, NULL, cmdpreview_buf, 0);
   int retv = rename_buffer("[Preview]");
-  aucmd_restbuf(&aco);
+  ctx_restore(&aco);
 
   if (retv == FAIL) {
     return NULL;
   }
 
   // Temporarily switch to preview buffer to set it up for previewing.
-  aucmd_prepbuf(&aco, cmdpreview_buf);
+  ctx_switch(&aco, NULL, NULL, cmdpreview_buf, 0);
   buf_clear();
   curbuf->b_p_ma = true;
   curbuf->b_p_ul = -1;
   curbuf->b_p_tw = 0;  // Reset 'textwidth' (was set by ftplugin)
-  aucmd_restbuf(&aco);
+  ctx_restore(&aco);
   cmdpreview_bufnr = cmdpreview_buf->handle;
 
   return cmdpreview_buf;

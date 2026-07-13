@@ -57,13 +57,13 @@
 #include "nvim/fileio.h"
 #include "nvim/fold.h"
 #include "nvim/garray.h"
-#include "nvim/getchar.h"
 #include "nvim/gettext_defs.h"
 #include "nvim/globals.h"
 #include "nvim/grid.h"
 #include "nvim/hashtab.h"
 #include "nvim/highlight.h"
 #include "nvim/highlight_group.h"
+#include "nvim/input.h"
 #include "nvim/keycodes.h"
 #include "nvim/log.h"
 #include "nvim/lua/executor.h"
@@ -1402,9 +1402,11 @@ static void command_line_scan(mparm_T *parmp)
             parmp->pre_commands[parmp->n_pre_commands++] = argv[0];
           } else if (strequal(argv[-1], "--listen")) {
             // "--listen {address}"
+            TO_SLASH(argv[0]);
             parmp->listen_addr = argv[0];
           } else if (strequal(argv[-1], "--server")) {
             // "--server {address}"
+            TO_SLASH(argv[0]);
             parmp->server_addr = argv[0];
           }
           // "--startuptime <file>" already handled
@@ -1490,14 +1492,14 @@ scripterror:
 
       // On Windows expand "~\" or "~/" prefix in file names to profile directory.
 #ifdef MSWIN
-      if (*p == '~' && (p[1] == '\\' || p[1] == '/')) {
+      TO_SLASH(p);
+      if (*p == '~' && p[1] == '/') {
         size_t size = strlen(os_homedir()) + strlen(p);
         char *tilde_expanded = xmalloc(size);
         snprintf(tilde_expanded, size, "%s%s", os_homedir(), p + 1);
         xfree(p);
         p = tilde_expanded;
       }
-      TO_SLASH(p);
 #endif
 
       if (parmp->diff_mode && os_isdir(p) && GARGCOUNT > 0
@@ -1781,6 +1783,8 @@ static void create_windows(mparm_T *parmp)
     // Don't execute Win/Buf Enter/Leave autocommands here
     autocmd_no_enter++;
     autocmd_no_leave++;
+    // Save the window selection made by startup scripts.
+    win_T *startup_curwin = curwin;
     bool dorewind = true;
     while (done++ < 1000) {
       if (dorewind) {
@@ -1840,8 +1844,11 @@ static void create_windows(mparm_T *parmp)
     }
     if (parmp->window_layout == WIN_TABS) {
       goto_tabpage(1);
-    } else {
+    } else if (parmp->window_count > 1 || !win_valid(startup_curwin)) {
+      // Multiple windows mode (-o/-O), or startup_curwin was closed: use firstwin.
       curwin = firstwin;
+    } else {
+      curwin = startup_curwin;
     }
     curbuf = curwin->w_buffer;
     autocmd_no_enter--;
@@ -1947,7 +1954,7 @@ static void edit_buffers(mparm_T *parmp)
   autocmd_no_enter--;
 
   // make the first window the current window
-  win = firstwin;
+  win = (parmp->window_count > 1) ? firstwin : curwin;
   // Avoid making a preview window the current window.
   while (win->w_p_pvw) {
     win = win->w_next;
