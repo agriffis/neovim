@@ -3267,6 +3267,13 @@ bool win_close_othertab(win_T *win, int free_buf, tabpage_T *tp, bool force)
     }
   }
 
+  if (ui_has(kUIMultigrid)) {
+    ui_call_win_close(win->w_grid_alloc.handle);
+  }
+  if (win->w_floating) {
+    ui_comp_remove_grid(&win->w_grid_alloc);
+  }
+
   // About to free the window. Remember its final buffer for terminal_check_size/TabClosed,
   // which may have changed since the last set_bufref. (e.g: close_buffer autocmds)
   set_bufref(&bufref, win->w_buffer);
