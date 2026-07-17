@@ -143,7 +143,7 @@ void changed(buf_T *buf)
   buf_inc_changedtick(buf);
 
   // If a pattern is highlighted, the position may now be invalid.
-  highlight_match = false;
+  Search.hl_match = false;
 }
 
 /// Internal part of changed(), no user interaction.
@@ -322,7 +322,7 @@ static void changed_common(buf_T *buf, linenr_T lnum, colnr_T col, linenr_T lnum
     }
   }
 
-  if (curwin->w_buffer == buf && VIsual_active) {
+  if (curwin->w_buffer == buf && Visual.active) {
     check_visual_pos();
   }
 
