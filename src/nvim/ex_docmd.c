@@ -4987,7 +4987,7 @@ static void ex_restart(exarg_T *eap)
       quit_cmd = eap->args[1];
       after_cmd = eap->argc > 2 ? eap->args[2] : "";
     } else {
-      emsg("restart failed: +cmd did not quit the server");
+      semsg(e_restart_failed_cmd_no_quit, quit_cmd);
       return;
     }
   }
@@ -5183,14 +5183,14 @@ static void ex_restart(exarg_T *eap)
   }
   // Try to quit.
   nvim_command(cstr_as_string(quit_cmd), &err);
-  xfree(quit_cmd_copy);
 
   if (ERROR_SET(&err)) {
     emsg(err.msg);  // Could not exit
     api_clear_error(&err);
   } else if (!exiting) {
-    emsg("restart failed: +cmd did not quit the server");
+    semsg(e_restart_failed_cmd_no_quit, quit_cmd);
   }
+  xfree(quit_cmd_copy);
 
 fail_2:
   set_vim_var_string(VV_EXITREASON, NULL, -1);
@@ -5961,58 +5961,45 @@ static void ex_tabs(exarg_T *eap)
 ///
 /// Detaches the current UI.
 ///
-/// ":detach!" with bang (!) detaches all UIs _except_ the current UI.
+/// ":%detach" detaches all UIs _except_ the current UI.
 static void ex_detach(exarg_T *eap)
 {
-  // come on pooky let's burn this mf down
-  if (eap && eap->forceit) {
+  if (!current_ui) {
+    emsg(_(e_noui));
+    return;
+  } else if (eap && eap->forceit) {
     emsg("bang (!) not supported yet");
+    return;
+  }
+
+  if (eap && eap->addr_count > 0) {
+    // ":%detach" detaches every UI except the current one.
+    if (eap->line1 != 1 || eap->line2 != curbuf->b_ml.ml_line_count) {
+      emsg(_(e_invrange));
+      return;
+    }
+
+    size_t n = ui_detach_others(current_ui);
+    if (n == 0) {
+      msg(_("No other UIs are attached"), 0);
+    } else {
+      smsg(0, _("Detached %d non-current UIs"), (int)n);
+    }
+    ILOG("%%detach current_ui=%" PRIu64 " detached=%zu", current_ui, n);
   } else {
+    // come on pooky let's burn this mf down
+    //
     // 1. Send "error_exit" UI-event (notification only).
     // 2. Perform server-side UI detach.
     // 3. Close server-side channel without self-exit.
-
-    if (!current_ui) {
-      emsg("UI not attached");
+    Error err = ERROR_INIT;
+    ui_detach_channel(current_ui, &err);
+    if (ERROR_SET(&err)) {
+      emsg(err.msg);  // UI disappeared already?
+      api_clear_error(&err);
       return;
     }
-
-    Channel *chan = find_channel(current_ui);
-    if (!chan) {
-      emsg(e_invchan);
-      return;
-    }
-    // Prevent self-exit on channel-close.
-    Error detach_err = ERROR_INIT;
-    nvim__chan_set_detach(chan->id, true, &detach_err);
-    api_clear_error(&detach_err);
-
-    // Server-side UI detach. Doesn't close the channel.
-    Error err2 = ERROR_INIT;
-    remote_ui_disconnect(chan->id, &err2, true);
-    if (ERROR_SET(&err2)) {
-      emsg(err2.msg);  // UI disappeared already?
-      api_clear_error(&err2);
-      return;
-    }
-
-    // Server-side channel close.
-    const char *err = NULL;
-    bool rv = channel_close(chan->id, kChannelPartAll, &err);
-    if (!rv && err) {
-      emsg(err);  // UI disappeared already?
-      return;
-    }
-    // XXX: Can't do this, channel_decref() is async...
-    // assert(!find_channel(chan->id));
-
-#ifdef MSWIN
-    // After UI/channel detach, move this server off the parent's console so it
-    // survives terminal closure and still has working CONIN$/CONOUT$.
-    os_swap_to_hidden_console();
-#endif
-
-    ILOG("detach current_ui=%" PRId64, chan->id);
+    ILOG("detach current_ui=%" PRIu64, current_ui);
   }
 }
 

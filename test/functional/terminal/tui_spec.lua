@@ -149,14 +149,16 @@ describe('TUI', function()
 end)
 
 describe('TUI :detach', function()
-  it('does not stop server', function()
+  local child_server, screen
+
+  local function setup_detach_child()
     n.clear()
     finally(function()
       n.check_close()
     end)
 
-    local child_server = new_pipename()
-    local screen = tt.setup_child_nvim({
+    child_server = new_pipename()
+    screen = tt.setup_child_nvim({
       '--listen',
       child_server,
       '-u',
@@ -169,6 +171,10 @@ describe('TUI :detach', function()
       nvim_set .. ' laststatus=2 background=dark',
     }, { env = env_notermguicolors })
     tt.override_screen_expect_for_conpty(screen)
+  end
+
+  it('does not stop server', function()
+    setup_detach_child()
 
     tt.feed_data('iHello, World')
     screen:expect([[
@@ -193,8 +199,8 @@ describe('TUI :detach', function()
       { child_session:request('nvim_command', 'detach!') }
     )
     eq(
-      { false, { 0, 'Vim(detach):E481: No range allowed: 1detach' } },
-      { child_session:request('nvim_command', '1detach') }
+      { false, { 0, 'Vim(detach):E16: Invalid range' } },
+      { child_session:request('nvim_command', '2detach') }
     )
     eq(
       { false, { 0, 'Vim(detach):E488: Trailing characters: foo: detach foo' } },
@@ -233,6 +239,72 @@ describe('TUI :detach', function()
                                                         |
       {5:-- TERMINAL --}                                    |
     ]])
+  end)
+
+  it('% detaches other UIs', function()
+    setup_detach_child()
+    finally(function()
+      pcall(function()
+        local s = n.connect(child_server)
+        s:request('nvim_command', 'qall!')
+      end)
+    end)
+
+    tt.feed_data('iHello from detach!')
+    screen:expect({ any = vim.pesc('Hello from detach!^') })
+    tt.feed_data('\027')
+
+    local child_session = n.connect(child_server)
+    local _, uis_before = child_session:request('nvim_list_uis')
+    eq(1, #uis_before)
+    local tui_chan_id = uis_before[1].chan
+
+    -- :%detach with only 1 UI is a no-op.
+    tt.feed_data(':%detach\013')
+    screen:expect({ any = vim.pesc('No other UIs are attached') })
+    local _, uis_noop = child_session:request('nvim_list_uis')
+    eq(1, #uis_noop)
+
+    child_session:request('nvim_ui_attach', 50, 7, {})
+    local _, uis_attached = child_session:request('nvim_list_uis')
+    eq(2, #uis_attached)
+
+    tt.feed_data(':%detach\013')
+    screen:expect([[
+      Hello from detach^!                                |
+      {100:~                                                 }|*3
+      {3:[No Name] [+]                                     }|
+                                                        |
+      {5:-- TERMINAL --}                                    |
+    ]])
+
+    local verify_session = n.connect(child_server)
+    local _, uis_after = verify_session:request('nvim_list_uis')
+    eq(1, #uis_after)
+    eq(tui_chan_id, uis_after[1].chan)
+  end)
+
+  it('% detaches the original UI when invoked from a later UI', function()
+    setup_detach_child()
+    finally(function()
+      pcall(function()
+        local s = n.connect(child_server)
+        s:request('nvim_command', 'qall!')
+      end)
+    end)
+
+    screen:expect({ any = vim.pesc('[No Name]') })
+    local child_session = n.connect(child_server)
+    child_session:request('nvim_ui_attach', 50, 7, {})
+    local _, uis_before = child_session:request('nvim_list_uis')
+    eq(2, #uis_before)
+
+    eq({ true, vim.NIL }, { child_session:request('nvim_command', '%detach') })
+    screen:expect({ any = [[Process exited 0]] })
+
+    local status, uis_after = child_session:request('nvim_list_uis')
+    ok(status)
+    eq(1, #uis_after)
   end)
 end)
 
@@ -444,6 +516,9 @@ describe('TUI :restart', function()
       'set laststatus=2 background=dark noruler noshowcmd',
     }, { env = { COLORTERM = 'truecolor' } })
     screen:set_option('rgb', true)
+    screen:add_extra_attr_ids({
+      [101] = { bold = true, foreground = Screen.colors.WebGreen },
+    })
 
     -- 'termguicolors' support should be detected properly after :restart!
     -- The value of has("gui_running") should be 0 before and after :restart!
@@ -533,12 +608,15 @@ describe('TUI :restart', function()
     for _, cmd in ipairs({ ':restart', ':restart!' }) do
       tt.feed_data(cmd .. ' +echo\013')
       screen:expect([[
-        ^                                                  |
-        {1:~}{18:                                                 }|*3
-        {3:[No Name]                                         }|
-        {9:restart failed: +cmd did not quit the server}      |
+                                                          |
+        {1:~}{18:                                                 }|
+        {3:                                                  }|
+        {9:E5201: Restart failed: +cmd did not quit server: e}|
+        {9:cho}                                               |
+        {101:Press ENTER or type command to continue}^           |
         {5:-- TERMINAL --}                                    |
       ]])
+      tt.feed_data('\013')
     end
 
     tt.feed_data('ithis will be removed\027')
@@ -575,7 +653,7 @@ describe('TUI :restart', function()
 
     -- Check ":confirm restart! +echo" correctly ignores ":confirm"
     tt.feed_data(':confirm restart! +echo\013')
-    screen:expect({ any = vim.pesc('+cmd did not quit the server') })
+    screen:expect({ any = vim.pesc('E5201: Restart failed: +cmd did not quit server') })
 
     -- Check ":restart[!]" on a modified buffer.
     tt.feed_data('ithis will be removed\027')
