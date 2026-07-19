@@ -269,7 +269,10 @@ describe('TUI :detach', function()
     local _, uis_attached = child_session:request('nvim_list_uis')
     eq(2, #uis_attached)
 
-    tt.feed_data(':%detach\013')
+    -- Send the command in two steps, to avoid "Screen test succeeded immediately" warning.
+    tt.feed_data(':%detach')
+    screen:expect({ any = vim.pesc(':%detach^') })
+    tt.feed_data('\013')
     screen:expect([[
       Hello from detach^!                                |
       {100:~                                                 }|*3
@@ -457,7 +460,14 @@ describe('TUI :restart', function()
     -- ZR preserves screen state
     tt.feed_data('ZR')
     starttime, server_session = assert_restarted(starttime, server_session, server_pipe)
-    screen:expect({ any = 'foo' })
+    -- Match the full restored screen, to avoid "Screen test succeeded immediately" warning.
+    screen:expect([[
+      ^foo                                               |
+      ~                                                 |*3
+      {2:Xtest-restart-file              1,1            All}|
+                                                        |
+      {5:-- TERMINAL --}                                    |
+    ]])
 
     -- [1-8]ZR does not preserve screen state
     tt.feed_data('1ZR')
@@ -467,6 +477,9 @@ describe('TUI :restart', function()
     tt.feed_data('ifoo\027')
     tt.feed_data('ZR')
     screen:expect({ any = 'E37:' })
+    -- Dismiss hit-enter so the next "E37" assertion below doesn't match this one immediately.
+    tt.feed_data('\013')
+    screen:expect({ any = vim.pesc('[No Name]') })
     tt.feed_data('1ZR')
     screen:expect({ any = 'E37:' })
 
@@ -498,7 +511,8 @@ describe('TUI :restart', function()
     end)
 
     local function assert_exitreason(expected)
-      local default = 'QuitPre:restart\nExitPre:restart\nVimLeavePre:restart\nVimLeave:restart\n'
+      local default =
+        'QuitPre:restart!\nExitPre:restart!\nVimLeavePre:restart!\nVimLeave:restart!\n'
       eq(expected or default, t.read_file(eventlog))
       os.remove(eventlog)
     end
@@ -566,6 +580,13 @@ describe('TUI :restart', function()
     ]]
 
     tt.feed_data(':set nomodified\013')
+    tt.feed_data(':restart\013')
+    screen:expect(s0)
+    assert_new_pid()
+    assert_exitreason('QuitPre:restart\nExitPre:restart\nVimLeavePre:restart\nVimLeave:restart\n')
+    assert_termguicolors_and_no_gui_running()
+
+    tt.feed_data(':set nomodified\013')
     -- Command is run on new server.
     tt.feed_data(":restart! put ='Hello1'\013")
     screen:expect(s1)
@@ -617,6 +638,8 @@ describe('TUI :restart', function()
         {5:-- TERMINAL --}                                    |
       ]])
       tt.feed_data('\013')
+      -- Return to a distinct state so the next screen:expect() doesn't "succeed immediately".
+      screen:expect({ any = vim.pesc('[No Name]') })
     end
 
     tt.feed_data('ithis will be removed\027')
@@ -630,7 +653,7 @@ describe('TUI :restart', function()
     tt.feed_data('C\013')
     screen:expect({ any = vim.pesc('[No Name]') })
     -- Failed/cancelled restarts still fire QuitPre/ExitPre (but not VimLeave[Pre]).
-    assert_exitreason('QuitPre:restart\nExitPre:restart\n')
+    assert_exitreason('QuitPre:restart!\nExitPre:restart!\n')
 
     -- Check :restart! respects 'confirm' option.
     tt.feed_data(':set confirm\013')
@@ -640,7 +663,7 @@ describe('TUI :restart', function()
     screen:expect({ any = vim.pesc('[No Name]') })
     tt.feed_data(':set noconfirm\013')
     -- Failed/cancelled restarts still fire QuitPre/ExitPre (but not VimLeave[Pre]).
-    assert_exitreason('QuitPre:restart\nExitPre:restart\n')
+    assert_exitreason('QuitPre:restart!\nExitPre:restart!\n')
 
     -- Check ":confirm restart! <cmd>" on a modified buffer.
     tt.feed_data(":confirm restart! put ='Hello3'\013")
@@ -657,10 +680,16 @@ describe('TUI :restart', function()
 
     -- Check ":restart[!]" on a modified buffer.
     tt.feed_data('ithis will be removed\027')
-    for _, cmd in ipairs({ ':restart', ':restart!' }) do
-      tt.feed_data(cmd .. '\013')
+    for cmd, exitreason in pairs({
+      [':restart'] = 'restart',
+      [':restart!'] = 'restart!',
+    }) do
+      tt.feed_data(cmd)
+      -- Assert the command-line echo so the E37 assertion below doesn't "succeed immediately".
+      screen:expect({ any = vim.pesc(cmd) })
+      tt.feed_data('\013')
       screen:expect({ any = vim.pesc('Vim(qall):E37: No write since last change') })
-      assert_exitreason('QuitPre:restart\nExitPre:restart\n')
+      assert_exitreason(('QuitPre:%s\nExitPre:%s\n'):format(exitreason, exitreason))
     end
 
     -- Check ":restart! +qall!" on a modified buffer.
@@ -2689,7 +2718,8 @@ describe('TUI', function()
 
   it('in nvim_list_uis(), sets nvim_set_client_info()', function()
     -- $TERM in :terminal.
-    local exp_term = (is_os('bsd') or is_os('win')) and 'xterm' or 'xterm-256color'
+    local exp_term = (is_os('bsd') or is_os('win') or fn.has('terminfo') == 0) and 'xterm'
+      or 'xterm-256color'
     local ui_chan = 1
     local expected = {
       {
@@ -3834,8 +3864,11 @@ end)
 describe("TUI 't_Co' (terminal colors)", function()
   local screen --[[@type test.functional.ui.screen]]
 
-  local function assert_term_colors(term, colorterm, maxcolors)
+  local function assert_term_colors(term, colorterm, maxcolors, builtin_maxcolors)
     clear({ env = { TERM = term }, args = {} })
+    if builtin_maxcolors and (is_os('freebsd') or is_os('win') or fn.has('terminfo') == 0) then
+      maxcolors = builtin_maxcolors
+    end
     screen = tt.setup_child_nvim({
       '--clean',
       '--cmd',
@@ -3944,24 +3977,15 @@ describe("TUI 't_Co' (terminal colors)", function()
 
   -- screen:
   --
-  -- FreeBSD and Windows fall back to the built-in screen-256colour entry.
-  -- Linux and MacOS have a screen entry in external terminfo with 8 colours,
-  -- which is raised to 16 by COLORTERM.
+  -- FreeBSD/Windows (any build without terminfo) fall back to built-in "screen-256colour".
+  -- Linux/MacOS have a screen entry in external terminfo with 8 colours, raised to 16 by COLORTERM.
 
   it('TERM=screen no COLORTERM uses 8/256 colors', function()
-    if is_os('freebsd') or is_os('win') then
-      assert_term_colors('screen', nil, 256)
-    else
-      assert_term_colors('screen', nil, 8)
-    end
+    assert_term_colors('screen', nil, 8, 256)
   end)
 
   it('TERM=screen COLORTERM=screen uses 16/256 colors', function()
-    if is_os('freebsd') or is_os('win') then
-      assert_term_colors('screen', 'screen', 256)
-    else
-      assert_term_colors('screen', 'screen', 16)
-    end
+    assert_term_colors('screen', 'screen', 16, 256)
   end)
 
   it('TERM=screen COLORTERM=screen-256color uses 256 colors', function()
