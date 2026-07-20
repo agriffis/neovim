@@ -179,6 +179,8 @@ API
 • |nvim_set_option_value()| accepts a new `operation` field to modify the
   existing option value.
 • |nvim_set_option_value()| returns the new option value.
+• |nvim_create_autocmd()| is now |api-fast|, so it can be called from a fast
+  event context (e.g. |vim.uv| callbacks).
 
 BUILD
 
@@ -386,6 +388,11 @@ VIMSCRIPT
 • |v:starttime| is the process start time (nanoseconds since UNIX epoch).
 • |v:useractive| indicates user activity.
 • |serverlist()| with `info=true` returns details for each server (own + peers).
+• These Vimscript functions may be called from |api-fast| context (e.g.
+  |vim.uv| timer/handle callbacks): |keytrans()|, |char2nr()|, |nr2char()|,
+  |str2list()|, |strpart()|, |strcharpart()|, |strgetchar()|, |strchars()|,
+  |strcharlen()|, |strlen()|, |strdisplaywidth()|, |byteidx()|, |charidx()|,
+  |utf16idx()|, |tr()|, |trim()|.
 
 ==============================================================================
 CHANGED FEATURES                                                 *news-changed*
@@ -410,6 +417,9 @@ These existing features changed their behavior.
 • Markdown inline highlighting now conceals the backslash in backslash escapes.
 • Markdown inline backslash escapes and hard line breaks no longer use the
   `@string.escape` capture.
+• |vim.lsp.util.open_floating_preview()| windows (e.g. |vim.lsp.buf.hover()|)
+  converted to normal windows (e.g. with |CTRL-W_H|) are no longer closed
+  automatically.
 
 ==============================================================================
 REMOVED FEATURES                                                 *news-removed*
