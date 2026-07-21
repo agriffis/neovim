@@ -25,7 +25,7 @@ local M = {
     ids = {}, ---@type table<string|integer, Msg> List of visible messages.
     msg_row = -1, -- Last row of message to distinguish for placing virt_text.
     last_col = o.columns, -- Crop text to start column of 'last' virt_text.
-    last_emsg = 0, -- Time an error was printed that should not be overwritten.
+    last_msg = 0, -- Time an important message was printed that should not be overwritten.
     prev_msg = '', -- Concatenated content of the previous message.
     prev_id = 0, ---@type string|integer Message id of the previous message.
     dupe = 0, -- Number of times message is repeated.
@@ -168,7 +168,12 @@ local function set_virttext(type, tgt)
       else
         if scol > M.cmd.last_col then
           -- Give the user some time to read an important message.
-          if os.time() - M.cmd.last_emsg < 2 then
+          if os.time() - M.cmd.last_msg < 2 then
+            -- The existing overlay may already cover the message, so hide it during the delay.
+            if M.virt.ids.last then
+              api.nvim_buf_del_extmark(ui.bufs.cmd, ui.ns, M.virt.ids.last)
+              M.virt.ids.last = nil
+            end
             M.virt.delayed = true
             vim.defer_fn(function()
               M.virt.delayed = false
@@ -467,7 +472,9 @@ function M.msg_show(kind, content, replace_last, _, append, id, trigger)
     if tgt == 'cmd' then
       -- Store the time when an important message was emitted in order to not overwrite
       -- it with 'last' virt_text in the cmdline so that the user has a chance to read it.
-      M.cmd.last_emsg = (kind == 'emsg' or kind == 'wmsg') and os.time() or M.cmd.last_emsg
+      local mode = api.nvim_get_mode().mode
+      local visual = mode:match('^[vV\22]') ~= nil
+      M.cmd.last_msg = (kind == 'emsg' or kind == 'wmsg' or visual) and os.time() or M.cmd.last_msg
       -- Should clear the search count now, mark itself is cleared by invalidate.
       M.virt.last[M.virt.idx.search][1] = nil
       M.virt.last[M.virt.idx.cmd] = {}
@@ -486,8 +493,9 @@ function M.msg_show(kind, content, replace_last, _, append, id, trigger)
       M.cmd.ids, M.cmd.prev_msg = {}, ''
     elseif tgt == 'pager' then
       -- Position cursor at start of first or last message at bottom of window.
-      local lnum = enter_pager and 1 or api.nvim_buf_line_count(ui.bufs.pager)
-      api.nvim_win_set_cursor(ui.wins.pager, { lnum, 0 })
+      -- Keep Normal commands: nvim_win_set_cursor() only ensures visibility, while zb
+      -- reliably places the final message at the bottom. :noautocmd avoids #40780.
+      fn.win_execute(ui.wins.pager, 'noautocmd norm! ' .. (enter_pager and 'gg0' or 'G0zb'))
     end
   end
 end
@@ -622,6 +630,7 @@ local dialog_on_key = function(_, typed)
 
   local info = map[typed] and fn.getwininfo(ui.wins.dialog)[1]
   if info and (not eob or info.botline < api.nvim_buf_line_count(ui.bufs.dialog)) then
+    -- Keep Normal commands for screen-relative H/L and page scrolling behavior.
     fn.win_execute(ui.wins.dialog, ('exe "norm! %s"'):format(map[typed]))
     set_top_bot_spill()
     return fn.getwininfo(ui.wins.dialog)[1].topline ~= info.topline and '' or nil
@@ -719,7 +728,9 @@ function M.set_pos(tgt)
         M.dialog_on_key = vim.on_key(dialog_on_key, M.dialog_on_key)
       elseif tgt == 'msg' then
         -- Ensure last line is visible and first line is at top of window.
-        api.nvim_win_set_cursor(ui.wins.msg, { api.nvim_buf_line_count(ui.bufs.msg), 0 })
+        -- Keep Normal commands: nvim_win_set_cursor() only ensures visibility, while zb
+        -- reliably places the final message at the bottom. :noautocmd avoids #40780.
+        fn.win_execute(ui.wins.msg, 'noautocmd norm! Gzb')
       elseif tgt == 'pager' and not in_pager then
         enter_pager()
       end
