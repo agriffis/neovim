@@ -3,6 +3,7 @@ local n = require('test.functional.testnvim')()
 local Screen = require('test.functional.ui.screen')
 local os = require('os')
 
+local describe, it, before_each, after_each, pending = t.describe, t.it, t.before_each, t.after_each, t.pending
 local clear, feed = n.clear, n.feed
 local assert_alive = n.assert_alive
 local command, feed_command = n.command, n.feed_command
@@ -3041,10 +3042,10 @@ describe('float window', function()
         ## grid 3
                                                   |
         ## grid 4
-          {33:╔}🦄{7:BB}{33:═════╗}|
+          {33:╔}{1:🦄}{7:BB}{33:═════╗}|
           {33:║}{1: halloj! }{33:║}|
           {33:║}{1: BORDAA  }{33:║}|
-          {33:╚}🦄{7:BB}{33:═════╝}|
+          {33:╚}{1:🦄}{7:BB}{33:═════╝}|
         ]],
           float_pos = { [4] = { 1001, 'NW', 1, 2, 5, true, 50, 1, 2, 5 } },
           win_viewport = {
@@ -3057,10 +3058,10 @@ describe('float window', function()
           grid = [[
           ^                                        |
           {0:~                                       }|
-          {0:~    }{33:╔}🦄{7:BB}{33:═════╗}{0:                        }|
+          {0:~    }{33:╔}{1:🦄}{7:BB}{33:═════╗}{0:                        }|
           {0:~    }{33:║}{1: halloj! }{33:║}{0:                        }|
           {0:~    }{33:║}{1: BORDAA  }{33:║}{0:                        }|
-          {0:~    }{33:╚}🦄{7:BB}{33:═════╝}{0:                        }|
+          {0:~    }{33:╚}{1:🦄}{7:BB}{33:═════╝}{0:                        }|
                                                   |
         ]],
         }

@@ -1,6 +1,7 @@
 local t = require('test.testutil')
 local n = require('test.functional.testnvim')()
 
+local describe, it, before_each = t.describe, t.it, t.before_each
 local clear = n.clear
 local exec_lua = n.exec_lua
 local eq = t.eq
@@ -129,6 +130,17 @@ describe('vim.system', function()
       t.write_file('test.bat', 'echo hello world')
       n.system_sync({ 'chmod', '+x', 'test.bat' })
       n.system_sync({ './test' })
+    end)
+
+    it('launches cmd.exe when shellslash is set', function()
+      n.command('set shellslash')
+      local path = exec_lua([[return vim.fn.exepath('cmd.exe')]])
+      t.neq(nil, path:find('/', 1, true))
+
+      local result = n.system_sync({ 'cmd.exe', '/c', 'echo OK' })
+      eq(0, result.code)
+      eq('OK\r\n', result.stdout)
+      eq('', result.stderr)
     end)
   end
 
