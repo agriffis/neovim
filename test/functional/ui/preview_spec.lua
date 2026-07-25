@@ -9,64 +9,69 @@ local clear, command, api, fn = n.clear, n.command, n.api, n.fn
 local eq, pcall_err, write_file = t.eq, t.pcall_err, t.write_file
 local exec, feed = n.exec, n.feed
 
+--- Joins lines "1".."count", with `overrides` (1-based row → text) substituted.
+--- @param count integer
+--- @param overrides table<integer, string>
+local function numbered_lines(count, overrides)
+  local lines = {} --- @type string[]
+  for i = 1, count do
+    lines[i] = overrides[i] or tostring(i)
+  end
+  return table.concat(lines, '\n')
+end
+
 describe("'previewpopup'", function()
   before_each(function()
     clear()
   end)
 
   local function with_ext_multigrid(multigrid)
-    local screen, attrs
+    local screen ---@type test.functional.ui.screen
     before_each(function()
       screen = Screen.new(40, 7, { ext_multigrid = multigrid })
-      attrs = {
-        [0] = { bold = true, foreground = Screen.colors.Blue },
-        [1] = { background = Screen.colors.LightMagenta },
-        [2] = {
-          background = Screen.colors.LightMagenta,
-          bold = true,
-          foreground = Screen.colors.Blue1,
-        },
-        [3] = { bold = true },
-        [4] = { bold = true, reverse = true },
-        [5] = { reverse = true },
-        [6] = { background = Screen.colors.LightMagenta, bold = true, reverse = true },
-        [7] = { foreground = Screen.colors.White, background = Screen.colors.Red },
-        [8] = { bold = true, foreground = Screen.colors.SeaGreen4 },
-        [9] = { background = Screen.colors.LightGrey, underline = true },
-        [10] = {
-          background = Screen.colors.LightGrey,
-          underline = true,
-          bold = true,
-          foreground = Screen.colors.Magenta,
-        },
-        [11] = { bold = true, foreground = Screen.colors.Magenta },
-        [12] = { background = Screen.colors.WebGrey },
-        [13] = { background = Screen.colors.Yellow },
-        [14] = {
+      screen:add_extra_attr_ids({
+        [100] = {
           foreground = Screen.colors.Magenta1,
           background = Screen.colors.Plum1,
           bold = true,
         },
-      }
-      screen:set_default_attr_ids(attrs)
+      })
     end)
 
     it('validation', function()
       local err = pcall_err(n.exec_capture, 'set previewpopup=height:yes')
-      eq('nvim_exec2(), line 1: Vim(set):E474: Invalid argument: previewpopup=height:yes', err)
+      eq(
+        "nvim_exec2(), line 1: Vim(set):E474: 'height' requires a number: previewpopup=height:yes",
+        err
+      )
 
       err = pcall_err(n.exec_capture, 'set previewpopup=width:yes')
-      eq('nvim_exec2(), line 1: Vim(set):E474: Invalid argument: previewpopup=width:yes', err)
+      eq(
+        "nvim_exec2(), line 1: Vim(set):E474: 'width' requires a number: previewpopup=width:yes",
+        err
+      )
 
       err = pcall_err(n.exec_capture, 'set previewpopup=width:20,height;10')
       eq(
-        'nvim_exec2(), line 1: Vim(set):E474: Invalid argument: previewpopup=width:20,height;10',
+        "nvim_exec2(), line 1: Vim(set):E474: Unknown item 'height;10': previewpopup=width:20,height;10",
         err
       )
+
+      err = pcall_err(n.exec_capture, 'set previewpopup=border:fancy')
+      eq(
+        'nvim_exec2(), line 1: Vim(set):E474: '
+          .. "'border' must be one of: double, single, shadow, rounded, solid, bold, none: "
+          .. 'previewpopup=border:fancy',
+        err
+      )
+
+      -- height/width must be >= 1 (semantic check, not the schema).
+      err = pcall_err(n.exec_capture, 'set previewpopup=height:0')
+      eq('nvim_exec2(), line 1: Vim(set):E474: Invalid argument: previewpopup=height:0', err)
     end)
 
     -- oldtest: Test_previewpopup
-    it('works with tags and search', function()
+    it('with tags and search', function()
       finally(function()
         os.remove('Xtags')
         os.remove('Xtagfile')
@@ -81,29 +86,11 @@ describe("'previewpopup'", function()
           theword	Xtagfile	/^theword
         ]])
       )
-      local tagfile_lines = {}
-      for i = 1, 20 do
-        table.insert(tagfile_lines, tostring(i))
-      end
-      table.insert(tagfile_lines, 'theword is here')
-      for i = 22, 27 do
-        table.insert(tagfile_lines, tostring(i))
-      end
-      table.insert(tagfile_lines, 'this is another place')
-      for i = 29, 40 do
-        table.insert(tagfile_lines, tostring(i))
-      end
-      write_file('Xtagfile', table.concat(tagfile_lines, '\n'))
-
-      local header_lines = {}
-      for i = 1, 10 do
-        table.insert(header_lines, tostring(i))
-      end
-      table.insert(header_lines, 'searched word is here')
-      for i = 12, 20 do
-        table.insert(header_lines, tostring(i))
-      end
-      write_file('Xheader.h', table.concat(header_lines, '\n'))
+      write_file(
+        'Xtagfile',
+        numbered_lines(40, { [21] = 'theword is here', [28] = 'this is another place' })
+      )
+      write_file('Xheader.h', numbered_lines(20, { [11] = 'searched word is here' }))
       command('set tags=Xtags')
       api.nvim_buf_set_lines(0, 0, -1, false, {
         'one',
@@ -137,21 +124,21 @@ describe("'previewpopup'", function()
             five                                    |
             six                                     |
             seven                                   |
-            find {13:^theword} somewhere                  |
+            find {10:^theword} somewhere                  |
             nine                                    |
             this is another word                    |
             very long line where the word is also an|
             other                                   |
-            {0:~                                       }|*7
+            {1:~                                       }|*7
           ## grid 3
             /theword                                |
           ## grid 4
-            {1:┌────────────}{14:Xtagfile}{1:────────────┐}|
-            {1:│20                              │}|
-            {1:│}{13:theword}{1: is here                 │}|
-            {1:│22                              │}|
-            {1:│23                              │}|
-            {1:└────────────────────────────────┘}|
+            {4:┌────────────}{100:Xtagfile}{4:────────────┐}|
+            {4:│20                              │}|
+            {4:│}{10:theword}{4: is here                 │}|
+            {4:│22                              │}|
+            {4:│23                              │}|
+            {4:└────────────────────────────────┘}|
           ]],
           win_pos = {
             [2] = { height = 19, startcol = 0, startrow = 0, width = 40, win = 1000 },
@@ -169,14 +156,14 @@ describe("'previewpopup'", function()
           five                                    |
           six                                     |
           seven                                   |
-          find {13:^theword} somewhere                  |
-          nine  {1:┌────────────}{14:Xtagfile}{1:────────────┐}|
-          this i{1:│20                              │}|
-          very l{1:│}{13:theword}{1: is here                 │}|
-          other {1:│22                              │}|
-          {0:~     }{1:│23                              │}|
-          {0:~     }{1:└────────────────────────────────┘}|
-          {0:~                                       }|*5
+          find {10:^theword} somewhere                  |
+          nine  {4:┌────────────}{100:Xtagfile}{4:────────────┐}|
+          this i{4:│20                              │}|
+          very l{4:│}{10:theword}{4: is here                 │}|
+          other {4:│22                              │}|
+          {1:~     }{4:│23                              │}|
+          {1:~     }{4:└────────────────────────────────┘}|
+          {1:~                                       }|*5
           /theword                                |
         ]])
       end
@@ -196,12 +183,12 @@ describe("'previewpopup'", function()
             five                                    |
             six                                     |
             seven                                   |
-            find {13:^theword} somewhere                  |
+            find {10:^theword} somewhere                  |
             nine                                    |
             this is another word                    |
             very long line where the word is also an|
             other                                   |
-            {0:~                                       }|*7
+            {1:~                                       }|*7
           ## grid 3
             /theword                                |
           ]],
@@ -218,12 +205,12 @@ describe("'previewpopup'", function()
           five                                    |
           six                                     |
           seven                                   |
-          find {13:^theword} somewhere                  |
+          find {10:^theword} somewhere                  |
           nine                                    |
           this is another word                    |
           very long line where the word is also an|
           other                                   |
-          {0:~                                       }|*7
+          {1:~                                       }|*7
           /theword                                |
         ]])
       end
@@ -244,21 +231,21 @@ describe("'previewpopup'", function()
             five                                    |
             six                                     |
             seven                                   |
-            find {13:^theword} somewhere                  |
+            find {10:^theword} somewhere                  |
             nine                                    |
             this is another word                    |
             very long line where the word is also an|
             other                                   |
-            {0:~                                       }|*7
+            {1:~                                       }|*7
           ## grid 3
             /theword                                |
           ## grid 5
-            {1:┌────────────}{14:Xtagfile}{1:────────────┐}|
-            {1:│20                              │}|
-            {1:│}{13:theword}{1: is here                 │}|
-            {1:│22                              │}|
-            {1:│23                              │}|
-            {1:└────────────────────────────────┘}|
+            {4:┌────────────}{100:Xtagfile}{4:────────────┐}|
+            {4:│20                              │}|
+            {4:│}{10:theword}{4: is here                 │}|
+            {4:│22                              │}|
+            {4:│23                              │}|
+            {4:└────────────────────────────────┘}|
           ]],
           win_pos = {
             [2] = { height = 19, startcol = 0, startrow = 0, width = 40, win = 1000 },
@@ -276,14 +263,14 @@ describe("'previewpopup'", function()
           five                                    |
           six                                     |
           seven                                   |
-          find {13:^theword} somewhere                  |
-          nine  {1:┌────────────}{14:Xtagfile}{1:────────────┐}|
-          this i{1:│20                              │}|
-          very l{1:│}{13:theword}{1: is here                 │}|
-          other {1:│22                              │}|
-          {0:~     }{1:│23                              │}|
-          {0:~     }{1:└────────────────────────────────┘}|
-          {0:~                                       }|*5
+          find {10:^theword} somewhere                  |
+          nine  {4:┌────────────}{100:Xtagfile}{4:────────────┐}|
+          this i{4:│20                              │}|
+          very l{4:│}{10:theword}{4: is here                 │}|
+          other {4:│22                              │}|
+          {1:~     }{4:│23                              │}|
+          {1:~     }{4:└────────────────────────────────┘}|
+          {1:~                                       }|*5
           /theword                                |
         ]])
       end
@@ -303,21 +290,21 @@ describe("'previewpopup'", function()
             five                                    |
             six                                     |
             seven                                   |
-            find {13:^theword} somewhere                  |
+            find {10:^theword} somewhere                  |
             nine                                    |
             this is another word                    |
             very long line where the word is also an|
             other                                   |
-            {0:~                                       }|*7
+            {1:~                                       }|*7
           ## grid 3
             /theword                                |
           ## grid 6
-            {1:┌───────────}{14:Xheader.h}{1:────────────┐}|
-            {1:│10                              │}|
-            {1:│searched word is here           │}|
-            {1:│12                              │}|
-            {1:│13                              │}|
-            {1:└────────────────────────────────┘}|
+            {4:┌───────────}{100:Xheader.h}{4:────────────┐}|
+            {4:│10                              │}|
+            {4:│searched word is here           │}|
+            {4:│12                              │}|
+            {4:│13                              │}|
+            {4:└────────────────────────────────┘}|
           ]],
           win_pos = {
             [2] = { height = 19, startcol = 0, startrow = 0, width = 40, win = 1000 },
@@ -335,14 +322,14 @@ describe("'previewpopup'", function()
           five                                    |
           six                                     |
           seven                                   |
-          find {13:^theword} somewhere                  |
-          nine  {1:┌───────────}{14:Xheader.h}{1:────────────┐}|
-          this i{1:│10                              │}|
-          very l{1:│searched word is here           │}|
-          other {1:│12                              │}|
-          {0:~     }{1:│13                              │}|
-          {0:~     }{1:└────────────────────────────────┘}|
-          {0:~                                       }|*5
+          find {10:^theword} somewhere                  |
+          nine  {4:┌───────────}{100:Xheader.h}{4:────────────┐}|
+          this i{4:│10                              │}|
+          very l{4:│searched word is here           │}|
+          other {4:│12                              │}|
+          {1:~     }{4:│13                              │}|
+          {1:~     }{4:└────────────────────────────────┘}|
+          {1:~                                       }|*5
           /theword                                |
         ]])
       end
@@ -367,14 +354,14 @@ describe("'previewpopup'", function()
       end)
       local expect_screen = [[
         one other^                     |
-        t{1:le}{12: other          }{1:           }|
-        t{1:le once                      }|
-        o{1:ec only                      }|
-        o{1:ec off                       }|
-        o{1:ca one            hello')    }|
-        o{1:" the end                    }|
-        {0:~                             }|*2
-        {3:-- }{8:match 1 of 5}               |
+        t{4:le}{12: other          }{4:           }|
+        t{4:le once                      }|
+        o{4:ec only                      }|
+        o{4:ec off                       }|
+        o{4:ca one            hello')    }|
+        o{4:" the end                    }|
+        {1:~                             }|*2
+        {5:-- }{6:match 1 of 5}               |
       ]]
 
       -- oldtest: Test_previewpopup_pum_pedit
@@ -407,7 +394,7 @@ describe("'previewpopup'", function()
       end)
     end)
 
-    it('pedit and border overrides', function()
+    it(':pedit and border overrides', function()
       command('call writefile(["bar"], "foo", "a")')
       finally(function()
         os.remove('foo')
@@ -421,14 +408,14 @@ describe("'previewpopup'", function()
             [3:----------------------------------------]|
           ## grid 2
             ^                                        |
-            {0:~                                       }|*5
+            {1:~                                       }|*5
           ## grid 3
                                                     |
           ## grid 4
-            {1:┌─}{14:foo}{1:─┐}|
-            {1:│bar  │}|
-            {1:│     │}|
-            {1:└─────┘}|
+            {4:┌─}{100:foo}{4:─┐}|
+            {4:│bar  │}|
+            {4:│     │}|
+            {4:└─────┘}|
           ]],
           win_pos = {
             [2] = {
@@ -466,11 +453,11 @@ describe("'previewpopup'", function()
       else
         screen:expect([[
           ^                                        |
-          {0:~}{1:┌─}{14:foo}{1:─┐}{0:                                }|
-          {0:~}{1:│bar  │}{0:                                }|
-          {0:~}{1:│     │}{0:                                }|
-          {0:~}{1:└─────┘}{0:                                }|
-          {0:~                                       }|
+          {1:~}{4:┌─}{100:foo}{4:─┐}{1:                                }|
+          {1:~}{4:│bar  │}{1:                                }|
+          {1:~}{4:│     │}{1:                                }|
+          {1:~}{4:└─────┘}{1:                                }|
+          {1:~                                       }|
                                                   |
         ]])
       end
@@ -482,20 +469,20 @@ describe("'previewpopup'", function()
           grid = [[
           ## grid 1
             [5:-------------------]│[2:--------------------]|*5
-            {5:[No Name]           }{4:[No Name]           }|
+            {2:[No Name]           }{3:[No Name]           }|
             [3:----------------------------------------]|
           ## grid 2
             ^                    |
-            {0:~                   }|*4
+            {1:~                   }|*4
           ## grid 3
                                                     |
           ## grid 4
-            {1:┌}{14:<xist}{1:┐}|
-            {1:│     │}|*2
-            {1:└─────┘}|
+            {4:┌}{100:<xist}{4:┐}|
+            {4:│     │}|*2
+            {4:└─────┘}|
           ## grid 5
                                |
-            {0:~                  }|*4
+            {1:~                  }|*4
           ]],
           win_pos = {
             [2] = {
@@ -572,10 +559,10 @@ describe("'previewpopup'", function()
       else
         screen:expect([[
                              │^                    |
-          {0:~                  }│{0:~}{1:┌}{14:<xist}{1:┐}{0:            }|
-          {0:~                  }│{0:~}{1:│     │}{0:            }|*2
-          {0:~                  }│{0:~}{1:└─────┘}{0:            }|
-          {5:[No Name]           }{4:[No Name]           }|
+          {1:~                  }│{1:~}{4:┌}{100:<xist}{4:┐}{1:            }|
+          {1:~                  }│{1:~}{4:│     │}{1:            }|*2
+          {1:~                  }│{1:~}{4:└─────┘}{1:            }|
+          {2:[No Name]           }{3:[No Name]           }|
                                                   |
         ]])
       end
@@ -584,15 +571,14 @@ describe("'previewpopup'", function()
 
       -- border overrides and falls back to 'winborder'
       command('only | set previewpopup=height:2,width:5,border:rounded | pedit foo')
-      if multigrid then
-      else
+      if not multigrid then
         screen:expect([[
           ^                                        |
-          {0:~}{1:╭─}{14:foo}{1:─╮}{0:                                }|
-          {0:~}{1:│bar  │}{0:                                }|
-          {0:~}{1:│     │}{0:                                }|
-          {0:~}{1:╰─────╯}{0:                                }|
-          {0:~                                       }|
+          {1:~}{4:╭─}{100:foo}{4:─╮}{1:                                }|
+          {1:~}{4:│bar  │}{1:                                }|
+          {1:~}{4:│     │}{1:                                }|
+          {1:~}{4:╰─────╯}{1:                                }|
+          {1:~                                       }|
                                                   |
         ]])
       end
@@ -605,12 +591,12 @@ describe("'previewpopup'", function()
             [3:----------------------------------------]|
           ## grid 2
             ^                                        |
-            {0:~                                       }|*5
+            {1:~                                       }|*5
           ## grid 3
                                                     |
           ## grid 7
-            {1:bar  }|
-            {1:     }|
+            {4:bar  }|
+            {4:     }|
           ]],
           win_pos = {
             [2] = { height = 6, startcol = 0, startrow = 0, width = 40, win = 1000 },
@@ -622,9 +608,9 @@ describe("'previewpopup'", function()
       else
         screen:expect([[
           ^                                        |
-          {0:~}{1:bar  }{0:                                  }|
-          {0:~}{1:     }{0:                                  }|
-          {0:~                                       }|*3
+          {1:~}{4:bar  }{1:                                  }|
+          {1:~}{4:     }{1:                                  }|
+          {1:~                                       }|*3
                                                   |
         ]])
       end

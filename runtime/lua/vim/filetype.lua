@@ -1798,6 +1798,7 @@ local filename = {
   ['.swrc'] = 'jsonc',
   ['.vsconfig'] = 'jsonc',
   ['bun.lock'] = 'jsonc',
+  ['osquery.conf'] = 'jsonc',
   ['.justfile'] = 'just',
   ['.Justfile'] = 'just',
   ['.JUSTFILE'] = 'just',

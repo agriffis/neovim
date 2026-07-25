@@ -1480,7 +1480,7 @@ size_t spell_move_to(win_T *wp, int dir, smt_T behaviour, bool curline, hlf_T *a
         // starting line again and accept the last match.
         lnum = wp->w_buffer->b_ml.ml_line_count;
         wrapped = true;
-        if (!shortmess(SHM_SEARCH)) {
+        if (!shortmess(kShmSearch)) {
           give_warning(_(top_bot_msg), true, false);
         }
       }
@@ -1495,7 +1495,7 @@ size_t spell_move_to(win_T *wp, int dir, smt_T behaviour, bool curline, hlf_T *a
         // starting line again and accept the first match.
         lnum = 1;
         wrapped = true;
-        if (!shortmess(SHM_SEARCH)) {
+        if (!shortmess(kShmSearch)) {
           give_warning(_(bot_top_msg), true, false);
         }
       }
@@ -1678,6 +1678,14 @@ static void free_salitem(salitem_T *smp)
   xfree(smp->sm_to_w);
 }
 
+/// Free the salitem_T entries in a "sl_sal" garray (the SN_SAL form) and
+/// clear the garray.  Used by slang_clear() and when set_sofo() reuses
+/// sl_sal for the SN_SOFO form.
+void free_sal_items(garray_T *gap)
+{
+  GA_DEEP_CLEAR(gap, salitem_T, free_salitem);
+}
+
 /// Frees a fromto_T
 static void free_fromto(fromto_T *ftp)
 {
@@ -1706,8 +1714,7 @@ void slang_clear(slang_T *lp)
     // "ga_len" is set to 1 without adding an item for latin1
     GA_DEEP_CLEAR_PTR(gap);
   } else {
-    // SAL items: free salitem_T items
-    GA_DEEP_CLEAR(gap, salitem_T, free_salitem);
+    free_sal_items(gap);
   }
 
   for (int i = 0; i < lp->sl_prefixcnt; i++) {

@@ -348,7 +348,7 @@ describe('nvim.dir', function()
     eq('new:2', exec_lua('return vim.g.nvim_dir_provider_list'))
   end)
 
-  it('maps - to open parent directories', function()
+  it('maps [count]- to open parent directories', function()
     make_fixture()
     n.clear({ args_rm = { '-u', '--cmd' } })
 
@@ -361,6 +361,57 @@ describe('nvim.dir', function()
 
     -- Ensure the cursor stays on the entry we navigated up from.
     eq('alpha.txt', api.nvim_get_current_line())
+
+    edit(file)
+    feed('1-')
+    poke_eventloop()
+
+    assert_directory(root)
+    eq('alpha.txt', api.nvim_get_current_line())
+
+    edit(file)
+    feed('2-')
+    poke_eventloop()
+
+    assert_directory(vim.fs.dirname(root))
+    eq(vim.fs.basename(root) .. '/', api.nvim_get_current_line())
+  end)
+
+  it('maps - to open the current directory from an unnamed buffer', function()
+    make_fixture()
+    n.clear({ args_rm = { '-u', '--cmd' } })
+    local cwd = fn.getcwd()
+    cd(root)
+    finally(function()
+      cd(cwd)
+    end)
+
+    eq('', api.nvim_buf_get_name(0))
+    feed('-')
+    poke_eventloop()
+
+    assert_directory(root)
+  end)
+
+  it('preserves a modified unnamed buffer when opening the current directory', function()
+    make_fixture()
+    n.clear({ args_rm = { '-u', '--cmd' } })
+    local cwd = fn.getcwd()
+    cd(root)
+    finally(function()
+      cd(cwd)
+    end)
+    local old_buf = api.nvim_get_current_buf()
+    api.nvim_buf_set_lines(old_buf, 0, -1, false, { 'unsaved' })
+
+    feed('-')
+    poke_eventloop()
+
+    assert_directory(root)
+    eq(old_buf, fn.bufnr('#'))
+    eq(true, api.nvim_buf_is_valid(old_buf))
+    eq(true, api.nvim_get_option_value('modified', { buf = old_buf }))
+    eq({ 'unsaved' }, api.nvim_buf_get_lines(old_buf, 0, -1, false))
   end)
 
   it('does not shadow startup plugin `-` mappings in directory buffers', function()

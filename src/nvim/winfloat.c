@@ -46,6 +46,7 @@
 #include "nvim/window.h"
 #include "nvim/winfloat.h"
 
+#include "options_keysets.generated.h"
 #include "winfloat.c.generated.h"
 
 /// Creates a new float, or transforms an existing window to a float.
@@ -410,8 +411,8 @@ win_T *win_float_find_altwin(const win_T *win, const tabpage_T *tp)
   return (wp != win && wp->w_config.focusable && !wp->w_config.hide) ? wp : tp->tp_firstwin;
 }
 
-/// Inline helper function for handling errors and cleanup in win_float_create_preview.
-static inline win_T *handle_error_and_cleanup(win_T *wp, Error *err)
+/// Abort win_float_special(): emit any error, tear down the half-built window, unblock autocmds.
+static inline win_T *win_float_special_fail(win_T *wp, Error *err)
 {
   if (ERROR_SET(err)) {
     emsg(err->msg);
@@ -425,13 +426,20 @@ static inline win_T *handle_error_and_cleanup(win_T *wp, Error *err)
   return NULL;
 }
 
-/// create a floating preview window.
+/// Snapshot a 'previewpopup' preview's anchor: the current cursor's screen cell.
+/// Call before the preview win is "entered" (then it becomes `curwin`).
+void win_float_anchor_preview(win_T *wp)
+  FUNC_ATTR_NONNULL_ALL
+{
+  wp->w_wantline = curwin->w_winrow + curwin->w_wrow;
+  wp->w_wantcol = curwin->w_wincol + curwin->w_wcol;
+}
+
+/// Creates a special floatwin: a 'previewpopup' preview or a pum-info popup.
 ///
-/// @param[in] bool enter floating window.
-/// @param[in] bool create a new buffer for window.
-/// @param[in] int floating preview window kind.
-///
-/// @return win_T
+/// @param enter    Enter the new window.
+/// @param new_buf  Give the window a new scratch buffer.
+/// @param kind     kWinPreview or kWinInfo.
 win_T *win_float_special(bool enter, bool new_buf, WinKind kind)
 {
   WinConfig config = WIN_CONFIG_INIT;
@@ -446,7 +454,7 @@ win_T *win_float_special(bool enter, bool new_buf, WinKind kind)
   config.style = kWinStyleMinimal;
   Error err = ERROR_INIT;
   bool preview = kind == kWinPreview;
-  if (preview && !win_float_parse_option(p_pvp, &config)) {
+  if (preview && !win_previewpopup_config(&config)) {
     emsg(_(e_invarg));
     return NULL;
   }
@@ -454,24 +462,24 @@ win_T *win_float_special(bool enter, bool new_buf, WinKind kind)
   block_autocmds();
   win_T *wp = win_new_float(NULL, false, config, &err);
   if (!wp) {
-    return handle_error_and_cleanup(wp, &err);
+    return win_float_special_fail(wp, &err);
   }
 
   if (new_buf) {
     Buffer b = nvim_create_buf(false, true, &err);
     if (!b) {
-      return handle_error_and_cleanup(wp, &err);
+      return win_float_special_fail(wp, &err);
     }
     buf_T *buf = find_buffer_by_handle(b, &err);
     if (!buf) {
-      return handle_error_and_cleanup(wp, &err);
+      return win_float_special_fail(wp, &err);
     }
     buf->b_p_bl = false;  // unlist
     set_option_direct_for(kOptBufhidden, STATIC_CSTR_AS_OPTVAL("wipe"), OPT_LOCAL, 0,
                           kOptScopeBuf, buf);
     win_set_buf(wp, buf, &err);
     if (ERROR_SET(&err)) {
-      return handle_error_and_cleanup(wp, &err);
+      return win_float_special_fail(wp, &err);
     }
   }
   unblock_autocmds();
@@ -482,10 +490,7 @@ win_T *win_float_special(bool enter, bool new_buf, WinKind kind)
   if (preview) {
     wp->w_p_pvw = true;
     RESET_BINDING(wp);
-    wp->w_maxheight = config.height;
-    wp->w_maxwidth = config.width;
-    wp->w_wantline = curwin->w_winrow + curwin->w_wrow;
-    wp->w_wantcol = curwin->w_wincol + curwin->w_wcol;
+    win_float_anchor_preview(wp);
   }
   wp->w_kind = kind;
 
@@ -507,11 +512,8 @@ void win_float_close(WinKind kind)
   }
 }
 
-/// Update the preview window from its content: the title (the previewed file's
-/// name), the size ('previewpopup' dimensions or autosized to the content), and
-/// the position.
-///
-/// @param wp pointer of floating preview window
+/// Re-layout a 'previewpopup' window for its current content: title, size, and anchored position.
+/// No-op if `wp` is not a floating 'previewwindow'.
 void win_float_update_preview(win_T *wp)
   FUNC_ATTR_NONNULL_ALL
 {
@@ -537,15 +539,17 @@ void win_float_update_preview(win_T *wp)
   int row = MIN(MAX(wp->w_wantline, 0), Rows - 1);
   int col = MIN(MAX(wp->w_wantcol, 0), Columns - 1);
 
+  OptKeyDict_pvp *v = opt_keyset(p_pvp, kOptPreviewpopup, NULL);
+  int want_w = HAS_KEY(v, pvp, width) ? (int)v->width : 0;
+  int want_h = HAS_KEY(v, pvp, height) ? (int)v->height : 0;
+
   // If a dimension is not given in 'previewpopup', autosize to the content.
   linenr_T last = wp->w_buffer->b_ml.ml_line_count;
-  int want_w = wp->w_maxwidth;
   if (want_w == 0) {
     want_w = MAX(win_max_displaywidth(wp, 1, last, Columns), 1);
   }
   want_w = MIN(want_w, Columns);
 
-  int want_h = wp->w_maxheight;
   if (want_h == 0) {
     int saved_view_width = wp->w_view_width;
     wp->w_view_width = want_w;
@@ -575,63 +579,38 @@ void win_float_update_preview(win_T *wp)
   win_config_float(wp, wp->w_config);
 }
 
-/// Parse 'previewpopup' ("height:N,width:N,border:style") into `config`.
-///
-/// @param value  the option value to parse (e.g. 'previewpopup')
+/// Applies 'previewpopup' ("height:N,width:N,border:style") to `config`.
 ///
 /// @return false on an invalid value; caller emits E474.
-bool win_float_parse_option(char *value, WinConfig *config)
+bool win_previewpopup_config(WinConfig *config)
   FUNC_ATTR_NONNULL_ALL
 {
-  int height = 0;
-  int width = 0;
-  bool has_border = false;
+  OptKeyDict_pvp *v = opt_keyset(p_pvp, kOptPreviewpopup, NULL);
 
-  char item[32];  // one "key:value" part; longest is "border:rounded"
-  for (char *p = value; *p != NUL;) {
-    copy_option_part(&p, item, sizeof(item), ",");
-
-    char *val = vim_strchr(item, ':');
-    if (val == NULL) {
-      return false;
-    }
-    *val++ = NUL;
-
-    if (strcmp(item, "border") == 0) {
-      Error err = ERROR_INIT;
-      bool ok = *val != NUL && parse_winborder(config, val, &err);
-      api_clear_error(&err);
-      if (!ok) {
-        return false;
-      }
-      has_border = true;
-    } else if (strcmp(item, "height") == 0 || strcmp(item, "width") == 0) {
-      char *end = val;
-      int n = getdigits_int(&end, false, 0);
-      if (end == val || *end != NUL || n < 1) {
-        return false;
-      }
-      *(item[0] == 'h' ? &height : &width) = n;
-    } else {
-      return false;
-    }
+  if ((HAS_KEY(v, pvp, height) && v->height < 1) || (HAS_KEY(v, pvp, width) && v->width < 1)) {
+    return false;
   }
+  config->height = HAS_KEY(v, pvp, height) ? (int)v->height : 0;
+  config->width = HAS_KEY(v, pvp, width) ? (int)v->width : 0;
 
-  config->height = height;
-  config->width = width;
-
-  if (!has_border) {
-    config->border = false;
-    if (*p_winborder != NUL) {
-      Error err = ERROR_INIT;
-      parse_winborder(config, p_winborder, &err);
-      api_clear_error(&err);
+  // Use 'previewpopup' border if set, else fallback to 'winborder'.
+  char *border = NULL;
+  if (HAS_KEY(v, pvp, border)) {
+    border = v->border;
+  } else if (*p_winborder != NUL) {
+    border = p_winborder;
+  }
+  if (border != NULL) {
+    Error err = ERROR_INIT;
+    bool ok = parse_winborder(config, border, &err);
+    api_clear_error(&err);
+    if (!ok) {
+      return false;
     }
   }
 
   if (!config->border) {
     config->title = false;
   }
-
   return true;
 }

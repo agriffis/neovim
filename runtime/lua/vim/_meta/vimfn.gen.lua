@@ -5602,7 +5602,7 @@ function vim.fn.log10(expr) end
 --- Note that {expr2} is the result of an expression and is then
 --- used as an expression again.  Often it is good to use a
 --- |literal-string| to avoid having to double backslashes.  You
---- still have to double ' quotes
+--- still have to double single (') quotes, though.
 ---
 --- If {expr2} is a |Funcref| it is called with two arguments:
 ---   1. The key or the index of the current item.
