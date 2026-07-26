@@ -265,27 +265,22 @@ void nvim_set_hl_ns_fast(Integer ns_id, Error *err)
   hl_check_ns();
 }
 
-/// Sends input-keys to Nvim, subject to various quirks controlled by `mode`
-/// flags. This is a blocking call, unlike |nvim_input()|.
+/// Sends input-keys to Nvim, subject to various quirks controlled by `mode` flags. This is
+/// a blocking call, unlike |nvim_input()|.
 ///
 /// On execution error: does not fail, but updates v:errmsg.
 ///
-/// To input sequences like [<C-o>] use |nvim_replace_termcodes()| (typically
-/// with escape_ks=false) to replace |keycodes|, then pass the result to
-/// nvim_feedkeys().
-///
-/// Example:
+/// To input keycodes like [<C-o>], pass the result of |nvim_replace_termcodes()|:
 ///
 /// ```vim
-/// :let key = nvim_replace_termcodes("<C-o>", v:true, v:false, v:true)
+/// :let key = nvim_replace_termcodes('<C-o>', v:true, v:false, v:true)
 /// :call nvim_feedkeys(key, 'n', v:false)
 /// ```
 ///
-/// @param keys         to be typed
-/// @param mode         behavior flags, see |feedkeys()|
-/// @param escape_ks    If true, escape K_SPECIAL bytes in `keys`.
-///                     This should be false if you already used
-///                     |nvim_replace_termcodes()|, and true otherwise.
+/// @param keys         Keys to send as input.
+/// @param mode         Behavior flags, see |feedkeys()|.
+/// @param escape_ks    If true, escape K_SPECIAL bytes in `keys`. Should be false if you used
+///                     |nvim_replace_termcodes()|, else true.
 /// @see feedkeys()
 /// @see vim_strsave_escape_ks
 void nvim_feedkeys(String keys, String mode, Boolean escape_ks)
@@ -481,10 +476,9 @@ error:
                 "invalid button or action");
 }
 
-/// Replaces terminal codes and |keycodes| ([<CR>], [<Esc>], ...) in a string with
-/// the internal representation.
+/// Converts terminal codes and |keycodes| ([<CR>], [<Esc>], …) in a key sequence, to the internal
+/// representation. See also Lua |vim.keycode()|.
 ///
-/// @note Lua can use |vim.keycode()| instead.
 /// @see replace_termcodes
 /// @see cpoptions
 ///
@@ -1636,18 +1630,24 @@ void nvim_set_keymap(uint64_t channel_id, String mode, String lhs, String rhs, D
                      Error *err)
   FUNC_API_SINCE(6)
 {
-  modify_keymap(channel_id, -1, false, mode, lhs, rhs, opts, err);
+  modify_keymap(channel_id, -1, MAPTYPE_MAP, mode, lhs, rhs, opts, err);
 }
 
 /// Unmaps a global |mapping| for the given mode.
 ///
 /// To unmap a buffer-local mapping, use |nvim_buf_del_keymap()|.
 ///
+/// @param  mode  Mode short-name ("n", "i", "v", ...)
+/// @param  lhs   Left-hand-side |{lhs}| of the mapping.
+/// @param  opts  Optional parameters.
+///               - lhs: When true, only match {lhs}, not {rhs}.
+///
 /// @see |nvim_set_keymap()|
-void nvim_del_keymap(uint64_t channel_id, String mode, String lhs, Error *err)
+void nvim_del_keymap(uint64_t channel_id, String mode, String lhs, Dict(keymap_del) *opts,
+                     Error *err)
   FUNC_API_SINCE(6)
 {
-  nvim_buf_del_keymap(channel_id, -1, mode, lhs, err);
+  nvim_buf_del_keymap(channel_id, -1, mode, lhs, opts, err);
 }
 
 /// Returns a 2-tuple (Array), where item 0 is the current channel id and item

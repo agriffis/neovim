@@ -1295,17 +1295,17 @@ vim.keycode({keys}, {info})                                    *vim.keycode()*
       • {info}  (`boolean?`) Also return key-chord info.
 
     Return (multiple): ~
-        (`string`) Internal bytes representation of the given `keys`.
+        (`string`) Internal representation of the given `keys`.
         (`table?`) List of parsed key-chords, each with fields:
-        • {key} (`string`) Key without modifiers. Example: `<C-A>` has `key`
-          `a`.
+        • {key} (`string`) Key without modifiers. Example: `<C-A>` has
+          `key="a"`.
         • {key_alt} (`string?`) Alternative spelling of `key`, or nil if There
-          Is No Alternative (TINA). Example: `key="<"` has `key_alt="lt"`.
+          Is No Alternative (TINA). Example: `"<"` has `key_alt="lt"`.
         • {keys} (`string`) Full key-chord in canonical key-notation (as
           produced by |keytrans()|), including modifiers. Example: `<A-f>` has
           `keys="<M-f>"`.
-        • {mod} (`('M'|'T'|'C'|'S'|'2'|'3'|'4'|'D')[]`) A list of single
-          character modifiers of the key.
+        • {mod} (`('M'|'T'|'C'|'S'|'2'|'3'|'4'|'D')[]`) List of key-chord
+          modifiers. Example: `<C-S-f>` has `mod={ 'C', 'S' }`.
 
     See also: ~
       • |nvim_replace_termcodes()|
@@ -3798,6 +3798,7 @@ Lua module: vim.keymap                                            *vim.keymap*
 
 vim.keymap.del({modes}, {lhs}, {opts})                      *vim.keymap.del()*
     Removes a mapping, or removes each (mode, lhs) pair if `lhs` is a list.
+
     Examples: >lua
         vim.keymap.del('n', 'lhs')
         vim.keymap.del({'n', 'i', 'v'}, '<leader>w', { buf = 5 })
@@ -3809,6 +3810,7 @@ vim.keymap.del({modes}, {lhs}, {opts})                      *vim.keymap.del()*
       • {opts}   (`table?`) A table with the following fields:
                  • {buf}? (`integer`) Remove a mapping from the given buffer.
                    `0` for current.
+                 • {lhs}? (`boolean`) When true, only match {lhs}, not {rhs}.
 
     See also: ~
       • |vim.keymap.set()|

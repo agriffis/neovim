@@ -1851,6 +1851,7 @@ void may_clear_cmdline(void)
 
 // Routines for displaying a partly typed command
 static char old_showcmd_buf[SHOWCMD_BUFLEN];    // For push_showcmd()
+static bool showcmd_is_clear = true;
 static bool showcmd_visual = false;
 
 void clear_showcmd(void)
@@ -2043,12 +2044,17 @@ void pop_showcmd(void)
   display_showcmd();
 }
 
-static void display_showcmd(void)
+void showcmd_update_clear_state(void)
 {
   showcmd_is_clear = (showcmd_buf[0] == NUL);
+}
+
+static void display_showcmd(void)
+{
+  showcmd_update_clear_state();
 
   if (*p_sloc == 's') {
-    if (showcmd_is_clear) {
+    if (showcmd_is_clear && !vgetc_busy) {
       curwin->w_redr_status = true;
     } else {
       win_redr_status(curwin);
@@ -2057,7 +2063,7 @@ static void display_showcmd(void)
     return;
   }
   if (*p_sloc == 't') {
-    if (showcmd_is_clear) {
+    if (showcmd_is_clear && !vgetc_busy) {
       redraw_tabline = true;
     } else {
       draw_tabline();
@@ -6409,9 +6415,12 @@ static void nv_record(cmdarg_T *cap)
       emsg(_(e_cmdline_window_already_open));
       return;
     }
+    bool insert_range = Visual.active && cap->nchar == ':';
     char fc[2] = { (char)cap->nchar, 0 };
     typval_T tv_args[] = {
       { .v_type = VAR_STRING, .vval.v_string = fc },
+      { .v_type = VAR_STRING, .vval.v_string = insert_range ? "'<,'>" : "" },
+      { .v_type = VAR_NUMBER, .vval.v_number = insert_range ? 5 : 1 },
       { .v_type = VAR_UNKNOWN },
     };
     nlua_call_typval("vim._core.cmdwin", "open", tv_args, NULL);

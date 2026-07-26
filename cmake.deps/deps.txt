@@ -2,8 +2,8 @@
 LIBUV_URL https://github.com/libuv/libuv/archive/v1.52.1.tar.gz
 LIBUV_SHA256 478baf2599bfbc882c355288c9cb6f92e0e7dda435fa04031fa5b607cf3f414c
 
-LUAJIT_URL https://github.com/luajit/luajit/archive/2460b3ff93a1c955de3d62cfc825de7d68dc272e.tar.gz
-LUAJIT_SHA256 5c52d06876d86aa199f9b8cdc65f6f9ac086fdfa8a4489ebf8dc4516e194550b
+LUAJIT_URL https://github.com/luajit/luajit/archive/346ab587cb235b4ef0b5777b4cd29009808d0cc0.tar.gz
+LUAJIT_SHA256 a59e9540e1d516b27192153437a2cf69677337a20e64edeba221663f5ebc92c8
 
 LUA_URL https://www.lua.org/ftp/lua-5.1.5.tar.gz
 LUA_SHA256 2640fc56a795f29d28ef15e13c34a47e223960b0240e8cb0a82d9b0738695333
@@ -49,8 +49,8 @@ TREESITTER_QUERY_URL https://github.com/tree-sitter-grammars/tree-sitter-query/a
 TREESITTER_QUERY_SHA256 c2b23b9a54cffcc999ded4a5d3949daf338bebb7945dece229f832332e6e6a7d
 TREESITTER_MARKDOWN_URL https://github.com/tree-sitter-grammars/tree-sitter-markdown/archive/v0.5.3.tar.gz
 TREESITTER_MARKDOWN_SHA256 df845b1ab7c7c163ec57d7fa17170c92b04be199bddab02523636efec5224ab6
-TREESITTER_URL https://github.com/tree-sitter/tree-sitter/archive/d11d18f746fdfd1826362c2531ce06808f386b02.tar.gz
-TREESITTER_SHA256 50546072d031b0cc1bf2075f3c2a22cdc94f95845059f3c68060389eab560a40
+TREESITTER_URL https://github.com/tree-sitter/tree-sitter/archive/4d0f126996baf50c99a15746c582cc423bcc3910.tar.gz
+TREESITTER_SHA256 d0394267d82d62b98152a02c879b7da1b933608754bf6e5adb27d4b49490f028
 
 # NOTE: Also update the find_package() call if bumping the minimum.
 WASMTIME_URL https://github.com/bytecodealliance/wasmtime/archive/v36.0.12.tar.gz
