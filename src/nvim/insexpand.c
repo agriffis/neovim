@@ -1597,7 +1597,7 @@ static int ins_compl_build_pum(void)
   // If it's user complete function and refresh_always,
   // do not use "compl_leader" as prefix filter.
   if (ins_compl_need_restart()) {
-    XFREE_CLEAR(compl_leader);
+    API_CLEAR_STRING(compl_leader);
   }
 
   bool compl_no_select = (get_cot_flags() & kOptCotFlagNoselect) != 0
@@ -3036,9 +3036,9 @@ const char *did_set_completefunc(optset_T *args)
   int retval;
 
   if (args->os_flags & OPT_LOCAL) {
-    retval = option_set_callback_func(args->os_newval.string.data, &buf->b_cfu_cb);
+    retval = option_set_callback_func(args->os_newval.data.string.data, &buf->b_cfu_cb);
   } else {
-    retval = option_set_callback_func(args->os_newval.string.data, &cfu_cb);
+    retval = option_set_callback_func(args->os_newval.data.string.data, &cfu_cb);
     if (retval == OK && !(args->os_flags & OPT_GLOBAL)) {
       set_buflocal_cfu_callback(buf);
     }
@@ -3064,9 +3064,9 @@ const char *did_set_omnifunc(optset_T *args)
   int retval;
 
   if (args->os_flags & OPT_LOCAL) {
-    retval = option_set_callback_func(args->os_newval.string.data, &buf->b_ofu_cb);
+    retval = option_set_callback_func(args->os_newval.data.string.data, &buf->b_ofu_cb);
   } else {
-    retval = option_set_callback_func(args->os_newval.string.data, &ofu_cb);
+    retval = option_set_callback_func(args->os_newval.data.string.data, &ofu_cb);
     if (retval == OK && !(args->os_flags & OPT_GLOBAL)) {
       set_buflocal_ofu_callback(buf);
     }
