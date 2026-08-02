@@ -345,7 +345,7 @@ describe('vim.fs', function()
       eq(nil, result['a/noaccess'])
     end)
 
-    it('opts.normalize=false uses {path} literally', function()
+    it('plain=true', function()
       mkdir('testdir')
       mkdir('testdir/$XTEST_FS_DIR')
       mkdir('testdir/expanded')
@@ -360,9 +360,9 @@ describe('vim.fs', function()
         exec_lua(function()
           vim.uv.os_setenv('XTEST_FS_DIR', 'expanded')
           local out = {} ---@type table<string, string>[]
-          for i, normalize in ipairs({ true, false }) do
+          for i, plain in ipairs({ false, true }) do
             out[i] = {}
-            for name, etype in vim.fs.dir('testdir/$XTEST_FS_DIR', { normalize = normalize }) do
+            for name, etype in vim.fs.dir('testdir/$XTEST_FS_DIR', { plain = plain }) do
               out[i][name] = etype
             end
           end
@@ -852,15 +852,29 @@ describe('vim.fs', function()
         eq([[C:/foo]], vim.fs.abspath([[C:\foo]]))
         eq([[C:/foo/../.]], vim.fs.abspath([[C:\foo\..\.]]))
         eq('//foo/bar', vim.fs.abspath('\\\\foo\\bar'))
+        eq('//foo/bar', vim.fs.abspath('\\\\foo\\bar'))
       else
         eq('/foo/../.', vim.fs.abspath('/foo/../.'))
         eq('/foo/bar', vim.fs.abspath('/foo/bar'))
       end
     end)
 
+    it('with `cwd`', function()
+      local parent_cwd = vim.fs.dirname(cwd)
+      eq(parent_cwd, vim.fs.abspath('.', { cwd = parent_cwd }))
+      eq(parent_cwd .. '/foo', vim.fs.abspath('foo', { cwd = parent_cwd }))
+      eq(parent_cwd .. '/.././../foo', vim.fs.abspath('.././../foo', { cwd = parent_cwd }))
+      eq('/foo/bar', vim.fs.abspath('/foo/bar', { cwd = parent_cwd }))
+    end)
+
     it('expands ~', function()
       eq(home .. '/foo', vim.fs.abspath('~/foo'))
       eq(home .. '/./.././foo', vim.fs.abspath('~/./.././foo'))
+    end)
+
+    it('does not expand ~ if plain=true', function()
+      eq(cwd .. '/~/foo', vim.fs.abspath('~/foo', { plain = true }))
+      eq(cwd .. '/~/./.././foo', vim.fs.abspath('~/./.././foo', { plain = true }))
     end)
 
     if is_os('win') then
