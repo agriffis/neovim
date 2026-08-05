@@ -1125,7 +1125,7 @@ static void recording_mode(int hl_id)
   msg_puts_hl(s, hl_id, false);
 }
 
-#define COL_RULER 17        // columns needed by standard ruler
+#define COL_RULER 18        // columns needed by standard ruler
 
 /// Compute columns for ruler and shown command. 'sc_col' is also used to
 /// decide what the maximum length of a message on the status line can be.
@@ -1138,7 +1138,7 @@ void comp_col(void)
   sc_col = 0;
   ru_col = 0;
   if (p_ru) {
-    ru_col = (ru_wid ? ru_wid : COL_RULER) + 1;
+    ru_col = (ru_wid ? ru_wid : COL_RULER);
     // no last status line, adjust sc_col
     if (!last_has_status) {
       sc_col = ru_col;
@@ -1444,6 +1444,8 @@ static void win_update(win_T *wp)
 
   // Window is zero-height: Only need to draw the separator
   if (wp->w_view_height == 0) {
+    // draw the vertical separator right of this window
+    draw_vsep_win(wp);
     // draw the horizontal separator below this window
     draw_hsep_win(wp);
     wp->w_redr_type = 0;

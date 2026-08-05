@@ -154,6 +154,8 @@ OPTIONS
   To restore the previous truncation from the left, add a `%<` to the start.
   The same applies to 'rulerformat', 'statuscolumn', 'tabline', 'winbar',
   'titlestring', and 'iconstring'.
+• 'rulerformat' can no longer be set empty, the new default expression will be
+  restored instead.
 
 PLUGINS
 
@@ -162,6 +164,12 @@ PLUGINS
 TREESITTER
 
 • todo
+
+UI
+
+• The bottom right cell of the screen is no longer left empty when the ruler
+  is shown. This was originally intended to prevent unwanted scrolling on
+  quirky terminals.
 
 VIMSCRIPT
 
@@ -220,10 +228,15 @@ BUILD
   (empty string) to assume that target binaries can run on the host during the
   build process (e.g. if target is x86 on a x86_64 system, or if emulation set
   up with binfmt or similar).
+• zig build: Nvim can now be built to produce a WebAssembly binary via
+  "-Dtarget=wasm32-emscripten", which can run inside a web browser. A basic
+  browser-based demo for running it is also included. Still very
+  experimental.
 
 DEFAULTS
 
-• todo
+• 'rulerformat' default is exposed as a statusline expression (previously it
+  was implemented as an internal C routine).
 
 DIAGNOSTICS
 
@@ -234,6 +247,8 @@ DIAGNOSTICS
 
 EDITOR
 
+• |:bcd| sets a buffer-local directory. |getcwd()| and |haslocaldir()| take
+  `bufnr` as a third parameter.
 • |:command-completion-customlist| can return a list of dictionaries with
   kind/menu/info/abbr for the popup menu.
 • |cmdwin| (|q:|, |q/|, |q?|, |c_CTRL-F|) is implemented as a "normal"
@@ -252,6 +267,10 @@ EDITOR
   • |:restart!| (with a bang "!") does not save/restore the session.
 • |ZR| restarts Nvim (|:restart|).
 • |:detach| with range "%" detaches all UIs except the current one.
+• |:detach!| (with bang "!") marks the current UI as detachable: Nvim will
+  continue running if the UI disconnects unexpectedly (e.g. if you
+  accidentally close your terminal, ssh connection lost, etc.).
+  Use |:connect| to reattach.
 • |:uptime| displays uptime.
 • |:packupdate| and |:packdel| for managing |vim.pack|.
 • 'scrollback' is now also valid in |prompt-buffer| buffers to limit the
@@ -324,6 +343,8 @@ LUA
 • |vim.fs.find()| returns a list of errors as its second return value.
 • |vim.fs.mkdir()| creates directories, including parent directories with
   `opts.parents=true`.
+• |vim.fs.slug()| generates a filesystem-safe file name from an arbitrary
+  identity string, with an optional length bound.
 • |vim.filetype.inspect()| returns a copy of the internal tables used for
   filetype detection.
 • Added `__eq` metamethod to |vim.VersionRange|. 2 distinct but representing
