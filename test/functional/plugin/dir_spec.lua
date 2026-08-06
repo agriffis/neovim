@@ -45,7 +45,7 @@ end
 local function assert_directory(path)
   local ffname = path:sub(-1) == '/' and path or path .. '/'
   eq(ffname, api.nvim_buf_get_name(0))
-  eq(path, vim.fs.normalize(fn.bufname('%')))
+  eq(path, vim.fs.normalize(fn.fnamemodify(fn.bufname('%'), ':p')))
   eq('directory', bufopt('filetype'))
   eq(true, bufopt('buflisted'))
 end
@@ -524,6 +524,20 @@ describe('nvim.dir', function()
     assert_directory(root)
     -- Keep the alternate buffer on the file we navigated up from.
     eq(file, api.nvim_buf_get_name(fn.bufnr('#')))
+
+    feed('-')
+    poke_eventloop()
+    assert_directory(vim.fs.dirname(root))
+    eq(file, api.nvim_buf_get_name(fn.bufnr('#')))
+
+    feed('<CR>')
+    poke_eventloop()
+    assert_directory(root)
+    eq(file, api.nvim_buf_get_name(fn.bufnr('#')))
+
+    feed('1-')
+    poke_eventloop()
+    eq(file, api.nvim_buf_get_name(fn.bufnr('#')))
   end)
 
   it('uses an absolute buffer name for a relative startup directory argument', function()
@@ -562,19 +576,24 @@ describe('nvim.dir', function()
   it('navigates entries and refreshes the listing', function()
     make_fixture()
     n.clear({ args = { '--clean' } })
+    local cwd = fn.getcwd()
 
     edit(root)
     assert_directory(root)
+    eq(vim.uv.fs_realpath(root), vim.uv.fs_realpath(fn.getcwd()))
+    eq('alpha.txt', fn.findfile('alpha.txt'))
 
     api.nvim_win_set_cursor(0, { line_of('alpha.txt'), 0 })
     feed('<CR>')
     poke_eventloop()
     eq(file, api.nvim_buf_get_name(0))
     eq({ 'alpha' }, lines())
+    eq(cwd, fn.getcwd())
 
     edit(subdir)
     assert_directory(subdir)
     eq({ '' }, lines())
+    eq(vim.uv.fs_realpath(subdir), vim.uv.fs_realpath(fn.getcwd()))
 
     feed('-')
     poke_eventloop()

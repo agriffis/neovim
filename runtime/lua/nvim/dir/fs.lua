@@ -10,7 +10,7 @@ local navigating = false
 ---@param path string
 ---@return string
 function M.normalize(path)
-  return fs.normalize(fs.abspath(path), { expand_env = false })
+  return fs.normalize(fs.abspath(path), { plain = true })
 end
 
 ---@return boolean
@@ -24,6 +24,7 @@ local function edit(path)
   local ok, err = pcall(api.nvim_cmd, {
     cmd = 'edit',
     args = { path },
+    mods = { keepalt = vim.b.nvim_dir ~= nil },
     magic = { file = false, bar = false },
   })
   navigating = false
@@ -96,10 +97,18 @@ function M.open_parent(_, path)
 end
 
 ---@param buf integer
-function M.init(buf)
+---@param path string
+function M.init(buf, path)
   if api.nvim_get_option_value('filetype', { buf = buf }) ~= 'directory' then
     api.nvim_set_option_value('filetype', 'directory', { buf = buf })
   end
+  api.nvim_buf_call(buf, function()
+    pcall(api.nvim_cmd, {
+      cmd = 'bcd',
+      args = { path },
+      magic = { file = false, bar = false },
+    })
+  end)
 end
 
 return M
