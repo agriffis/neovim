@@ -3911,6 +3911,60 @@ describe('progress-message', function()
     })
   end)
 
+  it('emitted by :write, not by :read #41193', function()
+    local fname = 'Xtest_progress_bufwrite'
+    finally(function()
+      os.remove(fname)
+    end)
+    command('write ' .. fname)
+    assert_progress_autocmd({
+      data = {},
+      id = ('nvim.bufwrite "%s"'):format(fname),
+      source = 'nvim',
+      status = 'success',
+      text = { ('"%s" [New] 0L, 0B written'):format(fname) },
+      title = '',
+    })
+
+    -- ":read" is not a write: it must not start a progress that never ends.
+    command('read ' .. fname)
+    assert_progress_autocmd(nil)
+
+    -- A failed write ends the progress-msg.
+    local events = exec_lua(function(f)
+      local out = {}
+      vim.api.nvim_create_autocmd('Progress', {
+        callback = function(ev)
+          table.insert(out, { id = ev.data.id, status = ev.data.status, text = ev.data.text[1] })
+        end,
+      })
+      pcall(vim.cmd.write, ('%s/nodir'):format(f))
+      return out
+    end, fname)
+    eq({ 'running', 'failed' }, { events[1].status, events[2].status })
+    eq(events[1].id, events[2].id)
+    t.matches('^E%d+:', events[2].text)
+  end)
+
+  it('emitted by ins-completion scan', function()
+    fn.writefile({ 'foobar', 'foobaz' }, 'Xdict')
+    finally(function()
+      os.remove('Xdict')
+    end)
+    exec_lua(function()
+      _G.events = {}
+      vim.api.nvim_create_autocmd('Progress', {
+        callback = function(ev)
+          table.insert(_G.events, ('%s %s'):format(ev.data.id, ev.data.status))
+        end,
+      })
+    end)
+    command('set shortmess-=C complete=kXdict')
+    -- Ends when scanning ends, regardless of whether popupmenu is open.
+    feed('ifoo<C-n>')
+    eq({ 'nvim.completion running', 'nvim.completion success' }, exec_lua('return _G.events'))
+  end)
+
   it('tui displays progress message in proper format', function()
     clear()
     setup_screen(false)

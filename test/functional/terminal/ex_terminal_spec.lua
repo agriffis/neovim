@@ -13,7 +13,6 @@ local fn = n.fn
 local api = n.api
 local exec_lua = n.exec_lua
 local retry = t.retry
-local pcall_err = t.pcall_err
 local ok = t.ok
 local command = n.command
 local skip = t.skip
@@ -268,6 +267,16 @@ local function test_terminal_with_fake_shell(backslash)
     ]])
   end)
 
+  it('spawns in CWD effective at time of invocation', function()
+    -- Run "echo" so the default TermClose handler does not auto-delete an exitcode=0 shell.
+    command('terminal echo')
+    local dir = fn.bufname():match('^term://(.-)//')
+    local parentdir = fn.fnamemodify(fn.getcwd(), ':h') -- Absolute, so 'cdpath' cannot interfere.
+    command(('bcd %s'):format(fn.fnameescape(parentdir))) -- :terminal should use this CWD.
+    command('terminal echo')
+    eq(fn.fnamemodify(dir, ':h'), fn.bufname():match('^term://(.-)//'))
+  end)
+
   it('allows quotes and slashes', function()
     command([[terminal echo 'hello' \ "world"]])
     screen:expect([[
@@ -360,7 +369,7 @@ local function test_terminal_with_fake_shell(backslash)
   end)
 end
 
-describe(':terminal (with fake shell)', function()
+describe(':terminal (fake shell)', function()
   test_terminal_with_fake_shell(false)
   if is_os('win') then
     describe("when 'shell' uses backslashes", function()

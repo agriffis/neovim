@@ -560,18 +560,25 @@ static inline Error_T set_err_arg(const char *msg, int arg)
   return (Error_T){ .num = NULL, .msg = (char *)msg, .arg = arg };
 }
 
-static void emit_err(Error_T *e)
+/// Shows a write error msg.  IObuff must hold the quoted file name.
+///
+/// @param msg_id  Ends the progress-message with "failed" status. NULL to show a plain error msg.
+static void emit_err(Error_T *e, char *msg_id)
 {
-  if (e->num != NULL) {
-    if (e->arg != 0) {
-      semsg("%s: %s%s: %s", e->num, IObuff, e->msg, os_strerror(e->arg));
-    } else {
-      semsg("%s: %s%s", e->num, IObuff, e->msg);
-    }
+  char errmsg[IOSIZE];
+  if (e->num != NULL && e->arg != 0) {
+    vim_snprintf(errmsg, IOSIZE, "%s: %s%s: %s", e->num, IObuff, e->msg, os_strerror(e->arg));
+  } else if (e->num != NULL) {
+    vim_snprintf(errmsg, IOSIZE, "%s: %s%s", e->num, IObuff, e->msg);
   } else if (e->arg != 0) {
-    semsg(e->msg, os_strerror(e->arg));
+    vim_snprintf(errmsg, IOSIZE, e->msg, os_strerror(e->arg));
   } else {
-    emsg(e->msg);
+    xstrlcpy(errmsg, e->msg, IOSIZE);
+  }
+  if (msg_id != NULL) {
+    msg_progress(errmsg, msg_id, "failed", HLF_E, false, false, true);
+  } else {
+    emsg(errmsg);
   }
   if (e->alloc) {
     xfree(e->msg);
@@ -1044,7 +1051,7 @@ int buf_write(buf_T *buf, char *fname, char *sfname, linenr_T start, linenr_T en
 #endif
 
   // true if writing over original
-  bool overwriting = buf->b_ffname != NULL && path_fnamecmp(ffname, buf->b_ffname) == 0;
+  bool overwriting = buf->b_ffname != NULL && path_equal(ffname, buf->b_ffname, kPathCmpLiteral);
 
   no_wait_return++;                 // don't wait for return yet
 
@@ -1075,13 +1082,20 @@ int buf_write(buf_T *buf, char *fname, char *sfname, linenr_T start, linenr_T en
   } else {
     msg_scroll = true;              // don't overwrite previous file message
   }
+  // Progress-msg id, e.g. `nvim.bufwrite "foo.txt"`.
+  char msg_id[MAXPATHL + 32];
+#ifndef UNIX
+  char *msgname = sfname;
+#else
+  char *msgname = fname;
+#endif
+  size_t id_len = xstrlcpy(msg_id, "nvim.bufwrite ", sizeof(msg_id));
+  add_quoted_fname(msg_id + id_len, sizeof(msg_id) - id_len, buf, msgname);
+  msg_id[strlen(msg_id) - 1] = NUL;  // add_quoted_fname() appends a space, for display only.
+
   if (!filtering) {
     // show that we are busy
-#ifndef UNIX
-    filemess(buf, sfname, "");
-#else
-    filemess(buf, fname, "");
-#endif
+    filemess_progress(buf, msgname, msg_id);
   }
   msg_scroll = false;               // always overwrite the file message now
 
@@ -1664,9 +1678,6 @@ restore_backup:
 #endif
   if (!filtering) {
     add_quoted_fname(IObuff, IOSIZE, buf, fname);
-    // Append the filename (without trailing char) to the message ID.
-    char msg_id[IOSIZE + 14] = "nvim.bufwrite ";
-    xstrlcat(msg_id, IObuff, 14 + strlen(IObuff));
     bool insert_space = false;
     if (write_info.bw_conv_error) {
       xstrlcat(IObuff, _(" CONVERSION ERROR"), IOSIZE);
@@ -1707,7 +1718,7 @@ restore_backup:
     }
     // Hide cursor while emitting "written" message, so cursor doesn't flicker in cmdline. #25974
     ui_busy_start();
-    set_keep_msg(msg_progress(IObuff, msg_id, "success", 0, true, true), 0);
+    set_keep_msg(msg_progress(IObuff, msg_id, "success", 0, true, true, false), 0);
     ui_busy_stop();
   }
 
@@ -1807,13 +1818,10 @@ nofail:
   os_free_acl(acl);
 
   if (err.msg != NULL) {
-    // - 100 to save some space for further error message
-#ifndef UNIX
-    add_quoted_fname(IObuff, IOSIZE - 100, buf, sfname);
-#else
-    add_quoted_fname(IObuff, IOSIZE - 100, buf, fname);
-#endif
-    emit_err(&err);
+    // - 100 to save some space for further error message.
+    add_quoted_fname(IObuff, IOSIZE - 100, buf, msgname);
+    // The error ends the progress-msg started by filemess_progress().
+    emit_err(&err, filtering ? NULL : msg_id);
 
     retval = FAIL;
     if (end == 0) {

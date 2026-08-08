@@ -251,6 +251,7 @@ EDITOR
 
 • |:bcd| sets a buffer-local directory. |getcwd()| and |haslocaldir()| take
   `bufnr` as a third parameter.
+• |:lcd!| |:tcd!| |:bcd!| unsets the directory of that scope.
 • |:command-completion-customlist| can return a list of dictionaries with
   kind/menu/info/abbr for the popup menu.
 • |cmdwin| (|q:|, |q/|, |q?|, |c_CTRL-F|) is implemented as a "normal"
@@ -329,6 +330,8 @@ LSP
   while a completion item is selected accepts the item as with
   |complete_CTRL-Y|, then inserts the character. Previously
   `commitCharacters` had no effect.
+• The `reuse_client` predicate now passes the target buffer. See |vim.lsp.Config| and
+  |vim.lsp.start()|
 
 LUA
 

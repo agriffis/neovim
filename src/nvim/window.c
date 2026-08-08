@@ -803,7 +803,7 @@ void win_set_buf(win_T *win, buf_T *buf, Error *err)
   bool win_ok;
 
   TRY_WRAP(err, {
-    win_ok = ctx_switch(&switchwin, win, tab, NULL, kCtxNoDisplay);
+    win_ok = ctx_switch(&switchwin, win, tab, NULL, kCtxNoDisplay | kCtxKeepCwd);
     if (win_ok) {
       const int save_acd = p_acd;
       if (!switchwin.cs_same_win) {
@@ -2684,6 +2684,7 @@ static bool close_last_window_tabpage(win_T *win, bool free_buf, tabpage_T *prev
   }
 
   buf_T *old_curbuf = curbuf;
+  tabpage_T *save_lastused = lastused_tabpage;
 
   Terminal *term = win->w_buffer ? win->w_buffer->terminal : NULL;
   if (term) {
@@ -2705,6 +2706,12 @@ static bool close_last_window_tabpage(win_T *win, bool free_buf, tabpage_T *prev
   // or closed the window when jumping to the other tab page.
   if (curtab != prev_curtab && valid_tabpage(prev_curtab) && prev_curtab->tp_firstwin == win) {
     win_close_othertab(win, free_buf, prev_curtab, false);
+  }
+
+  // Entering the other tab page made the closed one the last used tab page.
+  // Restore the previous one when it is still there.
+  if (valid_tabpage(save_lastused) && save_lastused != curtab) {
+    lastused_tabpage = save_lastused;
   }
   entering_window(curwin);
 
@@ -5362,12 +5369,12 @@ void update_cwd(CdCause cause)
   char *new_dir;
   CdScope scope;
 
-  if (curwin->w_localdir) {
-    new_dir = curwin->w_localdir;
-    scope = kCdScopeWindow;
-  } else if (curbuf->b_localdir) {
+  if (curbuf->b_localdir) {
     new_dir = curbuf->b_localdir;
     scope = kCdScopeBuffer;
+  } else if (curwin->w_localdir) {
+    new_dir = curwin->w_localdir;
+    scope = kCdScopeWindow;
   } else if (curtab->tp_localdir) {
     new_dir = curtab->tp_localdir;
     scope = kCdScopeTabpage;
@@ -5389,7 +5396,7 @@ void update_cwd(CdCause cause)
         globaldir = xstrdup(cwd);
       }
     }
-    bool dir_differs = pathcmp(new_dir, cwd, -1) != 0;
+    bool dir_differs = !path_equal(new_dir, cwd, kPathCmpLiteral);
     if (!p_acd && dir_differs) {
       do_autocmd_dirchanged(new_dir, scope, cause, true);
     }
@@ -5403,7 +5410,7 @@ void update_cwd(CdCause cause)
   } else if (globaldir != NULL) {
     // Window nor buffer have a local directory and we are not in the global
     // directory: Change to the global directory.
-    bool dir_differs = pathcmp(globaldir, cwd, -1) != 0;
+    bool dir_differs = !path_equal(globaldir, cwd, kPathCmpLiteral);
     if (!p_acd && dir_differs) {
       do_autocmd_dirchanged(globaldir, kCdScopeGlobal, cause, true);
     }
@@ -7254,7 +7261,13 @@ static bool resize_frame_for_status(frame_T *fr)
     emsg(_(e_noroom));
     return false;
   } else if (fp != fr) {
-    frame_setheight(fr, fr->fr_height + 1, false);
+    int old_height = fr->fr_height;
+
+    frame_setheight(fr, old_height + 1, false);
+    if (fr->fr_height == old_height) {
+      emsg(_(e_noroom));
+      return false;
+    }
     win_comp_pos();
   } else {
     win_new_height(wp, wp->w_height - 1);
@@ -7267,16 +7280,13 @@ static bool resize_frame_for_status(frame_T *fr)
 // @return Success or failure.
 static bool resize_frame_for_winbar(frame_T *fr)
 {
-  win_T *wp = fr->fr_win;
-  frame_T *fp = find_horizontally_resizable_frame(fr);
+  int old_height = fr->fr_height;
 
-  if (fp == NULL || fp == fr) {
+  frame_setheight(fr, old_height + 1, false);
+  if (fr->fr_height == old_height) {
     emsg(_(e_noroom));
     return false;
   }
-  frame_new_height(fp, fp->fr_height - 1, false, false, false);
-  win_new_height(wp, wp->w_height + 1);
-  frame_fix_height(wp);
   win_comp_pos();
 
   return true;

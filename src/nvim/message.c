@@ -1092,14 +1092,13 @@ char *msg_may_trunc(bool force, char *s)
   return s;
 }
 
-char *msg_progress(char *s, char *id, char *status, int hl_id, bool hist, bool trunc)
+/// Shows a progress-message.  A non-"running" `status` ends the message and announces the
+/// progress task as "done".
+///
+/// @param s    Message text.  NULL ends the message without showing anything.
+/// @param err  Show as an error message.
+char *msg_progress(char *s, char *id, char *status, int hl_id, bool hist, bool trunc, bool err)
 {
-  if (hist && (!trunc || ui_has(kUIMessages))) {
-    msg_hist_add(s, -1, 0);
-  }
-  if (trunc) {
-    s = msg_may_trunc(false, s);
-  }
   bool clear = false;
   MessageData data = {
     .source = cstr_as_string("nvim"),
@@ -1107,9 +1106,17 @@ char *msg_progress(char *s, char *id, char *status, int hl_id, bool hist, bool t
     .percent = -1,
   };
   HlMessage chunks = KV_INITIAL_VALUE;
-  kv_push(chunks, ((HlMessageChunk){ cstr_as_string(s), hl_id }));
+  if (s != NULL) {
+    if (hist && (!trunc || ui_has(kUIMessages))) {
+      msg_hist_add(s, -1, 0);
+    }
+    if (trunc) {
+      s = msg_may_trunc(false, s);
+    }
+    kv_push(chunks, ((HlMessageChunk){ cstr_as_string(s), hl_id }));
+  }
   msg_ext_no_fast();
-  msg_multihl(CSTR_AS_OBJ(id), chunks, "progress", false, false, &data, &clear);
+  msg_multihl(CSTR_AS_OBJ(id), chunks, "progress", false, err, &data, &clear);
   kv_destroy(chunks);
   ui_flush();
   return s;

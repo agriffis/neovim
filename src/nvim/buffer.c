@@ -938,9 +938,6 @@ bool buf_freeall(buf_T *buf, int flags)
   }
   syntax_clear(&buf->b_s);          // reset syntax info
   buf->b_flags &= ~BF_READERR;      // a read error is no longer relevant
-
-  XFREE_CLEAR(buf->b_localdir);
-  XFREE_CLEAR(buf->b_prevdir);
   return true;
 }
 
@@ -3266,7 +3263,7 @@ static bool otherfile_buf(buf_T *buf, char *ffname, FileID *file_id_p, bool file
   if (ffname == NULL || *ffname == NUL || buf->b_ffname == NULL) {
     return true;
   }
-  if (path_fnamecmp(ffname, buf->b_ffname) == 0) {
+  if (path_equal(ffname, buf->b_ffname, kPathCmpLiteral)) {
     return false;
   }
   {
