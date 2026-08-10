@@ -957,7 +957,9 @@ is_na_patch() {
       *.h)
         HUNKS=$(git -C "${VIM_SOURCE_DIR}" diff-tree --no-commit-id -r -b -U0 \
           '-I^\s+$' \
-          '-I^#\s*(ifdef|if.*defined\().*FEAT_' \
+          '-I^\s*/?\*/?$' \
+          '-I^\s*(//|/?\*).*\s([vV]im9|sound)' \
+          '-I^#\s*((ifdef|ifndef|define|undef)|(if|elif)\s.*defined\().*FEAT_' \
           '-I^#\s*(else|endif)' \
           '-I#\s*define\s+XDG_' \
           '-I^EXTERN type_T t_.* INIT[2-9]\(' \
@@ -984,10 +986,12 @@ is_na_patch() {
       *.c)
         HUNKS=$(git -C "${VIM_SOURCE_DIR}" diff-tree --no-commit-id -r -b -U0 \
           '-I^\s+$' \
-          '-I^#\s*include\s+<proto/' \
-          '-I^#\s*(ifdef|if.*defined\().*FEAT_' \
+          '-I^\s*/?\*/?$' \
+          '-I^\s*(//|/?\*).*\s([vV]im9|sound)' \
+          '-I^#\s*((ifdef|ifndef|define|undef)\s|(if|elif)\s.*defined\().*FEAT_' \
           '-I^#\s*(else|endif)' \
-          '-I^\s+\{"prop_[a-z]+",.*f_prop_[a-z]+},$' \
+          '-I^#\s*include\s+<proto/' \
+          '-I^\s+\{"(prop|sound)_[a-z]+",.*f_(prop|sound)_[a-z]+},$' \
           '-I#\s*define.*ex_ni$' \
           '-I[_.>]sc_version = ' \
           '-I[_.>]uf_script_ctx_version = ' \
