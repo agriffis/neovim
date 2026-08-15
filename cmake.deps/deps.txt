@@ -35,8 +35,8 @@ UTF8PROC_SHA256 abfed50b6d4da51345713661370290f4f4747263ee73dc90356299dfc7990c78
 
 TREESITTER_C_URL https://github.com/tree-sitter/tree-sitter-c/archive/v0.24.2.tar.gz
 TREESITTER_C_SHA256 2eeb4db31f8fa0865e45488503d13403923bcb485a1bdb637abff8c42dd97364
-TREESITTER_DIFF_URL https://github.com/tree-sitter-grammars/tree-sitter-diff/archive/v0.1.0.tar.gz
-TREESITTER_DIFF_SHA256 0d0414ac873c33154b458f4d62fe096aa966392ff416920a08c5629c765aaed3
+TREESITTER_DIFF_URL https://github.com/tree-sitter-grammars/tree-sitter-diff/archive/v0.2.0.tar.gz
+TREESITTER_DIFF_SHA256 6092f7fd11e186d96d3c130fdbe8d03cfc426ee9cc62cf4a2112571b1b0372e6
 TREESITTER_LUA_URL https://github.com/tree-sitter-grammars/tree-sitter-lua/archive/v0.5.0.tar.gz
 TREESITTER_LUA_SHA256 cf01b93f4b61b96a6d27942cf28eeda4cbce7d503c3bef773a8930b3d778a2d9
 TREESITTER_LUA_WASM_URL https://github.com/tree-sitter-grammars/tree-sitter-lua/releases/download/v0.5.0/tree-sitter-lua.wasm
@@ -49,8 +49,8 @@ TREESITTER_QUERY_URL https://github.com/tree-sitter-grammars/tree-sitter-query/a
 TREESITTER_QUERY_SHA256 c2b23b9a54cffcc999ded4a5d3949daf338bebb7945dece229f832332e6e6a7d
 TREESITTER_MARKDOWN_URL https://github.com/tree-sitter-grammars/tree-sitter-markdown/archive/v0.5.3.tar.gz
 TREESITTER_MARKDOWN_SHA256 df845b1ab7c7c163ec57d7fa17170c92b04be199bddab02523636efec5224ab6
-TREESITTER_URL https://github.com/tree-sitter/tree-sitter/archive/308aee0c90b0527b185b3100046781d69935c5c5.tar.gz
-TREESITTER_SHA256 5cba441e72b1f01f9e84370c1615bac1771f82b92679b3bd72da22c8df9fd61a
+TREESITTER_URL https://github.com/tree-sitter/tree-sitter/archive/21e3614b8dcb48a20841440ac3dbf58ce82d1500.tar.gz
+TREESITTER_SHA256 481bc3c916b2e0674bc1f6ce69f6a7d4ef5283af39c394c6bed0d483b1fc55d9
 
 # NOTE: Also update the find_package() call if bumping the minimum.
 WASMTIME_URL https://github.com/bytecodealliance/wasmtime/archive/v36.0.13.tar.gz
