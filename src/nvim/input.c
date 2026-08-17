@@ -233,8 +233,8 @@ char *get_recorded(void)
   return p;
 }
 
-/// Appends the composed `["x][count]` keysequence prefix of `spec` to `buf`.
-/// Every prefix emission goes through here.
+/// Composes a `["x][count]` prefix from `spec` and appends it to `buf`.
+/// This is "Step 1" of redo-composition ("Step 2" is either `redobuff.cur.keys` or `redo_chars`).
 ///
 /// @param replay  Composing an actual replay (start_redo()): a `"=` register spec appends <CR>,
 ///                re-evaluating the last expression.
@@ -253,8 +253,8 @@ void redo_prefix(const CmdSpec *spec, StringBuilder *buf, bool replay)
   }
 }
 
-/// Appends the composed command chars of `spec` to `buf`.
-/// Every command-char emission goes through here (see redo_prefix()).
+/// Composes a command keysequence from `spec` and appends it to `buf`.
+/// This is "Step 2" of redo-composition ("Step 1" is `redo_prefix`).
 ///
 /// @param arg_meta  Skip the `arg` byte (see prep_redo()).
 void redo_chars(const CmdSpec *spec, StringBuilder *buf, bool arg_meta)
@@ -280,28 +280,33 @@ void redo_chars(const CmdSpec *spec, StringBuilder *buf, bool arg_meta)
   }
 }
 
-/// Composes a redo's full keysequence: the `["x][v][count]` prefix (from the fields) followed by
-/// the command body.
+/// Takes `buf`'s bytes as an allocated, NUL-terminated String, and clears `buf`.
 ///
-/// @return  allocated String; .data == NULL if the redo is empty.
-static String redo_compose(RedoBuf *r)
+/// @return  String; .data=NULL if `buf` is empty.
+String sb_take_string(StringBuilder *buf)
   FUNC_ATTR_NONNULL_ALL FUNC_ATTR_WARN_UNUSED_RESULT
 {
-  StringBuilder buf = KV_INITIAL_VALUE;
-  redo_prefix(&r->spec, &buf, false);
-  kv_splice(buf, r->keys);
-  if (buf.size == 0) {
+  if (buf->size == 0) {
+    kv_destroy(*buf);
     return (String)STRING_INIT;
   }
-  kv_push(buf, NUL);
-  return cbuf_as_string(buf.items, buf.size - 1);
+  size_t len = buf->size;
+  assert(buf->items != NULL);  // Coverity false-positive (already checked `size` above).
+  kv_push(*buf, NUL);
+  char *items = buf->items;  // ownership moves to the caller
+  *buf = (StringBuilder)KV_INITIAL_VALUE;
+  return cbuf_as_string(items, len);
 }
 
-/// Gets the pending change's keysequence (redo_compose()), allocated.
+/// Gets the pending change: the `["x][count]` prefix + the captured command body.
+/// @return Allocated key sequence.
 String redo_keys(void)
   FUNC_ATTR_WARN_UNUSED_RESULT
 {
-  return redo_compose(&redobuff.cur);
+  StringBuilder buf = KV_INITIAL_VALUE;
+  redo_prefix(&redobuff.cur.spec, &buf, false);
+  kv_splice(buf, redobuff.cur.keys);
+  return sb_take_string(&buf);
 }
 
 /// Gets the pending change's CmdSpec.
@@ -586,31 +591,41 @@ void redo_free_all(void)
 }
 #endif
 
-/// Prepare for redo of any command: stores `spec` and appends its command chars (redo_chars()).
+/// Prepare for redo of any command: stores `spec` and appends its command chars.
 ///
-/// @param keys      Visual-mode command: the body opens with the selection's captured keys, so "."
-///                  re-executes the selection at cursor. Register/count compose into the body
-///                  after them (zeroed in the stored spec, so replay doesn't also prefix them).
-///                  NULL for a plain command: register/count stay spec fields.
+/// @param claim     Claim it as the atom. False if the atom is captured by other means
+///                  (insert-session entry/restart, "z=").
 /// @param arg_meta  Skip the `arg` byte: an interactively-typed operand may need CTRL-V quoting
 ///                  or its composing-char string form, which the caller appends itself.
-void prep_redo(const char *keys, size_t len, bool arg_meta, CmdSpec spec)
+void prep_redo(bool claim, bool arg_meta, CmdSpec spec)
+{
+  if (claim) {
+    atom_redo_set(spec);
+  }
+  redo_new(spec);
+  if (block_redo) {
+    return;
+  }
+  redo_chars(&spec, &redobuff.cur.keys, arg_meta);
+}
+
+/// Prepare for redo of a Visual-mode command: the body opens with `keys` (the captured selection),
+/// so "." re-executes the selection at cursor; the `["x][count]` prefix and command chars of
+/// `spec` compose into the body after them (zeroed in the stored spec, so replay doesn't also
+/// prefix them). Always claims (see prep_redo()).
+void prep_redo_visual(const char *keys, size_t len, CmdSpec spec)
 {
   CmdSpec stored = spec;
-  if (keys != NULL) {  // Visual-mode command.
-    stored.regname = 0;
-    stored.count = 0;
-  }
+  stored.regname = 0;
+  stored.count = 0;
   atom_redo_set(stored);
   redo_new(stored);
   if (block_redo) {
     return;
   }
-  if (keys != NULL) {  // Visual-mode command.
-    kv_concat_len(redobuff.cur.keys, keys, len);
-    redo_prefix(&spec, &redobuff.cur.keys, false);
-  }
-  redo_chars(&spec, &redobuff.cur.keys, arg_meta);
+  kv_concat_len(redobuff.cur.keys, keys, len);
+  redo_prefix(&spec, &redobuff.cur.keys, false);
+  redo_chars(&spec, &redobuff.cur.keys, false);
 }
 
 /// Discard the contents of the redo buffer and restore the previous redo
@@ -840,10 +855,10 @@ void stuffescaped(const char *arg, bool literally)
   }
 }
 
-/// Dot-repeat "." command: repeats the last change by composing the redo (fields + body, see
-/// RedoBuf) into readbuf2. "3." replaces count; a numbered-register redo increments regname
-/// ('"1p' then "." pastes '"2'), so "." steps through the delete history. A Visual-mode change
-/// re-executes its captured selection keys (embedded in the body, see prep_redo()).
+/// Dot-repeat "." command: repeats the last change by composing the redo into readbuf2. "3."
+/// replaces count; a numbered-register redo increments regname ('"1p' then "." pastes '"2'), so "."
+/// steps through the delete history. A Visual-mode change re-executes its captured selection keys
+/// (embedded in the body, see prep_redo()).
 ///
 /// @param old_redo  repeat the last-but-one change (i_CTRL-O ".": the insert
 ///                  session's own prep moved the last change to redobuff.old)
@@ -865,6 +880,7 @@ int start_redo(int count, bool old_redo)
   }
   StringBuilder prefix = KV_INITIAL_VALUE;
   redo_prefix(&spec, &prefix, true);
+  // coverity[var_deref_model] `items` is NULL only when size=0, which add_buff() ignores.
   add_buff(&readbuf2, prefix.items, (ptrdiff_t)prefix.size);
   kv_destroy(prefix);
   if (spec.regname == '=') {
@@ -3424,6 +3440,9 @@ char *getcmdkeycmd(int promptc, void *cookie, int indent, bool do_concat)
 
   if (aborted) {
     ga_clear(&line_ga);
+  } else if (promptc == ':') {
+    // Executing (do_cmdline()), not discarding (vim.on_key()): capture the payload.
+    atom_cmdline_set(K_COMMAND, line_ga.ga_data, (size_t)line_ga.ga_len);
   }
 
   return line_ga.ga_data;

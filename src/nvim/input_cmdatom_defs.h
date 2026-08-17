@@ -52,7 +52,8 @@ struct CmdAtom {
   CmdSpec spec;   ///< Structured fields.
   CmdAtomVec atoms;  ///< Composite (multi-command mapping, Visual sequence): its subatoms,
                      ///< in order; their keys concatenate to `keys`. Empty for non-composite.
-  char *keys;     ///< Resolved keysequence (typeahead encoding).
+  char *keys;     ///< Resolved keysequence (typeahead encoding), including `["x][count]` prefix
+                  ///< (unlike `RedoBuf.keys`).
   char *text;     ///< Payload: insert-session text, or Ex or search cmdline.
   char *lhs;      ///< Mapping LHS or macro register ("gj", "@q") that produced this atom, or NULL.
                   ///< Label/hint, not replayed.
@@ -65,17 +66,20 @@ struct CmdAtom {
 /// Key classes (atom_key_class()).
 /// Flags, bc same char can mean different things per mode (CTRL-T: tag-jump vs i_CTRL-T indent).
 enum {
-  kKeySynthetic  = 1 << 0,  ///< Not a user keystroke (K_EVENT, K_IGNORE, K_COMMAND, K_LUA).
-  kKeyPayload    = 1 << 1,  ///< Interactively-typed payload (/, ?, :, !).
-  kKeyScrollMove = 1 << 2,  ///< Scroll may move cursor (C-D/…): viewport-dependent, unreplayable.
-  kKeyScrollView = 1 << 3,  ///< Viewport-only scroll (C-Y,wheel): cursor stays, unless 'scrolloff'.
-  kKeyJump       = 1 << 4,  ///< Moves to absolute pos from primary cursor's shared nav state
+  kKeyOpaque     = 1 << 0,  ///< Uncapturable keys (<Cmd>, K_LUA, plus kKeySynthetic): its only
+                            ///< trace is its effect.
+  kKeySynthetic  = 1 << 1,  ///< Not a user keystroke (K_EVENT, K_IGNORE): unlike <Cmd>/K_LUA, never
+                            ///< reaches us from a mapping.
+  kKeyPayload    = 1 << 2,  ///< Interactively-typed payload (/, ?, :, !).
+  kKeyScrollMove = 1 << 3,  ///< Scroll may move cursor (C-D/…): viewport-dependent, unreplayable.
+  kKeyScrollView = 1 << 4,  ///< Viewport-only scroll (C-Y,wheel): cursor stays, unless 'scrolloff'.
+  kKeyJump       = 1 << 5,  ///< Moves to absolute pos from primary cursor's shared nav state
                             ///< (jumplist C-O/I, CTRL-T, "g;"): not followable.
-  kKeyMotion     = 1 << 5,  ///< Replayable special-key motion (arrows, <Home>, …).
-  kKeyInsFlush   = 1 << 6,  ///< Insert-mode cmd a literal preview cannot represent:
+  kKeyMotion     = 1 << 6,  ///< Replayable special-key motion (arrows, <Home>, …).
+  kKeyInsFlush   = 1 << 7,  ///< Insert-mode cmd a literal preview cannot represent:
                             ///< - deletions/indent-shifts (<Del>, CTRL-W, …) may edit text
                             ///<   outside the tracked region by per-cursor amounts;
                             ///< - cursor-moves (start_arrow()) move the insertion point itself.
-  kKeyMouse      = 1 << 7,  ///< Mouse button press (<LeftMouse>, …). Drag/release/move are the
+  kKeyMouse      = 1 << 8,  ///< Mouse button press (<LeftMouse>, …). Drag/release/move are the
                             ///< press's continuation: no class, invisible to capture.
 };
