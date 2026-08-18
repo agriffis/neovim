@@ -7,29 +7,18 @@
 #include "nvim/api/private/defs.h"
 #include "nvim/types_defs.h"
 
-/// structure used to store one block of the stuff/redo/recording buffers
-typedef struct buffblock {
-  struct buffblock *b_next;  ///< pointer to next buffblock
-  size_t b_strlen;      ///< length of b_str, excluding the NUL
-  char b_str[1];        ///< contents (actually longer)
-} buffblock_T;
-
-/// Consumable byte queue (linked list of buffblock_T) of keys in typeahead encoding (K_SPECIAL
-/// escaped). Appends (add_buff()) fill the spare space of the last block, allocating a new block
-/// when full; reads consume from the front (read_readbuf()).
-///
-/// Note: Append-only key accumulation (RedoBuf, macro recording) uses StringBuilder instead.
+/// Readahead ("stuff") buffer: consumable queue of keys in typeahead encoding (K_SPECIAL
+/// escaped). add_buff() writes at `insert`, read_readbuf() consumes from `read`.
 typedef struct {
-  buffblock_T bh_first;  ///< empty sentinel: bh_first.b_next holds the first content
-  buffblock_T *bh_curr;  ///< buffblock for appending
-  size_t bh_index;       ///< read position in the first block's b_str
-  size_t bh_space;       ///< space in bh_curr for appending
-  bool bh_create_newblock;  ///< create a new block?
-} buffheader_T;
+  StringBuilder keys;  ///< Bytes; `[read, keys.size)` is unread.
+  size_t read;         ///< Read position: consumed up to here. Reset (keeping capacity) on drain.
+  size_t insert;       ///< Write position: `keys.size`, or the read position as of start_stuff()
+                       ///< (newly stuffed keys drain before older readahead).
+} StuffBuf;
 
-#define BUFFHEADER_INIT { { NULL, 0, { NUL } }, NULL, 0, 0, false }
-
-/// Structured decomposition of a normal-mode command, used two ways:
+/// Represents any command. Projection of (`cmdarg_T`, `oparg_T`), which are stack-transient.
+///
+/// Used two ways:
 /// - Capture (prep_redo()): the command appends its own bytes to the redo body; only `regname`
 ///   and `count` are functional (the `["x][count]` prefix), the rest is CmdAtom metadata.
 /// - Reconstruction (atom_from_spec()): a "non-prepped" command ("u", motions) has no body, so
@@ -43,20 +32,16 @@ typedef struct {
   int cmd;           ///< Command/motion char ('J', 'p', 'f', K_LEFT, …; 0 = none)
   int cmd2;          ///< Second char of a two-char command name ("gJ" => 'J'; 0 = none)
   int arg;           ///< Operand ("fx" => 'x', "ma" => 'a'; 0 = none)
+  StringBuilder body;  ///< Captured cmd "body": keys without the `["x][count]` "prefix", updated
+                       ///< as the cmd executes (redo_append_xx); redo_keys() prepends the prefix.
+                       ///< Empty in spec-only contexts (i.e. not a "redo" buf).
 } CmdSpec;
 
-/// The last change. Updated as the command executes (redo_append_xx). redo_keys() treats `keys` as
-/// the command "body", but gets the "prefix" `["x][count]` from `spec`.
-typedef struct {
-  CmdSpec spec;        ///< "Metadata", except reg/count provide the "prefix".
-  StringBuilder keys;  ///< Cmd body. Perf: StringBuilder (not buffheader_T) => fewer allocs/copies.
-} RedoBuf;
-
-/// RedoBuf (dot-repeat) state: the pending change atom and the previous one.
+/// Dot-repeat state: the pending change and the previous one.
 /// Also the "save" shape for preserving it across user code (save_redobuff()).
 typedef struct {
-  RedoBuf cur;  ///< Pending change: "." replays it (start_redo()).
-  RedoBuf old;  ///< Last-but-one change: an insert session's own prep moved the previous change
+  CmdSpec cur;  ///< Pending change: "." replays it (start_redo()).
+  CmdSpec old;  ///< Last-but-one change: an insert session's own prep moved the previous change
                 ///< here (redo_new()); "i_CTRL-O ." replays it.
 } RedoState;
 
@@ -88,8 +73,8 @@ typedef struct {
 typedef struct {
   typebuf_T save_typebuf;
   UngotKey ungot;
-  buffheader_T save_readbuf1;
-  buffheader_T save_readbuf2;
+  StuffBuf save_readbuf1;
+  StuffBuf save_readbuf2;
 } tasave_T;
 
 /// Values for "noremap" argument of ins_typebuf()
