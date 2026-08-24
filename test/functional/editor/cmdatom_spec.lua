@@ -250,11 +250,12 @@ describe('CmdAtom', function()
     eq('motion', n.exec_lua('return _G.last_match'))
   end)
 
-  it('captures counts and payload chars', function()
+  it('captures counts, payload', function()
     fn.setline(1, { 'abcd,ef' })
     feed('gg0')
     atoms_start()
     feed('yw')
+
     -- A yank emits but does not edit.
     eq({ operator = 'y', changed = false }, pick(atom_last(), 'operator', 'changed'))
     feed('3x')
@@ -262,12 +263,14 @@ describe('CmdAtom', function()
     feed('vf,d')
     eq({ 'ef' }, get_lines())
     eq({ '3dl', 'vf,d' }, atoms_tail(2))
+
     -- Structured decomposition: operator/motion/operand as fields, no byte-parsing.
     local op = atoms()[#atoms() - 1] -- "3dl"
     eq(
       { operator = 'd', cmd = 'l', count = 3, changed = true },
       pick(op, 'operator', 'cmd', 'cmdarg', 'count', 'motionforce', 'changed')
     )
+
     -- A visual atom carries the completing operator's fields, and decomposes
     -- into its commands ("v", "f," and the operator).
     local vis = atom_last() -- "vf,d"
@@ -283,6 +286,7 @@ describe('CmdAtom', function()
       end, vis.atoms)
     )
     eq('d', vis.atoms[3].operator)
+
     -- Operators with an interactively-typed search payload: the atom is the
     -- redobuff, which includes the payload.
     fn.setline(1, { 'aa END bb' })
@@ -294,6 +298,7 @@ describe('CmdAtom', function()
       { operator = 'd', cmd = '/', changed = true },
       pick(atom_last(), 'operator', 'cmd', 'changed')
     )
+
     -- An operand (mark or register name, target char) is its own field; the second char of a
     -- two-char command NAME ("gJ") composes into `cmd`.
     fn.setline(1, { 'one', 'two' })
@@ -305,6 +310,7 @@ describe('CmdAtom', function()
     feed('qax') -- the recording register is an operand, not part of the name
     feed('q')
     eq({ cmd = 'q', cmdarg = 'a' }, pick(atoms()[nrec + 1], 'cmd', 'cmdarg'))
+
     -- Forced motion type ("dvj") is a field.
     fn.setline(1, { 'one', 'two' })
     feed('gg0dvj')
@@ -312,6 +318,71 @@ describe('CmdAtom', function()
       { operator = 'd', motionforce = 'v', cmd = 'j' },
       pick(atom_last(), 'operator', 'motionforce', 'cmd')
     )
+  end)
+
+  it('"!" operator captures its stuffed cmdline continuation', function()
+    -- ":.,.+1!" + typed "{prg}<CR>" completes the operator atom, like "d/END<CR>". #41447
+    local prg = n.testprg('shell-test') .. ' REP 2 X'
+    fn.setline(1, { 'b', 'a', '', 'e', 'c', 'd' })
+    atoms_start()
+    feed('gg')
+    feed(('!ip%s<CR>'):format(prg))
+    eq({ '0: X', '1: X', '', 'e', 'c', 'd' }, get_lines())
+    local bang = atom_last()
+    local keys = ('!ip%s\n'):format(prg)
+    eq(
+      { type = 'operator', operator = '!', lhs = keys, keys = keys },
+      pick(bang, 'type', 'operator', 'lhs', 'keys')
+    )
+    -- Replay recomputes the range from the motion: the whole 3-line paragraph is replaced.
+    feed('4G')
+    n.exec_lua(function(keys)
+      vim.api.nvim_feedkeys(keys, 'nx', false)
+    end, bang.keys)
+    eq({ '0: X', '1: X', '', '0: X', '1: X' }, get_lines())
+    -- Same for "=" with 'equalprg', "gq" with 'formatprg'.
+    api.nvim_set_option_value('equalprg', prg, {})
+    api.nvim_set_option_value('formatprg', prg, {})
+    api.nvim_buf_set_lines(0, 0, -1, true, { 'b', 'a', '', 'd', 'c' })
+    feed('gg=ip')
+    eq({ '0: X', '1: X', '', 'd', 'c' }, get_lines())
+    eq(
+      { type = 'operator', operator = '=', keys = '=ip' },
+      pick(atom_last(), 'type', 'operator', 'keys')
+    )
+    feed('4Ggqip')
+    eq({ '0: X', '1: X', '', '0: X', '1: X' }, get_lines())
+    eq(
+      { type = 'operator', operator = 'gq', keys = 'gqip' },
+      pick(atom_last(), 'type', 'operator', 'keys')
+    )
+  end)
+
+  it('mapping that enters :terminal mode', function()
+    -- Fake picker/fuzzy-finder: a mapping that opens a :terminal UI (like fzf-lua).
+    -- Its composite ends when :terminal is entered.
+    n.exec_lua(function(prg)
+      vim.keymap.set('n', ',f', function()
+        vim.cmd('enew')
+        vim.fn.jobstart({ prg, 'INTERACT' }, { term = true })
+        vim.cmd.startinsert()
+      end)
+    end, n.testprg('shell-test'))
+    atoms_start()
+    feed(',f')
+    n.poke_eventloop()
+    eq(
+      { buftype = 'terminal', mode = 't' },
+      n.exec_lua('return { buftype = vim.bo.buftype, mode = vim.fn.mode(1) }')
+    )
+    feed('exit<CR>') -- Terminal-mode input: no atoms.
+    n.poke_eventloop()
+    feed([[<C-\><C-N>]])
+    feed('gg')
+    eq({
+      { type = 'mapping', lhs = ',f' },
+      { type = 'motion', lhs = 'gg', keys = 'gg' },
+    }, atoms_tail(2, 'type', 'lhs', 'keys'))
   end)
 
   it('fires for user input, not programmatic sources', function()
