@@ -1347,24 +1347,26 @@ vim.notify_once({msg}, {level}, {opts})                    *vim.notify_once()*
         (`boolean`) true if message was displayed, else false
 
 vim.on_key({fn}, {ns_id}, {opts})                               *vim.on_key()*
-    Registers function {fn} with |namespace| {ns_id} as a listener to every,
-    yes EVERY, input key.
+    Registers function {fn} with |namespace| {ns_id} as a listener to EVERY
+    input key (except keys consumed by |getchar()|, by {fn} itself, or by a
+    <Cmd> payload).
 
     To parse |key-chord|s, see |vim.keycode()|. Example: >lua
         local keychords = vim.keycode(vim.fn.keytrans(key), true)
 <
-
-    The |-w| command-line option is related but does not support callbacks and
-    cannot be toggled dynamically.
 
     Note: ~
       • If {fn} returns an empty string, {key} is discarded/ignored; if {key}
         is <Cmd> then the "<Cmd>…<CR>" sequence is discarded as a whole.
       • Non-recursive: if {fn} itself consumes input, it won't be invoked for
         those keys.
+      • Not invoked for keys consumed by getchar()/getcharstr(): they never
+        reach the main loop.
       • To UNregister a given {ns_id}, pass `nil` {fn}.
       • {fn} will be removed on error.
       • {fn} will not be cleared by |nvim_buf_clear_namespace()|
+      • The |-w| command-line option is related but does not support callbacks
+        and cannot be toggled dynamically.
 
     Parameters: ~
       • {fn}     (`fun(key: string, typed: string): string??`) Function
@@ -6099,7 +6101,7 @@ UI2                                                                      *ui2*
 WARNING: This is an experimental feature intended to replace the builtin
 message + cmdline presentation layer.
 
-To enable this feature (default opts shown): >lua
+To enable this feature (default opts shown, see also 'messagesopt'): >lua
     require('vim._core.ui2').enable({
       enable = true, -- Whether to enable or disable the UI.
       msg = { -- Options related to the message module.
@@ -6108,47 +6110,40 @@ To enable this feature (default opts shown): >lua
         ---Table keys are matched as a Lua pattern to the message ID. 'default'
         ---mapping applies to any omitted kind: { default = 'cmd', progress = 'msg' }.
         targets = 'cmd',
-        cmd = { -- Options related to messages in the cmdline window.
-          -- Maximum height (rows if >=1, or % of 'lines' if <1) of messages expanded
-          -- beyond 'cmdheight'; 0.999 for full height.
-          height = 0.5,
-        },
         dialog = { -- Options related to dialog window.
           height = 0.5, -- Maximum height.
         },
         msg = { -- Options related to msg window.
           height = 0.5, -- Maximum height.
-          timeout = 4000, -- Time a message is visible in the message window.
         },
         pager = { -- Options related to message window.
           height = 0.999, -- Maximum height.
         },
-        pager_char = nil, -- Key checked after interactive messages.
       },
     })
 <
 
-There are four special windows/buffers for presenting messages and cmdline:
-• "cmd": Cmdline. Also used for 'showcmd', 'showmode', 'ruler', and messages
-  by default.
-• "msg": Message window, shows ephemeral messages useful for 'cmdheight' == 0.
-• "pager": Pager window, shows |:messages| and certain messages that are never
-  "collapsed".
-• "dialog": Dialog window, shows modal prompts that expect user input.
+ui2 behavior is also configured by these 'messagesopt' items: "pager",
+"timeout". Example: >vim
+    set messagesopt+=maxheight:50,pager:<CR>,timeout:4000
+<
 
-The buffer 'filetype' is set to the above-listed id ("cmd", "msg", …).
-Handle the |FileType| event to configure any local options for these windows
-and their respective buffers.
+There are four special windows/buffers for presenting messages and cmdline:
+• "cmd": Cmdline. Also used by default for messages, 'showcmd', 'showmode',
+  'ruler'.
+• "msg": Message window. Shows ephemeral messages; useful if 'cmdheight' is 0.
+• "pager": Pager window. Shows |:messages|, allows navigating all messages.
+• "dialog": Dialog window. Shows modal prompts that wait for user input.
+
+In each of the special buffers, 'filetype' is set as listed above ("cmd",
+"msg", …). Handle the |FileType| event to configure any local options for
+these windows/buffers.
 
 Unlike the legacy |hit-enter| prompt, messages exceeding 'cmdheight' are
-instead "collapsed", followed by a `[+x]` "spill" indicator, where `x`
-indicates the spilled lines. To see the full messages, do either:
-• ENTER immediately after interactive |:| cmdline shows a message and returns
-  to |Normal-mode|.
+collapsed, followed by a `[+x]` "spill" indicator, where `x` is number of
+overflow lines. To see all messages, do either:
 • |g<| at any time.
-
-If you'd like behavior similar to the old hit-enter prompt, pass
-`pager_char = "<CR>"` on the `cfg` table. When the pager is shown, hitting
-`<CR>` (in this example) will enter the pager.
+• Type the "pager" char (if configured in 'messagesopt'), immediately after an
+  interactive |:| command.
 
  vim:tw=78:ts=8:sw=4:sts=4:et:ft=help:norl:
