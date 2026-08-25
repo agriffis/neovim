@@ -1,30 +1,28 @@
 # vim:ft=spec:
 
-%if 0%{?el8}
-# see https://fedoraproject.org/wiki/Changes/CMake_to_do_out-of-source_builds
-# EPEL 8's %%cmake defaults to in-source build, which neovim does not support
-%undefine __cmake_in_source_build
-%endif
-
 %bcond_with jemalloc
 %ifarch %{arm} %{ix86} x86_64 %{mips} s390x
   %bcond_without luajit
 %else
   %ifarch aarch64
-    %if 0%{?el8}
-      # luajit codepath buggy on el8 aarch64
-      # https://bugzilla.redhat.com/show_bug.cgi?id=2065340
-      %bcond_with luajit
-    %else
-      %bcond_without luajit
-    %endif
+    %bcond_without luajit
   %else
     %bcond_with luajit
   %endif
 %endif
 
+%if 0%{?el10}
+# tree-sitter in EL10 is too old and libtree-sitter-devel is not shipped
+# https://issues.redhat.com/browse/RHEL-56996
+%bcond system_treesitter 0
+%else
+%bcond system_treesitter 1
+%endif
+
 %global luv_min_ver 1.43.0
-%global tree_sitter_min_ver 0.22.5
+%if %{with system_treesitter}
+%global tree_sitter_min_ver 0.26.7
+%endif
 %global vterm_min_ver 0.3.3
 
 %global luv_include_dir %{_includedir}/luv
@@ -40,7 +38,7 @@ Name:           {{{git_name name="neovim"}}}
 Version:        {{{git_version}}}
 Release:        {{{git_revision}}}%{?dist}
 
-License:        Apache-2.0 AND Vim
+License:        Apache-2.0 AND Vim AND MIT
 Summary:        Vim-fork focused on extensibility and agility
 Url:            https://neovim.io
 
@@ -57,8 +55,6 @@ BuildRequires:  fdupes
 BuildRequires:  gettext
 BuildRequires:  gperf
 BuildRequires:  gcc
-Requires:       utf8proc > 2.9.0
-BuildRequires:  utf8proc-devel > 2.9.0
 BuildRequires:  libluv-devel >= %{luv_min_ver}
 %if %{with luajit}
 # luajit implements version 5.1 of the lua language spec, so it needs the
@@ -73,23 +69,26 @@ BuildRequires:  lua5.1-bit32
 Requires:       lua5.1-luv >= %{luv_min_ver}
 # /with luajit
 %endif
-Requires:       lua5.1-lpeg
-BuildRequires:  lua5.1-lpeg
+Requires:       lua5.1-lpeg >= 1.1.0
+BuildRequires:  lua5.1-lpeg >= 1.1.0
 BuildRequires:  lua5.1-mpack >= 1.0.11
 %if %{with jemalloc}
 BuildRequires:  jemalloc-devel
 %endif
 BuildRequires:  msgpack-devel >= 3.1.0
 BuildRequires:  pkgconfig(termkey)
-BuildRequires:  pkgconfig(libuv) >= 1.42.0
+BuildRequires:  pkgconfig(libuv) >= 1.50.0
 BuildRequires:  pkgconfig(vterm) >= %{vterm_min_ver}
 # need the build with the fix for the resize buffer issue
 Requires:       libvterm >= %{vterm_min_ver}
 BuildRequires:  pkgconfig(unibilium)
+BuildRequires:  pkgconfig(libutf8proc) >= 2.10.0
+%if %{with system_treesitter}
 BuildRequires:  pkgconfig(tree-sitter) >= %{tree_sitter_min_ver}
 # tree-sitter didn't do an soname bump. enforce the min version
 # see https://github.com/nvim-treesitter/nvim-treesitter/pull/3055/files
 Requires:       libtree-sitter >= %{tree_sitter_min_ver}
+%endif
 # Parser generator, only needed for :TSInstallFromGrammar
 Recommends:     tree-sitter-cli
 Suggests:       (python2-neovim if python2)
@@ -98,6 +97,7 @@ Suggests:       (python3-neovim if python3)
 Recommends:     xsel
 Recommends:     wl-clipboard
 Recommends:     ripgrep
+Recommends:     inotify-tools
 
 %description
 Neovim is a refactor - and sometimes redactor - in the tradition of
@@ -129,6 +129,9 @@ USERNAME=koji
 %define __cmake_builddir .deps
 %cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo \
        -DUSE_BUNDLED=OFF \
+%if %{without system_treesitter}
+       -DUSE_BUNDLED_TS=ON \
+%endif
        -DUSE_BUNDLED_TS_PARSERS=ON
 %cmake_build
 
@@ -164,11 +167,11 @@ find %{buildroot}%{_datadir} \( -name "*.bat" -o -name "*.awk" \) \
 
 # Refresh documentation helptags.
 %transfiletriggerin -- %{_datadir}/nvim/runtime/doc
-%{_bindir}/nvim -u NONE -es -c ":helptags %{_datadir}/nvim/runtime/doc" -c ":q" &> /dev/null || :
+NVIM_LOG_FILE=/dev/null %{_bindir}/nvim -u NONE -es -c ":helptags %{_datadir}/nvim/runtime/doc" -c ":q" &> /dev/null || :
 
 %transfiletriggerpostun -- %{_datadir}/nvim/runtime/doc
 > %{_datadir}/nvim/runtime/doc/tags || :
-%{_bindir}/nvim -u NONE -es -c ":helptags %{_datadir}/nvim/runtime/doc" -c ":q" &> /dev/null || :
+NVIM_LOG_FILE=/dev/null %{_bindir}/nvim -u NONE -es -c ":helptags %{_datadir}/nvim/runtime/doc" -c ":q" &> /dev/null || :
 
 %files -f nvim.lang
 %license LICENSE.txt
@@ -190,109 +193,3 @@ find %{buildroot}%{_datadir} \( -name "*.bat" -o -name "*.awk" \) \
 %changelog
 * {{{git_changelog_date}}} Aron Griffis <aron@scampersand.com> - {{{git_changelog_version}}}
 - Nightly build from git master
-
-* Tue Jul 02 2024 Andreas Schneider <asn@cryptomilk.org> - 0.10.0-6
-- resolves: rhbz#2283574 - Bundle required tree-sitter parsers
-
-* Fri May 24 2024 Andreas Schneider <asn@cryptomilk.org> - 0.10.0-5
-- Fix updating helptags
-
-* Wed May 22 2024 Danie de Jager <danie.dejager@doxim.com> - 0.10.0-4
-- Add missing lua5.1-lpeg runtime requirement
-
-* Tue May 21 2024 Andreas Schneider <asn@cryptomilk.org> - 0.10.0-3
-- Add RPM file triggers support to regenerate helptags
-
-* Thu May 16 2024 Andreas Schneider <asn@cryptomilk.org> - 0.10.0-2
-- Update neovim-lua-bit32.patch
-
-* Thu May 16 2024 Andreas Schneider <asn@cryptomilk.org> - 0.10.0-1
-- Update to version 0.10.0 - check `:help news` for important changes
-
-* Mon Mar 04 2024 Andreas Schneider <asn@redhat.com> - 0.9.5-4
-- resolves: #2222911 - Build with luajit on s390x
-
-* Thu Jan 25 2024 Fedora Release Engineering <releng@fedoraproject.org> - 0.9.5-3
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_40_Mass_Rebuild
-
-* Sun Jan 21 2024 Fedora Release Engineering <releng@fedoraproject.org> - 0.9.5-2
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_40_Mass_Rebuild
-
-* Tue Jan 02 2024 Andreas Schneider <asn@redhat.com> - 0.9.5-1
-- Update to version 0.9.5
-  * https://github.com/neovim/neovim/releases/tag/v0.9.5
-  * For bigger version bump changelog see `:help news`
-  * resolves: rhbz#2256278
-
-* Fri Oct 20 2023 Andreas Schneider <asn@redhat.com> - 0.9.4-1
-- Update to version 0.9.4
-  * https://github.com/neovim/neovim/releases/tag/v0.9.4
-  * For bigger version bump changelog see `:help news`
-  * resolves: rhbz#2243010
-
-* Thu Sep 07 2023 Andreas Schneider <asn@redhat.com> - 0.9.2-1
-- Update to version 0.9.2
-  * For changelog see `:help news`
-
-* Mon Aug 28 2023 LuK1337 <priv.luk@gmail.com> - 0.9.1-4
-- Improve spec template
-
-* Thu Jul 20 2023 Fedora Release Engineering <releng@fedoraproject.org> - 0.9.1-3
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_39_Mass_Rebuild
-
-* Tue Jun 06 2023 Andreas Schneider <asn@redhat.com> - 0.9.1-2
-- Build with new libluv-devel
-
-* Wed May 31 2023 Andreas Schneider <asn@redhat.com> - 0.9.1-1
-- Update to version 0.9.1
-  * For changelog see `:help news`
-
-* Tue May 02 2023 Andreas Schneider <asn@redhat.com> - 0.9.0-3
-- Improve semantic token performance
-- related: rhbz#2188229 - Fix applying patches
-
-* Fri Apr 21 2023 Andreas Schneider <asn@redhat.com> - 0.9.0-2
-- resolves: rhbz#2188229 - Fix buffer overflow for user command
-
-* Fri Apr 07 2023 Andreas Schneider <asn@redhat.com> - 0.9.0-1
-- Update to version 0.9.0
-  * For changelog see `:help news`
-
-* Mon Mar 27 2023 Andreas Schneider <asn@redhat.com> - 0.8.3-4
-- resolves: rhbz#2181836 - Fix snprintf buffer overflow with tags
-
-* Sat Mar 25 2023 Andreas Schneider <asn@redhat.com> - 0.8.3-3
-- resolves: rhbz#2165805 - Fix snprintf buffer overflow
-
-* Sun Mar 05 2023 Andreas Schneider <asn@redhat.com> - 0.8.3-2
-- Update License to SPDX expression
-- Update spec template for auto(release|changelog)
-
-* Thu Feb 02 2023 Andreas Schneider <asn@redhat.com> - 0.8.3-1
-- Update to version 0.8.3
-  * https://github.com/neovim/neovim/releases/tag/v0.8.3
-
-* Thu Jan 19 2023 Fedora Release Engineering <releng@fedoraproject.org> - 0.8.2-2
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_38_Mass_Rebuild
-
-* Fri Dec 30 2022 Andreas Schneider <asn@redhat.com> - 0.8.2-1
-- Update to version 0.8.2
-  * https://github.com/neovim/neovim/releases/tag/v0.8.2
-
-* Mon Nov 14 2022 Andreas Schneider <asn@redhat.com> - 0.8.1-1
-- Update to version 0.8.1
-  * https://github.com/neovim/neovim/releases/tag/v0.8.1
-
-* Fri Sep 30 2022 Andreas Schneider <asn@redhat.com> - 0.8.0-1
-- Update to version 0.8.0
-  * https://github.com/neovim/neovim/releases/tag/v0.8.0
-
-* Wed Sep 21 2022 Andreas Schneider <asn@redhat.com> - 0.7.2-4
-- Build with libvterm 0.3
-
-* Thu Aug 25 2022 Michel Alexandre Salim <salimma@fedoraproject.org> - 0.7.2-3
-- Enforce the minimum tree-sitter version at runtime (Fixes: rhbz#2100577)
-
-* Fri Jul 22 2022 Fedora Release Engineering <releng@fedoraproject.org> - 0.7.2-2
-- Rebuilt for https://fedoraproject.org/wiki/Fedora_37_Mass_Rebuild
-
