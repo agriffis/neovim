@@ -6851,4 +6851,60 @@ func Test_complete_info_hlgroup()
   bwipe!
 endfunc
 
+" Test that complete_info() tells a completion Vim started by itself from one
+" that a key asked for.
+func Test_complete_info_auto()
+  call Ntest_override("char_avail", 1)
+  new
+  func! AutoOmni(findstart, base)
+    if a:findstart
+      call add(g:auto, complete_info(['auto']).auto)
+      return col('.') - 1
+    endif
+    return ['alpha', 'alphabet']
+  endfunc
+  setlocal omnifunc=AutoOmni
+  setlocal complete=o
+  setlocal completeopt=menuone
+  call setline(1, '    al')
+
+  " 'autocomplete' starts it, nothing was asked for.
+  setlocal autocomplete
+  let g:auto = []
+  call feedkeys("A\<Esc>", 'tx')
+  call assert_equal([1], g:auto)
+
+  " The second call is the one CTRL-X CTRL-O asked for.
+  let g:auto = []
+  call feedkeys("A\<C-X>\<C-O>\<Esc>", 'tx')
+  call assert_equal([1, 0], g:auto)
+
+  setlocal noautocomplete
+  let g:auto = []
+  call feedkeys("A\<C-X>\<C-O>\<Esc>", 'tx')
+  call assert_equal([0], g:auto)
+
+  call Ntest_override("ALL", 0)
+  unlet g:auto
+  delfunc AutoOmni
+  bwipe!
+endfunc
+
+func Test_complete_fuzzy_resort()
+  new
+  set completeopt=menu,menuone,noselect,fuzzy
+
+  inoremap <buffer> <F5> <Cmd>call complete(1, ['xxxb', 'xb', 'b'])<CR>
+  call feedkeys("i\<F5>b\<C-R>=string(map(complete_info(['items']).items, 'v:val.word'))\<CR>\<Esc>", 'tx')
+  call assert_equal("b['b', 'xb', 'xxxb']", getline(1))
+
+  %d _
+  call setline(1, ['xxxbar', 'xbar', 'bar'])
+  call feedkeys("Go\<C-P>b\<C-R>=string(map(complete_info(['items']).items, 'v:val.word'))\<CR>\<Esc>", 'tx')
+  call assert_equal("b['bar', 'xbar', 'xxxbar']", getline('$'))
+
+  bwipe!
+  set completeopt&
+endfunc
+
 " vim: shiftwidth=2 sts=2 expandtab nofoldenable
