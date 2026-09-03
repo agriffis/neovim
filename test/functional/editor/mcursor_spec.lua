@@ -404,6 +404,71 @@ describe('multicursor', function()
       eq(6, fn.line('.'))
     end)
 
+    it('per-cursor on fold contents, not the fold itself', function()
+      -- If the primary cursor operates on a closed fold it applies to the whole fold
+      -- (|fold-behavior|); but *replayed* edits/motions ignore folds, and operate on the per-cursor
+      -- text within folds (if there happens to be one at the given cursor).
+
+      fn.setline(1, { 'aaa', 'bbb', 'ccc', 'ddd' })
+      feed('3G0Q')
+      command('2,4fold')
+      eq(2, fn.foldclosed(3))
+      feed('gg0')
+      feed('x')
+      eq({ 'aa', 'bbb', 'cc', 'ddd' }, get_lines())
+      feed('dd')
+
+      -- Replayed "dd" deletes only the line (within the fold) at cursor. And the stays closed.
+      eq({ 'bbb', 'ddd' }, get_lines())
+      eq({ 1, 2 }, { fn.foldclosed(1), fn.foldclosedend(1) })
+      eq({ { 1, 0 } }, anchors())
+
+      -- Insert-cascade entry ("cc") acts on the fold contents, not the fold itself.
+      clear_cursors()
+      feed('zE') -- Eliminate the fold above, it would misdirect "3j" below.
+      cursors({ 'aaa', 'bbb', 'ccc', 'ddd', 'eee' }, '3jQgg')
+      command('3,5fold')
+      eq(3, fn.foldclosed(4))
+      feed('gg')
+      feed('ccX<Esc>')
+      eq({ 'X', 'bbb', 'ccc', 'X', 'eee' }, get_lines())
+      eq({ 3, 5 }, { fn.foldclosed(4), fn.foldclosedend(4) })
+      eq({ { 3, 0 } }, anchors())
+
+      -- Replayed fold command ("zN") must not re-enable fold semantics mid-cascade.
+      clear_cursors()
+      feed('zE')
+      command('nnoremap X zN:normal! dd<CR>')
+      cursors({ 'aaa', 'bbb', 'ccc', 'ddd', 'eee', 'fff' }, '3jQgg')
+      command('3,5fold')
+      feed('gg')
+      feed('X') -- Performs "dd".
+      eq({ 'bbb', 'ccc', 'eee', 'fff' }, get_lines())
+      eq({ 2, 3 }, { fn.foldclosed(2), fn.foldclosedend(2) })
+
+      -- Primary cursor keeps the usual |fold-behavior|: its "dd" deletes the whole fold.
+      -- But the replay does not: it only deletes the line at each cursor.
+      clear_cursors()
+      feed('zE')
+      cursors({ 'aaa', 'bbb', 'ccc', 'ddd', 'eee', 'fff' }, '4jQgg')
+      command('2,3fold')
+      feed('2G') -- Into the closed fold.
+      feed('dd')
+      eq({ 'aaa', 'ddd', 'fff' }, get_lines())
+      eq({ { 2, 0 } }, anchors())
+
+      -- Follow-mode motions also ignore closed folds. Replayed "j" steps into the fold.
+      clear_cursors()
+      feed('zE')
+      cursors({ 'aaa', 'bbb', 'ccc', 'ddd', 'eee', 'fff', 'ggg' }, 'Q4j')
+      command('2,4fold')
+      feed('q=')
+      feed('jj')
+      eq({ { 2, 0 } }, anchors())
+      eq(7, fn.line('.'))
+      eq(2, fn.foldclosed(3))
+    end)
+
     it('CTRL-D scrolling does not affect the other cursors', function()
       local screen = Screen.new(30, 10)
       local l = {}
@@ -434,7 +499,7 @@ describe('multicursor', function()
         line11                        |
         line12                        |
         line13                        |
-        multicursor: ...ow motion off |
+                                      |
       ]])
     end)
   end)
@@ -863,6 +928,34 @@ describe('multicursor', function()
       feed('2G0x')
       eq({ 'aa', 'bb' }, get_lines())
       eq({ 'xx', 'yy' }, api.nvim_buf_get_lines(buf_b, 0, -1, true))
+    end)
+
+    it('atom queued in one buffer does not cascade in another buffer', function()
+      command('set hidden')
+      cursors({ 'aaa', 'bbb' }, 'Qj')
+      local buf_a = api.nvim_get_current_buf()
+      command('enew')
+      fn.setline(1, { 'ccc', 'ddd' })
+      feed('gg0Qj')
+      local buf_b = api.nvim_get_current_buf()
+      command('buffer #')
+      command('nnoremap X x:bnext<CR>')
+      feed('2G0X')
+      -- The "x" atom was captured in A but resolves in B. It should not cascade to B's cursors.
+      -- A's cursors are skipped, except the edit done by the primary cursor.
+      eq({ a = { 'aaa', 'bb' }, b = { 'ccc', 'ddd' } }, {
+        a = api.nvim_buf_get_lines(buf_a, 0, -1, true),
+        b = api.nvim_buf_get_lines(buf_b, 0, -1, true),
+      })
+      -- Same-buffer edit still cascades.
+      feed('2G0x')
+      eq({ 'cc', 'dd' }, api.nvim_buf_get_lines(buf_b, 0, -1, true))
+
+      -- TEMPORARY buffer-switch is allowed. A mapping may do work in a throwaway buffer, then apply
+      -- edits to curbuf.
+      command('nnoremap Y :new<CR>ihello<Esc>:bwipe!<CR>x')
+      feed('2G0Y')
+      eq({ 'c', 'd' }, api.nvim_buf_get_lines(buf_b, 0, -1, true))
     end)
 
     it('edits cascade from any window showing the buffer (:split)', function()
@@ -1308,6 +1401,17 @@ describe('multicursor', function()
       feed('cc')
       feed('f<C-n><C-n><C-e><Esc>') -- cycle, then cancel back to the leader
       eq({ 'f', 'f', 'f' }, { get_lines()[4], get_lines()[5], get_lines()[6] })
+
+      -- No candidates, {Visual}Q cursors: <BS> mid-completion. #41602
+      clear_cursors()
+      api.nvim_buf_set_lines(0, 0, -1, true, { '', '', '' })
+      command('let v:errmsg = ""')
+      feed('VggQ')
+      feed('i a<BS>')
+      eq('', api.nvim_get_vvar('errmsg'))
+      feed('<Esc>')
+      eq('', api.nvim_get_vvar('errmsg'))
+      eq({ ' ', ' ', ' ' }, get_lines())
     end)
 
     it('InsertCharPre-driven complete() plugin (cmp-style)', function()
@@ -2167,7 +2271,7 @@ describe('multicursor', function()
     end)
   end)
 
-  describe('operatorfunc (g@)', function()
+  describe("'operatorfunc' (g@)", function()
     it('VISUAL-mode surround ("S") cascades', function()
       pending('visual ":" LHS-replay: the visual selection differs per cursor; TODO')
       -- Minimal vim-surround "S": VSurround is an Ex command plus a getchar()
@@ -2190,29 +2294,26 @@ describe('multicursor', function()
       eq({ '"foo" one', '"bar" two' }, get_lines())
     end)
 
-    it(
-      'surround-style plugin cascades, getchar() payload included; one u/CTRL-R reverts',
-      function()
-        -- The op edits each cursor's region through :normal + register juggling (a full
-        -- exec_normal() per cursor).
-        n.exec(t_atom.minisurround_vim)
-        cursors({ 'alpha beta', 'gamma delta', 'epsilon zeta' }, 'Qj0Qj0')
-        atoms_start()
-        feed('ysiw"')
-        -- The atom is the redobuff plus the getchar()'d payload: the replayed
-        -- opfunc reads the same wrap char.
-        eq({ 'g@iw"' }, atoms_tail(1))
-        eq({ '"alpha" beta', '"gamma" delta', '"epsilon" zeta' }, get_lines())
-        -- The whole cascade (primary + replays) is ONE undo step: a single
-        -- u/CTRL-R reverts or reapplies it at every cursor.
-        feed('u')
-        eq({ 'alpha beta', 'gamma delta', 'epsilon zeta' }, get_lines())
-        feed('<C-r>')
-        eq({ '"alpha" beta', '"gamma" delta', '"epsilon" zeta' }, get_lines())
-      end
-    )
+    it('surround plugin (w/ getchar() payload) cascades; one u/CTRL-R reverts', function()
+      -- The op edits each cursor's region through :normal + register juggling (a full
+      -- exec_normal() per cursor).
+      n.exec(t_atom.minisurround_vim)
+      cursors({ 'alpha beta', 'gamma delta', 'epsilon zeta' }, 'Qj0Qj0')
+      atoms_start()
+      feed('ysiw"')
+      -- The atom is the redobuff plus the getchar()'d payload: the replayed
+      -- opfunc reads the same wrap char.
+      eq({ 'g@iw"' }, atoms_tail(1))
+      eq({ '"alpha" beta', '"gamma" delta', '"epsilon" zeta' }, get_lines())
+      -- The whole cascade (primary + replays) is ONE undo step: a single
+      -- u/CTRL-R reverts or reapplies it at every cursor.
+      feed('u')
+      eq({ 'alpha beta', 'gamma delta', 'epsilon zeta' }, get_lines())
+      feed('<C-r>')
+      eq({ '"alpha" beta', '"gamma" delta', '"epsilon" zeta' }, get_lines())
+    end)
 
-    it('a no-effect operator (aborted "ysa[") does not cascade; cursors survive', function()
+    it('no-effect operator (aborted "ysa[") does not cascade', function()
       -- vim-surround "ysa[" whose surround char is <Esc>/CTRL-C: a redoable g@ whose opfunc does
       -- nothing. Its "a[" textobject jumps EVERY cursor to the same "[", so a cascade would
       -- collapse them (dedupe). No edit and no register write = no per-cursor effect: must not
@@ -2231,6 +2332,39 @@ describe('multicursor', function()
       feed('gg0Qj0') -- cursor on line 1, primary on line 2 (neither has brackets)
       feed(',sa[z') -- g@ + a[ jumps primary to line 4's "["; opfunc getchar()'s "z", does nothing
       eq(1, ncursors()) -- the cursor survives
+    end)
+
+    it('motion-only operator cascades during follow-mode #41612', function()
+      -- The operator does not change text/registers; it only moves the cursor.
+      n.exec_lua([[
+        local function test_op(motion)
+          if motion == nil then
+            vim.o.operatorfunc = test_op
+            return 'g@'
+          end
+          local pos = vim.pos.cursor()
+          local line = vim.api.nvim_buf_get_lines(pos.buf, pos.row, pos.row + 1, false)[1]
+          pos.col = #line
+          vim.api.nvim_win_set_cursor(0, pos:to_cursor())
+        end
+        vim.keymap.set('n', 'gm', test_op, { expr = true })
+      ]])
+      cursors({ 'aaaa', 'bbbbb', 'cccccc' }, 'QjQj')
+      feed('1q=')
+      atoms_start()
+      feed('gmil')
+      eq({ { 0, 3 }, { 1, 4 } }, anchors())
+      eq(6, fn.col('.'))
+      -- Exactly one type=operator atom.
+      eq(1, #atoms())
+      eq({
+        type = 'operator',
+        keys = 'g@il',
+        lhs = 'gmil',
+        operator = 'g@',
+        changed = false,
+        moved = true,
+      }, t_atom.pick(atom_last(), 'type', 'keys', 'lhs', 'operator', 'changed', 'moved'))
     end)
 
     it('cursors placed inside the opfunc are live for the next typed cascade', function()
@@ -2468,10 +2602,10 @@ describe('multicursor', function()
       screen:expect({ any = '1×' })
       feed('jQ')
       screen:expect({ any = '2×' })
-      command('silent normal! 1q=') -- Follow mode: "=" prefix (silent to avoid the q= message).
-      feed('l') --  Tickle showcmd redraw.
+      feed('q=') -- Follow mode: "=" prefix.
+      feed('l') -- Tickle showcmd redraw.
       screen:expect({ any = '=2×' })
-      command('silent normal! 2q=')
+      feed('q=') -- Follow mode off.
       feed('h') --  Tickle showcmd redraw.
       clear_cursors() -- cleared with the cursors
       feed('<Esc>') -- the indicator refreshes on the next command
@@ -2492,13 +2626,37 @@ describe('multicursor', function()
       screen:expect({ any = '1×' })
       feed('jQ')
       screen:expect({ any = '2×' })
-      command('silent normal! 1q=') -- Follow mode: "=" prefix (silent to avoid the q= message).
+      feed('q=') -- Follow mode: "=" prefix.
       feed('l') -- Tickle showcmd redraw.
       screen:expect({ any = '=2×' })
     end)
   end)
 
   describe('workflows', function()
+    it('follow-once mapping', function()
+      n.exec_lua([[
+        vim.keymap.set('n', 'q-', function()
+          vim.cmd('normal! 1q=')
+          vim.api.nvim_create_autocmd('CmdAtom', {
+            callback = function(ev)
+              if ev.data.lhs == 'q-' then
+                return
+              end
+              vim.cmd('normal! 2q=')
+              return true
+            end,
+          })
+        end)
+      ]])
+      cursors({ '  aaa', '  bbb', '  ccc' })
+      feed('q-')
+      feed('^') -- Cascades: every cursor moves to the first non-blank.
+      eq({ { 0, 2 }, { 1, 2 } }, anchors())
+      feed('l') -- Follow already ended: primary only.
+      eq({ { 0, 2 }, { 1, 2 } }, anchors())
+      eq(4, fn.col('.'))
+    end)
+
     it('split visual selection into line cursors', function()
       -- {Visual}Q
       fn.setline(1, { 'aaaa', 'bbbb', 'cc', 'dddd' })
@@ -2574,18 +2732,6 @@ describe('multicursor', function()
       eq({ 'ab', 'd' }, get_lines())
       feed('p')
       eq({ 'abc', 'de' }, get_lines())
-    end)
-
-    it('fold parity: cascade at a cursor inside a closed fold', function()
-      -- Operator on a closed fold applies to the whole fold (|fold-behavior|), so the replayed "x"
-      -- deletes the fold's lines.
-      fn.setline(1, { 'aaa', 'bbb', 'ccc', 'ddd' })
-      feed('3G0Q')
-      command('2,4fold')
-      eq(2, fn.foldclosed(3))
-      feed('gg0')
-      feed('x')
-      eq({ 'aa' }, get_lines())
     end)
 
     it('type=excmd CmdAtoms are emit-only, ":s" does not cascade', function()

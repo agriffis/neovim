@@ -33,6 +33,7 @@
 #include "nvim/input.h"
 #include "nvim/input_cmdatom.h"
 #include "nvim/insert.h"
+#include "nvim/insexpand.h"
 #include "nvim/keycodes.h"
 #include "nvim/log.h"
 #include "nvim/lua/executor.h"
@@ -51,6 +52,7 @@
 #include "nvim/os/input.h"
 #include "nvim/os/time.h"
 #include "nvim/plines.h"
+#include "nvim/popupmenu.h"
 #include "nvim/pos_defs.h"
 #include "nvim/register.h"
 #include "nvim/register_defs.h"
@@ -209,7 +211,7 @@ size_t mc_showcmd(char *buf, size_t size)
   return (size_t)snprintf(buf, size, "%s%zu× ", mc_follow_motion ? "=" : "", kv_size(mc_cursors));
 }
 
-/// True while a replay runs: keys executing are fed back by Nvim itself, not new user input.
+/// True during a replay: re-executing keys internally, not new user input.
 bool mc_replaying(void)
 {
   return mc_replay;
@@ -223,8 +225,8 @@ bool mc_replaying(void)
 ///                       position (e.g. "o" on the line above).
 /// @param no_undo        Transient mark, undo must not restore it (a restored right-gravity mark
 ///                       drifts when undo re-inserts text at its position).
-static void mc_point_mark_set(buf_T *buf, uint32_t ns, uint32_t *mark, pos_T pos, bool watched,
-                              bool right_gravity, bool no_undo)
+static void mc_mark_set(buf_T *buf, uint32_t ns, uint32_t *mark, pos_T pos, bool watched,
+                        bool right_gravity, bool no_undo)
 {
   DecorInline decor = DECOR_INLINE_INIT;
   if (watched) {
@@ -237,7 +239,7 @@ static void mc_point_mark_set(buf_T *buf, uint32_t ns, uint32_t *mark, pos_T pos
 /// Creates or updates the extmark tracking a multicursor position.
 static void mc_mark_upd(buf_T *buf, uint32_t *mark, pos_T pos)
 {
-  mc_point_mark_set(buf, mc_ns(), mark, pos, true, true, false);
+  mc_mark_set(buf, mc_ns(), mark, pos, true, true, false);
 }
 
 /// Gets the position tracked by `mark`, adjusted for buffer edits since the mark was set.
@@ -258,7 +260,7 @@ static bool mc_mark_get(buf_T *buf, uint32_t ns, uint32_t mark, pos_T *pos)
 /// across a cascade, the preview-apply cursor).
 static void mc_track_upd(buf_T *buf, uint32_t *mark, pos_T pos)
 {
-  mc_point_mark_set(buf, mc_session_ns(), mark, pos, false, true, true);
+  mc_mark_set(buf, mc_session_ns(), mark, pos, false, true, true);
 }
 
 /// Enters a replay sandbox, so keys fed (cascaded) per-cursor do not modify pending typeahead nor
@@ -468,6 +470,13 @@ static void mc_cascade(void)
 
   // Replay each atom at each cursor (nested ":norm! xx" queues multiple atoms per clock edge).
   for (size_t ai = 0; ai < kv_size(g_atoms); ai++) {
+    CmdAtom *atom = &kv_A(g_atoms, ai);
+    if (atom->origin.buf.br_buf != NULL
+        && (!bufref_valid(&atom->origin.buf) || atom->origin.buf.br_buf != curbuf)) {
+      // Cascade only in the atom's origin buffer (a mapping may switch buffers).
+      // Assume untagged atoms (atom_lhs_replay_queue()) are current-buffer.
+      continue;
+    }
     for (size_t ci = 0; ci < kv_size(mc_cursors); ci++) {
       // Replays consume `typebuf` only, so check for CTRL-C in OS/RPC input here.
       line_breakcheck();
@@ -499,9 +508,8 @@ void mc_clock_edge(bool map_edit)
 {
   if (map_edit && !atom_composite_queued() && kv_size(g_atoms) == 0
       && atom_composite_active() && mc_buf_has_cursors(curbuf)) {
-    // A payload mapping (vim-surround "ds'"/"S") edited the buffer via :normal/:call; invisible
-    // to atom capture, so nothing was queued. Fallback to LHS-replay: re-run the mapping at each
-    // cursor by replaying its trigger plus the keys its getchar() read (atom_lhs_replay_queue()).
+    // A payload mapping (vim-surround "ds'"/"S") edited the buffer via :norm/:call, invisible to
+    // atom capture, so nothing was queued. Fallback to LHS-replay.
     atom_lhs_replay_queue();
   }
   if (mc_buf_has_cursors(curbuf) && kv_size(g_atoms) > 0) {
@@ -519,7 +527,7 @@ void mc_clock_edge(bool map_edit)
   }
 }
 
-/// Removes cursors that overlap another cursor, so an edit does not apply N times at one position.
+/// Prunes cursors that overlap others, so an edit does not apply N times at one position.
 static void mc_dedupe(void)
 {
   const bool had_cursors = kv_size(mc_cursors) > 0;
@@ -833,8 +841,11 @@ void mc_ins_cascade(void)
   } else if (ins.size > mc_ins_span.done_len
              && mc_ins_keys_nonliteral(ins.data + mc_ins_span.done_len,
                                        ins.size - mc_ins_span.done_len)) {
-    // Non-literal keys pending (BS, CTRL-U, ...): re-execute instead of previewing.
-    mc_ins_span_flush(&ins, false);
+    // Non-literal keys pending (BS, CTRL-U, …): re-execute instead of previewing.
+    // Not during completion: edit() would raise E565. #41602
+    if (!ins_compl_active() && !pum_visible()) {
+      mc_ins_span_flush(&ins, false);
+    }
   } else {
     MTPair p = extmark_from_id(curbuf, mc_session_ns(), mc_ins_span.region);
     if (p.start.id != 0) {
@@ -1091,7 +1102,7 @@ void mc_vsel_refresh(void)
     }
     // Selection-end cursor; the anchor extmark stays put (the eventual replay position).
     uint32_t cmark = 0;
-    mc_point_mark_set(curbuf, mc_vcur_ns(), &cmark, curwin->w_cursor, true, false, true);
+    mc_mark_set(curbuf, mc_vcur_ns(), &cmark, curwin->w_cursor, true, false, true);
     mc_vsel_buf = curbuf->handle;
     Visual.active = false;
   }
@@ -1231,7 +1242,6 @@ bool mc_follow_toggle(long count0)
   } else {
     return false;
   }
-  smsg(0, _("multicursor: follow motion %s"), mc_follow_motion ? "on" : "off");
   return true;
 }
 
@@ -1345,7 +1355,7 @@ void mc_ns_cleared(buf_T *buf, uint32_t ns_id)
       continue;
     }
     uint32_t mark = 0;
-    mc_point_mark_set(buf, mc_last_ns(), &mark, ctx->pos, false, true, false);
+    mc_mark_set(buf, mc_last_ns(), &mark, ctx->pos, false, true, false);
   }
   mc_dedupe();  // Cleanup.
   if (kv_size(mc_cursors) == 0) {

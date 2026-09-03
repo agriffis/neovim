@@ -498,8 +498,7 @@ static char *atom_composite_lhs(void)
   return keys.items;
 }
 
-/// Queues an LHS-replay atom: a mapping that edited invisibly (:normal/:call, "ds'") re-runs
-/// per cursor from its LHS + payload keys. Cascade only.
+/// Queues an internal-only atom for mcursor cascade (no emit).
 void atom_lhs_replay_queue(void)
 {
   kv_push(g_atoms, ((CmdAtom){ .type = kAMapping, .keys = atom_composite_lhs(), .remap = true }));
@@ -972,7 +971,7 @@ static bool atom_visual_end_suffix(char *suffix, const CmdSpec *spec, bool redoa
     redo_append_str(suffix, -1);
   }
   if (!atom_is_user_cmd() || !(vatom.state & kVatomTyped)) {
-    // Not user input (":normal! vjd", fed keys): the redo prep above is the only effect; no emit.
+    // Internal input (":norm! vjd", fed keys): the redo prep above is the only effect; no emit.
     xfree(vkeys);
     xfree(suffix);
     atom_visual_reset();
@@ -1356,9 +1355,11 @@ static void atom_capture_cmd(cmdarg_T *ca, CmdFrame *old)
       CmdAtom atom = atom_from_redo(kAOperator);
       // The payload ('operatorfunc' getchar()) is not in the captured redo, append it.
       atom_payload_append(&atom, old);
-      // Cascade only on an OBSERVABLE effect: an edit or register write. A redoable operator that
-      // did neither is a no-op (vim-surround "ysa[" whose surround char was <Esc>).
-      bool effect = changed || reg_max_ts(true) > old->reg_ts;
+
+      // Cascade only an observable "effect": edit, register-write, or cursor-move (only during
+      // follow-mode).
+      bool effect = changed || reg_max_ts(true) > old->reg_ts
+                    || (mc_following() && atom_origin_moved(old->origin));
       if (atom.keys != NULL && *atom.keys != NUL) {
         atom.origin = old->origin;
         atom_push(effect, &atom);
