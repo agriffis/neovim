@@ -77,7 +77,7 @@ static struct {
                       ///< ("f(" + mapped key in one batch). 0: none.
 } composite;
 
-/// State of a Visual composite atom.
+/// State of a Visual session atom.
 typedef enum {
   kVatomNone = 0,   ///< No pending Visual atom.
 
@@ -88,7 +88,10 @@ typedef enum {
   kVatomVoid = 4,   ///< Not replayable: tainted/poisoned (by mouse, gv, …). But may emit CmdAtom.
 } VatomState;
 
-/// Accumulating Visual composite: the full Visual keysequence (selection keys + operator).
+/// Accumulating Visual session atom: the full Visual keysequence (selection keys + operator).
+///
+/// NOTE: Visual session is not modeled as `composite` bc they may overlap (not clean nesting):
+/// a mapping can open before `v` and end mid-selection ("nmap X vjj" followed by "d").
 static struct {
   CmdAtomVec atoms;  ///< Accumulated subatoms. A void session collects them as the `lhs` label.
   VatomState state;
@@ -1147,9 +1150,10 @@ InsSession atom_ins_start(int cmd, long count, VisualIns vis, bool vblock)
                                : cur_frame != NULL ? cur_frame->origin : atom_origin(),
   };
   if (vis != kVInsNone && !mc_replaying()) {
-    if (vis == kVInsKeys && !(atom_visual_replayable() && (vatom.state & kVatomTyped))) {
-      // The selection came from fed keys (":norm", scheduled feedkeys).
-      session.typed = false;
+    if (vis == kVInsKeys) {
+      // Internal (non-user) keys (":norm", scheduled feedkeys) are not user-input.
+      // But a Visual-mode operator mapping ("xnoremap c c") is user-input. #41605
+      session.typed = atom_visual_replayable() && (vatom.state & kVatomTyped) != 0;
     }
     // The selection is consumed: already in the redo body. Also clears selection display.
     atom_visual_reset();
@@ -1306,9 +1310,9 @@ static void atom_capture_cmd(cmdarg_T *ca, CmdFrame *old)
       vatom.state |= kVatomVoid;
     }
   } else if (old->visual.active) {
-    if (user && old->follow && atom_visual_replayable() && kv_size(vatom.atoms) > 0) {
-      // Follow-motion ("q="): a selection abandoned without an operator (<Esc>, "v" toggle) still
-      // moved the primary cursor to the selection end: replay it at every cursor.
+    if (user && atom_visual_replayable() && kv_size(vatom.atoms) > 0) {
+      // Cursor moved to selection-end after ESC/"v"-toggle. Even though this is technically
+      // a "motion", it's more intuitive to always replay it? #41631
       char suffix[2] = { ESC, NUL };
       atom_visual_end_suffix(xstrdup(suffix), NULL, false);
     } else {
@@ -1431,7 +1435,8 @@ void atom_cmd_end(cmdarg_T *ca, CmdFrame *old)
   // likewise while stuffed keys are pending (i_CTRL-O dance, or exec_stuffed() deferred under
   // textlock).
   if (old->parent == NULL && !mc_replaying() && typebuf_typed() && stuff_empty()) {
-    mc_clock_edge(map_edit);
+    bool map_moved = atom_composite_active() && atom_origin_moved(composite.origin);
+    mc_clock_edge(map_edit, map_moved);
     map_edit = false;
     // One atom spans its continuation: while op-pending, selection-active, or insert-will-resume
     // (i_CTRL-O), it stays open. ",Dw" (":nnoremap ,D d") is one atom, `keys="dw"`.

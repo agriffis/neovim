@@ -1132,7 +1132,8 @@ describe('multicursor', function()
       ]])
     end)
 
-    it('typed text appears at cursors before leaving insert-mode', function()
+    it('typed text live-mirrors at cursors', function()
+      command('let v:oldfiles = ["/a", "/b"] | let @a = "reg"')
       local screen = Screen.new(30, 6)
       cursors({ 'aaa', 'bbb', 'ccc' })
       -- Still in insert mode (no <Esc> yet): the text already cascaded; each cursor displays
@@ -1155,8 +1156,10 @@ describe('multicursor', function()
         {1:~                             }|*2
                                       |
       ]])
-      -- Entering insert mode displays each cursor at its insertion point
-      -- right away, BEFORE any text is typed ("a": one char to the right).
+      -- Cascade context-management should not clobber v:oldfiles.
+      eq({ '/a', '/b' }, api.nvim_get_vvar('oldfiles'))
+
+      -- Entering insert mode ("a") displays each cursor at its insertion-point immediately.
       feed('a')
       screen:expect([[
         XY{17:a}aa                         |
@@ -1166,8 +1169,7 @@ describe('multicursor', function()
         {5:-- INSERT --}                  |
       ]])
       feed('<Esc>')
-      -- An operator entry ("ciw") live-mirrors the same way: the entry
-      -- replay changes each cursor's OWN word, still in insert mode.
+      -- Operator entry ("ciw") live-mirrors the per-cursor change, still in insert mode.
       feed('0ciwZ')
       screen:expect([[
         Z{17: }                            |
@@ -1177,8 +1179,7 @@ describe('multicursor', function()
         {5:-- INSERT --}                  |
       ]])
       feed('<Esc>')
-      -- A Visual-entered change ("viwc") live-mirrors too: the entry replay
-      -- re-executes the selection at each cursor.
+      -- Visual-change entry ("viwc") live-mirrors the selection at each cursor.
       feed('viwcW')
       screen:expect([[
         W{17: }                            |
@@ -1188,6 +1189,50 @@ describe('multicursor', function()
         {5:-- INSERT --}                  |
       ]])
       feed('<Esc>')
+      -- Also when "c" is a Visual-mode operator mapping. #41605
+      command('xnoremap c "_c')
+      feed('viwcM')
+      screen:expect([[
+        M{17: }                            |
+        M{17: }                            |
+        M^                             |
+        {1:~                             }|*2
+        {5:-- INSERT --}                  |
+      ]])
+      feed('<Esc>')
+      -- Also when another key maps to "c".
+      command('xnoremap - c')
+      feed('viw-N')
+      screen:expect([[
+        N{17: }                            |
+        N{17: }                            |
+        N^                             |
+        {1:~                             }|*2
+        {5:-- INSERT --}                  |
+      ]])
+      feed('<Esc>')
+
+      -- Also when a Normal-mode mapping moves before entering Insert. #41605
+      clear_cursors()
+      cursors({ 'aaaa', 'bbbb', 'cccc' }, 'llQjQj')
+      command('nnoremap i ^i')
+      screen:expect([[
+        aa{17:a}a                          |
+        bb{17:b}b                          |
+        cc^cc                          |
+        {1:~                             }|*2
+                                      |
+      ]])
+      feed('iX')
+      screen:expect([[
+        X{17:a}aaa                         |
+        X{17:b}bbb                         |
+        X^cccc                         |
+        {1:~                             }|*2
+        {5:-- INSERT --}                  |
+      ]])
+      feed('<Esc>')
+      eq({ 'Xaaaa', 'Xbbbb', 'Xcccc' }, get_lines())
     end)
   end)
 
@@ -1394,7 +1439,8 @@ describe('multicursor', function()
       eq({ l[4], l[4] }, { l[5], l[6] })
     end)
 
-    it("'autocomplete': <BS> and <C-e> cancel propagate", function()
+    it("'autocomplete': <BS>, <C-e>", function()
+      -- BS/C-e cancel propagation.
       ac_setup()
       feed('ifoo<BS>x<Esc>')
       eq({ 'fox', 'fox', 'fox' }, { get_lines()[4], get_lines()[5], get_lines()[6] })
@@ -1412,6 +1458,35 @@ describe('multicursor', function()
       feed('<Esc>')
       eq('', api.nvim_get_vvar('errmsg'))
       eq({ ' ', ' ', ' ' }, get_lines())
+
+      -- Live-mirrors after <BS> ends autocompletion; popup shows on new input.
+      clear_cursors()
+      ac_setup()
+      feed('ifo')
+      eq(1, fn.pumvisible())
+      feed('<BS>')
+      eq(1, fn.pumvisible())
+      feed('<BS>')
+      eq(0, fn.pumvisible())
+      feed('fo')
+      eq(1, fn.pumvisible())
+      eq({ 'fo', 'fo', 'fo' }, { get_lines()[4], get_lines()[5], get_lines()[6] })
+      feed('<Esc>')
+      eq({ 'fo', 'fo', 'fo' }, { get_lines()[4], get_lines()[5], get_lines()[6] })
+
+      -- Live-mirrors if <BS> ends autocompletion then restarts it immediately ('autocomplete' with
+      -- printable char before the cursor). #41605
+      clear_cursors()
+      cursors({ 'foo', 'foobar', 'foobarbaz' })
+      feed('A f')
+      eq(1, fn.pumvisible())
+      feed('<BS>')
+      eq({ 'foo ', 'foobar ', 'foobarbaz ' }, get_lines())
+      feed(' fo')
+      eq(1, fn.pumvisible())
+      eq({ 'foo  fo', 'foobar  fo', 'foobarbaz  fo' }, get_lines())
+      feed('<Esc>')
+      eq({ 'foo  fo', 'foobar  fo', 'foobarbaz  fo' }, get_lines())
     end)
 
     it('InsertCharPre-driven complete() plugin (cmp-style)', function()
@@ -1449,7 +1524,7 @@ describe('multicursor', function()
   describe('visual-mode cascade', function()
     it('failed command mid-replay does not leak Visual mode into the next replay', function()
       fn.setline(1, { 'alpha bravo', 'golf hotel', 'mike november' })
-      feed('ggVjjQ') -- cursor on each line; enables "q=" follow-motion
+      feed('ggVjjQ') -- cursor on each line; enables "q=" follow-mode
       feed('gg0')
       -- The abandoned selection replays "vlo h <Esc>" at each cursor ("q=" follow). The "h" fails
       -- (col 0 after "o" swapped to the selection start), which flushes the rest of the replay,
@@ -1459,7 +1534,7 @@ describe('multicursor', function()
       eq('n', api.nvim_get_mode().mode)
     end)
 
-    it('shows per-cursor visual selection', function()
+    it('shows per-cursor selection', function()
       local screen = Screen.new(30, 6)
       cursors({ 'longword x', 'ab y', 'medium z' })
       -- Each cursor shows its own selection ("iw" = that cursor's word), previewed live.
@@ -1471,6 +1546,7 @@ describe('multicursor', function()
         {1:~                             }|*2
         {5:-- VISUAL --}                  |
       ]])
+      eq('visual', screen.mode) -- The UI mode ('guicursor'). #41631
       feed('e')
       screen:expect([[
         {17:longword x}                    |
@@ -1479,14 +1555,16 @@ describe('multicursor', function()
         {1:~                             }|*2
         {5:-- VISUAL --}                  |
       ]])
+      -- <Esc>: cursors move to the selection-end, like the primary.
       feed('<Esc>')
       screen:expect([[
-        {17:l}ongword x                    |
-        {17:a}b y                          |
+        longword {17:x}                    |
+        ab {17:y}                          |
         medium ^z                      |
         {1:~                             }|*2
                                       |
       ]])
+      eq('normal', screen.mode)
     end)
 
     it('shows linewise/blockwise selections', function()
@@ -1502,7 +1580,8 @@ describe('multicursor', function()
         {5:-- VISUAL LINE --}             |
       ]])
       feed('<Esc>')
-      feed('3G0l')
+      clear_cursors()
+      cursors({ 'aaaa', 'bbbb', 'cccc', 'dddd' }, 'Q2jl')
       feed('<C-v>jl') -- blockwise: primary (3,1)-(4,2), fake (1,0)-(2,1)
       screen:expect([[
         {17:aa}aa                          |
@@ -1550,11 +1629,19 @@ describe('multicursor', function()
       })
     end)
 
-    it('<Esc> discards the pending visual atom', function()
+    it('ESC moves cursors to selection-end', function()
       cursors({ 'abc', 'def' }, 'Qj')
       feed('viw<Esc>')
       feed('x') -- cascades normally; no stray visual replay
-      eq({ 'bc', 'de' }, get_lines())
+      eq({ 'ab', 'de' }, get_lines())
+      -- Without follow-mode a plain motion ("0") stays primary-only.
+      -- But the selection itself moves every cursor to its selection-end.
+      clear_cursors()
+      cursors({ 'aaa bbb ccc', 'ddd eee fff', 'ggg hhh iii' }, '4lQjQj')
+      feed('viw<Esc>x')
+      eq({ 'aaa bb ccc', 'ddd ee fff', 'ggg hh iii' }, get_lines())
+      feed('0viwe<Esc>x')
+      eq({ 'aaa bb cc', 'ddd ee ff', 'ggg h iii' }, get_lines())
     end)
 
     it('cursor displays at each selection end; o swaps it', function()
@@ -1618,7 +1705,7 @@ describe('multicursor', function()
     end)
   end)
 
-  describe('q= (follow motion)', function()
+  describe('q= (follow-mode)', function()
     it('cursors follow primary-cursor motions', function()
       cursors({ 'abcd', 'efgh' }, 'Q')
       feed('j') -- No cascade/follow.
@@ -1645,7 +1732,7 @@ describe('multicursor', function()
       eq({ 'b', '!' }, get_lines())
     end)
 
-    it('implicit exit (cursors deduped) resets follow-motion', function()
+    it('implicit exit (cursors deduped) resets follow-mode', function()
       cursors({ 'aaa', 'bbb', 'ccc' })
       eq(2, ncursors())
       feed('q=')
@@ -1667,6 +1754,36 @@ describe('multicursor', function()
       feed('j') -- No follow: nothing converges or dedupes.
       eq(2, ncursors())
       eq({ { 0, 1 }, { 1, 1 } }, anchors())
+    end)
+
+    it('follows a mapping that moves the cursor via API (no motion key) #41646', function()
+      command(
+        'nnoremap gm <Cmd>lua local p = vim.api.nvim_win_get_cursor(0); '
+          .. 'p[2] = p[2] + 1; vim.api.nvim_win_set_cursor(0, p)<CR>'
+      )
+      cursors({ 'abcd', 'efgh', 'ijkl' }, 'QjQj') -- A cursor on each line.
+      feed('q=')
+      feed('gm') -- Every cursor moves one column right.
+      feed('x')
+      eq({ 'acd', 'egh', 'ikl' }, get_lines())
+
+      -- <Cmd> mapping uses nested ":normal!" to move the cursor. #41653
+      clear_cursors()
+      command('nnoremap gh <Cmd>normal! $<CR>')
+      cursors({ 'a b', 'c d', 'e f' }, 'QjQj')
+      feed('q=')
+      feed('gh') -- Every cursor moves to EOL.
+      feed('x')
+      eq({ 'a ', 'c ', 'e ' }, get_lines())
+
+      -- matchit "%" mapping (uses ":call" to move the cursor).
+      command('packadd matchit')
+      clear_cursors()
+      cursors({ '(aa)', '(bb)', '(cc)' }, 'QjQj') -- All cursors on "(".
+      feed('q=')
+      feed('%') -- Every cursor jumps to its ")".
+      feed('x')
+      eq({ '(aa', '(bb', '(cc' }, get_lines())
     end)
 
     it('jumps are not followed (CTRL-O, backtick)', function()
@@ -1750,19 +1867,6 @@ describe('multicursor', function()
       feed('x')
       -- Follow did not toggle.
       eq({ '1', 'a2', 'b1', '2' }, get_lines())
-    end)
-
-    it('abandoned visual selection moves cursors to their selection ends', function()
-      cursors({ 'aaa bbb ccc', 'ddd eee fff', 'ggg hhh iii' }, '4lQjQj')
-      feed('q=')
-      feed('viw<Esc>') -- Selection end: the last char of each cursor's word.
-      feed('x')
-      eq({ 'aaa bb ccc', 'ddd ee fff', 'ggg hh iii' }, get_lines())
-      -- No follow: <Esc> discards, other cursors stay; "x" cascades.
-      feed('q=')
-      feed('0viw<Esc>')
-      feed('x')
-      eq({ 'aaa bbccc', 'ddd eefff', 'gg hh iii' }, get_lines())
     end)
 
     it('per-cursor curswant is kept over short lines', function()
@@ -2472,19 +2576,25 @@ describe('multicursor', function()
       screen:expect({ any = 'ine 30' }) -- ("l" is under the painted cursor cell)
     end)
 
-    it('cycle through the cursors, wrapping', function()
+    it('cycle through the cursors, wrapping; the old position keeps a cursor', function()
       cursors({ 'aaa', 'bbb', 'ccc', 'ddd' }, 'Q2jllQ')
       feed('gg0j')
       feed(']C')
       eq({ 3, 2 }, cur())
+      eq({ { 0, 0 }, { 1, 0 }, { 2, 2 } }, anchors())
       feed(']C') -- wraps
       eq({ 1, 0 }, cur())
       feed('2]C') -- count
-      eq({ 1, 0 }, cur())
-      feed('[C')
       eq({ 3, 2 }, cur())
       feed('[C')
+      eq({ 2, 0 }, cur())
+      feed('[C')
       eq({ 1, 0 }, cur())
+      -- The set of positions is invariant: an edit applies once at each (the cursor under the
+      -- primary merges into it).
+      feed('x')
+      eq({ 'aa', 'bb', 'cc', 'ddd' }, get_lines())
+      eq({ { 1, 0 }, { 2, 1 } }, anchors())
     end)
 
     it('does not move the other cursors in q= mode', function()
@@ -2492,7 +2602,7 @@ describe('multicursor', function()
       feed('q=')
       feed(']C')
       eq({ 1, 0 }, cur())
-      eq({ { 0, 0 } }, anchors())
+      eq({ { 0, 0 }, { 1, 0 } }, anchors()) -- (1,0): left behind by the jump.
       feed('q=')
     end)
 
@@ -2540,6 +2650,32 @@ describe('multicursor', function()
   end)
 
   describe('clipboard', function()
+    it("does not crash after jumping to an empty line with 'clipboard'", function()
+      n.exec_lua([[
+        _G.content = {}
+        vim.g.clipboard = {
+          name = 'test',
+          copy = {
+            ['+'] = function(lines)
+              _G.content = lines
+            end,
+          },
+          paste = {
+            ['+'] = function()
+              return _G.content
+            end,
+          },
+        }
+        vim.o.clipboard = 'unnamedplus'
+      ]])
+      cursors({ '', 'aa' }, 'Qj') -- Cursor on the empty line, primary on the non-empty line.
+      feed(']C') -- Make the empty-line cursor primary.
+      feed('C')
+      n.assert_alive()
+      feed('<Esc>')
+      eq({ '', '' }, get_lines())
+    end)
+
     it("perf: provider syncs once per cascade with 'clipboard'", function()
       n.exec_lua([[
         _G.copies = 0
@@ -2668,7 +2804,7 @@ describe('multicursor', function()
       -- One cursor per selected line, at primary cursor's column (on the short line: past EOL).
       feed('iX<Esc>')
       eq({ 'aaXaa', 'bbXbb', 'ccX', 'dddd' }, get_lines())
-      -- The mapping enabled follow-motion (q=).
+      -- The mapping enabled follow-mode (q=).
       feed('jx')
       eq({ 'aaXaa', 'bbbb', 'cc', 'ddd' }, get_lines())
     end)

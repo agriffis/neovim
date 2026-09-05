@@ -373,6 +373,9 @@ LSP
 
 LUA
 
+• |lua-async|: `vim.async` provides structured concurrency primitives for Lua
+  code, including task handles, await helpers, cooperative cancellation,
+  completion-order iteration, and semaphores.
 • |vim.ui.img| can display images. Use `:checkhealth vim.health` to confirm
   your terminal supports it.
 • |vim.net.request()| can specify custom headers by passing `opts.headers`.
@@ -491,6 +494,9 @@ UI
   • |:recover|
   • |:tselect|
   • |z=| (spell suggest)
+• The |ui2| dialog window scrolls with the mouse wheel, by 'mousescroll'
+  lines.
+• The |ui2| `[+x]` "spill" indicator is highlighted with |hl-MoreMsg|.
 
 VIMSCRIPT
 

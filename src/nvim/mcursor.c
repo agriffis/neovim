@@ -307,10 +307,10 @@ static void mc_sandbox_leave(McSandbox *sb)
   ctx_free(&sb->regs);
   restore_redobuff(&sb->redo);
   restore_search_patterns();
-  restore_current_state(&sb->sst);
-  // Visual before the cursor restore: check_cursor() below must see the restored mode (a
-  // blockwise 'virtualedit' selection would otherwise lose the cursor's coladd).
+  // Visual first: restore_current_state() updates the cursor shape, and check_cursor() below keeps
+  // a blockwise 'virtualedit' selection's coladd.
   Visual = sb->visual;
+  restore_current_state(&sb->sst);
   buf_T *buf = handle_get_buffer(sb->bufnr);
   bool topline_valid = false;
   if (buf != NULL) {
@@ -499,17 +499,18 @@ done:
   }
 }
 
-/// The clock edge: cascades the queued atoms (g_atoms) at every cursor. Called from
-/// atom_cmd_end(), at the completion of a toplevel, typed command.
+/// The clock edge: cascades the current composite, and queued atoms (g_atoms), at every cursor.
+/// Called at the completion of a toplevel, typed command.
 ///
-/// @param map_edit  A command fed by a mapping edited the buffer (or was insert-cascaded): the
-///                  whole mapping cascades as one unit, including its motions.
-void mc_clock_edge(bool map_edit)
+/// @param map_edit  The composite edited the buffer (or insert-cascaded).
+/// @param map_moved  The composite moved the cursor.
+void mc_clock_edge(bool map_edit, bool map_moved)
 {
-  if (map_edit && !atom_composite_queued() && kv_size(g_atoms) == 0
+  if ((map_edit || (mc_follow_motion && map_moved))
+      && !atom_composite_queued() && kv_size(g_atoms) == 0
       && atom_composite_active() && mc_buf_has_cursors(curbuf)) {
-    // A payload mapping (vim-surround "ds'"/"S") edited the buffer via :norm/:call, invisible to
-    // atom capture, so nothing was queued. Fallback to LHS-replay.
+    // XXX: Fallback to LHS-replay if the mapping edited the buffer or moved the cursor (in
+    // follow-mode) via :norm/Lua/… (thus no atom was captured/queued).
     atom_lhs_replay_queue();
   }
   if (mc_buf_has_cursors(curbuf) && kv_size(g_atoms) > 0) {
@@ -594,7 +595,11 @@ void mc_ins_cascade_start(bool cascade, varnumber_T tick)
     return;
   }
   mc_ins_joined = false;
-  mc_ins_span.active = cascade && mc_buf_has_cursors(curbuf) && kv_size(g_atoms) == 0;
+  if (cascade && mc_buf_has_cursors(curbuf) && kv_size(g_atoms) > 0) {
+    // Cascade now if a mapping queued atoms before entering Insert ("nnoremap i ^i").
+    mc_cascade();
+  }
+  mc_ins_span.active = cascade && mc_buf_has_cursors(curbuf);
   mc_ins_span.first = true;
   mc_ins_span.done_len = 0;
   mc_ins_span.tick = tick;
@@ -694,7 +699,7 @@ static void mc_ins_preview_rebase(void)
   mc_ins_regions_clear();
   for (size_t i = 0; i < kv_size(mc_cursors); i++) {
     Context *ctx = &kv_A(mc_cursors, i);
-    pos_T pos;
+    pos_T pos = { 0 };
     uint32_t mark = 0;
     if (mc_ctx_resolve(ctx, &pos)) {
       mc_region_mark_set(&mark, pos);
@@ -822,6 +827,7 @@ void mc_ins_cascade(void)
     return;
   }
   String ins = redo_keys(NULL);
+  assert(ins.data != NULL || ins.size == 0);  // Coverity: NULL only when empty.
   if (mc_ins_span.first) {
     // Not with a pending autoindent ("o" + 'autoindent'): the entry span's replay ends in <Esc>,
     // which would delete the indent.
@@ -1045,7 +1051,7 @@ void mc_vsel_refresh(void)
 
   for (size_t i = 0; i < kv_size(mc_cursors); i++) {
     Context *ctx = &kv_A(mc_cursors, i);
-    pos_T pos;
+    pos_T pos = { 0 };
     if (!mc_ctx_resolve(ctx, &pos)) {
       continue;
     }

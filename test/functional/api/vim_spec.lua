@@ -2892,6 +2892,11 @@ describe('API', function()
       eq(1, eval('g:one'))
       eq('', eval('&shada'))
       eq(0, eval("get(g:, 'optionset', 0)"))
+
+      -- Does not touch v:oldfiles (only ":rshada!" rebuilds it).
+      command('let v:oldfiles = ["/a", "/b"]')
+      api.nvim_load_context(ctx)
+      eq({ '/a', '/b' }, eval('v:oldfiles'))
     end)
 
     it('errors when context dict is invalid', function()
@@ -4517,6 +4522,12 @@ describe('API', function()
         str = '%StatusLineStringWithHighlights',
         width = 31,
       }, api.nvim_eval_statusline('%%StatusLineString%#WarningMsg#WithHighlights', {}))
+    end)
+
+    it('reports an invalid window once', function()
+      -- find_window_by_handle() already sets the error, so a second
+      -- api_set_error() here would allocate a message over that one and leak it.
+      eq('Invalid window id: 23', pcall_err(api.nvim_eval_statusline, 'a', { winid = 23 }))
     end)
 
     it("doesn't exceed maxwidth", function()
