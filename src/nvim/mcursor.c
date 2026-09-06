@@ -353,7 +353,7 @@ static void mc_execute(size_t cursoridx, size_t atomidx)
 
   // Get the tracked position: edits by other cursors (etc) may have shifted it since last update.
   if (ctx.mark != 0 && !mc_mark_get(curbuf, mc_ns(), ctx.mark, &ctx.pos)) {
-    // The extmark was deleted, thus the cursor is deleted (swept by mc_dedupe()).
+    // The extmark was deleted, thus the cursor is deleted (swept by mc_cleanup()).
     return;
   }
 
@@ -457,7 +457,7 @@ static void mc_cascade(void)
     edits |= kv_A(g_atoms, i).type != kAMotion;
   }
   if (edits) {
-    mc_dedupe();
+    mc_cleanup(true);
     if (kv_size(mc_cursors) == 0) {
       atoms_free(&g_atoms);
       return;
@@ -491,7 +491,7 @@ done:
   atoms_free(&g_atoms);
   mc_sandbox_leave(&sb);
   end_batch_changes();
-  mc_dedupe();
+  mc_cleanup(true);
   if (handle_get_buffer(sb.bufnr) == curbuf && !curbuf->b_u_synced
       && curbuf->b_u_newhead != NULL) {
     // Store the primary's post-cascade position in the still-open undo block; redo restores it.
@@ -528,8 +528,10 @@ void mc_clock_edge(bool map_edit, bool map_moved)
   }
 }
 
-/// Prunes cursors that overlap others, so an edit does not apply N times at one position.
-static void mc_dedupe(void)
+/// Prunes dead cursors and ends empty sessions. Optionally dedupes.
+///
+/// @param dedupe  Also removes overlapping cursors at cascade boundaries.
+static void mc_cleanup(bool dedupe)
 {
   const bool had_cursors = kv_size(mc_cursors) > 0;
   size_t n = 0;
@@ -542,9 +544,9 @@ static void mc_dedupe(void)
       ctx_free(ctx);
       continue;
     }
-    // This cursor is a duplicate (to sweep) if it coincides with the primary (which always
-    // wins), or another cursor's mark is first at its position (first-wins tiebreak).
-    const bool dup = ctx->mark != 0
+    // Deduplicate/merge: cursor is a duplicate if it coincides with the primary (which always
+    // wins), or another cursor's mark is first at its position (first wins).
+    const bool dup = dedupe && ctx->mark != 0
                      && ((curwin != NULL && buf == curbuf && equalpos(ctx->pos, curwin->w_cursor))
                          || mc_mark_at(buf, ctx->pos) != ctx->mark);
     if (dup) {
@@ -595,10 +597,6 @@ void mc_ins_cascade_start(bool cascade, varnumber_T tick)
     return;
   }
   mc_ins_joined = false;
-  if (cascade && mc_buf_has_cursors(curbuf) && kv_size(g_atoms) > 0) {
-    // Cascade now if a mapping queued atoms before entering Insert ("nnoremap i ^i").
-    mc_cascade();
-  }
   mc_ins_span.active = cascade && mc_buf_has_cursors(curbuf);
   mc_ins_span.first = true;
   mc_ins_span.done_len = 0;
@@ -640,11 +638,13 @@ static void mc_ins_restore_state(const McInsSaved *saved)
   curbuf->b_last_changedtick_i = saved->last_changedtick_i;
 }
 
-/// Pushes one span and immediately cascades it. Takes ownership of `keys` and `text`.
+/// Pushes one span and immediately cascades it, plus any pending mapping atoms.
+/// Takes ownership of `keys` and `text`.
 static void mc_ins_span_push(char *keys, char *text)
 {
   mc_ins_span.first = false;
-  // If all cursors disappear mid-session (e.g. by dedupe), emit but don't cascade.
+
+  // If all cursors disappear mid-session (e.g. dedupe), emit but don't cascade.
   bool cascade = mc_buf_has_cursors(curbuf);
   atom_push_raw(cascade, &(CmdAtom){
     .type = kAInsertSpan,
@@ -655,6 +655,7 @@ static void mc_ins_span_push(char *keys, char *text)
   if (!cascade) {
     return;
   }
+
   McInsSaved saved = mc_ins_save_state();
   block_autocmds();  // The span replay would fire InsertEnter/InsertLeave on every key.
   mc_cascade();
@@ -823,7 +824,7 @@ void mc_ins_cascade_restart(void)
 void mc_ins_cascade(void)
 {
   if (!mc_ins_span.active || mc_replaying() || !(State & MODE_INSERT)
-      || !mc_buf_has_cursors(curbuf) || kv_size(g_atoms) != 0) {
+      || !mc_buf_has_cursors(curbuf)) {
     return;
   }
   String ins = redo_keys(NULL);
@@ -1264,7 +1265,7 @@ void mc_toggle(buf_T *buf, pos_T pos, bool end_follow)
   uint32_t mark = mc_mark_at(buf, pos);
   if (mark != 0) {
     extmark_del_id(buf, mc_ns(), mark);
-    mc_dedupe();  // sweeps the mark-less cursor (and ends the session if it was the last)
+    mc_cleanup(false);
     return;
   }
   mc_add(buf, pos);
@@ -1308,10 +1309,10 @@ void mc_buf_clear(buf_T *buf)
 void mc_buf_free(buf_T *buf)
 {
   if (mc_replaying()) {
-    // Can't mutate mc_cursors during cascade. Entries are swept by mc_dedupe() after the cascade.
+    // Can't mutate (mc_cleanup) mc_cursors during cascade.
     return;
   }
-  mc_dedupe();
+  mc_cleanup(false);
   if (mc_vsel_buf == buf->handle) {
     // The selection extmarks died with the buffer too.
     mc_vsel_buf = 0;
@@ -1363,7 +1364,7 @@ void mc_ns_cleared(buf_T *buf, uint32_t ns_id)
     uint32_t mark = 0;
     mc_mark_set(buf, mc_last_ns(), &mark, ctx->pos, false, true, false);
   }
-  mc_dedupe();  // Cleanup.
+  mc_cleanup(false);
   if (kv_size(mc_cursors) == 0) {
     // Session ended; drop the pending cascade.
     atoms_free(&g_atoms);
