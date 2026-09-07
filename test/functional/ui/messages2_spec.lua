@@ -544,6 +544,8 @@ describe('messages2', function()
       baz                                                  |
       {16::}{15:echo} {26:"baz"}                                          |
     ]])
+    -- Moving the mouse does not dismiss the pager.
+    api.nvim_input_mouse('move', '', '', 0, 0, 3)
     -- Subsequent typed commands are appended to the pager.
     feed(':echo "typed append"<CR>')
     screen:expect([[

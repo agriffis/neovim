@@ -598,6 +598,7 @@ end
 
 local typed_g = false
 local function cmd_on_key(key, typed)
+  typed = fn.keytrans(typed)
   -- Don't dismiss for non-typed keys and mouse movement. When 'g' is passed (typed
   -- or mapped), wait until the next key to avoid flickering when the pager is opened.
   if not typed_g and (typed == '' or (typed == '<MouseMove>' or typed == 'g' or key == 'g')) then
@@ -611,7 +612,6 @@ local function cmd_on_key(key, typed)
     return
   end
   vim.on_key(nil, ui.ns)
-  typed = fn.keytrans(typed)
 
   -- Check if window was entered and reopen with original config. A shown (but not entered)
   -- pager is dismissed instead; "g<" passes through to reopen and enter it.

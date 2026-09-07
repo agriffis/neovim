@@ -514,6 +514,20 @@ describe('multicursor', function()
     end)
   end)
 
+  describe('composite/mapping', function()
+    it('Visual-mode mapping that creates cursors (Q) #41694', function()
+      command('xmap I Q0i')
+      cursors({ 'test', 'nvim', '', 'test', 'nvim' }, '')
+      feed('gg$Qjjj')
+      atoms_start()
+      feed('VjI')
+      feed('bad<Esc>')
+      eq({ 'badtest', 'nvim', '', 'badtest', 'badnvim' }, get_lines())
+      -- "Q" is excluded: it is cursor-management, not part of the edit.
+      eq({ '01i\27ibad\27' }, atoms_tail(1))
+    end)
+  end)
+
   describe('. (dot-repeat)', function()
     it('repeats operators, pre-cursor edits, inserts and changes at all cursors', function()
       -- Operator.
@@ -1031,7 +1045,7 @@ describe('multicursor', function()
     end)
   end)
 
-  describe('insert-mode cascade', function()
+  describe('insert-mode', function()
     it('CTRL-U cascades before <Esc> (deletion crossing the session anchor)', function()
       -- Deleting typed text cascades live (the region shrinks). But CTRL-U here eats the "o"
       -- autoindent, which precedes the tracked region, invisible to the preview diff.
@@ -1214,6 +1228,17 @@ describe('multicursor', function()
         {5:-- INSERT --}                  |
       ]])
       feed('<Esc>')
+      -- Programmatic Visual selection followed by a typed change. #41705
+      command('normal! viw')
+      feed('cV')
+      screen:expect([[
+        V{17: }                            |
+        V{17: }                            |
+        V^                             |
+        {1:~                             }|*2
+        {5:-- INSERT --}                  |
+      ]])
+      feed('<Esc>')
       -- Also when "c" is a Visual-mode operator mapping. #41605
       command('xnoremap c "_c')
       feed('viwcM')
@@ -1265,12 +1290,10 @@ describe('multicursor', function()
       end
       eq({ { 'motion', '^' }, { 'insert', k('1i<Esc>') }, { 'insert', k('iX<Esc>') } }, children)
     end)
-  end)
 
-  describe('insert-mode depth', function()
     it('session survives all cursors deduping away mid-session', function()
-      -- A cursor at the primary's position: the "A" entry replay lands it on the primary and
-      -- dedupe removes it mid-session; the <Esc> commit must not cascade into the empty set.
+      -- "A" entry replay lands on the primary and dedupe removes it mid-session; the ESC commit
+      -- must not cascade into the empty set.
       fn.setline(1, { 'x' })
       feed('Q')
       feed('Ahi<Esc>')
@@ -1278,7 +1301,7 @@ describe('multicursor', function()
       eq({ 'xhi' }, get_lines())
     end)
 
-    it('insert sessions cascade at each cursor', function()
+    it('sessions cascade at each cursor', function()
       assert_rows({
         -- iZ: after <Esc> the cursors sit ON the last inserted char (like the primary cursor).
         {
@@ -1390,7 +1413,7 @@ describe('multicursor', function()
       })
     end)
 
-    it('ea appends at word end at each cursor (with q=)', function()
+    it('ea (with q=)', function()
       cursors({ 'one two', 'three four' }, 'Qj')
       feed('q=')
       feed('ea!<Esc>')
@@ -1398,13 +1421,79 @@ describe('multicursor', function()
       eq({ 'one! two', 'three! four' }, get_lines())
     end)
 
-    it('i_CTRL-N completion result appears at each cursor', function()
-      fn.setline(1, { 'wombat', 'wo', 'wo' })
-      feed('2gg')
-      feed('Q')
-      feed('j')
+    it('completion: i_CTRL-N completes existing text at each cursor', function()
+      command('set completeopt=menuone')
+      cursors({ 'wombat', 'wo', 'wo' }, 'jQj')
       feed('A<C-n><Esc>')
       eq({ 'wombat', 'wombat', 'wombat' }, get_lines())
+    end)
+
+    it('completion: live-mirrors cursors on separate lines', function()
+      command('set completeopt=menuone')
+      cursors({ 'wombat', '', '' }, 'jQj')
+      feed('iwo<C-n>')
+      eq(1, fn.pumvisible())
+      eq({ 'wombat', 'wombat', 'wombat' }, get_lines())
+      feed('<Esc>')
+      eq({ 'wombat', 'wombat', 'wombat' }, get_lines())
+    end)
+
+    it('completion: ESC commits with stale previews #41719', function()
+      command('set completeopt=menuone,noselect')
+      cursors({ 'aa', 'bb cc dd', 'ee' }, 'GQkQww')
+      feed('ciwa<C-n>a')
+      eq(1, fn.pumvisible())
+      eq({ 'aa', 'a cc aa', 'a' }, get_lines())
+      feed('<Esc>')
+      eq({ 'aa', 'aa cc aa', 'aa' }, get_lines())
+    end)
+
+    it('completion: live-mirrors same-line cursor AFTER the primary', function()
+      command('set completeopt=menuone,noselect')
+      cursors({ 'aa', 'bb cc dd' }, 'jwwQ0')
+      feed('ciw<C-n>a')
+      eq(1, fn.pumvisible())
+      eq({ 'aa', 'a cc a' }, get_lines())
+      feed('<C-e>x<Esc>')
+      eq({ 'aa', 'ax cc ax' }, get_lines())
+    end)
+
+    it('completion: defers preview of multiline edit BEFORE primary #41719', function()
+      command('set completeopt=menuone')
+      cursors({ '', '' }, 'Qj')
+      feed('ia')
+      fn.complete(1, { 'aa\nbb', 'ac' })
+      eq(1, fn.pumvisible())
+      eq({ 'a', 'aa', 'bb' }, get_lines())
+      feed('<C-c>')
+    end)
+
+    it('completion: defers preview of same-line cursor BEFORE primary #41719', function()
+      command('set completeopt=menu,noselect')
+      -- Place cursor1 on its own line, to exercise whole-batch deferral.
+      -- Place cursor2 on same line as the primary, to test same-line handling.
+      for _, case in ipairs({
+        { 'aa', 'aa', '' },
+        { 'a<C-e>', 'a', 'a' },
+        { 'a<C-n><C-y>', 'aa', 'aa' },
+        { 'a<BS>a', 'a', 'a' },
+      }) do
+        local keys, text, preview = unpack(case)
+        clear_cursors()
+        cursors({ 'aa', 'bb cc dd', 'ee' }, 'GQkQww')
+        eq({ { 1, 0 }, { 2, 0 } }, anchors())
+        eq({ 2, 6 }, api.nvim_win_get_cursor(0))
+        feed('ciw<C-n>')
+        eq(1, fn.pumvisible())
+        feed(keys)
+        eq({ 'aa', ('%s cc %s'):format(preview, text), preview }, get_lines())
+        feed('aa')
+        eq(0, fn.pumvisible())
+        feed(' ')
+        eq({ 'aa', ('%saa  cc %saa '):format(text, text), ('%saa '):format(text) }, get_lines())
+        feed('x<Esc>')
+        eq({ 'aa', ('%saa x cc %saa x'):format(text, text), ('%saa x'):format(text) }, get_lines())
+      end
     end)
   end)
 
@@ -1438,8 +1527,7 @@ describe('multicursor', function()
 
   describe('completion', function()
     -- While a completion is active, the cascade pauses: redobuff is frozen, and spans cannot replay
-    -- into a busy completion (edit() refuses recursive insert). The other cursors catch up when the
-    -- completion ends.
+    -- into a busy completion (edit() refuses nesting). The cursors catch up when completion ends.
 
     --- Three empty lines under "foo*" completion candidates; cursors on lines 4-5, primary on 6.
     local function ac_setup()
@@ -1633,6 +1721,93 @@ describe('multicursor', function()
       eq({ ' x', ' d' }, get_lines())
       -- The operator is normalized ("translated"): visual "x" == "d".
       eq({ 'viweed' }, atoms_tail(1))
+    end)
+
+    it('shows selections opened by :normal #41705', function()
+      local screen = Screen.new(30, 6)
+      command('nnoremap <F2> <Cmd>normal! viw<CR>')
+      n.exec_lua(function()
+        vim.keymap.set('n', '<F3>', function()
+          vim.cmd.normal('vZ')
+        end)
+        vim.keymap.set('x', 'Z', '<Cmd>normal! iw<CR>')
+      end)
+      atoms_start()
+      -- Each entry opens the selection from a different enclosing frame: typed cmdline, <Cmd>
+      -- mapping, Lua mapping (nested x-mapping), RPC. Result does not depend on the follow-mode.
+      for i, keys in ipairs({ ':normal! viw<CR>', '<F2>', '<F3>', 'api' }) do
+        clear_cursors()
+        cursors({ 'longword x', 'ab y', 'medium z' })
+        feed(i % 2 == 0 and '2q=' or '1q=')
+        if keys == 'api' then
+          command('normal! viw')
+        else
+          feed(keys)
+        end
+        screen:expect([[
+          {17:longword} x                    |
+          {17:ab} y                          |
+          {17:mediu}^m z                      |
+          {1:~                             }|*2
+          {5:-- VISUAL --}                  |
+        ]])
+        -- Preview does not advance the anchors, even when a mapping opens the selection.
+        eq({ { 0, 0 }, { 1, 0 } }, anchors(), keys)
+        feed('d')
+        eq({ ' x', ' y', ' z' }, get_lines(), keys)
+        eq({ 'viwd' }, atoms_tail(1))
+        screen:expect({
+          condition = function()
+            eq('normal', screen.mode)
+          end,
+        })
+      end
+    end)
+
+    it('previews selections after mapping motions', function()
+      local screen = Screen.new(30, 6)
+      cursors({ 'a longword x', 'bbbb ab y', 'cc medium z' })
+      command('nnoremap <F2> w<Cmd>normal! viw<CR>')
+      atoms_start()
+      feed('<F2>')
+      -- The mapping's "w" places the selection anchors, even without follow-mode.
+      eq({ { 0, 2 }, { 1, 5 } }, anchors())
+      screen:expect([[
+        a {17:longword} x                  |
+        bbbb {17:ab} y                     |
+        cc {17:mediu}^m z                   |
+        {1:~                             }|*2
+        {5:-- VISUAL --}                  |
+      ]])
+      feed('d')
+      eq({ 'a  x', 'bbbb  y', 'cc  z' }, get_lines())
+      eq({ 'wviwd' }, atoms_tail(1))
+    end)
+
+    it('refreshes a nested selection even if the primary selection is unchanged', function()
+      local screen = Screen.new(30, 5)
+      cursors({ 'foo.bar tail', 'word tail' }, 'Qj')
+      n.exec_lua(function()
+        vim.keymap.set('x', 'Z', function()
+          vim.cmd.normal({ vim.keycode('<Esc>viW'), bang = true })
+        end)
+      end)
+      feed('viw')
+      screen:expect([[
+        {17:foo}.bar tail                  |
+        {17:wor}^d tail                     |
+        {1:~                             }|*2
+        {5:-- VISUAL --}                  |
+      ]])
+      feed('Z')
+      screen:expect([[
+        {17:foo.bar} tail                  |
+        {17:wor}^d tail                     |
+        {1:~                             }|*2
+        {5:-- VISUAL --}                  |
+      ]])
+      feed('d')
+      eq({ ' tail', ' tail' }, get_lines())
     end)
 
     it('operators cascade at each cursor', function()
@@ -3043,8 +3218,13 @@ describe('multicursor', function()
 
     it(':normal! never cascades (programmatic input)', function()
       cursors({ 'aaa', 'bbb' }, 'Qj')
+      atoms_start()
       command('normal! x') -- Programmatic, no cascade (primary only).
       eq({ 'aaa', 'bb' }, get_lines())
+      command('normal! viwd') -- The entire Visual op is programmatic, not just selection.
+      eq({ 'aaa', '' }, get_lines())
+      eq({}, atoms())
+      feed('u')
       feed('x') -- User input, cascades.
       eq({ 'aa', 'b' }, get_lines())
     end)
