@@ -1730,6 +1730,13 @@ describe('multicursor', function()
       eq({ ' x', ' d' }, get_lines())
       -- The operator is normalized ("translated"): visual "x" == "d".
       eq({ 'viweed' }, atoms_tail(1))
+
+      -- A motion that fails (beeps) at primary is skipped. E.g. "j" at EOB.
+      clear_cursors()
+      cursors({ 'a', 'b', 'c', 'd', 'e', 'f' }, 'QjQ4j') -- Cursors at lines 1-2, primary on the last.
+      feed('Vjd')
+      eq({ 'c', 'd', 'e' }, get_lines())
+      eq({ 'Vd' }, atoms_tail(1))
     end)
 
     it('shows selections opened by :normal #41705', function()
@@ -2049,6 +2056,21 @@ describe('multicursor', function()
       feed('$')
       feed('x')
       eq({ 'ab', 'defg' }, get_lines())
+
+      -- A motion that fails (beeps) at primary is not replayed. E.g. "j" at EOB.
+      clear_cursors()
+      cursors({ 'a', 'b', 'c' }, 'QjQj') -- Cursors at lines 1-2, primary on the last line.
+      feed('q=')
+      feed('j')
+      feed('x')
+      eq({ '', '', '' }, get_lines())
+      -- "0" at col 0 does not move the primary, but also does not fail/beep, so it cascades.
+      clear_cursors()
+      cursors({ 'abc', 'def' }, 'llQj0') -- Cursor at column 2, primary at column 0.
+      feed('q=')
+      feed('0')
+      feed('x')
+      eq({ 'bc', 'ef' }, get_lines())
     end)
 
     it('cursors follow mapped motions (nnoremap j gj)', function()
@@ -2891,9 +2913,9 @@ describe('multicursor', function()
       eq({ '', '' }, get_lines())
     end)
 
-    it("perf: provider syncs once per cascade with 'clipboard'", function()
+    it('clipboard: implicit clipboard=unnamed[plus], explicit "+', function()
       n.exec_lua([[
-        _G.copies = 0
+        _G.copies, _G.pastes = 0, 0
         _G.content = {}
         vim.g.clipboard = {
           name = 'test',
@@ -2905,20 +2927,40 @@ describe('multicursor', function()
           },
           paste = {
             ['+'] = function()
+              _G.pastes = _G.pastes + 1
               return _G.content
             end,
           },
         }
-        vim.o.clipboard = 'unnamedplus'
       ]])
+      local function provider()
+        return n.exec_lua('return { _G.copies, _G.pastes, _G.content }')
+      end
+
+      -- Implicit clipboard (clipboard=unnamed[plus]) is ignored during cascade.
+      -- On multicursor exit, the unnamed (") join is written to the clipboard.
+      command('set clipboard=unnamedplus')
       cursors({ 'aa bb', 'cc dd', 'ee ff' })
-      local base = n.exec_lua('return _G.copies')
       feed('dw')
       eq({ 'bb', 'dd', 'ff' }, get_lines())
-      -- One provider sync for the primary's own delete, ONE for the whole
-      -- cascade (not one per cursor), and the primary's registers win.
-      eq(base + 2, n.exec_lua('return _G.copies'))
-      eq({ 'ee ' }, n.exec_lua('return _G.content'))
+      -- Clipboard provider was updated only by the primary's "dw". Not cascaded.
+      eq({ 1, 0, { 'ee ' } }, provider())
+      feed('p') -- Pastes unnamed reg (not clipboard) per-cursor.
+      eq({ 'baa b', 'dcc d', 'fee f' }, get_lines())
+      eq({ 1, 1, { 'ee ' } }, provider())
+      clear_cursors() -- Exit: the joined yank is written to the clipboard.
+      eq({ 2, 1, { 'aa ', 'cc ', 'ee ', '' } }, provider())
+
+      -- Explicit clipboard "+".
+      command('set clipboard=')
+      cursors({ 'aa', 'bb' }, 'Qj0')
+      feed('"+yy') -- Explicit "+: writes the primary's yank to the clipboard.
+      eq({ 3, 1, { 'bb', '' } }, provider())
+      feed('"+p') -- Explicit "+: pastes the primary's clipboard at every cursor.
+      eq({ 'aa', 'bb', 'bb', 'bb' }, get_lines())
+      eq({ 3, 2, { 'bb', '' } }, provider())
+      clear_cursors()
+      eq({ 3, 2, { 'bb', '' } }, provider())
     end)
   end)
 

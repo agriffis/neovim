@@ -3367,6 +3367,30 @@ describe('LSP', function()
       end)
       eq('initialize', result.method)
     end)
+
+    it('clean up failed lsp client when rpc.connect fails', function()
+      exec_lua(function()
+        local server = assert(vim.uv.new_tcp())
+        server:bind('127.0.0.1', 0)
+        local port = server:getsockname().port
+        server:close()
+        local exited = false
+        vim.lsp.start({
+          name = 'dummy',
+          cmd = vim.lsp.rpc.connect('127.0.0.1', port),
+          on_exit = function()
+            exited = true
+          end,
+        })
+        assert(
+          vim.wait(1000, function()
+            return #vim.lsp.get_clients({ name = 'dummy', _uninitialized = true }) == 0
+          end),
+          'Timed out waiting for errored client to be cleaned up'
+        )
+        assert(exited)
+      end)
+    end)
   end)
 
   describe('handlers', function()
@@ -4084,9 +4108,13 @@ describe('LSP', function()
       deleted = exec_lua([[return vim.lsp.protocol.FileChangeType.Deleted]])
     end)
 
-    local function test_filechanges(watchfunc)
+    local function test_filechanges(watchfunc, missing_root)
       it(
-        string.format('sends notifications when files change (watchfunc=%s)', watchfunc),
+        string.format(
+          'sends notifications when files change (watchfunc=%s)%s',
+          watchfunc,
+          missing_root and ' after root is created' or ''
+        ),
         function()
           if watchfunc == 'inotify' then
             skip(is_os('win'), 'not supported on windows')
@@ -4112,12 +4140,19 @@ describe('LSP', function()
           end
 
           local root_dir = tmpname(false)
-          mkdir(root_dir)
+          if not missing_root then
+            mkdir(root_dir)
+          end
 
           exec_lua(create_server_definition)
           local result = exec_lua(function()
             local logfile = vim.lsp.log.get_filename()
+            vim.lsp.log.set_level('info')
             vim.fn.writefile({ '' }, logfile)
+            local notifications = {}
+            vim.notify = function(message, level)
+              notifications[#notifications + 1] = { message, level }
+            end
             local server = _G._create_server()
             local client_id = assert(vim.lsp.start({
               name = 'watchfiles-test',
@@ -4179,6 +4214,19 @@ describe('LSP', function()
               },
             }, { client_id = client_id })
 
+            if missing_root then
+              local client = assert(vim.lsp.get_client_by_id(client_id))
+              local method = 'workspace/didChangeWatchedFiles'
+              local reg = vim.deepcopy(client.registrations[method][1])
+              reg.id = 'watchfiles-test-missing'
+              client:_register({ reg })
+              client:_unregister({ { id = reg.id, method = method } })
+              vim.fn.mkdir(root_dir)
+              reg.id = 'watchfiles-test-1'
+              client:_register({ reg })
+              client:_unregister({ { id = 'watchfiles-test-0', method = method } })
+            end
+
             if watchfunc ~= 'watch' then
               vim.wait(100)
             end
@@ -4196,7 +4244,7 @@ describe('LSP', function()
 
             vim.lsp.get_client_by_id(client_id):stop()
 
-            return { logfile = logfile, messages = server.messages }
+            return { logfile = logfile, messages = server.messages, notifications = notifications }
           end)
 
           local uri = vim.uri_from_fname(root_dir .. '/watch')
@@ -4238,6 +4286,18 @@ describe('LSP', function()
               .. pesc('{foo}'),
             result.logfile
           )
+          if missing_root then
+            t.assert_log(
+              '%[INFO%].-file watcher failed for ' .. pesc(root_dir) .. '.-ENOENT',
+              result.logfile
+            )
+            eq(1, #result.notifications)
+            eq(vim.log.levels.INFO, result.notifications[1][2])
+            matches(
+              'file watcher failed for ' .. pesc(root_dir) .. ': ENOENT',
+              result.notifications[1][1]
+            )
+          end
         end
       )
     end
@@ -4245,6 +4305,7 @@ describe('LSP', function()
     test_filechanges('watch')
     test_filechanges('watchdirs')
     test_filechanges('inotify')
+    test_filechanges('watchdirs', true)
 
     it('correctly registers and unregisters', function()
       local root_dir = '/some_dir'
