@@ -13,7 +13,14 @@
 /// Multicursor: pending atoms; they cascade as a batch (mc_clock_edge).
 extern CmdAtomVec g_atoms;
 
-/// Pre-command state sampled at entry + storage for its "staged" atom. atom_cmd_end() finalizes it.
+/// One `normal_execute()`: the scope of a MODE_NORMAL command (Normal/Visual/Select/Op-pending, see
+/// get_real_state()). Same lifetime as `cmdarg_T`. A `composite` spans successive toplevel frames.
+///
+/// Entry state (`origin`, …) is diffed at `atom_cmd_end()` into the command's CmdAtom.
+///
+/// Insert/Cmdline modes (non-MODE_NORMAL) are "sessions", not "frames" (atom_ins_start(),
+/// atom_payload_start()). Mappings initiating from non-MODE_NORMAL defer their `composite` to the
+/// first frame.
 typedef struct CmdFrame CmdFrame;
 struct CmdFrame {
   CmdOrigin origin;     ///< State at entry.
@@ -23,7 +30,7 @@ struct CmdFrame {
   uint64_t global_ops;  ///< `global_ops` at entry.
   uint64_t beeps;       ///< `did_beep` at entry.
   uint64_t id;          ///< Identifies this frame (see `composite.frame`).
-  bool follow;          ///< mc_following() ("q=") at frame start.
+  bool follow;          ///< Follow-mode: updated until cursor-move happens (sticky) in this frame.
   bool consumers;       ///< Capture is skipped if there are no consumers (for performance).
   Timestamp reg_ts;     ///< Max register timestamp (to detect a per-cursor register write).
   CmdAtom staged;       ///< Atom staged in this frame (`keys=NULL`: none).

@@ -153,6 +153,7 @@ local function to_inclusive_pos(buf, row, col)
     col = col + vim.str_utf_start(line, col) - 1
   elseif col == 0 and row > 0 then
     row = row - 1
+    line = util.get_line(buf, row)
     col = #line > 0 and #line + vim.str_utf_start(line, #line) - 1 or 0
   end
 
@@ -271,8 +272,8 @@ function M.intersect(r1, r2)
   local r2_inclusive_end_row, r2_inclusive_end_col = to_inclusive_pos(r2.buf, r2[3], r2[4])
 
   if
-    util.cmp_pos.le(r1_inclusive_end_row, r1_inclusive_end_col, r2[1], r2[2])
-    or util.cmp_pos.ge(r1[1], r1[2], r2_inclusive_end_row, r2_inclusive_end_col)
+    util.cmp_pos.lt(r1_inclusive_end_row, r1_inclusive_end_col, r2[1], r2[2])
+    or util.cmp_pos.gt(r1[1], r1[2], r2_inclusive_end_row, r2_inclusive_end_col)
   then
     return nil
   end
