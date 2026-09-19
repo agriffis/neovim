@@ -20,7 +20,7 @@ local atoms_start = t_atom.atoms_start
 local atoms = t_atom.atoms
 local atoms_tail = t_atom.atoms_tail
 local atom_last = t_atom.atom_last
-local pick = t_atom.pick
+local pick = t.pick
 local subatoms = t_atom.subatoms
 
 describe('dot-repeat', function()
@@ -841,14 +841,16 @@ describe('CmdAtom', function()
       feed('.')
       eq('l3', fn.getline(1))
 
-      -- "gv" (absolute region) is unreplayable, but emitted in `lhs`.
-      api.nvim_buf_set_lines(0, 0, -1, true, { 'aaa bbb' })
+      -- "gv" is replayable, but "." redoes a fixed-size region ("1v"), like Vim.
+      api.nvim_buf_set_lines(0, 0, -1, true, { 'aaa bbb ccc' })
       feed('gg0viw<Esc>')
       before = #atoms()
       feed('gvd')
-      eq(' bbb', fn.getline(1))
+      eq(' bbb ccc', fn.getline(1))
       eq(before + 1, #atoms())
-      eq({ type = 'visual', keys = '', lhs = 'gvd' }, pick(atom_last(), 'type', 'keys', 'lhs'))
+      eq({ type = 'visual', keys = 'gvd', lhs = 'gvd' }, pick(atom_last(), 'type', 'keys', 'lhs'))
+      feed('.')
+      eq('b ccc', fn.getline(1))
 
       -- A fed (":normal!") Visual-put preps the selection keysequence, like any fed visual
       -- operator (":normal! vjd"): "." re-executes "Vjp", not a bare "p".
@@ -1757,7 +1759,7 @@ describe('CmdAtom', function()
     eq(true, atom_last().changed)
   end)
 
-  it('captures non-edit operators (zfap) and fold/view commands', function()
+  it('captures prep-exempt operators (zfap) and fold/view commands', function()
     fn.setline(1, { 'aa', 'aa', '' })
     feed('gg0')
     atoms_start()
@@ -1770,6 +1772,27 @@ describe('CmdAtom', function()
     -- Neither an operator nor a motion: its own kind.
     eq('normal', atom_last().type)
     eq(-1, fn.foldclosed(1))
+  end)
+
+  it('captures "do"/"dp" (:diffget/:diffput); "." repeats them (unlike Vim)', function()
+    atoms_start()
+    command('new')
+    fn.setline(1, { 'a', 'b', 'c', 'd' })
+    command('diffthis | vnew')
+    fn.setline(1, { 'a', 'XY', 'c', 'ZW' })
+    command('diffthis')
+    feed('2G')
+    local before = #atoms()
+    feed('do')
+    eq(before + 1, #atoms())
+    eq({ { type = 'operator', keys = 'do' } }, atoms_tail(1, 'type', 'keys'))
+    eq('b', fn.getline(2))
+    feed('2j.') -- Repeats "do" at the next hunk.
+    eq('d', fn.getline(4))
+    feed('2Gx')
+    feed('dp')
+    eq({ { type = 'operator', keys = 'dp' } }, atoms_tail(1, 'type', 'keys'))
+    eq({ '' }, fn.getbufline(fn.bufnr('#'), 2))
   end)
 
   it("operatorfunc atom includes the getchar()'d payload", function()

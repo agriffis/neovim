@@ -29,7 +29,7 @@
 //
 // Each u_entry list contains the information for one undo or redo.
 // curbuf->b_u_curhead points to the header of the last undo (the next redo),
-// or is NULL if nothing has been undone (end of the branch).
+// or is NULL if nothing has been undone ("leaf", end of the branch).
 //
 // For keeping alternate undo/redo branches the uh_alt field is used.  Thus at
 // each point in the list a branch may appear for an alternate to redo.  The
@@ -522,12 +522,7 @@ int u_savecommon(buf_T *buf, linenr_T top, linenr_T bot, linenr_T newbot, bool r
 
         // If lines have been inserted/deleted we give up.
         // Also when the line was included in a multi-line save.
-        if ((buf->b_u_newhead->uh_getbot_entry != uep
-             ? (uep->ue_top + uep->ue_size + 1
-                != (uep->ue_bot == 0
-                    ? buf->b_ml.ml_line_count + 1
-                    : uep->ue_bot))
-             : uep->ue_lcount != buf->b_ml.ml_line_count)
+        if (u_entry_resized(buf, uep)
             || (uep->ue_size > 1
                 && top >= uep->ue_top
                 && top + 2 <= uep->ue_top + uep->ue_size + 1)) {
@@ -623,6 +618,15 @@ int u_savecommon(buf_T *buf, linenr_T top, linenr_T bot, linenr_T newbot, bool r
   u_check(false);
 #endif
   return OK;
+}
+
+/// Whether lines were added or deleted since `uep` (an entry of the newest undo state) was saved.
+static bool u_entry_resized(buf_T *buf, u_entry_T *uep)
+{
+  return buf->b_u_newhead->uh_getbot_entry != uep
+         ? uep->ue_top + uep->ue_size + 1
+         != (uep->ue_bot == 0 ? buf->b_ml.ml_line_count + 1 : uep->ue_bot)
+         : uep->ue_lcount != buf->b_ml.ml_line_count;
 }
 
 // magic at start of undofile
@@ -1867,30 +1871,7 @@ bool u_undo_and_forget(int count, bool do_buf_event)
     return false;
   }
 
-  // Delete the current redo header
-  // set the redo header to the next alternative branch (if any)
-  // otherwise we will be in the leaf state
-  u_header_T *to_forget = curbuf->b_u_curhead;
-  curbuf->b_u_newhead = to_forget->uh_next.ptr;
-  curbuf->b_u_curhead = to_forget->uh_alt_next.ptr;
-  if (curbuf->b_u_curhead) {
-    to_forget->uh_alt_next.ptr = NULL;
-    curbuf->b_u_curhead->uh_alt_prev.ptr = to_forget->uh_alt_prev.ptr;
-    curbuf->b_u_seq_cur = curbuf->b_u_curhead->uh_next.ptr
-                          ? curbuf->b_u_curhead->uh_next.ptr->uh_seq : 0;
-  } else if (curbuf->b_u_newhead) {
-    curbuf->b_u_seq_cur = curbuf->b_u_newhead->uh_seq;
-  }
-  if (to_forget->uh_alt_prev.ptr) {
-    to_forget->uh_alt_prev.ptr->uh_alt_next.ptr = curbuf->b_u_curhead;
-  }
-  if (curbuf->b_u_newhead) {
-    curbuf->b_u_newhead->uh_prev.ptr = curbuf->b_u_curhead;
-  }
-  if (curbuf->b_u_seq_last == to_forget->uh_seq) {
-    curbuf->b_u_seq_last--;
-  }
-  u_freebranch(curbuf, to_forget, NULL);
+  u_forget_header(curbuf, curbuf->b_u_curhead);  // The undone branch.
   return true;
 }
 
@@ -3004,6 +2985,39 @@ static void u_freebranch(buf_T *buf, u_header_T *uhp, u_header_T **uhpp)
   }
 }
 
+/// Forgets `uhp` and its branch (the changes above it). The alt branch displaced by `uhp` (see
+/// u_savecommon()) takes its place as the redo branch; if there is none, the tree is at the leaf
+/// state (end of the branch, nothing to redo).
+static void u_forget_header(buf_T *buf, u_header_T *uhp)
+{
+  u_header_T *parent = uhp->uh_next.ptr;
+  u_header_T *alt = uhp->uh_alt_next.ptr;
+  if (alt != NULL) {
+    alt->uh_alt_prev.ptr = uhp->uh_alt_prev.ptr;
+  }
+  if (uhp->uh_alt_prev.ptr != NULL) {
+    uhp->uh_alt_prev.ptr->uh_alt_next.ptr = alt;
+  }
+  if (parent != NULL) {
+    parent->uh_prev.ptr = alt;
+  }
+  if (buf->b_u_oldhead == uhp) {
+    buf->b_u_oldhead = alt;
+  }
+  // Detached: u_freebranch() must not touch the alternate branch.
+  uhp->uh_alt_next.ptr = NULL;
+  uhp->uh_alt_prev.ptr = NULL;
+  // Positioned at the parent, with the alternate branch as redo.
+  buf->b_u_newhead = parent;
+  buf->b_u_curhead = alt;
+  buf->b_u_seq_cur = parent != NULL ? parent->uh_seq : 0;
+  if (buf->b_u_seq_last == uhp->uh_seq) {
+    buf->b_u_seq_last--;
+  }
+  buf->b_u_synced = true;
+  u_freebranch(buf, uhp, NULL);
+}
+
 /// Free all the undo entries for one header and the header itself.
 /// This means that "uhp" is invalid when returning.
 ///
@@ -3047,6 +3061,35 @@ static void u_freeentry(u_entry_T *uep, int n)
   uep->ue_magic = 0;
 #endif
   xfree(uep);
+}
+
+/// Prunes the newest undo entry if it has no changes (u_save() not followed by an actual edit).
+/// Frees the undo state (and extmark undo) if no entries remain, restoring the redo branch it
+/// displaced.
+///
+/// Dropping the entry loses nothing: undoing it would "restore" identical lines.
+void u_forget_unchanged(buf_T *buf)
+  FUNC_ATTR_NONNULL_ALL
+{
+  u_header_T *uhp = buf->b_u_newhead;
+  u_entry_T *uep = uhp != NULL ? uhp->uh_entry : NULL;
+  if (uep == NULL || buf->b_u_curhead != NULL || u_entry_resized(buf, uep)) {
+    return;  // Keep the entry: not at leaf, or lines were added/deleted.
+  }
+  for (linenr_T i = 0; i < uep->ue_size; i++) {
+    if (strcmp(uep->ue_array[i], ml_get_buf(buf, uep->ue_top + 1 + i)) != 0) {
+      return;  // Keep the entry: it has changes (lines differ vs the buffer).
+    }
+  }
+
+  uhp->uh_entry = uep->ue_next;
+  if (uhp->uh_getbot_entry == uep) {
+    uhp->uh_getbot_entry = NULL;
+  }
+  u_freeentry(uep, uep->ue_size);
+  if (uhp->uh_entry == NULL) {
+    u_forget_header(buf, uhp);  // Empty state (no changes).
+  }
 }
 
 /// invalidate the undo buffer; called when storage has already been released

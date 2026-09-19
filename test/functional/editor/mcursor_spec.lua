@@ -443,6 +443,23 @@ describe('multicursor', function()
   end)
 
   describe('normal-mode cascade', function()
+    it("'[ and '] are per-cursor", function()
+      cursors({ 'aa bb', 'cc dd' }, 'Qj')
+      feed('gUiw')
+      eq({ 'AA bb', 'CC dd' }, get_lines())
+      -- Each cursor's replay set its own change marks, so a mapping reading them acts per cursor.
+      command('nnoremap <F2> `[v`]u')
+      feed('<F2>')
+      eq({ 'aa bb', 'cc dd' }, get_lines())
+
+      -- The primary's marks are shifted by edits from other cursors.
+      clear_cursors()
+      cursors({ 'a', 'b', 'c', 'd', 'e' }, 'Q3j')
+      feed('dd') -- Delete line 1.
+      eq({ 'b', 'c', 'e' }, get_lines())
+      eq(3, fn.getpos("'[")[2])
+    end)
+
     it('CTRL-C interrupts the cascade; one "u" undoes the partial edit', function()
       local nlines = 5000
       local lines = {} ---@type string[]
@@ -1333,7 +1350,7 @@ describe('multicursor', function()
       local ev = atom_last()
       eq(
         { type = 'mapping', lhs = k('iX<Esc>'), changed = true },
-        t_atom.pick(atom_last(), 'type', 'lhs', 'changed')
+        t.pick(atom_last(), 'type', 'lhs', 'changed')
       )
       eq({
         { type = 'motion', keys = '^' },
@@ -1795,6 +1812,56 @@ describe('multicursor', function()
         {1:~                             }|
         {5:-- VISUAL BLOCK --}            |
       ]])
+    end)
+
+    it('gv reselects per-cursor #41606', function()
+      local screen = Screen.new(30, 6)
+      cursors({ 'aa bb cc dd', 'ee ff gg hh', 'ii jj kk ll' })
+      feed('v3l<Esc>')
+      -- Per-cursor '< '> marks: "gv" reselects that (absolute) area.
+      feed('gv')
+      screen:expect([[
+        {17:aa b}b cc dd                   |
+        {17:ee f}f gg hh                   |
+        {17:ii }^jj kk ll                   |
+        {1:~                             }|*2
+        {5:-- VISUAL --}                  |
+      ]])
+      feed('d')
+      eq({ 'b cc dd', 'f gg hh', 'j kk ll' }, get_lines())
+      -- "." redoes a same-size region ("1v"), like Vim: not "gv" (the collapsed area).
+      feed('.')
+      eq({ ' dd', ' hh', ' ll' }, get_lines())
+
+      -- The per-cursor "gv" regions are shifted by edits.
+      clear_cursors()
+      cursors({ 'a', 'b', 'c', 'd', 'e', 'f' }, '2jQgg')
+      feed('Vj<Esc>') -- Primary: lines 1-2. Cursor: lines 3-4.
+      feed('gvd')
+      eq({ 'e', 'f' }, get_lines())
+      -- ...and a cursor's delete shifts the primary's area.
+      clear_cursors()
+      cursors({ 'a', 'b', 'c', 'd', 'e', 'f' }, 'Q3j')
+      feed('Vj<Esc>') -- Cursor: lines 1-2. Primary: lines 4-5.
+      feed('gvd')
+      eq({ 'c', 'f' }, get_lines())
+      feed('gv')
+      screen:expect([[
+        {17:c}                             |
+        ^f                             |
+        {1:~                             }|*3
+        {5:-- VISUAL LINE --}             |
+      ]])
+      feed('<Esc>')
+
+      -- A cursor without a previous area (added after the selection) has nothing to reselect.
+      clear_cursors()
+      cursors({ 'aa bb', 'cc dd', 'ee ff' }, 'Qj')
+      feed('viw<Esc>')
+      feed('jQk') -- Cursor on line 3: no area.
+      feed('gvd')
+      eq({ ' bb', ' dd', 'ee ff' }, get_lines())
+      eq(2, ncursors())
     end)
 
     it('replays the full visual keysequence', function()
@@ -2309,14 +2376,20 @@ describe('multicursor', function()
         text = evs[#evs].text,
         keys = evs[#evs].keys,
       })
-      -- No session marks outlive the session (mc_ins_commit() drops them, cascaded or not).
-      eq(
-        0,
-        n.exec_lua([[
+      -- Session marks (preview regions, trackers) do not leak: a second session adds none.
+      local function session_marks()
+        return n.exec_lua([[
           local ns = vim.api.nvim_get_namespaces()['nvim.multicursor._session']
           return ns and #vim.api.nvim_buf_get_extmarks(0, ns, 0, -1, {}) or 0
         ]])
-      )
+      end
+      local marks = session_marks()
+      feed('i')
+      n.poke_eventloop()
+      feed('Z')
+      n.poke_eventloop()
+      feed('<Esc>')
+      eq(marks, session_marks())
       -- A Visual-entered session keeps its "visual" type: each nested span-replay bracket owns
       -- its own InsSession, so it cannot clobber the primary session's `vis`.
       clear_cursors()
@@ -2495,6 +2568,27 @@ describe('multicursor', function()
       eq({ 'aa', 'x', 'bb', 'cc', 'x' }, get_lines())
       feed('u')
       eq({ 'aa', 'bb', 'cc' }, get_lines())
+    end)
+
+    it('empty insert-session does not add undo state #41883', function()
+      cursors({ 'abc', 'def', 'ghi' }, 'Qj')
+      local seq = fn.undotree().seq_last
+      feed('i<Esc>')
+      eq(seq, fn.undotree().seq_last)
+      feed('a<Esc>') -- Move the cursors (records extmark undo), but don't edit.
+      eq(seq, fn.undotree().seq_last)
+      -- In a mapping the session shares the mapping's undo state: only its own entry is dropped.
+      command('nnoremap <F5> xi<Esc>')
+      feed('<F5>')
+      eq({ 'bc', 'ef', 'ghi' }, get_lines())
+      eq(seq + 1, fn.undotree().seq_last)
+      feed('u')
+      eq({ 'abc', 'def', 'ghi' }, get_lines())
+      -- After an undo, the redo branch survives.
+      feed('i<Esc>')
+      eq(seq + 1, fn.undotree().seq_last)
+      feed('<C-r>')
+      eq({ 'bc', 'ef', 'ghi' }, get_lines())
     end)
 
     it('a mapped undo/redo (vim-repeat "nmap u") does not cascade', function()
@@ -2690,9 +2784,12 @@ describe('multicursor', function()
 
       cursors({ 'aaa', 'bbb', 'ccc' }, 'QjQ')
       exec_lua('vim.wait(10)') -- drain the scheduled refresh
-      -- Clear-all, then shape 29 ("follow main cursor") at each position.
+      -- Clear-all, text color (30), cursor color (40), then positions (29).
       local sent = exec_lua('return _G.sent')
-      eq('\027[>0;4 q\027[>29;2:1:1;2:2:1 q', sent[#sent])
+      t.matches(
+        '^\027%[>0;4 q\027%[>30;2:%d+:%d+:%d+ q\027%[>40;2:%d+:%d+:%d+ q\027%[>29;2:1:1;2:2:1 q$',
+        sent[#sent]
+      )
 
       -- The cell-highlight fallback is suppressed (no {17:} on line 1).
       screen:expect([[
@@ -2843,7 +2940,7 @@ describe('multicursor', function()
         operator = 'g@',
         changed = false,
         moved = true,
-      }, t_atom.pick(atom_last(), 'type', 'keys', 'lhs', 'operator', 'changed', 'moved'))
+      }, t.pick(atom_last(), 'type', 'keys', 'lhs', 'operator', 'changed', 'moved'))
     end)
 
     it('cursors placed inside the opfunc are live for the next typed cascade', function()
