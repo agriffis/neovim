@@ -26,8 +26,9 @@ struct CmdFrame {
   CmdOrigin origin;     ///< State at entry.
   VisualState visual;   ///< Visual-mode state (active/start/mode are diffed).
   bool keytyped;        ///< KeyTyped
+  unsigned keyclass;    ///< atom_key_class() of the cmd char, before its `nchar`.
+  int ex_normal;        ///< If higher than `root_frame().ex_normal`, a cmd fed this (:norm, feed).
   uint64_t captures;    ///< `atom_captures` at entry.
-  size_t vatoms;        ///< `kv_size(vatom.atoms)` at entry: any beyond were fed in this frame.
   uint64_t global_ops;  ///< `global_ops` at entry.
   uint64_t beeps;       ///< `did_beep` at entry.
   uint64_t id;          ///< Identifies this frame (see `composite.frame`).
@@ -45,7 +46,6 @@ struct CmdFrame {
   uint64_t redo_frame;  ///< Frame whose redobuf (potentially) defines the atom. 0: none.
   char *cmdline;        ///< The ":" payload captured at cmdline accept. NULL: none.
                         ///< Note: search payloads ("/pat<CR>") travel on `cmdarg.searchbuf`.
-  bool ins_cascaded;    ///< Did the command's insert-session already cascade?
 };
 
 #include "input_cmdatom.h.generated.h"

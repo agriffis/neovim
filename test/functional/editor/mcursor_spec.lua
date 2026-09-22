@@ -1755,7 +1755,7 @@ describe('multicursor', function()
       eq('n', api.nvim_get_mode().mode)
     end)
 
-    it('shows per-cursor selection', function()
+    it('per-cursor selection', function()
       local screen = Screen.new(30, 6)
       cursors({ 'longword x', 'ab y', 'medium z' })
       -- Each cursor shows its own selection ("iw" = that cursor's word), previewed live.
@@ -1788,7 +1788,7 @@ describe('multicursor', function()
       eq('normal', screen.mode)
     end)
 
-    it('shows linewise/blockwise selections', function()
+    it('linewise/blockwise selections', function()
       local screen = Screen.new(30, 6)
       cursors({ 'aaaa', 'bbbb', 'cccc', 'dddd' }, 'Q2j')
       feed('Vj') -- linewise: primary lines 3-4, fake lines 1-2
@@ -1864,7 +1864,7 @@ describe('multicursor', function()
       eq(2, ncursors())
     end)
 
-    it('selection moved by API/Lua inside a mapping #41956', function()
+    it('selection moved by mapping via API/Lua #41956', function()
       local screen = Screen.new(30, 6)
       n.exec_lua(function()
         -- Extends the selection by 2 via the API, around a fed "o".
@@ -1883,8 +1883,7 @@ describe('multicursor', function()
       end)
       cursors({ 'aaaaaaa', 'bbbbbbb', 'ccccccc' })
       atoms_start()
-      -- The fed "o" does not describe the selection the mapping leaves, so the mapping itself is
-      -- the subatom: it replays at each cursor, for the preview and the cascade alike.
+      -- Fed "o" does not describe the resulting selection, so the mapping itself is the subatom.
       feed('vgh')
       screen:expect([[
         a{17:aaa}aaa                       |
@@ -1896,7 +1895,7 @@ describe('multicursor', function()
       feed('d')
       eq({ 'aaaa', 'bbbb', 'cccc' }, get_lines())
       eq({ { type = 'visual' } }, atoms_tail(1, 'type'))
-      -- A mapping that starts the selection: same.
+      -- Mapping that starts the selection: same.
       feed('gL')
       screen:expect([[
         a{17:aaa}                          |
@@ -1908,7 +1907,7 @@ describe('multicursor', function()
       feed('d')
       eq({ 'a', 'b', 'c' }, get_lines())
 
-      -- A fed "gv" reselects marks the mapping set: the mapping is the subatom, not "gv".
+      -- Fed "gv" reselects marks set by the mapping.
       n.exec_lua(function()
         vim.keymap.set('x', 'gs', function()
           local row, col = unpack(vim.api.nvim_win_get_cursor(0))
@@ -1930,8 +1929,8 @@ describe('multicursor', function()
       feed('d')
       eq({ 'aaaa', 'bbbb', 'cccc' }, get_lines())
 
-      -- A mapping that ends the selection with an operator and starts a new one elsewhere: the
-      -- session is kept across the operator, the mapping replaces what it fed.
+      -- Mapping that ends the selection by operator and starts a new one: session is kept across
+      -- the operator.
       n.exec_lua(function()
         vim.keymap.set('x', 'gl', function()
           vim.cmd('normal! "_y')
@@ -1953,6 +1952,59 @@ describe('multicursor', function()
       eq({ 'aaaaa', 'bbbbb', 'ccccc' }, get_lines())
     end)
 
+    it('mapping that edits during the selection #42005', function()
+      local screen = Screen.new(30, 6)
+      -- "Shift right": the mapping edits, then reselects the moved text.
+      command([[xnoremap gl <Cmd>normal! xp`[1v<CR>]])
+      cursors({ 'abcd', 'efgh', 'ijkl' })
+      feed('vgl')
+      screen:expect([[
+        b{17:a}cd                          |
+        f{17:e}gh                          |
+        j^ikl                          |
+        {1:~                             }|*2
+        {5:-- VISUAL --}                  |
+      ]])
+      eq({ 'bacd', 'fegh', 'jikl' }, get_lines())
+      feed('gl') -- span 2 continues from each cursor's own selection.
+      eq({ 'bcad', 'fgeh', 'jkil' }, get_lines())
+      feed('d') -- Operator completes the session as the last span.
+      eq({ 'bcd', 'fgh', 'jkl' }, get_lines())
+
+      -- Mapping that acts only in Visual mode ("mini.move").
+      n.exec_lua(function()
+        vim.keymap.set('x', 'gm', function()
+          if vim.fn.mode() ~= 'v' then
+            return
+          end
+          vim.cmd('normal! xp`[1v')
+        end)
+      end)
+      clear_cursors()
+      cursors({ 'abcd', 'efgh', 'ijkl' })
+      feed('vgm')
+      eq({ 'bacd', 'fegh', 'jikl' }, get_lines())
+    end)
+
+    it('cursor overlapping the primary is deduped before an edit #42025', function()
+      -- The command may move the primary before the cascade ("yiwp")!
+      command('nnoremap gm yiwp') -- "Multiply" the word at cursor.
+      cursors({ 'aa', 'bb' }, 'QjQ') -- Cursor overlapping the primary.
+      feed('gm')
+      eq({ 'aaaa', 'bbbb' }, get_lines())
+      -- Same for a Visual span: the primary sits at selection-end.
+      command([[xnoremap gl <Cmd>normal! xp`[1v<CR>]])
+      clear_cursors()
+      cursors({ 'abcd', 'efgh', 'ijkl' }, 'QjQjQ')
+      feed('0vgl')
+      eq({ 'bacd', 'fegh', 'jikl' }, get_lines())
+      -- Motion does not cascade, so it must not dedupe the cursor under the primary.
+      clear_cursors()
+      cursors({ 'abc', 'def' }, 'Q')
+      feed('l')
+      eq(1, ncursors())
+    end)
+
     it('replays the full visual keysequence', function()
       cursors({ 'one two three x', 'aa bb cc d' }, 'Qj')
       -- Select word, extend twice, delete: selection re-executes at each cursor, so the extents are
@@ -1971,18 +2023,18 @@ describe('multicursor', function()
       eq({ 'Vd' }, atoms_tail(1))
     end)
 
-    it('shows selections opened by :normal #41705', function()
+    it('selections opened by :normal #41705', function()
       local screen = Screen.new(30, 6)
       command('nnoremap <F2> <Cmd>normal! viw<CR>')
       n.exec_lua(function()
+        vim.keymap.set('x', 'Z', '<Cmd>normal! iw<CR>')
         vim.keymap.set('n', '<F3>', function()
           vim.cmd.normal('vZ')
         end)
-        vim.keymap.set('x', 'Z', '<Cmd>normal! iw<CR>')
       end)
       atoms_start()
       -- Each entry opens the selection from a different enclosing frame: typed cmdline, <Cmd>
-      -- mapping, Lua mapping (nested x-mapping), RPC. Result does not depend on the follow-mode.
+      -- mapping, Lua mapping (nested x-mapping), RPC. Result does not depend on follow-mode.
       for i, keys in ipairs({ ':normal! viw<CR>', '<F2>', '<F3>', 'api' }) do
         clear_cursors()
         cursors({ 'longword x', 'ab y', 'medium z' })
@@ -2003,7 +2055,20 @@ describe('multicursor', function()
         eq({ { 0, 0 }, { 1, 0 } }, anchors(), keys)
         feed('d')
         eq({ ' x', ' y', ' z' }, get_lines(), keys)
-        eq({ 'viwd' }, atoms_tail(1))
+
+        -- The atom is the literal input: a command is captured as itself, not any keys it "feeds".
+        -- But fed input with no enclosing command (RPC) collects its own keys.
+        local expected = ({
+          [':normal! viw<CR>'] = k(':normal! viw<NL>d'),
+          ['<F2>'] = k('<Cmd>normal! viw<NL>d'),
+          ['api'] = 'viwd',
+        })[keys]
+        if expected then
+          eq({ expected }, atoms_tail(1), keys)
+        else
+          t.matches('^\128\253g%d+\nd$', atoms_tail(1)[1]) -- "<F3>": K_LUA + mapping id.
+        end
+
         screen:expect({
           condition = function()
             eq('normal', screen.mode)
@@ -2012,7 +2077,7 @@ describe('multicursor', function()
       end
     end)
 
-    it('previews selections after mapping motions', function()
+    it('selections after mapping motions', function()
       local screen = Screen.new(30, 6)
       cursors({ 'a longword x', 'bbbb ab y', 'cc medium z' })
       command('nnoremap <F2> w<Cmd>normal! viw<CR>')
@@ -2029,7 +2094,7 @@ describe('multicursor', function()
       ]])
       feed('d')
       eq({ 'a  x', 'bbbb  y', 'cc  z' }, get_lines())
-      eq({ 'wviwd' }, atoms_tail(1))
+      eq({ k('w<Cmd>normal! viw<NL>d') }, atoms_tail(1))
     end)
 
     it('refreshes a nested selection even if the primary selection is unchanged', function()
@@ -2240,7 +2305,7 @@ describe('multicursor', function()
       eq({ '(aa', '(bb', '(cc' }, get_lines())
     end)
 
-    it('q= toggle is synchronous within a mapping #41836', function()
+    it("is decided at a mapping's first move #41836", function()
       -- Cursors on lines 2-4, primary line 5, follow=ON.
       cursors({ 'l1', 'l2', 'l3', 'l4', 'l5' }, 'jQjQjQj1q=')
       -- Mapping toggles follow OFF, moves, then toggles ON: the move should NOT cascade.

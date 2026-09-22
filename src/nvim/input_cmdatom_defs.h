@@ -27,6 +27,7 @@ typedef enum CmdAtomType {
   kAOperator,      ///< Operator+motion, or a self-contained edit command.
   kAScroll,        ///< Scroll (CTRL-Y/D/…, wheel): emit-only, like kAMouse.
   kAVisual,        ///< Visual-mode sequence ("viwee" + operator). Captures subatoms.
+  kAVisualSpan,    ///< Span (chunk) of an ongoing Visual session, cascaded mid-session.
 } CmdAtomType;
 
 /// State gathered at start of a command, composite, or insert. For calculating the "delta" at end.
@@ -59,28 +60,28 @@ typedef kvec_t(CmdAtom) CmdAtomVec;
 
 /// One repeatable operation. `keys` is the replay bytes; `spec` is the structured form.
 struct CmdAtom {
+  CmdAtomType type;
   CmdSpec spec;   ///< Structured fields.
+  CmdOrigin origin;  ///< Pre-command state.
   CmdAtomVec atoms;  ///< Composite (multi-command mapping, Visual sequence): its subatoms,
-                     ///< in order; their keys concatenate to `keys`. Empty for non-composite.
+                     ///< in order; their keys concatenate to `keys`. Empty: non-composite.
   char *keys;     ///< Resolved keysequence (typeahead encoding), including `["x][count]` prefix
                   ///< (unlike `CmdSpec.body`, the raw unprefixed form).
   char *text;     ///< Insert-session text, or Ex/search cmdline payload.
   char *lhs;      ///< Unresolved user input: mapping LHS, macro ("@q"), Visual op, or translation
                   ///< ("x" => "dl"). NULL: untranslated, same as `keys`.
-  CmdOrigin origin;  ///< Pre-command state.
-  CmdAtomType type;
   int undoseq;    ///< Undo state at settlement. Not monotonic (decreases on undo).
   bool changed;   ///< The command changed the buffer.
   bool moved;     ///< The command moved the cursor.
-  bool remap;     ///< If true, `keys` cannot replay: payload mapping (vim-surround "ds'") edits
-                  ///< invisibly (:norm/Ex). Must replay `lhs` instead.
+  bool remap;     ///< True if `keys` cannot replay (lossy/empty capture). Replay `lhs` instead.
+  bool cascaded;  ///< This atom already cascaded as spans: emit-only.
 };
 
 /// Key classes (atom_key_class()).
 /// Flags, bc same char can mean different things per mode (CTRL-T: tag-jump vs i_CTRL-T indent).
 enum {
-  kKeyOpaque     = 1 << 0,  ///< Uncapturable keys (<Cmd>, K_LUA, plus kKeySynthetic): its only
-                            ///< trace is its effect.
+  kKeyOpaque     = 1 << 0,  ///< Cmds not reified from subatoms (<Cmd>, K_LUA), plus kKeySynthetic.
+                            ///< The cmd itself is the atom, else its only trace is its effect.
   kKeySynthetic  = 1 << 1,  ///< Not a user keystroke (K_EVENT, K_IGNORE): unlike <Cmd>/K_LUA, never
                             ///< reaches us from a mapping.
   kKeyPayload    = 1 << 2,  ///< Interactively-typed payload (/, ?, :, !).
