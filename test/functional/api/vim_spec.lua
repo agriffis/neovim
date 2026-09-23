@@ -2307,6 +2307,38 @@ describe('API', function()
       eq('', api.nvim_get_option_value('wildignore', {}))
     end)
 
+    it('preserves :setlocal trust semantics when merging options', function()
+      local path = tmpname(false)
+      finally(function()
+        os.remove(path)
+      end)
+
+      local expr = "writefile(['foldexpr'], " .. fn.string(path) .. ')'
+      api.nvim_buf_set_lines(0, 0, -1, false, { 'one', 'two' })
+
+      -- Match :setlocal +=, ^=, and -=: retained expression text must stay sandboxed.
+      for _, case in ipairs({
+        { 'append', '+0' },
+        { 'prepend', '0+' },
+        { 'remove', '+0' },
+      }) do
+        local operation, value = unpack(case)
+
+        command('setlocal foldmethod=manual')
+        command('sandbox let &l:foldexpr = ' .. fn.string(expr .. '+0'))
+        api.nvim_set_option_value('foldexpr', value, { scope = 'local', operation = operation })
+
+        command('setlocal foldmethod=expr')
+        command('normal! zx')
+        eq(0, fn.filereadable(path))
+      end
+
+      -- As with :setlocal =, a full replacement from trusted code must allow the write.
+      api.nvim_set_option_value('foldexpr', expr, { scope = 'local' })
+      command('normal! zx')
+      eq({ 'foldexpr' }, fn.readfile(path))
+    end)
+
     it('allows setting, appending, prepending, removing dicts', function()
       -- NOTE: order is dependent on lua's hash map implementation. I don't
       -- *think* order matters for the map style options
@@ -2407,7 +2439,7 @@ describe('API', function()
         { 'isident', '256', 'E474:' },
         { 'iskeyword', '256', 'E474:' },
         { 'isfname', '256', 'E474:' },
-        { 'isprint', '256', 'E474:' },
+        { 'isprint', '256', 'E519:' },
         { 'spelllang', 'en/gb', 'E474:' },
         { 'spellfile', 'words.txt', 'E474:' },
         { 'complete', 'x', 'E539:' },
@@ -5945,6 +5977,15 @@ describe('API', function()
         'Invalid range element: expected non-negative Integer',
         pcall_err(api.nvim_cmd, { cmd = 'print', args = {}, range = { -1 } }, {})
       )
+      eq(
+        "Invalid 'range'",
+        pcall_err(api.nvim_cmd, { cmd = 'print', args = {}, range = { 99 } }, {})
+      )
+      -- Not ":1x" (:xit).
+      eq(
+        'Wrong number of arguments',
+        pcall_err(api.nvim_cmd, { cmd = '', range = { 1 }, args = { 'x' } }, {})
+      )
 
       eq(
         'Command cannot accept count: set',
@@ -6027,6 +6068,19 @@ describe('API', function()
         line5
         line6
       ]]
+    end)
+
+    it('uses the same default range as Ex', function()
+      api.nvim_buf_set_lines(0, 0, -1, false, { 'a', 'b', 'c' })
+      api.nvim_win_set_cursor(0, { 2, 0 })
+      command('command -range -addr=other Other let g:r = [<line1>, <line2>]')
+      command('command -range=% -addr=other OtherAll let g:r = [<line1>, <line2>]')
+      for _, name in ipairs({ 'Other', 'OtherAll' }) do
+        command(name)
+        local ex = api.nvim_get_var('r')
+        api.nvim_cmd({ cmd = name }, {})
+        eq(ex, api.nvim_get_var('r'))
+      end
     end)
 
     it('works with count', function()
@@ -6180,7 +6234,7 @@ describe('API', function()
           vim.print(opts.fargs)
         end
 
-        vim.api.nvim_create_user_command("Foo", FooFunc, { nargs = '+' })
+        vim.api.nvim_create_user_command("Foo", FooFunc, { nargs = '+', bar = true })
       ]],
         {}
       )
@@ -6198,6 +6252,13 @@ describe('API', function()
           { output = true }
         )
       )
+      eq([[{ " a|b" }]], api.nvim_cmd({ cmd = 'Foo', args = { ' a|b' } }, { output = true }))
+    end)
+
+    it('keeps leading white space of the first argument', function()
+      api.nvim_buf_set_lines(0, 0, -1, false, { 'ab' })
+      api.nvim_cmd({ cmd = 'normal', args = { ' x' } }, {})
+      eq({ 'a' }, api.nvim_buf_get_lines(0, 0, -1, false))
     end)
 
     it('works with buffer names', function()
