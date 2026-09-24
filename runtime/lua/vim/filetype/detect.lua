@@ -356,7 +356,7 @@ function M.cls(_, bufnr)
     return 'objectscript'
   elseif nonblank1 and nonblank1:find('^[%%\\]') then
     return 'tex'
-  elseif nonblank1 and findany(nonblank1, { '^%s*/%*', '^%s*::%w' }) then
+  elseif nonblank1 and findany(nonblank1, { '^%s*/%*', '^%s*::[%w_]' }) then
     return 'rexx'
   end
   return 'st'
@@ -609,9 +609,9 @@ local function modula2(bufnr)
 
   -- ignore unknown dialects or badly formatted tags
   for _, line in ipairs(getlines(bufnr, 1, 200)) do
-    local matched_dialect, matched_extension = line:match('%(%*!m2(%w+)%+(%w+)%*%)')
+    local matched_dialect, matched_extension = line:match('%(%*!m2([%w_]+)%+([%w_]+)%*%)')
     if not matched_dialect then
-      matched_dialect = line:match('%(%*!m2(%w+)%*%)')
+      matched_dialect = line:match('%(%*!m2([%w_]+)%*%)')
     end
     if matched_dialect then
       if vim.tbl_contains({ 'iso', 'pim', 'r10' }, matched_dialect) then
@@ -840,22 +840,37 @@ end
 
 --- @type vim.filetype.mapfn
 function M.header(_, bufnr)
-  for _, line in ipairs(getlines(bufnr, 1, 200)) do
-    if findany(line:lower(), { '^@interface', '^@end', '^@class' }) then
+  if vim.g.filetype_h then
+    return vim.g.filetype_h
+  elseif vim.g.c_syntax_for_h then
+    return 'c'
+  elseif vim.g.ch_syntax_for_h then
+    return 'ch'
+  end
+
+  for _, line in ipairs(getlines(bufnr, 1, 100)) do
+    if
+      findany(line:lower(), { '^%s*@interface%f[^%w_]', '^%s*@end%f[^%w_]', '^%s*@class%f[^%w_]' })
+    then
       if vim.g.c_syntax_for_h then
         return 'objc'
       else
         return 'objcpp'
       end
     end
+    if
+      findany(line:lower(), {
+        '^%s*class%f[^%w_]',
+        '^%s*namespace%f[^%w_]',
+        '^%s*template%f[^%w_]',
+        '^%s*using%f[^%w_]',
+      })
+    then
+      return 'cpp'
+    end
   end
-  if vim.g.c_syntax_for_h then
-    return 'c'
-  elseif vim.g.ch_syntax_for_h then
-    return 'ch'
-  else
-    return 'cpp'
-  end
+
+  return 'c'
 end
 
 --- Recursively search for Hare source files in a directory and any
@@ -1695,8 +1710,8 @@ function M.sc(_, bufnr)
         'var%s<',
         'classvar%s<',
         '%^this.*',
-        '|%w+|',
-        '%+%s%w*%s{',
+        '|[%w_]+|',
+        '%+%s[%w_]*%s{',
         '%*ar%s',
       })
     then
@@ -2040,7 +2055,7 @@ function M.v(_, bufnr)
         or line:find('%(%*') and not line:find('/[/*].*%(%*')
       then
         return 'coq'
-      elseif findany(line, { ';%s*$', ';%s*/[/*]', '^%s*module%s+%w+%s*%(' }) then
+      elseif findany(line, { ';%s*$', ';%s*/[/*]', '^%s*module%s+[%w_]+%s*%(' }) then
         return 'verilog'
       end
     end

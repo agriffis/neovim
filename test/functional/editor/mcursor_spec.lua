@@ -642,6 +642,69 @@ describe('multicursor', function()
       -- "Q" is excluded: it is cursor-management, not part of the edit.
       eq({ '01i\27ibad\27' }, atoms_tail(1))
     end)
+
+    it('jump (absolute motion) in a mapping is not replayed, like a mark', function()
+      -- "G" would move every cursor to the same line; only the edit replays per-cursor.
+      command('nnoremap X Gdd')
+      cursors({ 'a', 'b', 'c', 'd' }, 'jQ')
+      feed('X')
+      eq({ 'a', 'c' }, get_lines())
+    end)
+
+    it('global op (undo/redo, g CTRL-A) does not cascade', function()
+      -- Mapping that performs a "global op" must not cascade.
+
+      -- vim-repeat maps u/U/<C-R> to undo/redo wrappers.
+      fn.setline(1, { 'aaa', 'bbb', 'ccc' })
+      feed('gg0Qj0Qj0') -- 3 cursors
+      feed('x') -- one cascade: aa,bb,cc
+      eq({ 'aa', 'bb', 'cc' }, get_lines())
+      command('nnoremap <silent> u :<C-U>undo<CR>')
+      command('nnoremap <silent> <C-R> :<C-U>redo<CR>')
+      feed('u') -- One undo of the cascade, not per-cursor.
+      eq({ 'aaa', 'bbb', 'ccc' }, get_lines())
+      feed('<C-R>') -- Redo mapping does not cascade.
+      eq({ 'aa', 'bb', 'cc' }, get_lines())
+      -- Nested normal_execute() after the undo, in the same mapping.
+      command('nnoremap <silent> u :<C-U>undo <Bar> normal! l<CR>')
+      feed('u')
+      eq({ 'aaa', 'bbb', 'ccc' }, get_lines())
+
+      -- Follow-mode, where the undo's cursor-move would attempt LHS-replay. #42037
+      clear_cursors()
+      command('nnoremap u u<Cmd>let g:did_u = 1<CR>') -- Multi-command RHS.
+      command('nnoremap <C-R> <C-R>')
+      command('nnoremap gm yiwp')
+      cursors({ 'aa', 'bb' }, 'vipQ')
+      feed('gmgm')
+      eq({ 'aaaaaaaa', 'bbbbbbbb' }, get_lines())
+      feed('u')
+      eq({ 'aaaa', 'bbbb' }, get_lines())
+      feed('u')
+      eq({ 'aa', 'bb' }, get_lines())
+      feed('<C-R>')
+      eq({ 'aaaa', 'bbbb' }, get_lines())
+      feed('0x') -- Cursors are still in place.
+      eq({ 'aaa', 'bbb' }, get_lines())
+
+      -- "U" (line-undo) is also treated as a "global op".
+      clear_cursors()
+      command('nnoremap U U<Cmd>let g:did_U = 1<CR>')
+      cursors({ 'aaa', 'bbb' }, 'Qj0')
+      feed('x')
+      eq({ 'aa', 'bb' }, get_lines())
+      feed('U')
+      eq({ 'aaa', 'bb' }, get_lines())
+
+      -- g CTRL-A (counter) applies once, not per-cursor. Also in follow-mode.
+      command('nnoremap ,n g<C-A><Cmd>let g:did_n = 1<CR>')
+      for _, place in ipairs({ 'Qj0Qj0', 'VGQ' }) do
+        clear_cursors()
+        cursors({ 'a', 'b', 'c' }, place)
+        feed(',n')
+        eq({ '1a', '2b', '3c' }, get_lines(), place)
+      end
+    end)
   end)
 
   describe('. (dot-repeat)', function()
@@ -893,13 +956,6 @@ describe('multicursor', function()
       eq(2, ncursors())
     end)
 
-    it('via a mapping applies ONCE (cursor-global: no avalanche)', function()
-      cursors({ 'a', 'b', 'c' })
-      command('nnoremap ,n g<C-A>')
-      feed(',n')
-      eq({ '1a', '2b', '3c' }, get_lines())
-    end)
-
     it('without cursors, g CTRL-A is not a command', function()
       fn.setline(1, { 'x 5' })
       feed('gg0g<C-A>')
@@ -1114,6 +1170,35 @@ describe('multicursor', function()
   end)
 
   describe('insert-mode', function()
+    it('"cgn" cascades live; failed cursor is removed #41960', function()
+      -- "gn" searches per-cursor. Insert-entry cascades, and typed text previews live, before ESC.
+      cursors({ 'a x foo', 'b foo', 'c y z foo' }, 'QjQj0')
+      feed('/foo<CR>')
+      feed('cgn')
+      eq({ 'a x ', 'b ', 'c y z ' }, get_lines())
+      feed('X')
+      eq({ 'a x X', 'b X', 'c y z X' }, get_lines())
+      feed('<Esc>')
+      eq({ 'a x X', 'b X', 'c y z X' }, get_lines())
+      feed('u') -- One undo step.
+      eq({ 'a x foo', 'b foo', 'c y z foo' }, get_lines())
+
+      -- Cursor is removed when insert-entry fails at a cursor ("ct;" where there is no ";").
+      clear_cursors()
+      cursors({ 'a;b', 'cd', 'e;f' }, 'QjQj0')
+      eq(2, ncursors())
+      feed('ct;X<Esc>')
+      eq({ 'X;b', 'cd', 'X;f' }, get_lines())
+      eq(1, ncursors())
+      -- Same for "cgn" at a cursor with no match left (the primary's replay consumed it).
+      clear_cursors()
+      cursors({ 'a foo', 'b', 'c' }, 'jQjQgg0')
+      feed('/foo<CR>')
+      feed('cgnX<Esc>')
+      eq({ 'a X', 'b', 'c' }, get_lines())
+      eq(0, ncursors())
+    end)
+
     it('CTRL-U cascades before <Esc> (deletion crossing the session anchor)', function()
       -- Deleting typed text cascades live (the region shrinks). But CTRL-U here eats the "o"
       -- autoindent, which precedes the tracked region, invisible to the preview diff.
@@ -1743,16 +1828,26 @@ describe('multicursor', function()
   end)
 
   describe('visual-mode cascade', function()
-    it('failed command mid-replay does not leak Visual mode into the next replay', function()
+    it('failed motion mid-replay does not eat the keys after it', function()
       fn.setline(1, { 'alpha bravo', 'golf hotel', 'mike november' })
       feed('ggVjjQ') -- cursor on each line; enables "q=" follow-mode
       feed('gg0')
-      -- The abandoned selection replays "vlo h <Esc>" at each cursor ("q=" follow). The "h" fails
-      -- (col 0 after "o" swapped to the selection start), which flushes the rest of the replay,
-      -- eating the terminating <Esc>. Visual mode must not leak into the next cursor's replay.
+      -- The abandoned selection replays "vloh<Esc>" at each cursor ("q=" follow). The "h" fails
+      -- (col 0 after "o" swap); Visual mode must not leak into next cursor replay.
       feed('vloh<Esc>')
       eq({ 'alpha bravo', 'golf hotel', 'mike november' }, get_lines())
       eq('n', api.nvim_get_mode().mode)
+
+      -- Per-cursor behavior: "t;" fails if cursor-line has no ";". The op still applies to the
+      -- existing Visual selection.
+      clear_cursors()
+      cursors({ 'a;b', 'cd', 'e;f' }, 'jQjQgg0')
+      feed('vt;d')
+      eq({ ';b', 'd', ';f' }, get_lines())
+      clear_cursors()
+      cursors({ 'a;b', 'cd', 'e;f' }, 'jQjQgg0')
+      feed('vt;cX<Esc>')
+      eq({ 'X;b', 'Xd', 'X;f' }, get_lines())
     end)
 
     it('per-cursor selection', function()
@@ -1992,6 +2087,22 @@ describe('multicursor', function()
       cursors({ 'aa', 'bb' }, 'QjQ') -- Cursor overlapping the primary.
       feed('gm')
       eq({ 'aaaa', 'bbbb' }, get_lines())
+
+      -- Also when the edit displaces the overlapping cursor's (right-gravity) mark.
+      for _, place in ipairs({ 'QjQ', 'vipQ' }) do
+        for _, case in ipairs({
+          { 'rx', { 'xa', 'xb' } },
+          { '~', { 'Aa', 'Bb' } },
+          { 'g~~', { 'AA', 'BB' } },
+        }) do
+          clear_cursors()
+          cursors({ 'aa', 'bb' }, place)
+          feed(case[1])
+          eq(case[2], get_lines(), place .. ' ' .. case[1])
+          eq(1, ncursors(), place .. ' ' .. case[1])
+        end
+      end
+
       -- Same for a Visual span: the primary sits at selection-end.
       command([[xnoremap gl <Cmd>normal! xp`[1v<CR>]])
       clear_cursors()
@@ -2255,7 +2366,7 @@ describe('multicursor', function()
       cursors({ 'aaa', 'bbb', 'ccc' })
       eq(2, ncursors())
       feed('q=')
-      feed('gg') -- Absolute motion: every cursor lands on the primary, all deduped.
+      feed('9k') -- Every cursor clamps to line 1, onto the primary: all deduped.
       eq(0, ncursors())
       -- Exited implicitly: "q=" resets, else the next "Q" would dedupe on "j".
       feed('Q')
@@ -2352,7 +2463,7 @@ describe('multicursor', function()
       eq({ 2, 0 }, api.nvim_win_get_cursor(0))
     end)
 
-    it('jumps are not followed (CTRL-O, backtick)', function()
+    it('jumps (absolute motions) are not followed', function()
       cursors({ 'abcd', 'efgh', 'ijkl' }, 'Q')
       feed('3G') -- Jumps fill the jumplist; no cascade.
       feed('2G')
@@ -2361,7 +2472,22 @@ describe('multicursor', function()
       eq({ { 0, 1 } }, anchors())
       feed('<C-o>') -- Jump.
       feed('``') -- Jump.
+      feed('G')
+      feed('gg')
+      feed('L')
       eq({ { 0, 1 } }, anchors())
+    end)
+
+    it('"*" follows per-cursor (its own word); keeps the primary search pattern', function()
+      cursors({ 'foo bar', 'bar baz', 'foo', 'bar', 'baz' }, 'Qj0')
+      feed('q=')
+      feed('*') -- Each cursor goes to the next occurrence of its own word.
+      eq({ { 2, 0 } }, anchors())
+      eq({ 4, 1 }, { fn.line('.'), fn.col('.') })
+      eq([[\<bar\>]], fn.getreg('/'))
+      feed('n') -- The primary's pattern, at each cursor.
+      eq({ { 3, 0 } }, anchors())
+      eq({ 1, 5 }, { fn.line('.'), fn.col('.') })
     end)
 
     it('cursors follow j/k, gj/gk, arrow keys, and $', function()
@@ -2745,26 +2871,6 @@ describe('multicursor', function()
       eq({ 'bc', 'ef', 'ghi' }, get_lines())
     end)
 
-    it('a mapped undo/redo (vim-repeat "nmap u") does not cascade', function()
-      -- vim-repeat maps u/U/<C-R> to undo/redo wrappers. Such a mapping changes the buffer, but an
-      -- undo/redo is buffer-global, not a per-cursor edit: it must NOT cascade, or every cursor
-      -- would undo again, over-undoing the whole session (the reported bug).
-      fn.setline(1, { 'aaa', 'bbb', 'ccc' })
-      feed('gg0Qj0Qj0') -- 3 cursors
-      feed('x') -- one cascade: aa,bb,cc
-      eq({ 'aa', 'bb', 'cc' }, get_lines())
-      command('nnoremap <silent> u :<C-U>undo<CR>')
-      command('nnoremap <silent> <C-R> :<C-U>redo<CR>')
-      feed('u') -- ONE undo of the cascade, not one-per-cursor (would reach the empty buffer)
-      eq({ 'aaa', 'bbb', 'ccc' }, get_lines())
-      feed('<C-R>') -- redo mapping likewise does not cascade
-      eq({ 'aa', 'bb', 'cc' }, get_lines())
-      -- The guard survives a nested normal_execute() after the undo, in the same mapped command.
-      command('nnoremap <silent> u :<C-U>undo <Bar> normal! l<CR>')
-      feed('u')
-      eq({ 'aaa', 'bbb', 'ccc' }, get_lines())
-    end)
-
     it('u/CTRL-R ping-pong toggles without drift', function()
       -- Repeated undo/redo of one cascade must stabilize (no extmark drift).
       cursors({ 'aaa', 'bbb', 'ccc' }, 'QjQ')
@@ -2880,9 +2986,9 @@ describe('multicursor', function()
     it('coincident cursors merge', function()
       cursors({ 'aaa', 'bbb', 'ccc' }, 'QjQ')
       feed('q=')
-      feed('G') -- all cursors land on the last line
+      feed('9j') -- All cursors to the last line.
       feed('q=')
-      feed('x') -- one deletion, not three
+      feed('x') -- One deletion, not three.
       eq({ 'aaa', 'bbb', 'cc' }, get_lines())
     end)
   end)
