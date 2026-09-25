@@ -74,8 +74,8 @@ static struct {
   TriState follow;    ///< `CmdFrame.follow` at the atom's first motion (`kNone`: none yet).
   CmdAtomVec atoms;   ///< Subatoms of the mapping/macro.
   char lhs[MAXMAPLEN + 4];  ///< Label: mapping LHS, macro "@x", or :omap's op+LHS. "": none.
-  bool queued;        ///< Subatom queued for cascade (`g_atoms`, or Visual), or a global op (undo)
-                      ///< applied to every cursor already. No LHS-replay needed.
+  bool queued;        ///< Subatom queued for cascade (`g_atoms`, or Visual), global op (undo), or
+                      ///< jump. No LHS-replay needed.
   bool lossy;         ///< Detected partial capture: `keys` cannot replay it, `lhs` can.
                       ///< When: incomplete insert, payload with no capturing atom.
   bool macro;         ///< Macro execution: captured as an "@x"-labeled atom.
@@ -215,7 +215,8 @@ CmdSpec atom_cmd_spec(const cmdarg_T *cap)
 static CmdOrigin atom_origin(void)
 {
   CmdOrigin origin = { .win = curwin, .pos = curwin->w_cursor,
-                       .tick = buf_get_changedtick(curbuf), .maptick = maptick };
+                       .tick = buf_get_changedtick(curbuf), .maptick = maptick,
+                       .mcursor = mc_mark_at(curbuf, curwin->w_cursor) };
   set_bufref(&origin.buf, curbuf);
   return origin;
 }
@@ -569,7 +570,7 @@ void atom_lhs_replay_queue(void)
   kv_push(g_atoms, ((CmdAtom){ .type = kAComp, .keys = atom_composite_lhs(), .remap = true }));
 }
 
-/// True if the mapping queued a subatom for cascade: no LHS-replay needed
+/// True if the composite should NOT LHS-replay (see `composite.queued`).
 bool atom_composite_queued(void)
 {
   return composite.queued;
@@ -746,22 +747,21 @@ unsigned atom_key_class(int cmd, int arg)
     return strchr("[](){}mMcsz#*/", arg) != NULL ? kKeyMotion : 0;
   case 'z':
     return (arg == 'j' || arg == 'k') ? kKeyMotion : 0;
-  case K_UP:
   case K_DOWN:
+  case K_END:
+  case K_HOME:
   case K_LEFT:
   case K_RIGHT:
-  case K_HOME:
-  case K_END:
+  case K_UP:
     return kKeyMotion | kKeyInsFlush;
-  case K_S_LEFT:
-  case K_S_RIGHT:
-    return kKeyInsFlush;
+  case Ctrl_G:
+  case Ctrl_H:
+  case Ctrl_R:  // "<C-R>x" (insert_reg()): reads per-cursor registers.
+  case Ctrl_W:
   case K_BS:
   case K_DEL:
-  case Ctrl_H:
-  case Ctrl_W:
-    return kKeyInsFlush;
-  case Ctrl_G:
+  case K_S_LEFT:
+  case K_S_RIGHT:
     return kKeyInsFlush;
   case K_LEFTMOUSE:
   case K_LEFTMOUSE_NM:
@@ -1052,7 +1052,7 @@ static void atom_visual_span_flush(void)
   }
   String span = atom_visual_span();
   vatom.done = kv_size(vatom.atoms);
-  kv_push(g_atoms, ((CmdAtom){ .type = kAVisualSpan, .keys = span.data }));
+  kv_push(g_atoms, ((CmdAtom){ .type = kAVisualSpan, .keys = span.data, .origin = vatom.origin }));
 }
 
 /// Ends the pending visual atom, appends `suffix`, and stages it. Or discards if unreplayable.
@@ -1140,7 +1140,7 @@ static bool atom_visual_end_suffix(char *suffix, const CmdSpec *spec, bool redoa
   if (atom.cascaded && vatom.done < kv_size(vatom.atoms)) {
     // Spans cascaded the selection's edits. This last one completes it (the operator).
     String span = atom_visual_span();
-    kv_push(g_atoms, ((CmdAtom){ .type = kAVisualSpan, .keys = span.data }));
+    kv_push(g_atoms, ((CmdAtom){ .type = kAVisualSpan, .keys = span.data, .origin = origin }));
   }
   atom.atoms = vatom.atoms;
   vatom.atoms = (CmdAtomVec)KV_INITIAL_VALUE;
@@ -1308,7 +1308,7 @@ InsSession atom_ins_start(int cmd, long count, VisualIns vis, bool vblock)
   bool reexec = vis == kVInsNone || vis == kVInsKeys
                 || (vis == kVInsMotion && cur_frame->payload_start == SIZE_MAX);
   mc_ins_cascade_start(session.typed && count <= 1 && !repl && !vblock && reexec,
-                       session.origin.tick, root_frame()->id);
+                       session.origin, root_frame()->id);
   return session;
 }
 
@@ -1368,7 +1368,6 @@ void atom_cmd_start(CmdFrame *old, int cmdchar)
   *old = (CmdFrame){
     .origin = atom_origin(),
     .visual = Visual,
-    .dup_mark = mc_mark_at(curbuf, Visual.active ? Visual.start : curwin->w_cursor),
     .keytyped = KeyTyped,
     .keyclass = atom_key_class(cmdchar, NUL),
     .ex_normal = ex_normal_busy,
@@ -1586,6 +1585,9 @@ static bool atom_capture_cmd(cmdarg_T *ca, CmdFrame *old)
       CmdAtom atom = atom_from_spec(motion ? kAMotion : jump_cmd ? kAJump : kANormal, spec);
       atom.origin = old->origin;
       atom_push(follow, &atom);
+      if (jump_cmd && atom_composite_active()) {
+        composite.queued = true;  // Do not LHS-replay a mapped jump ("nnoremap <Down> ]C").
+      }
     } else if ((scroll_cmd || mouse_cmd) && !atom_composite_active()) {
       // Emit-only (viewport-dependent).
       CmdSpec spec = atom_cmd_spec(ca);
@@ -1636,10 +1638,7 @@ void atom_cmd_end(cmdarg_T *ca, CmdFrame *old)
   // textlock).
   if (old->parent == NULL && !mc_replaying() && typebuf_typed() && stuff_empty()) {
     bool map_moved = atom_composite_active() && atom_origin_moved(composite.origin);
-    // Primary pos: defined at cmd start or Visual-sel start, even if the cmd moved it since.
-    pos_T primary = old->visual.active ? old->visual.start : old->origin.pos;
-
-    mc_clock_edge(map_edit, map_moved, composite.follow == kTrue, primary, old->dup_mark);
+    mc_clock_edge(map_edit, map_moved, composite.follow == kTrue);
 
     map_edit = false;
     // One atom spans its continuation: while op-pending, selection-active, or insert-will-resume

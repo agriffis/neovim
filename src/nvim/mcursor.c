@@ -102,14 +102,13 @@ typedef struct {
 /// - literal text is previewed
 /// - non-literal keys (mc_ins_keys_nonliteral) have per-cursor effects, so flush (early commit).
 static struct {
+  CmdOrigin origin;  ///< State at session start: the session's atoms diff against it.
+  kvec_t(uint32_t) regions;  ///< Per-cursor preview regions (`mc_session_ns`).
   bool active;      ///< Current insert-session is cascading.
   bool first;       ///< Entry-command not yet cascaded (no span pushed yet).
   uint64_t frame;   ///< Root frame that started the insert-session.
   size_t done_len;  ///< Bytes of the capture already consumed by replayed spans; tail is pending.
-  varnumber_T tick;  ///< b:changedtick at session start: the session's atoms (spans, the whole
-                     ///< session) diff against it for their `changed` field.
   uint32_t region;  ///< Primary cursor's inserted text.
-  kvec_t(uint32_t) regions;  ///< Per-cursor preview regions (`mc_session_ns`).
 } mc_ins_span;
 
 /// Editor state when the mc session started, which every cursor replays against.
@@ -165,6 +164,7 @@ static uint32_t mc_vsel_ns(void)
 }
 
 /// Namespace for the previous session's cursor positions, snapshotted on clear ("gQ" restores).
+/// Mark id 1 is the primary-cursor position.
 static uint32_t mc_last_ns(void)
 {
   static uint32_t ns = 0;
@@ -391,9 +391,12 @@ static void mc_execute(size_t cursoridx, size_t atomidx)
 }
 
 /// Runs the cascade: replays queued atoms (g_atoms) at every cursor, as one batch.
-static void mc_cascade(pos_T primary, uint32_t dup_mark)
+static void mc_cascade(void)
 {
   assert(kv_size(g_atoms) >= 1);
+  const CmdOrigin *origin = &kv_A(g_atoms, 0).origin;
+  // Primary-overlapping cursor (if any). Its replay is skipped, pos follows primary.
+  const uint32_t mcursor = origin->buf.br_buf == curbuf ? origin->mcursor : 0;
   assert(kv_size(mc_cursors) > 0);
   assert(!mc_replaying());
 
@@ -408,7 +411,7 @@ static void mc_cascade(pos_T primary, uint32_t dup_mark)
     edits |= kv_A(g_atoms, i).type != kAMotion;
   }
   if (edits) {
-    mc_cleanup(true, primary, dup_mark);
+    mc_cleanup(true, NULL, 0);
     if (kv_size(mc_cursors) == 0) {
       atoms_free(&g_atoms);
       return;
@@ -433,14 +436,24 @@ static void mc_cascade(pos_T primary, uint32_t dup_mark)
         // Interrupted (CTRL-C), abort the cascade. Keep the partial edit; a "u" will undo it.
         goto done;
       }
-      mc_execute(ci, ai);
+      if (mcursor == 0 || kv_A(mc_cursors, ci).mark != mcursor) {  // Skip cursor at primary.
+        mc_execute(ci, ai);
+      }
     }
   }
 done:
   atoms_free(&g_atoms);
   const handle_T bufnr = sb.primary.buf;  // mc_sandbox_leave() frees `sb.primary`.
   mc_sandbox_leave(&sb);
-  mc_cleanup(true, curwin->w_cursor, 0);
+
+  // Ensure the primary-overlapping cursor (if any) settles on the primary cursor's position.
+  pos_T mcursor_pos;
+  if (mcursor != 0 && extmark_get_pos(curbuf, mc_ns(), mcursor, &mcursor_pos)) {
+    uint32_t mark = mcursor;
+    mc_mark_upd(curbuf, &mark, curwin->w_cursor);
+  }
+
+  mc_cleanup(true, &curwin->w_cursor, mcursor);
   if (handle_get_buffer(bufnr) == curbuf && !curbuf->b_u_synced
       && curbuf->b_u_newhead != NULL) {
     // Store the primary's post-cascade position in the still-open undo block; redo restores it.
@@ -454,9 +467,7 @@ done:
 /// @param map_edit  The composite edited the buffer (or insert-cascaded).
 /// @param map_moved  The composite moved the cursor.
 /// @param follow  Follow-mode ("q=") when the queued motions ran.
-/// @param primary  Primary cursor pos at cmd start.
-/// @param dup_mark  Cursor overlapping `primary` at cmd start.
-void mc_clock_edge(bool map_edit, bool map_moved, bool follow, pos_T primary, uint32_t dup_mark)
+void mc_clock_edge(bool map_edit, bool map_moved, bool follow)
 {
   if ((map_edit || (follow && map_moved && !Visual.active))
       && !atom_composite_queued() && kv_size(g_atoms) == 0
@@ -473,7 +484,7 @@ void mc_clock_edge(bool map_edit, bool map_moved, bool follow, pos_T primary, ui
     if (has_edit || follow
         // Cascade if a mapping left a selection open ("nn x w<Cmd>norm! viw<CR>").
         || Visual.active) {
-      mc_cascade(primary, dup_mark);
+      mc_cascade();
     } else {
       // A pure-motion mapping without "q=" follow-motion: do not cascade
       // (the atoms are still emitted as one composite CmdAtom).
@@ -485,9 +496,9 @@ void mc_clock_edge(bool map_edit, bool map_moved, bool follow, pos_T primary, ui
 /// Prunes dead cursors and ends empty sessions. Optionally dedupes.
 ///
 /// @param dedupe  Also removes overlapping cursors at cascade boundaries.
-/// @param primary  Primary cursor pos, for `dedupe`.
-/// @param dup_mark  Also remove this cursor (mark id) for `dedupe`. 0: none.
-static void mc_cleanup(bool dedupe, pos_T primary, uint32_t dup_mark)
+/// @param primary  Primary cursor pos, for `dedupe`. NULL: dedupe cursors only among themselves.
+/// @param keep_mark  Primary-overlapping cursor (mark id). 0: none.
+static void mc_cleanup(bool dedupe, const pos_T *primary, uint32_t keep_mark)
 {
   const bool had_cursors = kv_size(mc_cursors) > 0;
   size_t n = 0;
@@ -504,7 +515,8 @@ static void mc_cleanup(bool dedupe, pos_T primary, uint32_t dup_mark)
     // wins), or another cursor's mark is first at its position (first wins).
     const bool dup = dedupe && ctx->mark != 0
                      && ((curwin != NULL && buf == curbuf
-                          && (equalpos(ctx->pos, primary) || ctx->mark == dup_mark))
+                          && primary != NULL && equalpos(ctx->pos, *primary)
+                          && ctx->mark != keep_mark)
                          || mc_mark_at(buf, ctx->pos) != ctx->mark);
     if (dup) {
       extmark_del_id(buf, mc_ns(), ctx->mark);
@@ -545,8 +557,8 @@ bool mc_ins_replay_can_join(void)
 /// Starts an insert-cascade. Call before entering insert mode from a normal-mode command.
 ///
 /// @param cascade  The session qualifies for insert-cascading.
-/// @param tick     b:changedtick at session start.
-void mc_ins_cascade_start(bool cascade, varnumber_T tick, uint64_t root_frame)
+/// @param origin   State at session start.
+void mc_ins_cascade_start(bool cascade, CmdOrigin origin, uint64_t root_frame)
 {
   if (mc_replaying()) {
     // Nested replay session: don't clobber the primary session's state.
@@ -557,7 +569,7 @@ void mc_ins_cascade_start(bool cascade, varnumber_T tick, uint64_t root_frame)
   mc_ins_span.first = true;
   mc_ins_span.frame = root_frame;
   mc_ins_span.done_len = 0;
-  mc_ins_span.tick = tick;
+  mc_ins_span.origin = origin;
   mc_ins_span.region = 0;
   mc_ins_regions_clear();
 
@@ -579,13 +591,6 @@ void mc_ins_cascade_start(bool cascade, varnumber_T tick, uint64_t root_frame)
     }
     (void)u_save(lo - 1, hi + 1);  // Ignore FAIL result: only relevant if undo is unavailable.
   }
-}
-
-/// True during a span replay. The replay's synthetic <Esc> does not end the primary insert-session,
-/// so session-end cleanup must not run.
-bool mc_ins_replaying(void)
-{
-  return mc_replaying() && mc_ins_span.active;
 }
 
 /// Saves the primary's insert-session state: each span replay runs a nested edit().
@@ -624,12 +629,12 @@ static void mc_ins_span_push(char *keys, char *text)
     .type = kAInsertSpan,
     .keys = keys,
     .text = text,
-    .changed = buf_get_changedtick(curbuf) != mc_ins_span.tick,
+    .origin = mc_ins_span.origin,
   });
   if (cascade) {
     McInsSaved saved = mc_ins_save_state();
     block_autocmds();  // The span replay would fire InsertEnter/InsertLeave on every key.
-    mc_cascade(curwin->w_cursor, 0);  // Still `first` during the entry span.
+    mc_cascade();  // Still `first` during the entry span.
     unblock_autocmds();
     mc_ins_restore_state(&saved);
     mc_ins_joined = false;  // The next span decides whether its replays may join.
@@ -675,7 +680,7 @@ static void mc_ins_preview_rebase(void)
     Context *ctx = &kv_A(mc_cursors, i);
     pos_T pos = { 0 };
     uint32_t mark = 0;
-    if (mc_ctx_resolve(ctx, &pos)) {
+    if (mc_ctx_resolve(ctx, &pos) && ctx->mark != mc_ins_span.origin.mcursor) {
       mc_region_mark_set(&mark, pos);
       kv_push(mc_ins_span.regions, mark);
     }
@@ -784,6 +789,19 @@ void mc_ins_cascade_restart(void)
   mc_ins_span.done_len = ins.size;
   api_free_string(ins);
   mc_ins_preview_rebase();
+}
+
+/// True during a span replay. The replay's synthetic <Esc> does not end the primary insert-session,
+/// so session-end cleanup must not run.
+bool mc_ins_replaying(void)
+{
+  return mc_replaying() && mc_ins_cascading();
+}
+
+/// True during insert-cascade.
+bool mc_ins_cascading(void)
+{
+  return mc_ins_span.active;
 }
 
 /// True if the insert-session started by `root_frame` cascaded a span.
@@ -1139,7 +1157,7 @@ bool mc_ins_commit(void)
   }
   mc_ins_regions_clear();
 
-  if (active && buf_get_changedtick(curbuf) == mc_ins_span.tick) {
+  if (active && buf_get_changedtick(curbuf) == mc_ins_span.origin.tick) {
     // Nothing changed; drop the "umbrella" undo-entry added by mc_ins_cascade_start. #41883
     u_forget_unchanged(curbuf);
   }
@@ -1158,7 +1176,9 @@ bool mc_ins_commit(void)
     if (!mc_ctx_resolve(ctx, &ctx->pos)) {
       continue;
     }
-    if (ctx->pos.col > 0) {
+    if (ctx->mark == mc_ins_span.origin.mcursor) {
+      ctx->pos = curwin->w_cursor;  // ESC moved the primary; update primary-overlapping cursor.
+    } else if (ctx->pos.col > 0) {
       dec(&ctx->pos);  // one char left, like <Esc> (but never crossing lines)
     }
     mc_mark_upd(curbuf, &ctx->mark, ctx->pos);
@@ -1254,7 +1274,7 @@ void mc_toggle(buf_T *buf, pos_T pos, bool end_follow)
   uint32_t mark = mc_mark_at(buf, pos);
   if (mark != 0) {
     extmark_del_id(buf, mc_ns(), mark);
-    mc_cleanup(false, (pos_T){ 0 }, 0);
+    mc_cleanup(false, NULL, 0);
     return;
   }
   mc_add(buf, pos);
@@ -1303,7 +1323,7 @@ void mc_buf_free(buf_T *buf)
     // Can't mutate (mc_cleanup) mc_cursors during cascade.
     return;
   }
-  mc_cleanup(false, (pos_T){ 0 }, 0);
+  mc_cleanup(false, NULL, 0);
   if (mc_vsel_buf == buf->handle) {
     // The selection extmarks died with the buffer too.
     mc_vsel_buf = 0;
@@ -1325,7 +1345,8 @@ void mc_ns_clearing(buf_T *buf, uint32_t ns_id)
   }
 }
 
-/// Deleting the "nvim.multicursor" namespace deletes its cursors. Saves snapshot for "gQ".
+/// Deleting the "nvim.multicursor" namespace deletes its cursors. Saves snapshot for "gQ" (and
+/// reserves extmark-id 1 for the primary cursor).
 void mc_ns_cleared(buf_T *buf, uint32_t ns_id)
 {
   if ((ns_id != mc_ns() && ns_id != 0) || mc_replaying() || !mc_buf_has_cursors(buf)) {
@@ -1346,16 +1367,22 @@ void mc_ns_cleared(buf_T *buf, uint32_t ns_id)
   }
 
   // Snapshot the positions into "nvim.multicursor.last" ("gQ").
-  extmark_clear(buf, mc_last_ns(), 0, 0, MAXLNUM, MAXCOL);
-  for (size_t i = 0; i < kv_size(mc_cursors); i++) {
-    Context *ctx = &kv_A(mc_cursors, i);
-    if (ctx->buf != buf->handle) {
-      continue;
+  if (!exiting) {
+    extmark_clear(buf, mc_last_ns(), 0, 0, MAXLNUM, MAXCOL);
+    if (curbuf == buf) {
+      uint32_t primary = 1;  // Reserve id 1 for the primary cursor.
+      extmark_set_pos(buf, mc_last_ns(), &primary, curwin->w_cursor, true, false, false);
     }
-    uint32_t mark = 0;
-    extmark_set_pos(buf, mc_last_ns(), &mark, ctx->pos, true, false, false);
+    for (size_t i = 0; i < kv_size(mc_cursors); i++) {
+      Context *ctx = &kv_A(mc_cursors, i);
+      if (ctx->buf != buf->handle) {
+        continue;
+      }
+      uint32_t mark = 0;
+      extmark_set_pos(buf, mc_last_ns(), &mark, ctx->pos, true, false, false);
+    }
   }
-  mc_cleanup(false, (pos_T){ 0 }, 0);
+  mc_cleanup(false, NULL, 0);
   if (kv_size(mc_cursors) == 0) {
     // Session ended; drop the pending cascade.
     atoms_free(&g_atoms);

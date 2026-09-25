@@ -174,17 +174,24 @@ describe('multicursor', function()
 
     it('gQ restores the cleared cursors (like gv)', function()
       cursors({ 'aaa', 'bbb', 'ccc', 'ddd' }, 'QjQ')
+      eq({ { 0, 0 }, { 1, 0 } }, anchors())
+      eq({ 2, 0 }, api.nvim_win_get_cursor(0))
       clear_cursors()
       eq(0, ncursors())
+      feed('G$') -- Move the primary away.
       feed('gQ')
-      eq(2, ncursors())
-      feed('Gx') -- the restored cursors cascade
+      eq({ { 0, 0 }, { 1, 0 } }, anchors())
+      eq({ 2, 0 }, api.nvim_win_get_cursor(0)) -- Primary cursor position is restored too.
+      feed('Gx') -- The restored cursors cascade.
       eq({ 'aa', 'bb', 'ccc', 'dd' }, get_lines())
-      -- The snapshot is extmark-tracked: edits in between shift it.
+      -- The snapshot extmarks are shifted by intervening edits.
       clear_cursors()
-      feed('ggO<Esc>') -- new line on top shifts the snapshot down
+      feed('ggO<Esc>') -- New line on top shifts the snapshot down.
       feed('gQ')
       eq({ { 1, 0 }, { 2, 0 } }, anchors())
+      -- No-op if multicursor is already active.
+      feed('gQ')
+      eq('gQ: multicursor session is active', n.exec_capture('1messages'))
     end)
 
     it(':g//normal! Q places a cursor at each match', function()
@@ -206,13 +213,24 @@ describe('multicursor', function()
       eq({ 'one wo' }, get_lines())
     end)
 
-    it('Q then non-moving edit applies once (cursor merges into primary)', function()
-      fn.setline(1, { 'ab' })
+    it('Q then edit applies once; primary-overlapping cursor stays synced', function()
+      fn.setline(1, { 'ab', 'cd' })
       feed('Q')
       eq(1, ncursors())
-      feed('x')
-      eq({ 'b' }, get_lines())
-      eq(0, ncursors()) -- merged at the cascade; multicursor mode ended
+      feed('x') -- The primary's own edit covers the cursor under it, applied only once.
+      eq({ 'b', 'cd' }, get_lines())
+      eq({ { 0, 0 } }, anchors())
+      feed('jx') -- Move with follow=OFF, the cursor is no longer "primary-overlapping".
+      eq({ '', 'd' }, get_lines())
+
+      -- Insert-session ESC moves the primary; the primary-overlapping cursor stays synced.
+      for _, keys in ipairs({ 'i<Esc>', 'a<Esc>', 'aX<Esc>', 'A<Esc>', 'cwX<Esc>', 'oX<Esc>' }) do
+        clear_cursors()
+        cursors({ 'abcd', 'efgh' }, 'lQjQ')
+        feed(keys)
+        local cur = api.nvim_win_get_cursor(0)
+        eq({ cur[1] - 1, cur[2] }, anchors()[2], keys)
+      end
     end)
 
     it('Q on an existing cursor removes it (toggle)', function()
@@ -314,8 +332,8 @@ describe('multicursor', function()
       eq({ 1, 8 }, api.nvim_win_get_cursor(0))
       feed('cwXXX<Esc>')
       eq({ 'XXX bar XXX', 'baz XXX qux', 'foobar XXX' }, get_lines())
-      -- The cursor under the primary merged at the cascade (no double-apply).
-      eq(3, ncursors())
+      -- Primary-overlapping cursor is not replayed (no double-apply).
+      eq(4, ncursors())
       -- A "/" search likewise, also with several matches per line.
       clear_cursors()
       api.nvim_buf_set_lines(0, 0, -1, true, { 'ab ab ab', 'xx ab' })
@@ -752,6 +770,24 @@ describe('multicursor', function()
       eq({ 'aaa', 'aaa', 'bbb', 'bbb' }, get_lines())
     end)
 
+    it('insert-mode <C-R>x #41933', function()
+      for _, case in ipairs({
+        { '0', 'yiw', { 'aaa x-aaa', 'ccc y-ccc' } },
+        { 'a', '"ayiw', { 'aaa x-aaa', 'ccc y-ccc' } },
+        { '"', 'yiw', { 'aaa x-aaa', 'ccc y-ccc' } },
+        { '-', 'diw', { ' x-aaa', ' y-ccc' } },
+      }) do
+        local reg, fill, want = case[1], case[2], case[3]
+        clear_cursors()
+        cursors({ 'aaa x', 'ccc y' }, 'Qj0')
+        feed(fill)
+        feed(('A-<C-R>%s'):format(reg))
+        eq(want, get_lines(), reg) -- Live, before <Esc>.
+        feed('Z<Esc>')
+        eq({ want[1] .. 'Z', want[2] .. 'Z' }, get_lines(), reg)
+      end
+    end)
+
     it('empty at cursor init restores as empty', function()
       fn.setline(1, { 'one two', 'three four' })
       feed('gg0')
@@ -1176,6 +1212,7 @@ describe('multicursor', function()
       feed('/foo<CR>')
       feed('cgn')
       eq({ 'a x ', 'b ', 'c y z ' }, get_lines())
+      eq({ { 0, 4 }, { 1, 2 } }, anchors()) -- Each cursor moved to its match.
       feed('X')
       eq({ 'a x X', 'b X', 'c y z X' }, get_lines())
       feed('<Esc>')
@@ -1844,6 +1881,7 @@ describe('multicursor', function()
       cursors({ 'a;b', 'cd', 'e;f' }, 'jQjQgg0')
       feed('vt;d')
       eq({ ';b', 'd', ';f' }, get_lines())
+      eq(2, ncursors()) -- The cursor where "t;" failed is kept.
       clear_cursors()
       cursors({ 'a;b', 'cd', 'e;f' }, 'jQjQgg0')
       feed('vt;cX<Esc>')
@@ -2081,12 +2119,15 @@ describe('multicursor', function()
       eq({ 'bacd', 'fegh', 'jikl' }, get_lines())
     end)
 
-    it('cursor overlapping the primary is deduped before an edit #42025', function()
+    it('primary-overlapping cursor is not replayed; stays synced #42025', function()
       -- The command may move the primary before the cascade ("yiwp")!
       command('nnoremap gm yiwp') -- "Multiply" the word at cursor.
-      cursors({ 'aa', 'bb' }, 'QjQ') -- Cursor overlapping the primary.
+      cursors({ 'aa', 'bb' }, 'QjQ') -- Primary-overlapping cursor.
       feed('gm')
       eq({ 'aaaa', 'bbbb' }, get_lines())
+      -- Primary-overlapping cursor settles on the primary's new position (the paste moved it).
+      local cur = api.nvim_win_get_cursor(0)
+      eq({ { 0, 2 }, { cur[1] - 1, cur[2] } }, anchors())
 
       -- Also when the edit displaces the overlapping cursor's (right-gravity) mark.
       for _, place in ipairs({ 'QjQ', 'vipQ' }) do
@@ -2099,7 +2140,8 @@ describe('multicursor', function()
           cursors({ 'aa', 'bb' }, place)
           feed(case[1])
           eq(case[2], get_lines(), place .. ' ' .. case[1])
-          eq(1, ncursors(), place .. ' ' .. case[1])
+          local cur = api.nvim_win_get_cursor(0)
+          eq({ cur[1] - 1, cur[2] }, anchors()[2], place .. ' ' .. case[1]) -- Re-synced.
         end
       end
 
@@ -2109,6 +2151,17 @@ describe('multicursor', function()
       cursors({ 'abcd', 'efgh', 'ijkl' }, 'QjQjQ')
       feed('0vgl')
       eq({ 'bacd', 'fegh', 'jikl' }, get_lines())
+      -- Also when Visual selection moves the primary first.
+      for _, keys in ipairs({ 'va)d', 'va)cX<Esc>', 'ca)X<Esc>' }) do
+        feed('<Esc>')
+        clear_cursors()
+        cursors({ 'aa (bb) (cc)', 'aa (bb) (cc)' }, 'vipQ')
+        feed(keys)
+        local x = keys:find('X') and 'X' or ''
+        eq({ ('aa %s (cc)'):format(x), ('aa %s (cc)'):format(x) }, get_lines(), keys)
+        local cur = api.nvim_win_get_cursor(0)
+        eq({ cur[1] - 1, cur[2] }, anchors()[2], keys) -- Primary-overlapping cursor stays synced.
+      end
       -- Motion does not cascade, so it must not dedupe the cursor under the primary.
       clear_cursors()
       cursors({ 'abc', 'def' }, 'Q')
@@ -2476,6 +2529,19 @@ describe('multicursor', function()
       feed('gg')
       feed('L')
       eq({ { 0, 1 } }, anchors())
+
+      -- Jump from a mapping (no LHS-replay fallback). #41995
+      command('nnoremap <Down> ]C')
+      clear_cursors()
+      cursors({ 'a', 'b', 'c', 'd' }, 'QjQjQj')
+      feed('1q=')
+      eq({ { 0, 0 }, { 1, 0 }, { 2, 0 } }, anchors())
+      eq(4, fn.line('.'))
+      for _, line in ipairs({ 1, 2, 3, 1 }) do
+        feed('<Down>')
+        eq(line, fn.line('.')) -- The primary jumps to the next cursor (wraps)...
+        eq({ { 0, 0 }, { 1, 0 }, { 2, 0 } }, anchors()) -- ...the cursors stay put.
+      end
     end)
 
     it('"*" follows per-cursor (its own word); keeps the primary search pattern', function()
