@@ -202,7 +202,7 @@ function vim._os_proc_info(pid)
   if pid == nil or pid <= 0 or type(pid) ~= 'number' then
     error('invalid pid')
   end
-  local cmd = { 'ps', '-p', pid, '-o', 'comm=' }
+  local cmd = { 'ps', '-p', tostring(pid), '-o', 'comm=' }
   local r = vim.system(cmd):wait()
   local name = assert(r.stdout)
   if r.code == 1 and vim.trim(name) == '' then
@@ -210,7 +210,7 @@ function vim._os_proc_info(pid)
   elseif r.code ~= 0 then
     error('command failed: ' .. vim.fn.string(cmd))
   end
-  local ppid_string = assert(vim.system({ 'ps', '-p', pid, '-o', 'ppid=' }):wait().stdout)
+  local ppid_string = assert(vim.system({ 'ps', '-p', tostring(pid), '-o', 'ppid=' }):wait().stdout)
   -- Remove trailing whitespace.
   name = vim.trim(name):gsub('^.*/', '')
   local ppid = tointeger(ppid_string) or -1
@@ -230,13 +230,14 @@ function vim._os_proc_children(ppid)
   end
   local cmd = { 'pgrep', '-P', ppid }
   local r = vim.system(cmd):wait()
-  if r.code == 1 and vim.trim(r.stdout) == '' then
+  local stdout = assert(r.stdout)
+  if r.code == 1 and vim.trim(stdout) == '' then
     return {} -- Process not found.
   elseif r.code ~= 0 then
     error('command failed: ' .. vim.fn.string(cmd))
   end
   local children = {} --- @type integer[]
-  for s in r.stdout:gmatch('%S+') do
+  for s in stdout:gmatch('%S+') do
     children[#children + 1] = tointeger(s)
   end
   return children
@@ -309,7 +310,7 @@ do
       if not got_line1 then
         got_line1 = (#lines > 1)
         -- Escape control characters
-        local line1 = lines[1]:gsub('(%c)', '\022%1')
+        local line1 = assert(lines[1]):gsub('(%c)', '\022%1')
         -- nvim_input() is affected by mappings,
         -- so use nvim_feedkeys() with "n" flag to ignore mappings.
         -- "t" flag is also needed so the pasted text is saved in cmdline history.
@@ -332,7 +333,8 @@ do
       end
       --- @type integer, integer
       local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-      local bufline = vim.api.nvim_buf_get_lines(0, row - 1, row, true)[1]
+      -- The cursor row is always in the buffer.
+      local bufline = assert(vim.api.nvim_buf_get_lines(0, row - 1, row, true)[1])
       local firstline = lines[1]
       firstline = bufline:sub(1, col) .. firstline
       lines[1] = firstline
@@ -570,8 +572,8 @@ end
 --- position (for example, |linewise| visual selection) is returned as |v:maxcol| (big number).
 ---
 ---@param bufnr integer Buffer number, or 0 for current buffer
----@param pos1 integer[]|string Start of region as a (line, column) tuple or |getpos()|-compatible string
----@param pos2 integer[]|string End of region as a (line, column) tuple or |getpos()|-compatible string
+---@param pos1 [integer, integer]|string Start of region as a (line, column) tuple or |getpos()|-compatible string
+---@param pos2 [integer, integer]|string End of region as a (line, column) tuple or |getpos()|-compatible string
 ---@param regtype string # [setreg()]-style selection type
 ---@param inclusive boolean Controls whether the ending column is inclusive (see also 'selection').
 ---@return table region Dict of the form `{linenr = {startcol,endcol}}`. `endcol` is exclusive, and
@@ -914,7 +916,7 @@ function vim.str_utfindex(s, encoding, index, strict_indexing)
   end
 
   if not index then
-    index = math.huge
+    index = vim._maxint
     strict_indexing = false
   end
 
@@ -1148,10 +1150,10 @@ function vim._expand_pat(pat, env)
     insert_keys(vim.iter(options):filter(filter):fold({}, _fold_to_map))
   end
 
-  keys = vim.tbl_keys(keys)
-  table.sort(keys)
+  local matches = vim.tbl_keys(keys)
+  table.sort(matches)
 
-  return keys, #prefix_match_pat
+  return matches, #prefix_match_pat
 end
 
 --- @param lua_string string
@@ -1459,8 +1461,8 @@ function vim.deprecate(name, alternative, version, plugin, backtrace)
     -- Show a warning only if feature is hard-deprecated (see MAINTAIN.md).
     -- Example: if removal `version` is 0.12 (soft-deprecated since 0.10-dev), show warnings
     -- starting at 0.11, including 0.11-dev.
-    local major, minor = version:match('(%d+)%.(%d+)')
-    major, minor = tointeger(major), tointeger(minor)
+    local major_str, minor_str = version:match('(%d+)%.(%d+)')
+    local major, minor = vim._assert_integer(major_str), vim._assert_integer(minor_str)
     local nvim_major = 0 --- Current Nvim major version.
 
     -- We can't "subtract" from a major version, so:

@@ -961,11 +961,13 @@ function vim.islist(t)
   return true
 end
 
+-- EmmyLua 0.25.1 cannot subtract unions, so return_cast only removes Lua nil on false.
 --- Tests if `t` is `nil` or |vim.NIL|.
 ---
 --- @since 15
 --- @param t? any
 --- @return boolean `true` if `nil` or |vim.NIL|, else `false`.
+--- @return_cast t nil|vim.NIL else -nil
 function vim.isnil(t)
   return t == nil or t == vim.NIL
 end
@@ -1505,10 +1507,10 @@ end
 
 --- @nodoc
 --- @class vim.context.state
---- @field bo? table<string, any>
---- @field env? table<string, any>
---- @field go? table<string, any>
---- @field wo? table<string, any>
+--- @field bo table<string, any>
+--- @field env table<string, any>
+--- @field go table<string, any>
+--- @field wo table<string, any>
 
 local scope_map = { buf = 'bo', global = 'go', win = 'wo' }
 local scope_order = { 'o', 'wo', 'bo', 'go', 'env' }
@@ -1517,7 +1519,7 @@ local state_restore_order = { 'bo', 'wo', 'go', 'env' }
 --- Gets data about current state, enough to properly restore specified options/env/etc.
 --- @param context vim.context.mods
 --- @return vim.context.state
-local get_context_state = function(context)
+local function get_context_state(context)
   --- @type vim.context.state
   local res = { bo = {}, env = {}, go = {}, wo = {} }
 

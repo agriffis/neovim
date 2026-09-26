@@ -235,7 +235,7 @@ function LanguageTree:_log(...)
     args = { args[1]() }
   end
 
-  local info = debug.getinfo(2, 'nl')
+  local info = assert(debug.getinfo(2, 'nl'))
   local nregions = vim.tbl_count(self:included_regions())
   local prefix =
     string.format('%s:%d: (#regions=%d) ', info.name or '???', info.currentline or 0, nregions)
@@ -329,7 +329,9 @@ end
 --- @return boolean
 local function contains_region(region1, region2)
   if type(region2[1]) ~= 'table' then
-    region2 = { region2 }
+    region2 = {
+      region2 --[[@as Range]],
+    }
   end
 
   -- TODO: Combine intersection ranges in region1
@@ -416,7 +418,7 @@ end
 function LanguageTree:_parse_regions(range, thread_state)
   local changes = {}
   local no_regions_parsed = 0
-  local total_parse_time = 0
+  local total_parse_time = 0 ---@type number
 
   -- If there are no ranges, set to an empty list
   -- so the included ranges in the parser are cleared.
@@ -566,10 +568,9 @@ function LanguageTree:_async_parse(range, on_parse)
   end
 
   local source = self._source
-  local is_buffer_parser = type(source) == 'number'
-  local buf = is_buffer_parser and vim.b[source] or nil
-  local ct = is_buffer_parser and buf.changedtick or nil
-  local total_parse_time = 0
+  local buf = type(source) == 'number' and vim.b[source] or nil
+  local ct = buf and buf.changedtick or nil
+  local total_parse_time = 0 ---@type number
   local redrawtime = vim.o.redrawtime * 1000000
 
   local thread_state = {} ---@type ParserThreadState
@@ -578,7 +579,7 @@ function LanguageTree:_async_parse(range, on_parse)
   local parse = coroutine.wrap(self._parse)
 
   local function step()
-    if is_buffer_parser then
+    if buf then
       if
         not vim.api.nvim_buf_is_valid(source --[[@as number]])
       then
@@ -624,6 +625,7 @@ end
 ---     Set to `false|nil` to only parse regions with empty ranges (typically
 ---     only the root tree without injections).
 --- @param on_parse fun(err?: string, trees?: table<integer, TSTree>)? Function invoked when parsing completes.
+---     When omitted, parsing is synchronous and always returns the trees.
 ---     When provided and `vim.g._ts_force_sync_parsing` is not set, parsing will run
 ---     asynchronously. The first argument to the function is a string representing the error type,
 ---     in case of a failure (currently only possible for timeouts). The second argument is the list
@@ -633,6 +635,7 @@ end
 ---     If parsing was still able to finish synchronously (within 3ms), `parse()` returns the list
 ---     of trees. Otherwise, it returns `nil`.
 --- @return table<integer, TSTree>?
+--- @overload fun(self: vim.treesitter.LanguageTree, range?: boolean|Range|Range[]): table<integer, TSTree>
 function LanguageTree:parse(range, on_parse)
   if on_parse then
     return self:_async_parse(range, on_parse)
@@ -670,7 +673,7 @@ function LanguageTree:_parse(range, thread_state)
   -- Collect some stats
   local no_regions_parsed = 0
   local query_time = 0
-  local total_parse_time = 0
+  local total_parse_time = 0 ---@type number
 
   -- At least 1 region is invalid
   if not self:is_valid(true, type(range) == 'table' and range or nil) then
@@ -788,10 +791,11 @@ end
 
 ---@param region Range6[]
 local function region_tostr(region)
-  if #region == 0 then
+  local first = region[1]
+  if not first then
     return '[]'
   end
-  local srow, scol = region[1][1], region[1][2]
+  local srow, scol = first[1], first[2]
   local erow, ecol = region[#region][4], region[#region][5]
   return string.format('[%d:%d-%d:%d]', srow, scol, erow, ecol)
 end
@@ -860,6 +864,8 @@ function LanguageTree:set_included_regions(new_regions)
       end
     end
   end
+
+  ---@cast new_regions Range6[][]
 
   -- included_regions is not guaranteed to be list-like, but this is still sound, i.e. if
   -- new_regions is different from included_regions, then outdated regions in included_regions are
@@ -947,8 +953,8 @@ local function clip_regions(region1, region2)
   local i, j = 1, 1
 
   while i <= #region1 and j <= #region2 do
-    local r1 = region1[i]
-    local r2 = region2[j]
+    local r1 = assert(region1[i])
+    local r2 = assert(region2[j])
 
     local intersection = Range.intersection(r1, r2)
     if intersection then
@@ -1057,7 +1063,10 @@ function LanguageTree:_get_injection(match, metadata)
   local combined = metadata['injection.combined'] ~= nil
   local injection_lang = metadata['injection.language'] --[[@as string?]]
   local lang = metadata['injection.self'] ~= nil and self:lang()
-    or metadata['injection.parent'] ~= nil and self._parent:lang()
+    or metadata['injection.parent'] ~= nil and assert(
+      self._parent,
+      'injection.parent requires a parent language tree'
+    ):lang()
     or (injection_lang and resolve_lang(injection_lang))
   local include_children = metadata['injection.include-children'] ~= nil
 
@@ -1117,7 +1126,7 @@ function LanguageTree:_get_injections(range, thread_state)
     local injections = {}
     local root_node = tree:root()
     local parent_ranges = self._regions and self._regions[tree_index] or nil
-    local scan_region ---@type Range4[]
+    local scan_region ---@type Range[]
     if full_scan then
       --- @diagnostic disable-next-line: missing-fields LuaLS varargs bug
       scan_region = { { root_node:range() } }
@@ -1347,7 +1356,7 @@ end
 function LanguageTree:_on_detach(...)
   self:invalidate(true)
   self:_do_callback('detach', ...)
-  if self._logfile then
+  if self._logger and self._logfile then
     self._logger('nvim', 'detaching')
     self._logger = nil
     self._logfile:close()

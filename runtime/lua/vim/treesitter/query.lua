@@ -723,34 +723,38 @@ local directive_handlers = {
     local end_idx = #node_text
     local start_idx = 1
 
+    local end_line = node_text[end_idx]
     if trim_end_lines then
-      while end_idx > 0 and node_text[end_idx]:find('^%s*$') do
+      while end_line and end_line:find('^%s*$') do
         end_idx = end_idx - 1
+        end_line = node_text[end_idx]
         end_row = end_row - 1
         -- set the end position to the last column of the next line, or 0 if we just trimmed the
         -- last line
-        end_col = end_idx > 0 and #node_text[end_idx] or 0
+        end_col = end_line and #end_line or 0
       end
     end
     if trim_end_cols then
-      if end_idx == 0 then
+      if not end_line then
         end_row = start_row
         end_col = start_col
       else
-        local whitespace_start = node_text[end_idx]:find('(%s*)$')
+        local whitespace_start = assert(end_line:find('(%s*)$'))
         end_col = (whitespace_start - 1) + (end_idx == 1 and start_col or 0)
       end
     end
 
+    local start_line = node_text[start_idx]
     if trim_start_lines then
-      while start_idx <= end_idx and node_text[start_idx]:find('^%s*$') do
+      while start_idx <= end_idx and assert(start_line):find('^%s*$') do
         start_idx = start_idx + 1
+        start_line = node_text[start_idx]
         start_row = start_row + 1
         start_col = 0
       end
     end
-    if trim_start_cols and node_text[start_idx] then
-      local _, whitespace_end = node_text[start_idx]:find('^(%s*)')
+    if trim_start_cols and start_line then
+      local _, whitespace_end = start_line:find('^(%s*)')
       whitespace_end = whitespace_end or 0
       start_col = (start_idx == 1 and start_col or 0) + whitespace_end
     end
@@ -974,7 +978,7 @@ function Query:iter_captures(node, source, start_row, end_row, opts)
 
     local match_id, pattern_i = match:info()
 
-    --- @type vim.treesitter.query.TSMetadata
+    --- @type vim.treesitter.query.TSMetadata?
     local metadata
     if match_id <= highest_cached_match_id then
       metadata = match_cache[match_id]
@@ -1113,7 +1117,7 @@ end
 --- @field langs? string|string[]
 ---
 --- Just clear current lint errors
---- @field clear boolean
+--- @field clear? boolean
 
 --- Lint treesitter queries using installed parser, or clear lint errors.
 ---

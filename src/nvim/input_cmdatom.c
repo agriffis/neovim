@@ -474,7 +474,7 @@ void atom_push_raw(bool cascade, CmdAtom *atom)
       composite.queued = true;
     }
     kv_push(vatom.atoms, *atom);
-    vatom.frame = cur_frame->id;
+    vatom.frame = cur_frame != NULL ? cur_frame->id : 0;
     return;
   }
   atom_captures++;
@@ -567,7 +567,8 @@ static char *atom_composite_lhs(void)
 /// Queues an internal-only (no emit) atom for mcursor cascade.
 void atom_lhs_replay_queue(void)
 {
-  kv_push(g_atoms, ((CmdAtom){ .type = kAComp, .keys = atom_composite_lhs(), .remap = true }));
+  kv_push(g_atoms, ((CmdAtom){ .type = kAComp, .keys = atom_composite_lhs(), .remap = true,
+                               .origin = composite.origin }));
 }
 
 /// True if the composite should NOT LHS-replay (see `composite.queued`).

@@ -65,7 +65,7 @@ M.FileChangeType = {
 --- @field subscribers table<vim._watch.Subscriber, true>
 --- @field cancel? fun()
 
---- @type table<string, table<string, table<vim._watch.Shared, true>>>
+--- @type table<'watch'|'watchdirs'|'inotify', table<string, table<vim._watch.Shared, true>>>
 local shared = { watch = {}, watchdirs = {}, inotify = {} }
 
 --- Counts backend watchers with outstanding subscriptions, excluding failed starts.
@@ -196,6 +196,8 @@ local function subscribe(name, backend, path, opts, rules, subscriber)
       debounce = key.debounce,
       uvflags = key.uvflags,
       -- Both filters must match from the beginning of the full path.
+      -- EmmyLua does not infer the LPeg length operator's result type.
+      ---@diagnostic disable-next-line: assign-type-mismatch
       include_pattern = #include_pattern * include,
       exclude_pattern = exclude_pattern,
       on_error = function(err)
@@ -238,7 +240,7 @@ local function subscribe(name, backend, path, opts, rules, subscriber)
         shared[name][path] = nil
       end
 
-      entry.cancel()
+      assert(entry.cancel)()
     end
   end
 end

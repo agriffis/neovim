@@ -165,7 +165,7 @@ local detect = setmetatable({}, {
   --- @return function
   __index = function(t, k)
     t[k] = function(...)
-      return require('vim.filetype.detect')[k](...)
+      return assert(require('vim.filetype.detect')[k])(...)
     end
     return t[k]
   end,
@@ -3407,7 +3407,11 @@ end
 --- whether a certain extension, filename, or pattern has been registered so far. In addition, the
 --- `pattern` table is in an internal format optimized for fast lookup. Prefer |vim.filetype.match()|
 --- for checking the detected filetype for a given pattern.
----@return table<string, table<string, vim.filetype.mapping|table<string, vim.filetype.mapping>>>
+--- @return {
+---   extension: vim.filetype.mapping,
+---   filename: vim.filetype.mapping,
+---   pattern: table<string, vim.filetype.mapping>
+--- }
 function M.inspect()
   return {
     extension = vim.deepcopy(extension),

@@ -338,7 +338,7 @@ end
 ---
 --- Title of the window. If a function, it accepts the buffer number of the
 --- source buffer as its only argument and should return a string.
---- @field title (string|fun(bufnr:integer):string|nil)
+--- @field title? string|fun(bufnr:integer):string
 
 --- @nodoc
 --- @param opts vim.treesitter.dev.inspect_tree.Opts?
@@ -410,7 +410,7 @@ function M.inspect_tree(opts)
     nowait = true,
     callback = function()
       local row = api.nvim_win_get_cursor(w)[1]
-      local lnum, col = treeview:get(row).node:start()
+      local lnum, col = assert(treeview:get(row)).node:start()
 
       -- update source window if original was closed
       if not api.nvim_win_is_valid(win) then
@@ -481,7 +481,7 @@ function M.inspect_tree(opts)
     w = api.nvim_get_current_win()
     api.nvim_buf_clear_namespace(buf, treeview.ns, 0, -1)
     local row = api.nvim_win_get_cursor(w)[1]
-    local lnum, col, end_lnum, end_col = treeview:get(row).node:range()
+    local lnum, col, end_lnum, end_col = assert(treeview:get(row)).node:range()
     api.nvim_buf_set_extmark(buf, treeview.ns, lnum, col, {
       end_row = end_lnum,
       end_col = math.max(0, end_col),

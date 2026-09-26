@@ -59,7 +59,7 @@
 
 local nvim_on = require('vim._core.util').nvim_on
 
---- @type table<string,fun(bufnr: integer, val: string, opts?: table)>
+--- @type table<string,fun(bufnr: integer, val: string, opts: table)>
 local properties = {}
 
 --- Modified version of the builtin assert that does not include error position information
@@ -335,7 +335,6 @@ function M.config(buf)
     if val ~= 'unset' then
       local func = M.properties[opt]
       if func then
-        --- @type boolean, string?
         local ok, err = pcall(func, buf, val, opts)
         if ok then
           applied[opt] = val

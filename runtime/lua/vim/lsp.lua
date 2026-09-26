@@ -343,6 +343,7 @@ lsp.config = setmetatable({ _configs = {} }, {
       -- Calls to vim.lsp.config in lsp/* have a lower precedence than calls from other sites.
       local rtp_config --- @type vim.lsp.Config?
       for _, v in ipairs(api.nvim_get_runtime_file(('lsp/%s.lua'):format(name), true)) do
+        --- @diagnostic disable-next-line: need-check-nil EmmyLuaLs/emmylua-analyzer-rust#1259
         local config = assert(loadfile(v))() ---@type any?
         if type(config) == 'table' then
           --- @type vim.lsp.Config?
@@ -805,7 +806,8 @@ function lsp.status()
       --- @cast progress {token: lsp.ProgressToken, value: lsp.LSPAny}
       local value = progress.value
       if type(value) == 'table' and value.kind then
-        local message = value.message and (value.title .. ': ' .. value.message) or value.title
+        -- Progress handlers carry the title over to report and end messages.
+        local message = value.message and (value.title .. ': ' .. value.message) or value.title --[[@as string?]]
         messages[#messages + 1] = message
         if value.percentage then
           percentage = math.max(percentage or 0, value.percentage)
@@ -1376,7 +1378,7 @@ end
 ---
 --- The timeout period for the formatting request.
 --- (default: 500ms).
---- @field timeout_ms integer
+--- @field timeout_ms? integer
 
 --- Provides an interface between the built-in client and a `formatexpr` function.
 ---
@@ -1412,7 +1414,7 @@ function lsp.formatexpr(opts)
     local params = util.make_formatting_params()
     local method ---@type vim.lsp.protocol.Method.ClientToServer.Request?
     if client:supports_method('textDocument/rangeFormatting') then
-      local end_line = vim.fn.getline(end_lnum) --[[@as string]]
+      local end_line = vim.fn.getline(end_lnum)
       local end_col = vim.str_utfindex(end_line, client.offset_encoding)
       --- @cast params +lsp.DocumentRangeFormattingParams
       params.range = {

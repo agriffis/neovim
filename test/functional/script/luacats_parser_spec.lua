@@ -129,6 +129,43 @@ describe('luacats parser', function()
     end)
   end
 
+  it('supports @return_cast annotations', function()
+    local _, funs = parser.parse_str(
+      dedent([[
+        --- @param value any
+        --- @return boolean # Whether the value is nil.
+        --- @return_cast value nil|vim.NIL else -nil
+        function is_nil(value) end
+      ]]),
+      'myfile.lua'
+    )
+
+    eq({ { type = 'boolean', desc = 'Whether the value is nil.' } }, funs[1].returns)
+  end)
+
+  it('parses multiline return annotations', function()
+    local _, funs = parser.parse_str(
+      dedent([[
+        --- Inspect the registry.
+        --- @return table<string, {
+        ---   name: string
+        --- }> # Registry contents.
+        --- @return integer count # Number of entries.
+        function inspect() end
+      ]]),
+      'myfile.lua'
+    )
+
+    eq('Inspect the registry.', funs[1].desc)
+    eq({
+      {
+        type = 'table<string, { name: string }>',
+        desc = 'Registry contents.',
+      },
+      { type = 'integer', name = 'count', desc = 'Number of entries.' },
+    }, funs[1].returns)
+  end)
+
   it('tracks class member declaration style', function()
     local classes, funs = parser.parse_str(
       dedent([[        --- @class vim.MyClass

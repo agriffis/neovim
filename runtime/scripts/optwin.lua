@@ -590,9 +590,9 @@ local function update_current_line()
   ---@type string
   local name
   if line:find('=') then
-    name = line:match('^ \tset (.-)=')
+    name = assert(line:match('^ \tset (.-)='))
   else
-    name = line:match('^ \tset ([a-z]*)'):gsub('^no', '') --[[@as string]]
+    name = assert(line:match('^ \tset ([a-z]*)')):gsub('^no', '') --[[@as string]]
   end
 
   local info = vim.api.nvim_get_option_info2(name, {})
@@ -628,22 +628,23 @@ local function current_line_set_option()
     return
   end
 
-  ---@type string
+  ---@type string?
   local name
-  ---@type string|boolean|integer
+  ---@type string|boolean|integer?
   local value
   if line:find('=') then
     name, value = line:match('^ \tset (.-)=(.*)')
   else
-    local option = line:match('^ \tset ([a-z]*)')
+    local option = assert(line:match('^ \tset ([a-z]*)'))
     name = option:gsub('^no', '') --[[@as string]]
     value = vim.startswith(option, 'no')
   end
+  assert(name and value ~= nil)
 
   local info = vim.api.nvim_get_option_info2(name, {})
 
   if info.type == 'number' then
-    value = assert(tonumber(value), value .. ' is not a number')
+    value = vim._assert_integer(value)
   end
 
   if info.global_local or info.scope == 'global' or info.scope == 'tab' then
@@ -704,7 +705,7 @@ else
     elseif line_type == 'header' then
       vim.fn.search(line, 'w')
     elseif line_type == 'opt-desc' then
-      local name = line:match('[^\t]*')
+      local name = assert(line:match('[^\t]*'))
       vim.cmd.help(("'%s'"):format(name))
     end
   end, { buf = buf })
