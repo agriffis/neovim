@@ -48,6 +48,7 @@
 #include "nvim/move.h"
 #include "nvim/normal.h"
 #include "nvim/ops.h"
+#include "nvim/option.h"
 #include "nvim/option_vars.h"
 #include "nvim/os/input.h"
 #include "nvim/os/time.h"
@@ -109,6 +110,7 @@ static struct {
   uint64_t frame;   ///< Root frame that started the insert-session.
   size_t done_len;  ///< Bytes of the capture already consumed by replayed spans; tail is pending.
   uint32_t region;  ///< Primary cursor's inserted text.
+  const char *vsel;  ///< Supplants the capture's "1v" (see `InsSession.vsel`).
 } mc_ins_span;
 
 /// Editor state when the mc session started, which every cursor replays against.
@@ -129,8 +131,6 @@ static bool mc_ins_joined;
 static ContextVec mc_cursors = KV_INITIAL_VALUE;
 /// Replay is in progress: keys re-executing internally, hooks suppressed.
 static bool mc_replay = false;
-/// "Follow motion" mode ("q="): cascade primary-cursor motions to all mcursors.
-static bool mc_follow_motion = false;
 
 /// Namespace for tracking multicursor positions.
 static uint32_t mc_ns(void)
@@ -199,7 +199,7 @@ size_t mc_showcmd(char *buf, size_t size)
     buf[0] = NUL;
     return 0;
   }
-  return (size_t)snprintf(buf, size, "%s%zu× ", mc_follow_motion ? "=" : "", kv_size(mc_cursors));
+  return (size_t)snprintf(buf, size, "%s%zu× ", mc_following() ? "=" : "", kv_size(mc_cursors));
 }
 
 /// True during a replay: re-executing keys internally, not new user input.
@@ -295,6 +295,10 @@ static void mc_execute(size_t cursoridx, size_t atomidx)
   // Get the tracked position: edits by other cursors (etc) may have shifted it since last update.
   if (ctx.mark != 0 && !extmark_get_pos(curbuf, mc_ns(), ctx.mark, &ctx.pos)) {
     // The extmark was deleted, thus the cursor is deleted (swept by mc_cleanup()).
+    return;
+  }
+  if (ctx.visual.vi_start.lnum == 0 && strncmp(atom.keys, "gv", 2) == 0) {
+    // Replaying "gv", but Visual-reselect area is not defined for this cursor.
     return;
   }
 
@@ -428,7 +432,7 @@ static void mc_cascade(void)
   McSandbox sb;
   mc_sandbox_enter(&sb, edits);
 
-  // Replay each atom at each cursor (nested ":norm! xx" queues multiple atoms per clock edge).
+  // Replay each atom at each cursor (a composite queues its subatoms, e.g. mapping "xx").
   for (size_t ai = 0; ai < kv_size(g_atoms); ai++) {
     CmdAtom *atom = &kv_A(g_atoms, ai);
     if (atom->origin.buf.br_buf != NULL
@@ -528,14 +532,10 @@ static void mc_cleanup(bool dedupe, const pos_T *primary, uint32_t keep_mark)
     }
   }
   kv_size(mc_cursors) = n;
-  if (n == 0) {
-    // Session ended implicitly ("q=" + "G" deduped all cursors). Reset "q=".
-    mc_follow_set(kFalse);
-    if (had_cursors) {
-      ctx_free(&mc_start.regs);
-      mc_start.time = 0;
-      mc_lua_enable(false);
-    }
+  if (n == 0 && had_cursors) {
+    ctx_free(&mc_start.regs);
+    mc_start.time = 0;
+    mc_lua_enable(false);
   }
 }
 
@@ -559,12 +559,14 @@ bool mc_ins_replay_can_join(void)
 ///
 /// @param cascade  The session qualifies for insert-cascading.
 /// @param origin   State at session start.
-void mc_ins_cascade_start(bool cascade, CmdOrigin origin, uint64_t root_frame)
+/// @param vsel     See `InsSession.vsel`. Borrowed.
+void mc_ins_cascade_start(bool cascade, CmdOrigin origin, uint64_t root_frame, const char *vsel)
 {
   if (mc_replaying()) {
     // Nested replay session: don't clobber the primary session's state.
     return;
   }
+  mc_ins_span.vsel = vsel;
   mc_ins_joined = false;
   mc_ins_span.active = cascade && mc_buf_has_cursors(curbuf);
   mc_ins_span.first = true;
@@ -830,7 +832,14 @@ void mc_ins_cascade(void)
     if (!Ins.did_ai && ins.data != NULL && ins.size > 0) {
       // Entry replay.
       StringBuilder keys = KV_INITIAL_VALUE;
-      kv_concat_len(keys, ins.data, ins.size);
+      size_t skip = 0;
+      if (mc_ins_span.vsel != NULL) {
+        assert(ins.size >= 2 && strncmp(ins.data, "1v", 2) == 0);
+        kv_concat(keys, mc_ins_span.vsel);  // Supplant redo's "1v" fallback.
+        skip = 2;
+        mc_ins_span.vsel = NULL;
+      }
+      kv_concat_len(keys, ins.data + skip, ins.size - skip);
       kv_push(keys, ESC);
       kv_push(keys, NUL);
       mc_ins_span.done_len = ins.size;
@@ -1138,6 +1147,7 @@ bool mc_ins_commit(void)
   bool active = mc_ins_span.active;
   bool ins_cascaded = active && !mc_ins_span.first;
   mc_ins_span.active = false;
+  mc_ins_span.vsel = NULL;
 
   if (ins_cascaded) {
     // COMMIT: replace the previews with a real replay: abbrev, 'textwidth', … re-exec per cursor.
@@ -1198,10 +1208,10 @@ bool mc_buf_has_cursors(buf_T *buf)
   return false;
 }
 
-/// Whether "follow motion" mode ("q=") is enabled.
+/// Whether 'follow' mode is enabled.
 bool mc_following(void)
 {
-  return mc_follow_motion;
+  return curbuf->b_p_follow;
 }
 
 /// Notifies mcursor.lua that the session started (first cursor) or ended (last cursor removed).
@@ -1250,15 +1260,17 @@ void mc_counter(long count1)
   nlua_call_typval("vim._core.mcursor", "number", tv_args, NULL);
 }
 
-/// Sets "follow motion" mode ("q="), and applies the change to the executing CmdAtom.
+/// Sets 'follow' mode ("q="), which applies to the executing CmdAtom.
 ///
 /// @param on  kNone: toggle. kTrue/kFalse: force it ("1q=" on, "2q=" off).
 void mc_follow_set(TriState on)
 {
-  bool follow = on == kNone ? !mc_follow_motion : on == kTrue;
-  if (mc_follow_motion != follow) {
-    mc_follow_motion = follow;
-    atom_follow_changed();
+  if (mc_replaying()) {
+    return;  // Follow-mode is session state, not per-cursor.
+  }
+  bool follow = on == kNone ? !curbuf->b_p_follow : on == kTrue;
+  if (curbuf->b_p_follow != follow) {
+    set_option_value_give_err(kOptFollow, BOOLEAN_OBJ(follow), OPT_LOCAL);
   }
 }
 

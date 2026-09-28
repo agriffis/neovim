@@ -98,11 +98,13 @@ describe('multicursor', function()
       eq({ 'aa', 'bb', 'ccc' }, get_lines())
     end)
 
-    it('clearing mcursors also disables q= follow-mode', function()
+    it("clearing mcursors keeps 'follow'; Q disables it", function()
       cursors({ 'aaa', 'bbb', 'ccc' }, 'QjQ')
       feed('q=')
       clear_cursors()
+      eq(true, api.nvim_get_option_value('follow', {}))
       feed('Q')
+      eq(false, api.nvim_get_option_value('follow', {}))
       eq(1, ncursors())
       feed('l')
       eq(1, ncursors())
@@ -1896,7 +1898,7 @@ describe('multicursor', function()
       screen:expect([[
         {17:longword} x                    |
         {17:ab} y                          |
-        {17:mediu}^m z                      |
+        {17:mediu^m} z                      |
         {1:~                             }|*2
         {5:-- VISUAL --}                  |
       ]])
@@ -1905,7 +1907,7 @@ describe('multicursor', function()
       screen:expect([[
         {17:longword x}                    |
         {17:ab y}                          |
-        {17:medium }^z                      |
+        {17:medium ^z}                      |
         {1:~                             }|*2
         {5:-- VISUAL --}                  |
       ]])
@@ -1929,7 +1931,7 @@ describe('multicursor', function()
         {17:aaaa}                          |
         {17:bbbb}                          |
         {17:cccc}                          |
-        ^d{17:ddd}                          |
+        {17:^dddd}                          |
         {1:~                             }|
         {5:-- VISUAL LINE --}             |
       ]])
@@ -1941,7 +1943,7 @@ describe('multicursor', function()
         {17:aa}aa                          |
         {17:bb}bb                          |
         c{17:cc}c                          |
-        d{17:d}^dd                          |
+        d{17:d^d}d                          |
         {1:~                             }|
         {5:-- VISUAL BLOCK --}            |
       ]])
@@ -1956,7 +1958,7 @@ describe('multicursor', function()
       screen:expect([[
         {17:aa b}b cc dd                   |
         {17:ee f}f gg hh                   |
-        {17:ii }^jj kk ll                   |
+        {17:ii ^j}j kk ll                   |
         {1:~                             }|*2
         {5:-- VISUAL --}                  |
       ]])
@@ -1981,7 +1983,7 @@ describe('multicursor', function()
       feed('gv')
       screen:expect([[
         {17:c}                             |
-        ^f                             |
+        {17:^f}                             |
         {1:~                             }|*3
         {5:-- VISUAL LINE --}             |
       ]])
@@ -1995,6 +1997,26 @@ describe('multicursor', function()
       feed('gvd')
       eq({ ' bb', ' dd', 'ee ff' }, get_lines())
       eq(2, ncursors())
+      clear_cursors()
+      cursors({ 'aa bb', 'cc dd', 'ee ff' }, 'Qj')
+      feed('viw<Esc>')
+      feed('jQk')
+      feed('gvrZ') -- Not Normal-mode "rZ".
+      eq({ 'ZZ bb', 'ZZ dd', 'ee ff' }, get_lines())
+
+      -- Per-cursor "gv" + Insert-entering cmd ("gvc…").
+      clear_cursors()
+      cursors({ 'aa bb', 'cc dd', 'ee ff' })
+      feed('viw<Esc>')
+      feed('gvcX<Esc>')
+      eq({ 'X bb', 'X dd', 'X ff' }, get_lines())
+      -- Cursor without a previous area is skipped.
+      clear_cursors()
+      cursors({ 'aa bb', 'cc dd', 'ee ff' }, 'Qj')
+      feed('<C-v>l<Esc>')
+      feed('jQk') -- Cursor on line 3: no area.
+      feed('gvIX<Esc>')
+      eq('ee ff', fn.getline(3))
     end)
 
     it('selection moved by mapping via API/Lua #41956', function()
@@ -2021,7 +2043,7 @@ describe('multicursor', function()
       screen:expect([[
         a{17:aaa}aaa                       |
         b{17:bbb}bbb                       |
-        c{17:cc}^cccc                       |
+        c{17:cc^c}ccc                       |
         {1:~                             }|*2
         {5:-- VISUAL --}                  |
       ]])
@@ -2033,7 +2055,7 @@ describe('multicursor', function()
       screen:expect([[
         a{17:aaa}                          |
         b{17:bbb}                          |
-        c{17:cc}^c                          |
+        c{17:cc^c}                          |
         {1:~                             }|*2
         {5:-- VISUAL --}                  |
       ]])
@@ -2055,7 +2077,7 @@ describe('multicursor', function()
       screen:expect([[
         {17:aaa}aaaa                       |
         {17:bbb}bbbb                       |
-        {17:cc}^ccccc                       |
+        {17:cc^c}cccc                       |
         {1:~                             }|*2
         {5:-- VISUAL --}                  |
       ]])
@@ -2077,7 +2099,7 @@ describe('multicursor', function()
       screen:expect([[
         aa{17:aa}aaa                       |
         bb{17:bb}bbb                       |
-        cc{17:c}^cccc                       |
+        cc{17:c^c}ccc                       |
         {1:~                             }|*2
         {5:-- VISUAL --}                  |
       ]])
@@ -2094,7 +2116,7 @@ describe('multicursor', function()
       screen:expect([[
         b{17:a}cd                          |
         f{17:e}gh                          |
-        j^ikl                          |
+        j{17:^i}kl                          |
         {1:~                             }|*2
         {5:-- VISUAL --}                  |
       ]])
@@ -2230,7 +2252,7 @@ describe('multicursor', function()
         screen:expect([[
           {17:longword} x                    |
           {17:ab} y                          |
-          {17:mediu}^m z                      |
+          {17:mediu^m} z                      |
           {1:~                             }|*2
           {5:-- VISUAL --}                  |
         ]])
@@ -2271,7 +2293,7 @@ describe('multicursor', function()
       screen:expect([[
         a {17:longword} x                  |
         bbbb {17:ab} y                     |
-        cc {17:mediu}^m z                   |
+        cc {17:mediu^m} z                   |
         {1:~                             }|*2
         {5:-- VISUAL --}                  |
       ]])
@@ -2291,14 +2313,14 @@ describe('multicursor', function()
       feed('viw')
       screen:expect([[
         {17:foo}.bar tail                  |
-        {17:wor}^d tail                     |
+        {17:wor^d} tail                     |
         {1:~                             }|*2
         {5:-- VISUAL --}                  |
       ]])
       feed('Z')
       screen:expect([[
         {17:foo.bar} tail                  |
-        {17:wor}^d tail                     |
+        {17:wor^d} tail                     |
         {1:~                             }|*2
         {5:-- VISUAL --}                  |
       ]])
@@ -2360,7 +2382,7 @@ describe('multicursor', function()
       screen:expect([[
         aaa {100:b}{30:b}b ccc                             |
         ddd {100:e}{30:e}e fff                             |
-        ggg {17:h}^hh iii                             |
+        ggg {17:h^h}h iii                             |
         {1:~                                       }|*2
         {5:-- VISUAL --}                            |
       ]])
@@ -2368,7 +2390,7 @@ describe('multicursor', function()
       screen:expect([[
         aaa {30:b}{100:b}b ccc                             |
         ddd {30:e}{100:e}e fff                             |
-        ggg ^h{17:h}h iii                             |
+        ggg {17:^hh}h iii                             |
         {1:~                                       }|*2
         {5:-- VISUAL --}                            |
       ]])
@@ -2408,6 +2430,29 @@ describe('multicursor', function()
   end)
 
   describe('q= (follow-mode)', function()
+    it("'follow' option", function()
+      -- :setlocal is the same as "q=".
+      cursors({ 'abcd', 'efgh' }, 'Qj')
+      command('setlocal follow')
+      feed('lx')
+      eq({ 'acd', 'egh' }, get_lines())
+      -- Buffer-local.
+      command('new')
+      eq(false, api.nvim_get_option_value('follow', {}))
+      command('bwipe!')
+      eq(true, api.nvim_get_option_value('follow', {}))
+      -- LHS-replay does not re-run "q=" (toggle) at each cursor.
+      clear_cursors()
+      command('setlocal nofollow')
+      command('let g:optionset = 0 | autocmd OptionSet follow let g:optionset += 1')
+      command([[nnoremap gx <Cmd>exe 'normal! q='<Bar>call setline('.', 'X'..getline('.'))<CR>]])
+      cursors({ 'aa', 'bb' }, 'Qj')
+      feed('gx')
+      eq({ 'Xaa', 'Xbb' }, get_lines())
+      eq(true, api.nvim_get_option_value('follow', {}))
+      eq(1, n.eval('g:optionset'))
+    end)
+
     it('cursors follow primary-cursor motions', function()
       cursors({ 'abcd', 'efgh' }, 'Q')
       feed('j') -- No cascade/follow.
@@ -2434,14 +2479,15 @@ describe('multicursor', function()
       eq({ 'b', '!' }, get_lines())
     end)
 
-    it('implicit exit (cursors deduped) resets follow-mode', function()
+    it("implicit exit (cursors deduped) keeps 'follow'; Q disables it", function()
       cursors({ 'aaa', 'bbb', 'ccc' })
       eq(2, ncursors())
       feed('q=')
       feed('9k') -- Every cursor clamps to line 1, onto the primary: all deduped.
       eq(0, ncursors())
-      -- Exited implicitly: "q=" resets, else the next "Q" would dedupe on "j".
-      feed('Q')
+      eq(true, api.nvim_get_option_value('follow', {}))
+      feed('Q') -- Disables follow-mode, else it would dedupe on "j".
+      eq(false, api.nvim_get_option_value('follow', {}))
       feed('j')
       eq(1, ncursors())
     end)
@@ -3457,7 +3503,7 @@ describe('multicursor', function()
       screen:expect([[
         foo(one, {17:two})                 |
         bar(three, {17:four})              |
-        baz(five, {17:si}^x)                |
+        baz(five, {17:si^x})                |
         {1:~                             }|*2
         {5:-- VISUAL --}                  |
       ]])
@@ -3465,7 +3511,7 @@ describe('multicursor', function()
       screen:expect([[
         foo{17:(one, two)}                 |
         bar{17:(three, four)}              |
-        baz{17:(five, six}^)                |
+        baz{17:(five, six^)}                |
         {1:~                             }|*2
         {5:-- VISUAL --}                  |
       ]])
