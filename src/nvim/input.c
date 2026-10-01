@@ -493,6 +493,11 @@ void flush_buffers(flush_buffers_T flush_typeahead)
     atom_composite_abort();
   }
 
+  if (readbuf2.keys.size > 0 && Visual.active) {
+    // This flush discards the dot-repeat keys, including the operator that would end the selection.
+    // End Visual mode at cmd end, not here (else its autocmds would run inside emsg/vgetorpeek).
+    Visual.need_end = true;
+  }
   free_buff(&readbuf1);
   free_buff(&readbuf2);
 
@@ -535,15 +540,13 @@ void flush_buffers(flush_buffers_T flush_typeahead)
 /// flush map and typeahead buffers and give a warning for an error
 void beep_flush(void)
 {
-  if (emsg_silent == 0) {
-    // Don't flush during mc-replay. A failed motion ("vt;" where there is no ";") should not eat
-    // the keys typed after it ("c"). This matches Helix multiselection: each action during a Visual
-    // selection proceeds or fails, without canceling the next action.
-    if (!mc_replaying()) {
-      flush_buffers(FLUSH_MINIMAL);
-    }
-    vim_beep(kOptBoFlagError);
+  // Don't flush during mc-replay. A failed motion ("vt;" where there is no ";") should not eat
+  // the keys typed after it ("c"). This matches Helix multiselection: each action during a Visual
+  // selection proceeds or fails, without canceling the next action.
+  if (emsg_silent == 0 && !mc_replaying()) {
+    flush_buffers(FLUSH_MINIMAL);
   }
+  vim_beep(kOptBoFlagError);
 }
 
 /// Starts capturing a new change: stores `spec`, caller appends the body (redo_append_x). The

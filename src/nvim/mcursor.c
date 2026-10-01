@@ -133,6 +133,11 @@ static ContextVec mc_cursors = KV_INITIAL_VALUE;
 /// Replay is in progress: keys re-executing internally, hooks suppressed.
 static bool mc_replay = false;
 
+void mc_init(void)
+{
+  mc_ns();  // Eagerly create the namespace so mc_on_extmark_set() can assume it exists.
+}
+
 /// Namespace for tracking multicursor positions.
 static uint32_t mc_ns(void)
 {
@@ -282,7 +287,7 @@ static void mc_sandbox_leave(McSandbox *sb)
   mc_replay = false;
 }
 
-/// Cascade step: replays an atom at `cursoridx`, then updates Context.
+/// Cascade step: replays an atom at `cursoridx` and updates Context.
 static void mc_execute(size_t cursoridx, size_t atomidx)
 {
   Context ctx = kv_A(mc_cursors, cursoridx);
@@ -317,7 +322,13 @@ static void mc_execute(size_t cursoridx, size_t atomidx)
     regs_ts = reg_max_ts(false);
   }
 
-  ctx_load(&ctx, kCtxCursor | kCtxVisual | kCtxMarks, 0);
+  // Perf: motions never set cursor-local marks; skip save/restore.
+  // Except motions (`.) that read them, and LHS-replay.
+  const int mark_cmd = atom.spec.cmd == 'g' ? atom.spec.cmd2 : atom.spec.cmd;  // g`. like `.
+  const bool swap_marks = atom.type != kAMotion || atom.remap || mark_cmd == '\''
+                          || mark_cmd == '`';
+
+  ctx_load(&ctx, swap_marks ? kCtxVisual | kCtxMarks | kCtxCursor : kCtxCursor, 0);
 
   // Edits by other cursors may have invalidated this cursor's position.
   if (atom.type == kAInsertSpan) {
@@ -349,7 +360,6 @@ static void mc_execute(size_t cursoridx, size_t atomidx)
   if (atom.type == kAInsertSpan && mc_ins_span.first && did_beep != beeps
       && buf_get_changedtick(curbuf) == tick) {
     // XXX: Insert-entering cmd failed ("ct;" did not match ";"). Drop the cursor. #41960
-    // (Not detected under emsg_silent: beep_flush() does not beep.)
     extmark_del_id(curbuf, mc_ns(), ctx.mark);
     return;
   }
@@ -368,7 +378,11 @@ static void mc_execute(size_t cursoridx, size_t atomidx)
   const bool wrote_regs = swap_regs && reg_max_ts(false) != regs_ts;
 
   if (cursoridx >= kv_size(mc_cursors)) {
-    // Cursors were removed while replaying (e.g. gQ via autocmd); already freed.
+    // Cursors were removed during replay (e.g. gQ via autocmd); already freed.
+    return;
+  }
+  if (!extmark_get_pos(curbuf, mc_ns(), ctx.mark, &ctx.pos)) {
+    // Extmark was deleted during replay; mc_cleanup() will sweep the cursor state.
     return;
   }
 
@@ -377,7 +391,7 @@ static void mc_execute(size_t cursoridx, size_t atomidx)
     api_free_string(ctx.regs);
     ctx.regs = shada_encode_regs(false, mc_start.time);
   }
-  ctx_save(&ctx, kCtxCursor | kCtxVisual | kCtxMarks);
+  ctx_save(&ctx, swap_marks ? kCtxVisual | kCtxMarks | kCtxCursor : kCtxCursor);
 
   if (atom.type == kAInsertSpan && curbuf->b_last_insert.mark.lnum > 0) {
     // Anchor at the insertion point ('^ mark): this is where the primary cursor, still in Insert
@@ -517,7 +531,7 @@ static void mc_cleanup(bool dedupe, const pos_T *primary, uint32_t keep_mark)
                      && ((curwin != NULL && buf == curbuf
                           && primary != NULL && equalpos(ctx->pos, *primary)
                           && ctx->mark != keep_mark)
-                         || mc_mark_at(buf, ctx->pos) != ctx->mark);
+                         || mc_mark_at(buf, ctx->pos, 0) != ctx->mark);
     if (dup) {
       extmark_del_id(buf, mc_ns(), ctx->mark);
       ctx_free(ctx);
@@ -772,7 +786,7 @@ static bool mc_ins_keys_nonliteral(const char *keys, size_t len)
       key = TO_SPECIAL((uint8_t)keys[i + 1], (uint8_t)keys[i + 2]);
       i += 2;
     }
-    if ((atom_key_class(key, NUL) & kKeyInsFlush) != 0) {
+    if ((atom_key_class(key, NUL, NUL) & kKeyInsFlush) != 0) {
       return true;
     }
   }
@@ -1222,8 +1236,8 @@ static void mc_lua_enable(bool enable)
   nlua_call_typval("vim._core.mcursor", "enable", tv_args, NULL);
 }
 
-/// The first cursor extmark at `pos` in `buf`, or 0 if none.
-uint32_t mc_mark_at(buf_T *buf, pos_T pos)
+/// The first cursor extmark (except `skip`) at `pos` in `buf`, or 0 if none.
+uint32_t mc_mark_at(buf_T *buf, pos_T pos, uint32_t skip)
 {
   if (kv_size(mc_cursors) == 0) {
     return 0;
@@ -1234,7 +1248,7 @@ uint32_t mc_mark_at(buf_T *buf, pos_T pos)
   // Perf: bisect the marktree, instead of scanning mc_cursors (quadratic).
   while ((k = marktree_itr_current(itr)).id != 0
          && k.pos.row == pos.lnum - 1 && k.pos.col == pos.col) {
-    if (k.ns == mc_ns() && !mt_end(k)) {
+    if (k.ns == mc_ns() && !mt_end(k) && k.id != skip) {
       return k.id;
     }
     if (!marktree_itr_next(buf->b_marktree, itr)) {
@@ -1246,7 +1260,7 @@ uint32_t mc_mark_at(buf_T *buf, pos_T pos)
 
 /// For "zq{motion}": runs motion `keys` at `pos`.
 ///
-/// @return  Where the motion moved the cursor.
+/// @return  Where the motion moved the cursor. lnum=0: it failed (beeped).
 static pos_T mc_zq_step(const char *keys, pos_T pos)
 {
   curwin->w_cursor = pos;
@@ -1262,14 +1276,16 @@ static pos_T mc_zq_step(const char *keys, pos_T pos)
   block_autocmds();
   save_state_T sst;
   save_current_state(&sst);
+  const uint64_t beeps = did_beep_silent;
   exec_normal_cmd((char *)keys, REMAP_NONE, true);
+  const bool failed = did_beep_silent != beeps;
   restore_current_state(&sst);
   unblock_autocmds();
   atom_suppress(false);
   cmdmod.cmod_flags = save_cmod_flags;
   emsg_silent--;
   msg_silent--;
-  return curwin->w_cursor;
+  return failed ? (pos_T){ 0 } : curwin->w_cursor;
 }
 
 /// Visual area ('< '>) of the target at `step`: its search match, else the char (or line).
@@ -1279,8 +1295,11 @@ static visualinfo_T mc_zq_target(pos_T step, bool search, MotionType motion_type
 {
   const visualinfo_T save = curbuf->b_visual;
   const int save_mode_eval = curbuf->b_visual_mode_eval;
-  curbuf->b_visual = (visualinfo_T){ .vi_start = step, .vi_end = step, .vi_curswant = step.col,
-                                     .vi_mode = motion_type == kMTLineWise ? 'V' : 'v' };
+  // Search: lnum=0 if "gn" finds no match.
+  curbuf->b_visual = search ? (visualinfo_T){ 0 }
+                            : (visualinfo_T){ .vi_start = step, .vi_end = step,
+                                              .vi_curswant = step.col,
+                                              .vi_mode = motion_type == kMTLineWise ? 'V' : 'v' };
   curbuf->b_visual_mode_eval = curbuf->b_visual.vi_mode;
   if (search) {
     mc_zq_step("gn\033", step);  // Selects the match at `step`; <Esc> stores it as '< '>.
@@ -1337,13 +1356,17 @@ static bool mc_zq_first(const char *keys, bool search, MotionType motion_type, c
   if (step->lnum != 0) {
     return true;
   }
+  const bool failed = s.lnum == 0;
+  if (failed && motion_type != kMTLineWise && equalpos(from, start)) {
+    return false;  // Fails from the start ("fx" without "x"): no step.
+  }
   if (bof
       && (!search || equalpos(mc_zq_target(start, true, motion_type, NULL).vi_start, start))) {
     *step = start;  // Buffer start, nothing before it: a step (search: if a match starts there).
     return true;
   }
-  if (equalpos(s, from)) {
-    *step = start;  // Stays: the start is a step ("0").
+  if (failed || equalpos(s, from)) {
+    *step = start;  // Stays: the start is a step ("0", "j" on the last line, a short line's end).
     return true;
   }
   *step = s;
@@ -1364,9 +1387,14 @@ static int mc_zq_run(const char *keys, bool search, MotionType motion_type, pos_
     mc_zq_target(step, search, motion_type, mc_add(curbuf, step));
     placed++;
     const pos_T prev = step;
-    step = mc_zq_step(keys, prev);
-    if (equalpos(step, prev)) {
-      break;  // Failed, or does not advance.
+    pos_T from = prev;
+    step = mc_zq_step(keys, from);
+    if (equalpos(step, from) && inc(&from) != -1) {
+      // Retry from next char. The motion neither failed nor advanced ("ti" before an "i").
+      step = mc_zq_step(keys, from);
+    }
+    if (step.lnum == 0 || equalpos(step, prev) || equalpos(step, from)) {
+      break;  // Failed, or did not advance (after retry).
     }
     if (lt(step, prev)) {  // Wrapped around the end of the buffer ('wrapscan'), or backward.
       if (!wrap || wrapped) {
@@ -1416,34 +1444,49 @@ void mc_zq(oparg_T *oap, cmdarg_T *cap, pos_T origin)
     return;
   }
   pos_T primary = origin;
+
+  // "zq": from primary to end of buffer.
   // "{Visual}zq": the selection ('< '>). Linewise, blockwise: whole lines (blockwise: `vcols`).
   visualinfo_T v = curbuf->b_visual;
-  pos_T bounds[2] = { mark_get_visual(curbuf, '<')->mark, mark_get_visual(curbuf, '>')->mark };
+  pos_T bounds[2] = { primary, { .lnum = MAXLNUM } };
+  if (oap->from_visual) {
+    bounds[0] = mark_get_visual(curbuf, '<')->mark;
+    bounds[1] = mark_get_visual(curbuf, '>')->mark;
+  }
+
+  const bool lines = oap->motion_type == kMTLineWise;  // Linewise motion ("j") steps by lines.
+  if (lines) {
+    bounds[0].col = 0;
+    bounds[1].col = MAXCOL;
+  }
   colnr_T vcols[2] = { 0, MAXCOL };
-  if (v.vi_mode == Ctrl_V) {
+  const bool blockwise = oap->from_visual && v.vi_mode == Ctrl_V && !lines;
+  if (blockwise) {
     getvcols(curwin, &v.vi_start, &v.vi_end, &vcols[0], &vcols[1], 0);
     vcols[1] = v.vi_curswant == MAXCOL ? MAXCOL : vcols[1];  // "$": to the end of every line.
   }
   // The steps use the primary's column, not the column they start from.
   curwin->w_cursor = primary;
   update_curswant();
+  viewstate_T view;
+  save_viewstate(curwin, &view);
+  save_search_patterns();
 
   const bool search = (cap->cmdchar != NUL && strchr("*#/?nN", cap->cmdchar) != NULL)
                       || (cap->cmdchar == 'g' && cap->nchar != NUL
                           && strchr("*#nN", cap->nchar) != NULL);
   int placed = 0;
   pos_T first = { 0 };
+  CmdSpec spec = atom_cmd_spec(cap);
+  spec.regname = 0;  // The operator's ("\"azq").
   // The search motion already set the pattern. Each step is "/<CR>".
-  String keys = search ? cstr_to_string("/\n")
-                       : redo_keys(&(CmdSpec){ .count = cap->count0, .cmd = cap->cmdchar,
-                                               .cmd2 = cap->nchar });
-  if (!oap->from_visual) {
-    // The primary is a step (search: if on a match, else its next match is, like the motion).
-    first = (!search || equalpos(mc_zq_target(primary, true, oap->motion_type, NULL).vi_start,
-                                 primary))
-            ? primary : mc_zq_step(keys.data, primary);
-    placed = mc_zq_run(keys.data, search, oap->motion_type, (pos_T){ .lnum = MAXLNUM }, first);
-  } else if (v.vi_mode != Ctrl_V) {
+  String keys = search ? cstr_to_string("/\n") : redo_keys(&spec);
+  if (!oap->from_visual && search) {
+    first = mc_zq_target(primary, true, oap->motion_type, NULL).vi_start;  // Match at/after it.
+    if (first.lnum != 0) {
+      placed = mc_zq_run(keys.data, search, oap->motion_type, bounds[1], first);
+    }
+  } else if (!blockwise) {
     if (mc_zq_first(keys.data, search, oap->motion_type, bounds, &first)) {
       placed = mc_zq_run(keys.data, search, oap->motion_type, bounds[1], first);
     }
@@ -1463,10 +1506,13 @@ void mc_zq(oparg_T *oap, cmdarg_T *cap, pos_T origin)
       }
     }
   }
+
   api_free_string(keys);
+  restore_search_patterns();
+  restore_viewstate(curwin, &view);
 
   if (placed > 0) {
-    if (mc_mark_at(curbuf, primary) == 0) {
+    if (mc_mark_at(curbuf, primary, 0) == 0) {
       primary = first;  // Not on a step; move the primary to the first placement.
       curwin->w_set_curswant = true;
     }
@@ -1516,7 +1562,7 @@ void mc_toggle(buf_T *buf, pos_T pos, bool end_follow, TriState on)
   if (end_follow) {
     mc_follow_set(kFalse);
   }
-  uint32_t mark = mc_mark_at(buf, pos);
+  uint32_t mark = mc_mark_at(buf, pos, 0);
   if (mark != 0 && on != kTrue) {
     extmark_del_id(buf, mc_ns(), mark);
     mc_cleanup(false, NULL, 0);
@@ -1527,17 +1573,38 @@ void mc_toggle(buf_T *buf, pos_T pos, bool end_follow, TriState on)
 
 /// Places an mcursor at position `pos` in `buf`.
 ///
-/// @return  The new cursor's Context, or NULL if not placed.
+/// @return  The (new or existing) cursor at `pos`. NULL if not placed (cascade).
 Context *mc_add(buf_T *buf, pos_T pos)
 {
+  const uint32_t existing = mc_mark_at(buf, pos, 0);
+  for (size_t i = 0; existing != 0 && i < kv_size(mc_cursors); i++) {
+    if (kv_A(mc_cursors, i).buf == buf->handle && kv_A(mc_cursors, i).mark == existing) {
+      return &kv_A(mc_cursors, i);
+    }
+  }
+  const size_t count = kv_size(mc_cursors);
+  uint32_t mark = 0;
+  mc_mark_upd(buf, &mark, pos);
+  return kv_size(mc_cursors) > count ? &kv_last(mc_cursors) : NULL;
+}
+
+/// Called when an extmark is set. Extmarks added to the "nvim.multicursor" namespace are cursors.
+///
+/// Deletes the new extmark if a cursor already exists there, or during cascade (not supported).
+void mc_on_extmark_set(buf_T *buf, uint32_t ns_id, uint32_t id, pos_T pos)
+{
+  if (ns_id != mc_ns()) {
+    return;
+  }
   if (mc_replaying()) {
-    // Can't add cursors while the cascade iterates them.
-    return NULL;
+    extmark_del_id(buf, ns_id, id);  // Can't add cursors while the cascade iterates them.
+    return;
   }
-  // Ignore duplicate cursor (e.g. repeated "[count]Q", nvim_mcursor()).
-  if (mc_mark_at(buf, pos) != 0) {
-    return NULL;
+  if (mc_mark_at(buf, pos, id) != 0) {
+    extmark_del_id(buf, ns_id, id);  // Duplicate cursor (e.g. repeated "1Q").
+    return;
   }
+  mc_mark_upd(buf, &id, pos);  // Ensure our extmark flags.
   // Discard the pending Visual atom, else it would cascade to the cursor created below.
   atom_visual_reset();
   if (kv_size(mc_cursors) == 0) {
@@ -1550,8 +1617,7 @@ Context *mc_add(buf_T *buf, pos_T pos)
   Context *ctx = &kv_last(mc_cursors);
   ctx->buf = buf->handle;
   ctx->pos = pos;
-  mc_mark_upd(buf, &ctx->mark, pos);
-  return ctx;
+  ctx->mark = id;
 }
 
 /// A reload/wipe invalidated the tracked positions: deletes the mcursors + "gQ" snapshot.

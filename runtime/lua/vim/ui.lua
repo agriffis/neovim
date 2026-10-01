@@ -134,7 +134,10 @@ function M.input(opts, on_confirm)
   local _canceled = vim.NIL
   opts = vim.tbl_extend('keep', opts, { cancelreturn = _canceled })
 
-  local ok, input = pcall(vim.fn.input, opts)
+  -- EmmyLua workaround: a direct call resolves the table overload correctly.
+  local ok, input = pcall(function()
+    return vim.fn.input(opts)
+  end)
   if not ok or input == _canceled then
     on_confirm(nil)
   else
@@ -344,30 +347,26 @@ do
   --- Initialize Progress handlers.
   local function progress_init()
     progress_group = vim.api.nvim_create_augroup('nvim.ui.progress_status', { clear = true })
-    progress_autocmd = require('vim._core.util').nvim_on(
-      'Progress',
-      progress_group,
-      {
-        desc = 'Tracks progress messages for vim.ui.progress_status()',
-      }, ---@param ev {data: vim.event.progress.data}
-      function(ev)
-        if not ev.data or not ev.data.id then
-          return
-        end
-        ev.data.percent = ev.data.percent or 0
-        progress[ev.data.id] = ev.data
-
-        -- Clear finished items
-        if
-          ev.data.status == 'success'
-          or ev.data.percent == 100
-          or ev.data.status == 'failed'
-          or ev.data.status == 'cancel'
-        then
-          progress[ev.data.id] = nil
-        end
+    progress_autocmd = require('vim._core.util').nvim_on('Progress', progress_group, {
+      desc = 'Tracks progress messages for vim.ui.progress_status()',
+    }, function(ev)
+      if not ev.data or not ev.data.id then
+        return
       end
-    )
+      --- @cast ev.data vim.event.progress.data
+      ev.data.percent = ev.data.percent or 0
+      progress[ev.data.id] = ev.data
+
+      -- Clear finished items
+      if
+        ev.data.status == 'success'
+        or ev.data.percent == 100
+        or ev.data.status == 'failed'
+        or ev.data.status == 'cancel'
+      then
+        progress[ev.data.id] = nil
+      end
+    end)
   end
 
   --- Gets a status description summarizing currently running progress messages.

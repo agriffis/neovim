@@ -125,11 +125,12 @@ local check_summary = { warn = 0, error = 0 }
 
 --- From a path return a list [{name}, {func}, {type}] representing a healthcheck
 --- @param path string
+--- @return [string, string, 'l'|'v']
 local function filepath_to_healthcheck(path)
   path = vim.fs.abspath(vim.fs.normalize(path))
   local name --- @type string
   local func --- @type string
-  local filetype --- @type string
+  local filetype --- @type 'l'|'v'
   if path:find('vim$') then
     name = vim.fs.basename(path):gsub('%.vim$', '')
     func = 'health#' .. name .. '#check'
@@ -143,6 +144,8 @@ local function filepath_to_healthcheck(path)
       :find(function(dir)
         return vim.fs.relpath(dir, path)
       end)
+    -- The healthcheck path came from nvim_get_runtime_file(), so a runtime directory must match.
+    assert(rtp_lua)
     -- "/path/to/rtp/lua/foo/bar/health.lua" => "foo/bar/health.lua"
     -- "/another/rtp/lua/baz/health/init.lua" => "baz/health/init.lua"
     local subpath = path:gsub('^' .. vim.pesc(rtp_lua), ''):gsub('^/+', '')
@@ -162,9 +165,9 @@ local function filepath_to_healthcheck(path)
 end
 
 --- @param plugin_names string
---- @return table<any,string[]> { {name, func, type}, ... } representing healthchecks
+--- @return [string, string, 'l'|'v'|''][] { {name, func, type}, ... } representing healthchecks
 local function get_healthcheck_list(plugin_names)
-  local healthchecks = {} --- @type table<any,string[]>
+  local healthchecks = {} --- @type [string, string, 'l'|'v'|''][]
   local plugin_names_list = vim.split(plugin_names, ' ')
   for _, p in pairs(plugin_names_list) do
     -- support vim/lsp/health{/init/}.lua as :checkhealth vim.lsp
@@ -200,10 +203,10 @@ local function get_healthcheck_list(plugin_names)
 end
 
 --- @param plugin_names string
---- @return table<string, string[]> {name: [func, type], ..} representing healthchecks
+--- @return table<string, [string, 'l'|'v'|'']> {name: [func, type], ..} representing healthchecks
 local function get_healthcheck(plugin_names)
   local health_list = get_healthcheck_list(plugin_names)
-  local healthchecks = {} --- @type table<string, string[]>
+  local healthchecks = {} --- @type table<string, [string, 'l'|'v'|'']>
   for _, c in pairs(health_list) do
     if c[1] ~= 'vim' then
       healthchecks[c[1]] = { c[2], c[3] }

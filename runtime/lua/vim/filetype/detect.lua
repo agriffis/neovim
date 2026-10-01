@@ -1,3 +1,5 @@
+--- @diagnostic disable: annotation-usage-error
+
 -- Contains filetype detection functions for use in filetype.lua that are either:
 --  * used more than once or
 --  * complex (e.g. check more than one line or use conditionals).
@@ -909,7 +911,7 @@ end
 --- Recursively search for Hare source files in a directory and any
 --- subdirectories, up to a given depth.
 --- @param dir string
---- @param depth number
+--- @param depth integer
 --- @return boolean
 local function is_hare_module(dir, depth)
   depth = math.max(depth, 0)

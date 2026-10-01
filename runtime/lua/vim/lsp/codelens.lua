@@ -308,7 +308,7 @@ function M.get(filter)
       'vim.lsp.codelens.get({ bufnr = bufnr })',
       '0.13.0'
     )
-    local bufnr = vim._resolve_bufnr(filter)
+    local bufnr = vim._resolve_bufnr(filter --[[@as integer]])
     local provider = Provider.active[bufnr]
     if not provider then
       return {}
@@ -434,6 +434,7 @@ end
 --- |lsp-handler| for the method `workspace/codeLens/refresh`
 ---
 ---@internal
+---@diagnostic disable-next-line: annotation-usage-error
 ---@type lsp.Handler
 function M.on_refresh(err, _, ctx)
   if err then

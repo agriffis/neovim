@@ -12,7 +12,6 @@ local M = {}
 ---@field named vim.treesitter.dev.Node[]
 local TSTreeView = {}
 
----@private
 ---@class (private) vim.treesitter.dev.TSTreeViewOpts
 ---@field anon boolean If true, display anonymous nodes.
 ---@field lang boolean If true, display the language alongside each node.
@@ -190,7 +189,7 @@ end
 --- Updates the cursor position in the inspector to match the node under the cursor.
 ---
 --- @param treeview vim.treesitter.dev.TSTreeView
---- @param lang string
+--- @param lang string?
 --- @param source_buf integer
 --- @param inspect_buf integer
 --- @param inspect_win integer

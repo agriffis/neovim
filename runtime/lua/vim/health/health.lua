@@ -333,7 +333,7 @@ local function check_rplugin_manifest()
       return
     end
 
-    local python_dir = python_glob[1]
+    local python_dir = assert(python_glob[1])
     local python_version = vim.fs.basename(python_dir)
 
     --- @type string[]
@@ -463,7 +463,7 @@ local function check_tmux()
       { '$TERM may have been set by some rc (.bashrc, .zshrc, ...).' }
     )
   elseif
-    not vim.regex([[\v(tmux-256color|tmux-direct|screen-256color)]]):match_str(vim.env.TERM)
+    not vim.regex([[\v(tmux-256color|tmux-direct|screen-256color)]]):match_str(assert(vim.env.TERM))
   then
     health.error(
       '$TERM should be "screen-256color", "tmux-256color", or "tmux-direct" in tmux. Colors might look wrong.',
@@ -574,7 +574,7 @@ local function check_external_tools()
     local rg_path = vim.fn.exepath('rg')
     local rg_job = run_system({ rg_path, '-V' })
     if rg_job.code == 0 then
-      health.ok(('%s (%s)'):format(vim.trim(rg_job.stdout), rg_path))
+      health.ok(('%s (%s)'):format(vim.trim(assert(rg_job.stdout)), rg_path))
     else
       health.warn('found `rg` but failed to run `rg -V`', { rg_job.stderr })
     end
@@ -762,9 +762,9 @@ local function check_sysinfo()
   vim.health.start('System Info')
 
   -- Use :version because `vim.version().build` returns "Homebrew" for brew installs.
-  local version_out = vim.api.nvim_exec2('version', { output = true }).output
+  local version_out = vim.api.nvim_exec2('version', { output = true }).output --[[@as string]]
   local nvim_version = version_out:match('NVIM (v[^\n]+)') or 'unknown'
-  local commit --[[@type string]] = (version_out:match('%+g(%x+)') or ''):sub(1, 12)
+  local commit = (version_out:match('%+g(%x+)') or ''):sub(1, 12)
 
   if vim.fn.executable('git') ~= 1 then
     vim.health.warn('Cannot check for updates: git not found')

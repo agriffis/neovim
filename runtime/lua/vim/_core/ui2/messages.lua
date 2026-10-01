@@ -329,6 +329,8 @@ function M.show_msg(tgt, kind, content, replace_last, append, id)
     or (api.nvim_buf_line_count(buf) - ((replace_last or cr or append) and 1 or 0))
   local curline = (cr or append) and api.nvim_buf_get_lines(buf, row, row + 1, false)[1]
   col = mark[2] or (append and not cr and math.min(col, #curline) or 0)
+  --- EmmyLuaLs/emmylua-analyzer-rust#1269
+  --- @type integer, integer, integer
   local start_row, start_col, lines = row, col, o.lines
 
   local function set_target_pos()
@@ -496,10 +498,13 @@ function M.msg_show(kind, content, replace_last, _, append, id, trigger)
     -- Extract only the search_count, not the entered search command.
     -- Match any of search.c:cmdline_search_stat():' [(x | >x | ?)/(y | >y | ??)]'
     content = { content[#content] }
-    content[1][2] = content[1][2]:match('W? %[>?%d*%??/>?%d*%?*%]') .. '  '
-    M.virt.last[M.virt.idx.search] = content
-    M.virt.last[M.virt.idx.cmd] = { { 0, (' '):rep(11) } }
-    set_virttext('last', 'cmd')
+    local stat = content[1][2]:match('W? %[>?%d*%??/>?%d*%?*%]')
+    if stat then
+      content[1][2] = stat .. '  '
+      M.virt.last[M.virt.idx.search] = content
+      M.virt.last[M.virt.idx.cmd] = { { 0, (' '):rep(11) } }
+      set_virttext('last', 'cmd')
+    end
   elseif (ui.cmd.prompt or (ui.cmd.level > 0 and tgt == 'cmd')) and ui.cmd.srow == 0 then
     -- Route to dialog when a prompt is active, or message would overwrite active cmdline.
     replace_last = api.nvim_win_get_config(ui.wins.dialog).hide or kind == 'wildlist'
@@ -743,9 +748,13 @@ local function enter_pager()
         in_pager = api.nvim_get_current_win() == ui.wins.pager
       end
       in_pager = in_pager and api.nvim_win_is_valid(ui.wins.pager)
+      --- @type vim.api.keyset.win_config
       local cfg = in_pager and { relative = 'laststatus', col = 0 } or { hide = true }
       if in_pager then
-        cfg.row, cfg.height, cfg.border = win_row_height_border('pager', height)
+        local has_border
+        cfg.row, cfg.height, has_border = win_row_height_border('pager', height)
+        cfg.border = has_border and { '', { mopt.msgsep, 'MsgSeparator' }, '', '', '', '', '', '' }
+          or 'none'
       else
         pcall(api.nvim_set_option_value, 'eiw', 'all', { scope = 'local', win = ui.wins.pager })
         api.nvim_del_autocmd(id)

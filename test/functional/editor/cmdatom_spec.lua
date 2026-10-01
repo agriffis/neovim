@@ -54,6 +54,36 @@ describe('dot-repeat', function()
     eq({ 'acbzacbonexy', 'czacbtwo' }, get_lines())
   end)
 
+  it('failing mid-selection ends Visual-mode #41896', function()
+    fn.setline(1, { '1', '2', '3' })
+    feed('<C-V>jI1<Esc>j.j.') -- The 2nd "." fails: "j" on the last line.
+    eq({ '11', '112', '13' }, get_lines())
+    eq('n', fn.mode(1))
+    feed('k0.') -- The failed "." did not replace the last change.
+    eq({ '11', '1112', '113' }, get_lines())
+    -- Error (E20) instead of beep. ModeChanged fires after the error, not inside emsg().
+    command('autocmd ModeChanged V:n echomsg "ModeChanged"')
+    for _, eb in ipairs({ 'noerrorbells', 'errorbells' }) do
+      api.nvim_buf_set_lines(0, 0, -1, true, { 'one', 'two' })
+      feed('ggmajV`a~')
+      command(('set %s | delmarks a | messages clear'):format(eb))
+      feed('.')
+      eq({ 'ONE', 'TWO' }, get_lines(), eb)
+      eq('n', fn.mode(1))
+      eq('\nE20: Mark not set\nModeChanged', fn.execute('messages'))
+    end
+    -- A macro or mapping still stops at the failed motion, in Visual mode (map-error).
+    api.nvim_buf_set_lines(0, 0, -1, true, { 'one', 'two', 'three' })
+    fn.setreg('q', 'Vjd')
+    command('nnoremap Q Vjd')
+    for _, keys in ipairs({ 'gg2@q', 'Q' }) do
+      feed(keys)
+      eq({ 'three' }, get_lines(), keys)
+      eq('V', fn.mode(1))
+      feed('<Esc>')
+    end
+  end)
+
   it('of a visual op does not churn showcmd', function()
     local screen = Screen.new(40, 8, { ext_messages = true })
     command('set showcmd')
@@ -1403,18 +1433,24 @@ describe('CmdAtom', function()
       { type = 'excmd', keys = k(':nohlsearch<NL>') },
     }, atoms_tail(4, 'type', 'keys'))
 
-    -- Cursor-local marks ('< '[ '. '^) are classified as type=motion. Other marks are type=jump.
+    -- Cursor-relative marks ('< '. '{ …) are classified as type=motion. Other marks are type=jump.
     feed('ma')
     feed('`.')
     feed("'[")
+    feed('`{')
+    feed('g`.')
     feed('`a')
+    feed("g'a")
     feed('G')
     eq({
       { type = 'motion', keys = '`.' },
       { type = 'motion', keys = "'[" },
+      { type = 'motion', keys = '`{' },
+      { type = 'motion', keys = 'g`.' },
       { type = 'jump', keys = '`a' },
+      { type = 'jump', keys = "g'a" },
       { type = 'jump', keys = 'G' },
-    }, atoms_tail(4, 'type', 'keys'))
+    }, atoms_tail(7, 'type', 'keys'))
 
     -- ":" embeds its count as the range prefill, never as composed digits;
     -- the count field carries it.

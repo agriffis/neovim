@@ -7,7 +7,6 @@ local lsp = vim._defer_require('vim.lsp', {
   _changetracking = ..., --- @module 'vim.lsp._changetracking'
   _folding_range = ..., --- @module 'vim.lsp._folding_range'
   _snippet_grammar = ..., --- @module 'vim.lsp._snippet_grammar'
-  _tagfunc = ..., --- @module 'vim.lsp._tagfunc'
   _watchfiles = ..., --- @module 'vim.lsp._watchfiles'
   buf = ..., --- @module 'vim.lsp.buf'
   client = ..., --- @module 'vim.lsp.client'
@@ -24,6 +23,9 @@ local lsp = vim._defer_require('vim.lsp', {
   protocol = ..., --- @module 'vim.lsp.protocol'
   rpc = ..., --- @module 'vim.lsp.rpc'
   semantic_tokens = ..., --- @module 'vim.lsp.semantic_tokens'
+  -- Work around EmmyLuaLs/emmylua-analyzer-rust#1238 for function exports.
+  --- @type fun(pattern: string, flags: string): table[]|vim.NIL
+  tagfunc = ..., --- @module 'vim.lsp.tagfunc'
   util = ..., --- @module 'vim.lsp.util'
 })
 
@@ -396,19 +398,17 @@ lsp.config = setmetatable({ _configs = {} }, {
 local function get_config_names()
   local config_names = vim
     .iter(api.nvim_get_runtime_file('lsp/*.lua', true))
-    --- @param path string
     :map(function(path)
-      local file_name = path:match('[^/]*.lua$')
+      local file_name = assert(path:match('[^/]*.lua$'))
       return file_name:sub(0, #file_name - 4)
     end)
-    :totable()
+    :totable() --[[@as string[] ]]
 
   vim.list_extend(config_names, vim.tbl_keys(lsp.config._configs))
 
   return vim
     .iter(config_names)
     :unique()
-    --- @param name string
     :filter(function(name)
       return name ~= '*'
     end)
@@ -562,7 +562,7 @@ local function lsp_enable_callback(bufnr)
       config = vim.deepcopy(config)
 
       if type(config.root_dir) == 'function' then
-        ---@param root_dir string
+        ---@param root_dir string?
         config.root_dir(bufnr, function(root_dir)
           config.root_dir = root_dir
           vim.schedule(function()
@@ -808,8 +808,8 @@ function lsp.status()
         -- Progress handlers carry the title over to report and end messages.
         local message = value.message and (value.title .. ': ' .. value.message) or value.title --[[@as string?]]
         messages[#messages + 1] = message
-        if value.percentage then
-          percentage = math.max(percentage or 0, value.percentage)
+        if type(value.percentage) == 'number' then
+          percentage = math.max(percentage or 0, value.percentage --[[@as number]])
         end
       end
       -- else: Doesn't look like work done progress and can be in any format
@@ -1099,7 +1099,7 @@ end
 ---@param force? boolean|integer See |Client:stop()|
 function lsp.stop_client(client_id, force)
   vim.deprecate('vim.lsp.stop_client()', 'vim.lsp.Client:stop()', '0.13')
-  --- @type integer[]|vim.lsp.Client[]
+  --- @type (integer|vim.lsp.Client)[]
   local ids = type(client_id) == 'table' and client_id or { client_id }
   for _, id in ipairs(ids) do
     if type(id) == 'table' then
@@ -1107,7 +1107,6 @@ function lsp.stop_client(client_id, force)
         id:stop(force)
       end
     else
-      --- @cast id -vim.lsp.Client
       local client = lsp.get_client_by_id(id)
       if client then
         client:stop(force)
@@ -1442,23 +1441,6 @@ function lsp.formatexpr(opts)
 
   -- do not run builtin formatter.
   return 0
-end
-
---- Provides an interface between the built-in client and 'tagfunc'.
----
---- When used with normal mode commands (e.g. |CTRL-]|) this will invoke
---- the "textDocument/definition" LSP method to find the tag under the cursor.
---- Otherwise, uses "workspace/symbol". If no results are returned from
---- any LSP servers, falls back to using built-in tags.
----
----@param pattern string Pattern used to find a workspace symbol
----@param flags string See |tag-function|
----
----@return table[]|vim.NIL tags A list of matching tags, or `vim.NIL` to use the built-in tags.
-function lsp.tagfunc(pattern, flags)
-  -- EmmyLua incorrectly treats function exports referenced by @module as non-callable.
-  --- @diagnostic disable-next-line:call-non-callable EmmyLuaLs/emmylua-analyzer-rust#1238
-  return vim.lsp._tagfunc(pattern, flags)
 end
 
 --- Provides an interface between the built-in client and a `foldexpr` function.

@@ -5057,7 +5057,17 @@ static void f_reltimestr(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
 /// Repeat the list "l" "n" times and set "rettv" to the new list.
 static void repeat_list(list_T *l, varnumber_T n, typval_T *rettv)
 {
-  tv_list_alloc_ret(rettv, (n > 0) * n * tv_list_len(l));
+  const int slen = tv_list_len(l);
+
+  tv_list_alloc_ret(rettv, (n > 0) * n * slen);
+  if (l == NULL || n <= 0 || slen == 0) {
+    return;
+  }
+
+  if (check_repeat_count(slen, n) == FAIL) {
+    return;
+  }
+
   while (n-- > 0) {
     tv_list_extend(rettv->vval.v_list, l, NULL);
   }
@@ -5074,10 +5084,13 @@ static void repeat_blob(typval_T *blob_tv, varnumber_T n, typval_T *rettv)
   }
 
   const int slen = blob->bv_ga.ga_len;
-  const int len = (int)(slen * n);
-  if (len <= 0) {
+  if (slen <= 0) {
     return;
   }
+  if (check_repeat_count(slen, n) == FAIL) {
+    return;
+  }
+  const int len = slen * (int)n;
 
   ga_grow(&rettv->vval.v_blob->bv_ga, len);
 
@@ -5095,7 +5108,7 @@ static void repeat_blob(typval_T *blob_tv, varnumber_T n, typval_T *rettv)
     return;
   }
 
-  for (i = 0; i < n; i++) {
+  for (i = 0; i < (int)n; i++) {
     tv_blob_set_range(rettv->vval.v_blob, i * slen, (i + 1) * slen - 1, blob_tv);
   }
 }
@@ -5112,14 +5125,13 @@ static void repeat_string(typval_T *str_tv, varnumber_T n, typval_T *rettv)
   const char *const p = tv_get_string(str_tv);
 
   const size_t slen = strlen(p);
-  if (slen == 0) {
+  if (slen == 0 || n <= 0) {
+    return;
+  }
+  if (check_repeat_count((varnumber_T)slen, n) == FAIL) {
     return;
   }
   const size_t len = slen * (size_t)n;
-  // Detect overflow.
-  if (len / (size_t)n != slen) {
-    return;
-  }
 
   char *const r = xmallocz(len);
 
@@ -7060,7 +7072,7 @@ static void f_submatch(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   int retList = 0;
 
   if (argvars[1].v_type != VAR_UNKNOWN) {
-    retList = (int)tv_get_number_chk(&argvars[1], &error);
+    retList = (int)tv_get_bool_chk(&argvars[1], &error);
     if (error) {
       return;
     }
@@ -7409,7 +7421,7 @@ static void f_timer_pause(typval_T *argvars, typval_T *unused, EvalFuncData fptr
     return;
   }
 
-  int paused = (bool)tv_get_number(&argvars[1]);
+  bool paused = (bool)tv_get_bool(&argvars[1]);
   timer_T *timer = find_timer_by_nr(tv_get_number(&argvars[0]));
   if (timer != NULL) {
     if (!timer->paused && paused) {

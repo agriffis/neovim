@@ -27,11 +27,8 @@
   },
   "diagnostics": {
     "disable": [
-      "annotation-usage-error",
-      "code-style-check",
       "incomplete-signature-doc",
       "iter-variable-reassign",
-      "param-type-mismatch",
       "unnecessary-if"
     ],
     "severity": {
@@ -43,6 +40,7 @@
       "unused": "warning"
     },
     "enables": [
+      "code-style-check",
       "missing-global-doc",
       "non-literal-expressions-in-assert",
       "unknown-doc-tag"
