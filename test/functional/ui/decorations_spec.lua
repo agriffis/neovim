@@ -1229,6 +1229,7 @@ describe('extmark decorations', function()
       [45] = { background = Screen.colors.Red, special = Screen.colors.Red, foreground = Screen.colors.Red },
       [46] = { background = Screen.colors.Blue, foreground = Screen.colors.Blue, special = Screen.colors.Red },
       [47] = { background = Screen.colors.Green, foreground = Screen.colors.Blue, special = Screen.colors.Red },
+      [48] = { background = Screen.colors.LightGrey, foreground = Screen.colors.Blue, bold = true },
     }
 
     ns = api.nvim_create_namespace 'test'
@@ -1256,6 +1257,36 @@ describe('extmark decorations', function()
     ]])
     api.nvim_buf_set_extmark(0, ns, 4, 0, { virt_text = { { '' } }, virt_text_pos = 'eol' })
     screen:expect_unchanged()
+  end)
+
+  it('pads virtual text after a listchars eol character #26101', function()
+    screen:try_resize(20, 4)
+    insert('hello')
+    api.nvim_buf_set_extmark(0, ns, 0, 0, {
+      virt_text = { { 'test', 'ErrorMsg' } },
+      virt_text_pos = 'eol',
+    })
+    command('set nolist listchars=eol:$')
+    screen:expect([[
+      hell^o {4:test}          |
+      {1:~                   }|*2
+                          |
+    ]])
+
+    feed('v$')
+    screen:expect([[
+      hell{27:o}{48:^ }{4:test}          |
+      {1:~                   }|*2
+      {24:-- VISUAL --}        |
+    ]])
+    feed('<Esc>')
+
+    command('set list')
+    screen:expect([[
+      hell^o{1:$} {4:test}         |
+      {1:~                   }|*2
+                          |
+    ]])
   end)
 
   it('can have virtual text of overlay position', function()
@@ -5624,32 +5655,56 @@ describe('decorations: inline virtual text', function()
   end)
 
   it('before a space with linebreak', function()
-    screen:try_resize(50, 6)
+    screen:try_resize(50, 12)
     exec([[
       setlocal linebreak showbreak=+ breakindent breakindentopt=shift:2
       call setline(1, repeat('a', 50) .. ' ' .. repeat('c', 45))
       normal! $
     ]])
     api.nvim_buf_set_extmark(0, ns, 0, 50, { virt_text = { { ('b'):rep(10) } }, virt_text_pos = 'inline' })
-    screen:expect {
-      grid = [[
+    screen:expect([[
       aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|
         {1:+}bbbbbbbbbb                                     |
         {1:+}cccccccccccccccccccccccccccccccccccccccccccc^c  |
-      {1:~                                                 }|*2
+      {1:~                                                 }|*8
                                                         |
-    ]],
-    }
+    ]])
     feed('05x$')
-    screen:expect {
-      grid = [[
+    screen:expect([[
       aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbb|
         {1:+}bbbbb                                          |
         {1:+}cccccccccccccccccccccccccccccccccccccccccccc^c  |
+      {1:~                                                 }|*8
+                                                        |
+    ]])
+    exec([[
+      call append(0, repeat('a', 50) .. ' ' .. repeat('c', 45))
+      normal! gg$
+    ]])
+    api.nvim_buf_set_extmark(0, ns, 0, 50, { virt_text = { { ('b'):rep(160) } }, virt_text_pos = 'inline' })
+    screen:expect([[
+      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|
+        {1:+}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|*3
+        {1:+}bbbbbbbbbbbbbbbbbbb                            |
+        {1:+}cccccccccccccccccccccccccccccccccccccccccccc^c  |
+      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbb|
+        {1:+}bbbbb                                          |
+        {1:+}ccccccccccccccccccccccccccccccccccccccccccccc  |
       {1:~                                                 }|*2
                                                         |
-    ]],
-    }
+    ]])
+    feed('015x$')
+    screen:expect([[
+      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbb|
+        {1:+}bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|*3
+        {1:+}bbbb                                           |
+        {1:+}cccccccccccccccccccccccccccccccccccccccccccc^c  |
+      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbb|
+        {1:+}bbbbb                                          |
+        {1:+}ccccccccccccccccccccccccccccccccccccccccccccc  |
+      {1:~                                                 }|*2
+                                                        |
+    ]])
   end)
 
   it('is counted when linebreak decides if a word fits', function()
