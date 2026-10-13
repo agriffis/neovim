@@ -26,6 +26,7 @@
 #include "nvim/drawscreen.h"
 #include "nvim/errors.h"
 #include "nvim/eval/typval_defs.h"
+#include "nvim/eval/vars.h"
 #include "nvim/ex_docmd.h"
 #include "nvim/extmark.h"
 #include "nvim/gettext_defs.h"
@@ -103,6 +104,7 @@ typedef struct {
 /// The boundary:
 /// - literal text is previewed
 /// - non-literal keys (mc_ins_keys_nonliteral) have per-cursor effects, so flush (early commit).
+/// - non-captured cursor-moves and edits keep the previews (see mc_ins_cascade_restart).
 static struct {
   CmdOrigin origin;  ///< State at session start: the session's atoms diff against it.
   kvec_t(uint32_t) regions;  ///< Per-cursor preview regions (`mc_session_ns`).
@@ -130,8 +132,6 @@ static bool mc_ins_joined;
 /// The mcursors, in creation order. Each is a Context snapshot: an extmark-tracked position
 /// plus editor state (registers) scoped to that cursor.
 static ContextVec mc_cursors = KV_INITIAL_VALUE;
-/// Replay is in progress: keys re-executing internally, hooks suppressed.
-static bool mc_replay = false;
 
 void mc_init(void)
 {
@@ -208,10 +208,10 @@ size_t mc_showcmd(char *buf, size_t size)
   return (size_t)snprintf(buf, size, "%s%zu× ", mc_following() ? "=" : "", kv_size(mc_cursors));
 }
 
-/// True during a replay: re-executing keys internally, not new user input.
+/// True during a replay (v:cascading): re-executing keys internally, not new user input.
 bool mc_replaying(void)
 {
-  return mc_replay;
+  return get_vim_var_tv(VV_CASCADING)->vval.v_bool == kBoolVarTrue;
 }
 
 /// Creates or updates the (ui_watched) extmark tracking a multicursor position.
@@ -234,8 +234,8 @@ static void mc_track_upd(buf_T *buf, uint32_t *mark, pos_T pos)
 /// @param save_regs  Registers too. Perf: skipped for pure motions.
 static void mc_sandbox_enter(McSandbox *sb, bool save_regs)
 {
-  assert(!mc_replay);
-  mc_replay = true;  // Capture hooks will ignore keys fed during the sandbox.
+  assert(!mc_replaying());
+  set_vim_var_bool(VV_CASCADING, kBoolVarTrue);  // Capture hooks ignore keys fed in the sandbox.
   sb->primary = (Context)CONTEXT_INIT;
   // Change/Visual marks belong to the primary cursor's (already executed) operation.
   // (jumplist/changelist are owned by the primary.)
@@ -284,7 +284,7 @@ static void mc_sandbox_leave(McSandbox *sb)
     }
   }
   ctx_free(&sb->primary);
-  mc_replay = false;
+  set_vim_var_bool(VV_CASCADING, kBoolVarFalse);
 }
 
 /// Cascade step: replays an atom at `cursoridx` and updates Context.
@@ -758,6 +758,7 @@ static void mc_ins_preview_set(const String *new)
   mc_track_upd(curbuf, &primary, curwin->w_cursor);
   const int save_cmod_flags = cmdmod.cmod_flags;
   cmdmod.cmod_flags |= CMOD_KEEPJUMPS;  // Not a change of the user: keeps '. and the changelist.
+  set_vim_var_bool(VV_CASCADING, kBoolVarTrue);  // Listeners (on_bytes, …) see cascade edits.
   for (size_t i = 0; i < kv_size(mc_ins_span.regions); i++) {
     pos_T rs, re;
     // Re-resolve each region, previous loop iterations may have shifted it.
@@ -767,6 +768,7 @@ static void mc_ins_preview_set(const String *new)
     // Cursor display mark (right-gravity) is pushed by the replacement to the new preview end.
     mc_ins_preview_replace(rs, re, new);
   }
+  set_vim_var_bool(VV_CASCADING, kBoolVarFalse);
   cmdmod.cmod_flags = save_cmod_flags;
   pos_T pos = curwin->w_cursor;
   if (extmark_get_pos(curbuf, mc_session_ns(), primary, &pos)) {
@@ -792,8 +794,9 @@ static bool mc_ins_keys_nonliteral(const char *keys, size_t len)
   return false;
 }
 
-/// Capture restarted mid insert-session (stop_arrow(), after a non-captured cursor-move: mouse,
-/// <PageUp>, …). The previews stay; rebase and continue the insert-cascade.
+/// Capture restarted mid insert-session, after a non-captured cursor-move (stop_arrow(): mouse,
+/// <PageUp>, …) or edit (<Cmd>, Lua mapping, RPC, …). The previews stay; rebase and continue the
+/// insert-cascade.
 void mc_ins_cascade_restart(void)
 {
   if (!mc_ins_span.active || mc_replaying() || !(State & MODE_INSERT)
@@ -1086,6 +1089,7 @@ void mc_vsel_refresh(void)
   McSandbox sb;  // Save the primary-cursor state (selection included), like a cascade replay.
   mc_sandbox_enter(&sb, false);
   block_autocmds();
+  block_on_key();
   emsg_silent++;
 
   for (size_t i = 0; i < kv_size(mc_cursors); i++) {
@@ -1135,6 +1139,7 @@ void mc_vsel_refresh(void)
   }
 
   emsg_silent--;
+  unblock_on_key();
   unblock_autocmds();
   mc_sandbox_leave(&sb);
   xfree(span.data);
@@ -1273,12 +1278,14 @@ static pos_T mc_zq_step(const char *keys, pos_T pos)
   // Like ":normal": not fed the mapping's pending keys ("xmap I Q0i"), keeps `finish_op`.
   atom_suppress(true);
   block_autocmds();
+  block_on_key();
   save_state_T sst;
   save_current_state(&sst);
   const uint64_t beeps = did_beep_silent;
   exec_normal_cmd((char *)keys, REMAP_NONE, true);
   const bool failed = did_beep_silent != beeps;
   restore_current_state(&sst);
+  unblock_on_key();
   unblock_autocmds();
   atom_suppress(false);
   cmdmod.cmod_flags = save_cmod_flags;
@@ -1294,15 +1301,14 @@ static visualinfo_T mc_zq_target(pos_T step, bool search, MotionType motion_type
 {
   const visualinfo_T save = curbuf->b_visual;
   const int save_mode_eval = curbuf->b_visual_mode_eval;
-  // Search: lnum=0 if "gn" finds no match.
-  curbuf->b_visual = search ? (visualinfo_T){ 0 }
-                            : (visualinfo_T){ .vi_start = step, .vi_end = step,
-                                              .vi_curswant = step.col,
-                                              .vi_mode = motion_type == kMTLineWise ? 'V' : 'v' };
-  curbuf->b_visual_mode_eval = curbuf->b_visual.vi_mode;
-  if (search) {
-    mc_zq_step("gn\033", step);  // Selects the match at `step`; <Esc> stores it as '< '>.
+  if (!search) {
+    curbuf->b_visual = (visualinfo_T){ .vi_start = step, .vi_end = step, .vi_curswant = step.col,
+                                       .vi_mode = motion_type == kMTLineWise ? 'V' : 'v' };
+  } else if (mc_zq_step("gn\033", step).lnum == 0) {
+    // "gn" selects at `step`; ESC stores it as '< '>. Until then '< '> is the user's, for "\%V".
+    curbuf->b_visual = (visualinfo_T){ 0 };  // No match.
   }
+  curbuf->b_visual_mode_eval = curbuf->b_visual.vi_mode;
   if (ctx != NULL) {
     curwin->w_cursor = step;
     ctx_save(ctx, kCtxVisual);  // Tracks the marks by extmark.
