@@ -1506,10 +1506,10 @@ bool parse_cmdline(char **cmdline, exarg_T *eap, cmdmod_T *cmod, const char **er
   };
 
   char *orig_cmd = eap->cmd;
-  // If parse command modifiers failed but modifiers were passed, continue
+  // Continue after modifiers without a command, not after an invalid modifier.
   int result = skipmods ? OK : parse_command_modifiers(eap, errormsg, cmod, false);
   after_modifier = eap->cmd;
-  if (result == FAIL && after_modifier == orig_cmd) {
+  if (result == FAIL && (*errormsg != NULL || after_modifier == orig_cmd)) {
     goto end;
   }
 
@@ -5876,6 +5876,7 @@ static void ex_detach(exarg_T *eap)
 
   if (eap && eap->forceit) {
     chan->detach = true;
+    channel_event(chan, EVENT_CHANINFO);
     msg(_("Nvim will continue running if the UI disconnects"), 0);
     return;
   }
