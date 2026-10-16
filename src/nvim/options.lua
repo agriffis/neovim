@@ -5,7 +5,7 @@
 --- @field alias? string|string[]
 --- Defaults to 'did_set_str_generic' when `flags_varname` is present.
 --- @field cb? string Applies the stored value and updates derived state.
---- @field validation_cb? string Checks a candidate value without side effects.
+--- @field validation_cb? string Checks a candidate and may prepare data without side effects.
 --- @field defaults? vim.option_defaults|vim.option_value|fun(): string
 --- @field deny_duplicates? boolean
 --- @field desc? string
@@ -600,6 +600,7 @@ local options = {
           get one in the option (see |option-backslash|), for example: >vim
             set bdir=c:\\tmp,\ dir\\,with\\,commas,\\\ dir\ with\ spaces
         <
+
         See also 'backup' and 'writebackup' options.
         If you want to hide your backup files on Unix, consider this value: >vim
         	set backupdir=./.backup,~/.backup,.,/tmp
@@ -1151,6 +1152,7 @@ local options = {
     },
     {
       cb = 'did_set_cedit',
+      validation_cb = 'validate_cedit',
       defaults = {
         if_true = macros('CTRL_F_STR', 'string'),
         doc = 'CTRL-F',
@@ -1630,6 +1632,7 @@ local options = {
     {
       abbreviation = 'cia',
       cb = 'did_set_completeitemalign',
+      validation_cb = 'validate_completeitemalign',
       defaults = 'abbr,kind,menu',
       deny_duplicates = true,
       desc = [=[
@@ -2266,6 +2269,7 @@ local options = {
     {
       abbreviation = 'culopt',
       cb = 'did_set_cursorlineopt',
+      validation_cb = 'validate_cursorlineopt',
       defaults = 'both',
       -- Keep this in sync with fill_culopt_flags(). "both" is an alias (line+number), not its own bit.
       schema = {
@@ -2698,6 +2702,7 @@ local options = {
           get one in the option (see |option-backslash|), for example: >vim
             set dir=c:\\tmp,\ dir\\,with\\,commas,\\\ dir\ with\ spaces
         <
+
         Editing the same file twice will result in a warning.  Using "/tmp" on
         is discouraged: if the system crashes you lose the swap file. And
         others on the computer may be able to see the files.
@@ -2802,6 +2807,7 @@ local options = {
     {
       abbreviation = 'enc',
       cb = 'did_set_encoding',
+      validation_cb = 'validate_encoding',
       defaults = macros('ENC_DFLT', 'string'),
       desc = [=[
         String-encoding used internally and for |RPC| communication.
@@ -3056,6 +3062,7 @@ local options = {
     {
       abbreviation = 'fenc',
       cb = 'did_set_encoding',
+      validation_cb = 'validate_encoding',
       defaults = '',
       desc = [=[
         File-content encoding for the current buffer. Conversion is done with
@@ -5777,6 +5784,7 @@ local options = {
     {
       abbreviation = 'menc',
       cb = 'did_set_encoding',
+      validation_cb = 'validate_encoding',
       defaults = '',
       desc = [=[
         Encoding used for reading the output of external commands.  When
@@ -5970,6 +5978,7 @@ local options = {
     {
       abbreviation = 'mopt',
       cb = 'did_set_messagesopt',
+      validation_cb = 'validate_messagesopt',
       defaults = 'hit-enter,history:500,progress:c',
       schema = {
         dict = {
@@ -6806,7 +6815,9 @@ local options = {
         	set path=.,c:\\include
         <	  Or just use '/' instead: >vim
         	set path=.,c:/include
-        <	Don't forget "." or files won't even be found in the same directory as
+        <
+
+        Don't forget "." or files won't even be found in the same directory as
         the file!
         The maximum length is limited.  How much depends on the system, mostly
         it is something like 256 or 1024 characters.
@@ -8007,6 +8018,7 @@ local options = {
            'a"b', '"a\b"' is the same as "a\b" again.
         4. Outside of quotes backslash always means itself, it cannot be used
            to escape quote: 'a\"b"' is the same as "a\b".
+
         Note that such processing is done after |:set| did its own round of
         unescaping, so to keep yourself sane use |:let-&| like shown above.
         						*shell-powershell*
@@ -8779,6 +8791,7 @@ local options = {
     {
       abbreviation = 'spc',
       cb = 'did_set_spellcapcheck',
+      validation_cb = 'validate_spellcapcheck',
       defaults = '[.?!]\\_[\\])\'"\\t ]\\+',
       desc = [=[
         Pattern to locate the end of a sentence.  The following word will be
@@ -8918,6 +8931,7 @@ local options = {
     {
       abbreviation = 'sps',
       cb = 'did_set_spellsuggest',
+      validation_cb = 'validate_spellsuggest',
       defaults = 'best',
       -- Keep this in sync with spell_check_sps().
       schema = {
@@ -10360,7 +10374,8 @@ local options = {
     },
     {
       abbreviation = 'vsts',
-      cb = 'did_set_varsofttabstop',
+      cb = 'did_set_vartabstop',
+      validation_cb = 'validate_vartabstop',
       defaults = '',
       desc = [=[
         Defines variable-width soft tab stops.  The value is a comma-separated
@@ -10388,6 +10403,7 @@ local options = {
     {
       abbreviation = 'vts',
       cb = 'did_set_vartabstop',
+      validation_cb = 'validate_vartabstop',
       defaults = '',
       desc = [=[
         Defines variable-width tab stops.  The value is a comma-separated list
@@ -10780,6 +10796,7 @@ local options = {
     {
       abbreviation = 'wim',
       cb = 'did_set_wildmode',
+      validation_cb = 'validate_wildmode',
       defaults = 'full',
       -- Keep this in sync with check_opt_wim().
       schema = {
