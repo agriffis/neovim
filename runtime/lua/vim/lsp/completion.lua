@@ -221,7 +221,9 @@ local function get_completion_word(item, prefix, match)
       --    label: insert
       --
       -- Typing `i` would remove the candidate because newText starts with `t`.
-      local text = parse_snippet(nonempty(item.insertText) or assert(item.textEdit).newText)
+      local text = parse_snippet(
+        (item.textEdit and item.textEdit.newText) or assert(nonempty(item.insertText))
+      )
       local filter_text = nonempty(item.filterText)
       local word = #text < #item.label and vim.fn.matchstr(text, '\\k*')
         or (filter_text and vim.fn.match(item.label, '^\\k') == -1 and filter_text or item.label)
@@ -273,7 +275,7 @@ local function apply_defaults(item, defaults, apply_kind)
       and vim.tbl_extend('force', defaults.data, item.data)
     or vim.nonnil(item.data, defaults.data)
 
-  if defaults.editRange then
+  if defaults.editRange and not item.textEdit then
     local textEdit = item.textEdit or {}
     item.textEdit = textEdit --[[@as lsp.TextEdit|lsp.InsertReplaceEdit]]
     textEdit.newText = textEdit.newText
@@ -422,7 +424,7 @@ local function complete_item_info(item, popup)
   end
 
   if info == '' and popup and item.insertTextFormat == protocol.InsertTextFormat.Snippet then
-    local text = item.insertText or (item.textEdit and item.textEdit.newText)
+    local text = (item.textEdit and item.textEdit.newText) or nonempty(item.insertText)
     if text then
       local snippet = parse_snippet(text)
       info = ('```%s\n%s\n```'):format(vim.bo.filetype, snippet)
@@ -963,15 +965,16 @@ end
 
 local function on_complete_done()
   local completed_item = api.nvim_get_vvar('completed_item')
-  if not completed_item or not completed_item.user_data or not completed_item.user_data.nvim then
+  local user_data = completed_item and vim.tbl_get(completed_item, 'user_data', 'nvim', 'lsp')
+  if not user_data then
     Context:reset()
     return
   end
 
   local cursor_row, cursor_col = unpack(api.nvim_win_get_cursor(0)) --- @type integer, integer
   cursor_row = cursor_row - 1
-  local completion_item = completed_item.user_data.nvim.lsp.completion_item --- @type lsp.CompletionItem
-  local client_id = completed_item.user_data.nvim.lsp.client_id --- @type integer
+  local completion_item = user_data.completion_item --- @type lsp.CompletionItem
+  local client_id = user_data.client_id --- @type integer
   if not completion_item or not client_id then
     Context:reset()
     return
@@ -979,7 +982,7 @@ local function on_complete_done()
 
   local bufnr = api.nvim_get_current_buf()
   local expand_snippet = completion_item.insertTextFormat == protocol.InsertTextFormat.Snippet
-    and (completion_item.textEdit ~= nil or completion_item.insertText ~= nil)
+    and (completion_item.textEdit ~= nil or nonempty(completion_item.insertText) ~= nil)
 
   Context:reset()
 

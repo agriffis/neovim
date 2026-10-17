@@ -62,6 +62,8 @@ For inserting text see |insert.txt|.
 :[range]d[elete] [x]	Delete [range] lines (default: current line) [into
 			register x].
 			Note these weird abbreviations:
+
+			  Command	Meaning ~
 			  :dl		delete and list
 			  :dell		idem
 			  :delel	idem
@@ -692,25 +694,27 @@ The flags that you can use for the substitute commands:
 
 [c]	Confirm each substitution.  Vim highlights the matching string (with
 	|hl-IncSearch|).  You can type:				*:s_c*
-	    'y'	    to substitute this match
-	    'l'	    to substitute this match and then quit ("last")
-	    'n'	    to skip this match
-	    <Esc>   to quit substituting
-	    'a'	    to substitute this and all remaining matches
-	    'q'	    to quit substituting
-	    CTRL-E  to scroll the screen up
-	    CTRL-Y  to scroll the screen down
+
+	    Key		Action ~
+	    'y'		to substitute this match
+	    'l'		to substitute this match and then quit ("last")
+	    'n'		to skip this match
+	    <Esc>	to quit substituting
+	    'a'		to substitute this and all remaining matches
+	    'q'		to quit substituting
+	    CTRL-E	to scroll the screen up
+	    CTRL-Y	to scroll the screen down
 
 							*:s_e*
 [e]     When the search pattern fails, do not issue an error message and, in
 	particular, continue in maps as if no error occurred.  This is most
 	useful to prevent the "No match" error from breaking a mapping.  Vim
 	does not suppress the following error messages, however:
-		Regular expressions can't be delimited by letters
-		\ should be followed by /, ? or &
-		No previous substitute regular expression
-		Trailing characters
-		Interrupted
+	- Regular expressions can't be delimited by letters
+	- \ should be followed by /, ? or &
+	- No previous substitute regular expression
+	- Trailing characters
+	- Interrupted
 
 							*:s_g*
 [g]	Replace all occurrences in the line.  Without this argument,
@@ -799,38 +803,38 @@ The substitution is limited in recursion to 4 levels. *E1290*
 
 Otherwise these characters in {string} have a special meaning:
 
-magic	nomagic	  action    ~
-  &	  \&	  replaced with the whole matched pattern	     *s/\&*
- \&	   &	  replaced with &
-      \0	  replaced with the whole matched pattern	   *\0* *s/\0*
-      \1	  replaced with the matched pattern in the first
-		  pair of ()					     *s/\1*
-      \2	  replaced with the matched pattern in the second
-		  pair of ()					     *s/\2*
-      ..	  ..						     *s/\3*
-      \9	  replaced with the matched pattern in the ninth
-		  pair of ()					     *s/\9*
-  ~	  \~	  replaced with the {string} of the previous
-		  substitute					     *s~*
- \~	   ~	  replaced with ~				     *s/\~*
-      \u	  next character made uppercase			     *s/\u*
-      \U	  following characters made uppercase, until \E      *s/\U*
-      \l	  next character made lowercase			     *s/\l*
-      \L	  following characters made lowercase, until \E      *s/\L*
-      \e	  end of \u, \U, \l and \L (NOTE: not <Esc>!)	     *s/\e*
-      \E	  end of \u, \U, \l and \L			     *s/\E*
-      <CR>	  split line in two at this point
-		  (Type the <CR> as CTRL-V <Enter>)		     *s<CR>*
-      \r	  idem						     *s/\r*
-      \<CR>	  insert a carriage-return (CTRL-M)
-		  (Type the <CR> as CTRL-V <Enter>)		     *s/\<CR>*
-      \n	  insert a <NL> (<NUL> in the file)
-		  (does NOT break the line)			     *s/\n*
-      \b	  insert a <BS>					     *s/\b*
-      \t	  insert a <Tab>				     *s/\t*
-      \\	  insert a single backslash			     *s/\\*
-      \x	  where x is any character not mentioned above:
-		  Reserved for future expansion
+ 		magic	nomagic	action ~
+*s/\&*		&	\&	replaced with the whole matched pattern
+ 		\&	&	replaced with &
+*\0* *s/\0*	\0	\0	replaced with the whole matched pattern
+*s/\1*		\1	\1	replaced with the matched pattern in the first
+				pair of ()
+*s/\2*		\2	\2	replaced with the matched pattern in the second
+				pair of ()
+*s/\3*		..	..	..
+*s/\9*		\9	\9	replaced with the matched pattern in the ninth
+				pair of ()
+*s~*		~	\~	replaced with the {string} of the previous
+				substitute
+*s/\~*		\~	~	replaced with `~`
+*s/\u*		\u	\u	next character made uppercase
+*s/\U*		\U	\U	following characters made uppercase, until \E
+*s/\l*		\l	\l	next character made lowercase
+*s/\L*		\L	\L	following characters made lowercase, until \E
+*s/\e*		\e	\e	end of \u, \U, \l and \L (NOTE: not <Esc>!)
+*s/\E*		\E	\E	end of \u, \U, \l and \L
+*s<CR>*		<CR>	<CR>	split line in two at this point
+				(Type the <CR> as CTRL-V <Enter>)
+*s/\r*		\r	\r	idem
+*s/\<CR>*	\<CR>	\<CR>	insert a carriage-return (CTRL-M)
+				(Type the <CR> as CTRL-V <Enter>)
+*s/\n*		\n	\n	insert a <NL> (<NUL> in the file)
+				(does NOT break the line)
+*s/\b*		\b	\b	insert a <BS>
+*s/\t*		\t	\t	insert a <Tab>
+*s/\\*		\\	\\	insert a single backslash
+ 		\x	\x	where x is any character not mentioned above:
+				Reserved for future expansion
 
 The special meaning is also used inside the third argument {sub} of
 the |substitute()| function with the following exceptions:
@@ -887,27 +891,30 @@ characters.  For example ":sce" works like ":s ce".  The table lists the
 possible combinations, not all flags are possible, because the command is
 short for another command.
 
-     List of :substitute commands
-     |      c    e    g    i    I    n    p    l    r
-     | c  :sc  :sce :scg :sci :scI :scn :scp :scl
-     | e
-     | g  :sgc :sge :sg  :sgi :sgI :sgn :sgp :sgl :sgr
-     | i  :sic :sie      :si  :siI :sin :sip      :sir
-     | I  :sIc :sIe :sIg :sIi :sI  :sIn :sIp :sIl :sIr
-     | n
-     | p
-     | l
-     | r  :src      :srg :sri :srI :srn :srp :srl :sr
+List of :substitute commands:
+
+	 	c	e	g	i	I	n	p	l	r ~
+	c	:sc	:sce	:scg	:sci	:scI	:scn	:scp	:scl
+	e	 
+	g	:sgc	:sge	:sg	:sgi	:sgI	:sgn	:sgp	:sgl	:sgr
+	i	:sic	:sie	 	:si	:siI	:sin	:sip	 	:sir
+	I	:sIc	:sIe	:sIg	:sIi	:sI	:sIn	:sIp	:sIl	:sIr
+	n	 
+	p	 
+	l	 
+	r	:src	 	:srg	:sri	:srI	:srn	:srp	:srl	:sr
 
 Exceptions:
-     :scr  is  `:scriptnames`
-     :se   is  `:set`
-     :sig  is  `:sign`
-     :sil  is  `:silent`
-     :sn   is  `:snext`
-     :sp   is  `:split`
-     :sl   is  `:sleep`
-     :sre  is  `:srewind`
+
+	Abbreviation	Command ~
+	:scr		`:scriptnames`
+	:se		`:set`
+	:sig		`:sign`
+	:sil		`:silent`
+	:sn		`:snext`
+	:sp		`:split`
+	:sl		`:sleep`
+	:sre		`:srewind`
 
 
 Substitute with an expression			*sub-replace-expression*
@@ -1670,7 +1677,7 @@ You can use the 'formatoptions' option  to influence how Vim formats text.
 'formatoptions' is a string that can contain any of the letters below.  You
 can separate the option letters with commas for readability.
 
-letter	 meaning when present in 'formatoptions'    ~
+letter   meaning when present in 'formatoptions'    ~
 							*fo-t*
 t	Auto-wrap text using 'textwidth'
 							*fo-c*
@@ -1756,11 +1763,13 @@ B	When joining lines, don't insert a space between two multibyte
 	"utf-8".
 							*fo-j*
 j	Where it makes sense, remove a comment leader when joining lines.  For
-	example, joining:
-		int i;   // the index ~
-			 // in the list ~
-	Becomes:
-		int i;   // the index in the list ~
+	example, joining: >
+		int i;   // the index
+			 // in the list
+<
+	Becomes: >
+		int i;   // the index in the list
+<
 							*fo-p*
 p	Don't break lines at single spaces that follow periods.  This is
 	intended to complement 'joinspaces' and |cpo-J|, for prose with
@@ -1776,6 +1785,7 @@ p	Don't break lines at single spaces that follow periods.  This is
 
 
 With 't' and 'c' you can specify when Vim performs auto-wrapping:
+
 value	action	~
 ""	no automatic formatting (you can use "gq" for manual formatting)
 "t"	automatic formatting of text, but not comments

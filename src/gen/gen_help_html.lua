@@ -86,6 +86,7 @@ local M = {}
 -- These files are generated with "flow" layout (non fixed-width, wrapped text paragraphs).
 -- All other files are "legacy" files which require fixed-width layout.
 local new_layout = {
+  ['api-ui-events.txt'] = true,
   ['api.txt'] = true,
   ['channel.txt'] = true,
   ['deprecated.txt'] = true,
@@ -98,16 +99,26 @@ local new_layout = {
   ['dev_vimpatch.txt'] = true,
   ['diagnostic.txt'] = true,
   ['faq.txt'] = true,
+  ['ft_hare.txt'] = true,
+  ['ft_ps1.txt'] = true,
+  ['ft_raku.txt'] = true,
   ['gui.txt'] = true,
+  ['health.txt'] = true,
   ['help.txt'] = true,
+  ['helphelp.txt'] = true,
+  ['index.txt'] = true,
   ['intro.txt'] = true,
   ['job_control.txt'] = true,
+  ['l10n-russian.txt'] = true,
+  ['l10n-vietnamese.txt'] = true,
   ['lsp.txt'] = true,
+  ['lua-async.txt'] = true,
   ['lua-bit.txt'] = true,
   ['lua-guide.txt'] = true,
   ['lua-plugin.txt'] = true,
   ['lua.txt'] = true,
   ['luaref.txt'] = true,
+  ['luvref.txt'] = true,
   ['news-0.10.txt'] = true,
   ['news-0.11.txt'] = true,
   ['news-0.12.txt'] = true,
@@ -115,12 +126,22 @@ local new_layout = {
   ['news.txt'] = true,
   ['nvim.txt'] = true,
   ['pack.txt'] = true,
+  ['pattern.txt'] = true,
+  ['pi_gzip.txt'] = true,
+  ['pi_paren.txt'] = true,
+  ['pi_spec.txt'] = true,
+  ['pi_tutor.txt'] = true,
+  ['plugins.txt'] = true,
   ['provider.txt'] = true,
+  ['remote_plugin.txt'] = true,
+  ['rileft.txt'] = true,
   ['starting.txt'] = true,
+  ['support.txt'] = true,
   ['terminal.txt'] = true,
   ['tui.txt'] = true,
   ['ui.txt'] = true,
   ['vim_diff.txt'] = true,
+  ['zip.txt'] = true,
 }
 
 -- Map of new-page:old-page, to redirect renamed pages.
@@ -269,7 +290,8 @@ local function is_noise(line, noise_lines)
     -- Example: "vim:tw=78:ts=8:sw=4:sts=4:et:ft=help:norl:"
     or line:find('^%s*vim?%:.*ft=help')
     or line:find('^%s*vim?%:.*filetype=help')
-    or line:find('[*>]local%-additions[*<]')
+    -- help.txt `*local-additions*` tag definition, not taglink.
+    or line:find('[*"]local%-additions[*"]')
   then
     -- table.insert(stats.noise_lines, getbuflinestr(root, opt.buf, 0))
     table.insert(noise_lines or {}, line)
@@ -348,6 +370,18 @@ local function trim_indent(s)
   return (vim.text.indent(0, s, { expandtab = 8 }))
 end
 
+--- Gets the display column (tabstop 8) where `node` starts.
+--- @param node TSNode
+--- @param bufnr integer
+local function get_col(node, bufnr)
+  local row, col = node:range()
+  local w = 0
+  for c in vim.fn.getbufline(bufnr, row + 1)[1]:sub(1, col):gmatch('[^\128-\191][\128-\191]*') do
+    w = c == '\t' and (w + 8 - w % 8) or (w + 1)
+  end
+  return w
+end
+
 --- Splits the named children of `node` into cells (tab-delimited).
 ---@param node TSNode
 ---@param bufnr integer
@@ -370,7 +404,7 @@ local function get_table_cells(node, bufnr)
 end
 
 --- Gets the rows (header first) of `block` if it is a table, else nil. Each row is a list of cells,
---- each cell a list of nodes. See "Tables" in the tree-sitter-vimdoc README.
+--- each cell a list of nodes. Separator => empty row. See "Tables" in the tree-sitter-vimdoc README.
 ---@param block TSNode
 ---@param bufnr integer
 ---@return TSNode[][][]?
@@ -385,8 +419,12 @@ local function get_table(block, bufnr)
     local line = assert(block:named_child(i))
     local is_sep = vim.treesitter.get_node_text(line, bufnr):match('^[%s%-=~]+$')
     local row = not is_sep and get_table_cells(line, bufnr)
-    if row and #row == 1 and #rows > 1 then
-      vim.list_extend(rows[#rows][#rows[#rows]], row[1]) -- Wrapped line continues last cell.
+    local last = rows[#rows]
+    local in_body = #rows > 1 and #last > 0 -- Last row is not the header or a separator.
+    if is_sep and in_body then
+      rows[#rows + 1] = {}
+    elseif row and #row == 1 and in_body then
+      vim.list_extend(last[#last], row[1]) -- Wrapped line continues last cell.
     elseif row then
       rows[#rows + 1] = row
     end
@@ -406,18 +444,36 @@ local function getbuflinestr(node, bufnr, offset)
   return table.concat(lines, '\n')
 end
 
---- Gets the whitespace just before `node` from the raw buffer text.
---- Needed for preformatted `old` lines.
+--- Gets the whitespace just before `node` from the raw buffer text (nodes don't include it, e.g.
+--- it separates words).
+---
 ---@param node TSNode
 ---@param bufnr integer
+---@param conceal? boolean For preformatted `old` lines: Tab is preceded by a space for each char
+---   concealed on the line since the previous Tab: Nvim widens the Tab by that much, so text after a
+---   Tab stays at its raw column.
 ---@return string
-local function getws(node, bufnr)
+local function getws(node, bufnr, conceal)
   local line1, c1, line2, _ = node:range()
   ---@type string
   local raw = vim.fn.getbufline(bufnr, line1 + 1, line2 + 1)[1]
   local text_before = raw:sub(1, c1)
   local leading_ws = text_before:match('%s+$') or ''
-  return leading_ws
+  if not conceal or not leading_ws:find('\t') then
+    return leading_ws
+  end
+
+  -- TODO: Remove `conceal` when all docs are in `new_layout`.
+  local n = 0
+  local sib = node:prev_named_sibling()
+  while sib and select(3, sib:range()) == line1 do
+    n = n + (vim.list_contains({ 'taglink', 'tag', 'codespan' }, sib:type()) and 2 or 0)
+    if getws(sib, bufnr):find('\t') then
+      break
+    end
+    sib = sib:prev_named_sibling()
+  end
+  return (leading_ws:gsub('\t', ('%s\t'):format((' '):rep(n)), 1))
 end
 
 local function get_tagname(node, bufnr)
@@ -599,20 +655,6 @@ local function visit_validate(root, level, lang_tree, opt, stats)
   end
 end
 
--- Fix tab alignment issues caused by concealed characters like |, `, * in tags
--- and code blocks.
----@param text string
----@param next_node_text string
-local function fix_tab_after_conceal(text, next_node_text)
-  -- Vim tabs take into account the two concealed characters even though they
-  -- are invisible, so we need to add back in the two spaces if this is
-  -- followed by a tab to make the tab alignment to match Vim's behavior.
-  if string.sub(next_node_text, 1, 1) == '\t' then
-    text = text .. '  '
-  end
-  return text
-end
-
 ---@class (exact) nvim.gen_help_html.heading
 ---@field name string
 ---@field subheadings nvim.gen_help_html.heading[]
@@ -630,14 +672,14 @@ local function ts_node_to_html(root, level, lang_tree, headings, opt, stats)
 
   local function node_text(node, ws_)
     node = node or root
-    ws_ = (ws_ == nil or ws_ == true) and getws(node, opt.buf) or ''
+    ws_ = (ws_ == nil or ws_ == true) and getws(node, opt.buf, opt.old) or ''
     return string.format('%s%s', ws_, vim.treesitter.get_node_text(node, opt.buf))
   end
 
   -- Gets leading whitespace of `node`.
   local function ws(node)
     node = node or root
-    local ws_ = getws(node, opt.buf)
+    local ws_ = getws(node, opt.buf, opt.old)
     -- XXX: first node of a (line) includes whitespace, even after
     -- https://github.com/neovim/tree-sitter-vimdoc/pull/31 ?
     if ws_ == '' then
@@ -656,6 +698,9 @@ local function ts_node_to_html(root, level, lang_tree, headings, opt, stats)
     local trs = {} ---@type string[]
     for i, row in ipairs(table_rows) do
       local tag = i == 1 and 'th' or 'td'
+      local next_row = table_rows[i + 1]
+      -- Empty row = separator.
+      local attr = next_row and #next_row == 0 and ' class="help-table-sep"' or ''
       local cells = {} ---@type string[]
       for _, cell in ipairs(row) do
         local s = ''
@@ -664,7 +709,9 @@ local function ts_node_to_html(root, level, lang_tree, headings, opt, stats)
         end
         cells[#cells + 1] = ('<%s>%s</%s>'):format(tag, trim(s), tag)
       end
-      trs[#trs + 1] = ('<tr>%s</tr>'):format(table.concat(cells))
+      if #row > 0 then
+        trs[#trs + 1] = ('<tr%s>%s</tr>'):format(attr, table.concat(cells))
+      end
     end
     return ('<table class="help-table">\n<thead>%s</thead>\n<tbody>\n%s\n</tbody>\n</table>\n'):format(
       trs[1],
@@ -794,8 +841,9 @@ local function ts_node_to_html(root, level, lang_tree, headings, opt, stats)
     local prev_li = sib and sib:type() == 'line_li'
     local cssclass = numli and 'help-li-num' or 'help-li'
 
-    -- Conjoin list items separated by blank lines (wrapped in separate blocks).
-    if not prev_li then
+    -- Conjoin list items separated by blank lines (wrapped in separate blocks), unless the block
+    -- starts with something else (then it's a new list).
+    if not sib then
       local parent_block = root:parent()
       local prev_block = parent_block and parent_block:prev_sibling()
       local prev_last = prev_block and prev_block:type() == 'block' and last(prev_block)
@@ -805,32 +853,33 @@ local function ts_node_to_html(root, level, lang_tree, headings, opt, stats)
       end
     end
 
+    -- Column of the prefix, not `root`: it may start at a codeblock-terminating "<".
+    local this_w = get_col(assert(prefix), opt.buf)
     if not prev_li then
       opt.indent = 1
-      -- Track the leading whitespace for each indent level so that we can dedent
+      -- Track the indent width for each indent level so that we can dedent
       -- to the correct level later.
-      opt.indent_ws = { ws() }
+      opt.indent_w = { this_w }
     else
-      opt.indent_ws = opt.indent_ws or { ws() }
-      local sib_ws = ws(sib)
-      local this_ws = ws()
+      opt.indent_w = opt.indent_w or { this_w }
+      local sib_w = get_col(assert(first(sib, 'prefix')), opt.buf)
       -- Unindented listitem is top-level. Check only its first line: other lines in the captured
       -- listitem may be at column 0 (e.g. codeblock ">" or "<").
-      if this_ws == '' then
+      if this_w == 0 then
         opt.indent = 1
-        opt.indent_ws = { this_ws }
-      elseif this_ws > sib_ws then
+        opt.indent_w = { this_w }
+      elseif this_w > sib_w then
         -- Previous sibling is logically the _parent_ if it is indented less.
         opt.indent = opt.indent + 1
-        opt.indent_ws[opt.indent] = this_ws
-      elseif this_ws < sib_ws then
-        -- Dedent: pop indent levels whose tracked whitespace is deeper than the
-        -- current item, so we return to the correct ancestor level.
-        while opt.indent > 1 and (opt.indent_ws[opt.indent] or '') > this_ws do
-          opt.indent_ws[opt.indent] = nil
+        opt.indent_w[opt.indent] = this_w
+      elseif this_w < sib_w then
+        -- Dedent: pop indent levels deeper than the current item, so we return to the correct
+        -- ancestor level.
+        while opt.indent > 1 and (opt.indent_w[opt.indent] or 0) > this_w do
+          opt.indent_w[opt.indent] = nil
           opt.indent = opt.indent - 1
         end
-        opt.indent_ws[opt.indent] = this_ws
+        opt.indent_w[opt.indent] = this_w
       end
     end
     local margin = opt.indent == 1 and '' or ('margin-left: %drem;'):format((1.5 * opt.indent))
@@ -841,25 +890,17 @@ local function ts_node_to_html(root, level, lang_tree, headings, opt, stats)
     if ignored or not helppage then
       return html_esc(node_text(root))
     end
-    local s = ('%s<a href="/doc/user/%s#%s">%s</a>'):format(
+    return ('%s<a href="/doc/user/%s#%s">%s</a>'):format(
       ws(),
       helppage,
       url_encode(tagname),
       html_esc(tagname)
     )
-    if opt.old and node_name == 'taglink' then
-      s = fix_tab_after_conceal(s, node_text(root:next_sibling()))
-    end
-    return s
   elseif vim.list_contains({ 'codespan', 'keycode' }, node_name) then
     if root:has_error() then
       return text
     end
-    local s = ('%s<code>%s</code>'):format(ws(), trimmed)
-    if opt.old and node_name == 'codespan' then
-      s = fix_tab_after_conceal(s, node_text(root:next_sibling()))
-    end
-    return s
+    return ('%s<code>%s</code>'):format(ws(), trimmed)
   elseif node_name == 'argument' then
     return ('%s<code>%s</code>'):format(ws(), trim(node_text(root)))
   elseif node_name == 'codeblock' then
@@ -887,7 +928,8 @@ local function ts_node_to_html(root, level, lang_tree, headings, opt, stats)
       return text
     end
     local in_heading = vim.list_contains({ 'h1', 'h2', 'h3' }, parent)
-    local h4 = not in_heading and not next_ and get_indent(node_text()) > 8 -- h4 pseudo-heading
+    local raw = getws(root, opt.buf) .. node_text(root, false) -- Without `conceal` padding.
+    local h4 = not in_heading and not next_ and get_indent(raw) > 8 -- h4 pseudo-heading
     local cssclass = h4 and 'help-tag-right' or 'help-tag'
     local tagname = node_text(root:child(1), false)
     if vim.tbl_count(stats.first_tags) < 2 then
@@ -906,9 +948,6 @@ local function ts_node_to_html(root, level, lang_tree, headings, opt, stats)
       trimmed,
       el
     )
-    if opt.old then
-      s = fix_tab_after_conceal(s, node_text(root:next_sibling()))
-    end
 
     if in_heading and prev ~= 'tag' then
       -- Start the <span> container for tags in a heading.
@@ -993,7 +1032,13 @@ local function ts_node_to_typ(root, level, lang_tree, opt, stats)
         cells[#cells + 1] = ('[%s]'):format(trim(s))
       end
       local tr = table.concat(cells, ', ')
-      trs[#trs + 1] = i == 1 and ('table.header(%s),'):format(tr) or ('%s,'):format(tr)
+      if i == 1 then
+        trs[#trs + 1] = ('table.header(%s),'):format(tr)
+      elseif #row == 0 then
+        trs[#trs + 1] = 'table.hline(stroke: 2pt),' -- Separator (see `get_table`).
+      else
+        trs[#trs + 1] = ('%s,'):format(tr)
+      end
     end
     return ('#table(columns: %d,\n  %s\n)\n'):format(ncols, table.concat(trs, '\n  '))
   end
@@ -1128,9 +1173,6 @@ local function ts_node_to_typ(root, level, lang_tree, opt, stats)
     local tagname = node_text(root:child(1), false)
     -- NOTE: the <%s> syntax doesn't work because it terminates the heading
     local s = ('%s%s #label("%s")'):format(ws(), text, typ_str_esc(tagname))
-    if opt.old then
-      s = fix_tab_after_conceal(s, node_text(root:next_sibling()))
-    end
 
     if in_heading and prev ~= 'tag' then
       -- Add fractional spacing to right-align the tags in a heading
@@ -1530,7 +1572,7 @@ local print_css = [[
   .help-column_heading { font-weight: bold; }
   .help-table { border-collapse: collapse; margin: 0.6em 0; break-inside: avoid; }
   .help-table th, .help-table td { padding: 0.15em 0.8em; text-align: left; vertical-align: top; border-bottom: 1px solid #ccc; }
-  .help-table th { border-bottom-color: #888; }
+  .help-table th, .help-table-sep td { border-bottom-color: #888; }
 ]]
 
 --- Joins page bodies into one standalone HTML page, for printing to PDF.

@@ -97,6 +97,7 @@ describe('vim.lsp.completion: item conversion', function()
 
   -- https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_completion
   it('prefers textEdit over label as word', function()
+    n.command('set completeopt=menuone,popup')
     local range0 = {
       start = { line = 0, character = 0 },
       ['end'] = { line = 0, character = 0 },
@@ -129,7 +130,7 @@ describe('vim.lsp.completion: item conversion', function()
       },
       {
         label = '•INT16_C(c)',
-        insertText = 'INT16_C(${1:c})',
+        insertText = 'x$0',
         insertTextFormat = 2,
         filterText = 'INT16_C',
         sortText = 'h',
@@ -160,6 +161,7 @@ describe('vim.lsp.completion: item conversion', function()
     }
     local result = complete('|', completion_list)
     eq_partial(expected, result.items)
+    eq('```\nINT16_C(c)\n```', result.items[8].info)
   end)
 
   local word_sorter = function(a, b)
@@ -706,6 +708,24 @@ describe('vim.lsp.completion: item conversion', function()
     eq(2, item.insertTextFormat)
     eq('item-property-has-priority', item.data)
     eq({ line = 1, character = 1 }, item.textEdit.range.start)
+
+    local default_range = completion_list.itemDefaults.editRange
+    local item_range = vim.deepcopy(default_range)
+    item_range.start.character = 0
+    for _, edit_range in ipairs({
+      default_range,
+      { insert = default_range, replace = default_range },
+    }) do
+      for _, text_edit in ipairs({
+        { range = item_range, newText = 'hello' },
+        { insert = item_range, replace = item_range, newText = 'hello' },
+      }) do
+        completion_list.itemDefaults.editRange = edit_range
+        completion_list.items[1].textEdit = text_edit
+        result = complete('|', completion_list)
+        eq(text_edit, result.items[1].user_data.nvim.lsp.completion_item.textEdit)
+      end
+    end
   end)
 
   it(
@@ -1848,12 +1868,27 @@ describe('vim.lsp.completion: integration', function()
     end)
   end)
 
+  it('ignores non-LSP completion metadata on acceptance', function()
+    n.command('set completeopt=menuone,noselect')
+    create_server('dummy', {})
+    feed('i')
+    exec_lua(function()
+      vim.v.errmsg = ''
+      vim.fn.complete(1, { { word = 'other', user_data = { nvim = {} } } })
+    end)
+    wait_for_pum()
+    feed('<C-n><C-y>')
+    eq('other', n.api.nvim_get_current_line())
+    eq('', n.api.nvim_get_vvar('errmsg'))
+  end)
+
   it('omnifunc works without enable() #38252', function()
     local completion_list = {
       isIncomplete = false,
       items = {
         { label = 'hello' },
-        { label = 'hallo' },
+        -- Empty snippet insertText must fall back to the label on acceptance.
+        { label = 'hallo', insertText = '', insertTextFormat = 2 },
       },
     }
     exec_lua(function()

@@ -258,12 +258,11 @@ shorter to type: >
 
 	:ls
 
-The output could look like this:
-
-  1 #h   "help.txt"			line 62 ~
-  2 %a + "usr_21.txt"			line 1 ~
-  3      "usr_toc.txt"			line 1 ~
-
+The output could look like this: >
+  1 #h   "help.txt"			line 62
+  2 %a + "usr_21.txt"			line 1
+  3      "usr_toc.txt"			line 1
+<
 The first column contains the buffer number.  You can use this to edit the
 buffer without having to type the name, see below.
    After the buffer number come the flags.  Then the name of the file
@@ -276,7 +275,7 @@ and the line number where the cursor was the last time.
 	  a	Buffer is loaded and displayed.
 	  h	Buffer is loaded but hidden.
 	   =	Buffer is read-only.
-	   -	Buffer is not modifiable, the 'modifiable' option is off.
+	   `-`	Buffer is not modifiable, the 'modifiable' option is off.
 	    +	Buffer has been modified.
 
 

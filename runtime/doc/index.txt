@@ -10,9 +10,9 @@ short description.  The lists are sorted on ASCII value.
 Tip: When looking for certain functionality, use a search command.  E.g.,
 to look for deleting something, use: "/delete".
 
-For an overview of options see |option-list|.
-For an overview of built-in functions see |functions|.
-For a list of Vim variables see |vvars|.
+- For an overview of options see |option-list|.
+- For an overview of built-in functions see |functions|.
+- For a list of Vim variables see |vvars|.
 
                                       Type |gO| to see the table of contents.
 
@@ -20,7 +20,6 @@ For a list of Vim variables see |vvars|.
 1. Insert mode						*insert-index*
 
 Tag		Char		Insert-mode action	~
------------------------------------------------------------------------------- ~
 |i_CTRL-@|	CTRL-@		insert previously inserted text and stop
 				insert
 |i_CTRL-A|	CTRL-A		insert previously inserted text
@@ -40,14 +39,14 @@ Tag		Char		Insert-mode action	~
 |i_CTRL-G_u|	CTRL-G u	start new undoable edit
 |i_CTRL-G_U|	CTRL-G U	don't break undo with next cursor movement
 |i_<BS>|	<BS>		delete character before the cursor
-|i_digraph|	{char1}<BS>{char2}
+|i_digraph|	{char1}<BS>{char2}	 
 				enter digraph (only when 'digraph' option set)
 |i_CTRL-H|	CTRL-H		same as <BS>
 |i_<Tab>|	<Tab>		insert a <Tab> character
 |i_CTRL-I|	CTRL-I		same as <Tab>
 |i_<NL>|	<NL>		same as <CR>
 |i_CTRL-J|	CTRL-J		same as <CR>
-|i_CTRL-K|	CTRL-K {char1} {char2}
+|i_CTRL-K|	CTRL-K {char1} {char2}	 
 				enter digraph
 |i_<CR>|	<CR>		begin new line
 |i_CTRL-M|	CTRL-M		same as <CR>
@@ -59,16 +58,16 @@ Tag		Char		Insert-mode action	~
 				the cursor
 |i_CTRL-Q|	CTRL-Q		same as CTRL-V, unless used for terminal
 				control flow
-|i_CTRL-SHIFT-Q|  CTRL-SHIFT-Q {char}
+|i_CTRL-SHIFT-Q|	CTRL-SHIFT-Q {char}	 
 				like CTRL-Q unless |tui-modifyOtherKeys| is active
-|i_CTRL-R|	CTRL-R {register}
+|i_CTRL-R|	CTRL-R {register}	 
 				insert the contents of a register
-|i_CTRL-R_CTRL-R| CTRL-R CTRL-R {register}
+|i_CTRL-R_CTRL-R|	CTRL-R CTRL-R {register}	 
 				insert the contents of a register literally
-|i_CTRL-R_CTRL-O| CTRL-R CTRL-O {register}
+|i_CTRL-R_CTRL-O|	CTRL-R CTRL-O {register}	 
 				insert the contents of a register literally
 				and don't auto-indent
-|i_CTRL-R_CTRL-P| CTRL-R CTRL-P {register}
+|i_CTRL-R_CTRL-P|	CTRL-R CTRL-P {register}	 
 				insert the contents of a register literally
 				and fix indent.
  		CTRL-S		not used or used for terminal control flow
@@ -77,29 +76,34 @@ Tag		Char		Insert-mode action	~
 |i_CTRL-U|	CTRL-U		delete all entered characters in the current
 				line
 |i_CTRL-V|	CTRL-V {char}	insert next non-digit literally
-|i_CTRL-SHIFT-V|  CTRL-SHIFT-V {char}
+|i_CTRL-SHIFT-V|	CTRL-SHIFT-V {char}	 
 				like CTRL-V unless |tui-modifyOtherKeys| is active
-|i_CTRL-V_digit| CTRL-V {number} insert three digit decimal number as a single
+|i_CTRL-V_digit|	CTRL-V {number}	insert three digit decimal number as a single
 				byte.
 |i_CTRL-W|	CTRL-W		delete word before the cursor
 |i_CTRL-X|	CTRL-X {mode}	enter CTRL-X sub mode, see |i_CTRL-X_index|
 |i_CTRL-Y|	CTRL-Y		insert the character which is above the cursor
 |i_<Esc>|	<Esc>		end insert mode
 |i_CTRL-[|	CTRL-[		same as <Esc>
-|i_CTRL-\_CTRL-N| CTRL-\ CTRL-N	go to Normal mode
-|i_CTRL-\_CTRL-G| CTRL-\ CTRL-G	go to Normal mode
+|i_CTRL-\_CTRL-N|	CTRL-\ CTRL-N	go to Normal mode
+|i_CTRL-\_CTRL-G|	CTRL-\ CTRL-G	go to Normal mode
  		CTRL-\ a - z	reserved for extensions
  		CTRL-\ others	not used
 |i_CTRL-]|	CTRL-]		trigger abbreviation
 |i_CTRL-^|	CTRL-^		toggle use of |:lmap| mappings
 |i_CTRL-_|	CTRL-_		When 'allowrevins' set: toggle 'revins'
+------------------------------------------------------------------------------
  		<Space> to '~'	not used, except '0' and '^' followed by
 				CTRL-D
+------------------------------------------------------------------------------
 |i_0_CTRL-D|	0 CTRL-D	delete all indent in the current line
 |i_^_CTRL-D|	^ CTRL-D	delete all indent in the current line, restore
 				it in the next line
+------------------------------------------------------------------------------
 |i_<Del>|	<Del>		delete character under the cursor
+------------------------------------------------------------------------------
  		Meta characters (0x80 to 0xff, 128 to 255)	not used
+------------------------------------------------------------------------------
 |i_<Left>|	<Left>		cursor one character left
 |i_<S-Left>|	<S-Left>	cursor one word left
 |i_<C-Left>|	<C-Left>	cursor one word left
@@ -127,12 +131,11 @@ Tag		Char		Insert-mode action	~
 |i_<ScrollWheelLeft>|	<ScrollWheelLeft>	move window six columns left
 |i_<S-ScrollWheelLeft>|	<S-ScrollWheelLeft>	move window one page left
 |i_<ScrollWheelRight>|	<ScrollWheelRight>	move window six columns right
-|i_<S-ScrollWheelRight>| <S-ScrollWheelRight>	move window one page right
+|i_<S-ScrollWheelRight>|	<S-ScrollWheelRight>	move window one page right
 
 commands in CTRL-X submode				*i_CTRL-X_index*
 
 Tag			Char		CTRL-X submode action	~
------------------------------------------------------------------------------- ~
 |i_CTRL-X_CTRL-D|	CTRL-X CTRL-D	complete defined identifiers
 |i_CTRL-X_CTRL-E|	CTRL-X CTRL-E	scroll up
 |i_CTRL-X_CTRL-F|	CTRL-X CTRL-F	complete file names
@@ -155,7 +158,6 @@ Tag			Char		CTRL-X submode action	~
 commands in completion mode (see |popupmenu-keys|)
 
 Tag		Char		Completion-mode action	~
------------------------------------------------------------------------------- ~
 |complete_CTRL-E|	CTRL-E	stop completion and go back to original text
 |complete_CTRL-Y|	CTRL-Y	accept selected match and stop completion
  		CTRL-L		insert one character from the current match
@@ -171,17 +173,17 @@ Tag		Char		Completion-mode action	~
 ==============================================================================
 2. Normal mode						*normal-index*
 
-CHAR	 any non-blank character
-WORD	 a sequence of non-blank characters
-N	 a number entered before the command
-{motion} a cursor movement command
-Nmove	 the text that is moved over with a {motion}
-SECTION	 a section that possibly starts with '}' instead of '{'
+Notation	Meaning ~
+CHAR		any non-blank character
+WORD		a sequence of non-blank characters
+N		a number entered before the command
+{motion}	a cursor movement command
+Nmove		the text that is moved over with a {motion}
+SECTION		a section that possibly starts with '}' instead of '{'
 
 note: 1 = cursor movement command; 2 = can be undone/redone
 
 Tag		Char	      Note Normal-mode action	~
------------------------------------------------------------------------------- ~
  		CTRL-@		   not used
 |CTRL-A|	CTRL-A		2  add N to number at/after cursor
 |CTRL-B|	CTRL-B		1  scroll N screens Backwards
@@ -227,8 +229,9 @@ Tag		Char	      Note Normal-mode action	~
 |CTRL-<Tab>|	CTRL-<Tab>	   same as `g<Tab>` : go to last accessed tab
 				   page
  		CTRL-_		   not used
+------------------------------------------------------------------------------
 |<Space>|	<Space>		1  same as "l"
-|!|		!{motion}{filter}
+|!|		!{motion}{filter}	 
 				2  filter Nmove text through the {filter}
 				   command
 |!!|		!!{filter}	2  filter N lines through the {filter} command
@@ -430,7 +433,7 @@ Tag		Char	      Note Normal-mode action	~
 |<C-Left>|	<C-Left>	1  same as "b"
 |<C-LeftMouse>|	<C-LeftMouse>	   place a multicursor at mouse-click
 |<C-Right>|	<C-Right>	1  same as "w"
-|<C-RightMouse>| <C-RightMouse>	   same as "CTRL-T"
+|<C-RightMouse>|	<C-RightMouse>	   same as "CTRL-T"
 |<C-Tab>|	<C-Tab>		   same as "g<Tab>"
 |<Del>|		["x]<Del>	2  same as "x"
 |N<Del>|	{count}<Del>	   remove the last digit from {count}
@@ -452,7 +455,7 @@ Tag		Char	      Note Normal-mode action	~
 |<S-Left>|	<S-Left>	1  same as "b"
 |<S-LeftMouse>|	<S-LeftMouse>	   same as "*" at the mouse click position
 |<S-Right>|	<S-Right>	1  same as "w"
-|<S-RightMouse>| <S-RightMouse>	   same as "#" at the mouse click position
+|<S-RightMouse>|	<S-RightMouse>	   same as "#" at the mouse click position
 |<S-Up>|	<S-Up>		1  same as CTRL-B
 |<Undo>|	<Undo>		2  same as "u"
 |<Up>|		<Up>		1  same as "k"
@@ -471,7 +474,6 @@ Tag		Char	      Note Normal-mode action	~
 These can be used after an operator or in Visual mode to select an object.
 
 Tag		Command		   Op-pending and Visual-mode action	~
------------------------------------------------------------------------------- ~
 |v_aquote|	a"		   double quoted string
 |v_a'|		a'		   single quoted string
 |v_a(|		a(		   same as ab
@@ -515,7 +517,6 @@ Tag		Command		   Op-pending and Visual-mode action	~
 2.2 Window commands						*CTRL-W*
 
 Tag		Command		   Normal-mode action	~
------------------------------------------------------------------------------- ~
 |CTRL-W_CTRL-B|	CTRL-W CTRL-B	   same as "CTRL-W b"
 |CTRL-W_CTRL-C|	CTRL-W CTRL-C	   no-op
 |CTRL-W_CTRL-D|	CTRL-W CTRL-D	   same as "CTRL-W d"
@@ -568,7 +569,7 @@ Tag		Command		   Normal-mode action	~
 |CTRL-W_F|	CTRL-W F	   split window and edit file name under the
 				   cursor and jump to the line number
 				   following the file name.
-|CTRL-W_g_CTRL-]| CTRL-W g CTRL-]  split window and do |:tjump| to tag under
+|CTRL-W_g_CTRL-]|	CTRL-W g CTRL-]	split window and do |:tjump| to tag under
 				   cursor
 |CTRL-W_g]|	CTRL-W g ]	   split window and do |:tselect| for tag
 				   under cursor
@@ -607,13 +608,12 @@ Tag		Command		   Normal-mode action	~
 |CTRL-W_<Down>|	CTRL-W <Down>	   same as "CTRL-W j"
 |CTRL-W_<Up>|	CTRL-W <Up>	   same as "CTRL-W k"
 |CTRL-W_<Left>|	CTRL-W <Left>	   same as "CTRL-W h"
-|CTRL-W_<Right>| CTRL-W <Right>	   same as "CTRL-W l"
+|CTRL-W_<Right>|	CTRL-W <Right>	   same as "CTRL-W l"
 
 ==============================================================================
 2.3 Square bracket commands					*[* *]*
 
 Tag		Char	      Note Normal-mode action	~
------------------------------------------------------------------------------- ~
 |[_CTRL-D|	[ CTRL-D	   jump to first #define found in current and
 				   included files matching the word under the
 				   cursor, start searching at beginning of
@@ -658,7 +658,8 @@ Tag		Char	      Note Normal-mode action	~
 |[s|		[s		1  move to the previous misspelled word
 |[z|		[z		1  move to start of open fold
 |[{|		[{		1  cursor N times back to unmatched '{'
-|[<MiddleMouse>| [<MiddleMouse>	2  same as "[p"
+|[<MiddleMouse>|	[<MiddleMouse>	2  same as "[p"
+------------------------------------------------------------------------------
 |]_CTRL-D|	] CTRL-D	   jump to first #define found in current and
 				   included files matching the word under the
 				   cursor, start searching at cursor position
@@ -698,13 +699,12 @@ Tag		Char	      Note Normal-mode action	~
 |]s|		]s		1  move to next misspelled word
 |]z|		]z		1  move to end of open fold
 |]}|		]}		1  cursor N times forward to unmatched '}'
-|]<MiddleMouse>| ]<MiddleMouse>	2  same as "]p"
+|]<MiddleMouse>|	]<MiddleMouse>	2  same as "]p"
 
 ==============================================================================
 2.4 Commands starting with 'g'						*g*
 
 Tag		Char	      Note Normal-mode action	~
------------------------------------------------------------------------------- ~
 |g_CTRL-A|	g CTRL-A	   insert an ascending number at each
 				   multicursor ("counter")
 |g_CTRL-G|	g CTRL-G	   show information about current cursor
@@ -807,7 +807,6 @@ Tag		Char	      Note Normal-mode action	~
 2.5 Commands starting with 'z'						*z*
 
 Tag		Char	      Note Normal-mode action	~
------------------------------------------------------------------------------- ~
 |z<CR>|		z<CR>		   redraw, cursor line to top of window,
 				   cursor on first non-blank
 |zN<CR>|	z{height}<CR>	   redraw, make window {height} lines high
@@ -881,7 +880,6 @@ Tag		Char	      Note Normal-mode action	~
 These can be used after an operator, but before a {motion} has been entered.
 
 Tag		Char		Operator-pending-mode action	~
------------------------------------------------------------------------------- ~
 |o_v|		v		force operator to work charwise
 |o_V|		V		force operator to work linewise
 |o_CTRL-V|	CTRL-V		force operator to work blockwise
@@ -893,9 +891,8 @@ Most commands in Visual mode are the same as in Normal mode.  The ones listed
 here are those that are different.
 
 Tag		Command	      Note Visual-mode action	~
------------------------------------------------------------------------------- ~
-|v_CTRL-\_CTRL-N| CTRL-\ CTRL-N	   stop Visual mode
-|v_CTRL-\_CTRL-G| CTRL-\ CTRL-G	   go to Normal mode
+|v_CTRL-\_CTRL-N|	CTRL-\ CTRL-N	   stop Visual mode
+|v_CTRL-\_CTRL-G|	CTRL-\ CTRL-G	   go to Normal mode
 |v_CTRL-A|	CTRL-A		2  add N to number in highlighted text
 |v_CTRL-C|	CTRL-C		   stop Visual mode
 |v_CTRL-G|	CTRL-G		   toggle between Visual mode and Select mode
@@ -1014,7 +1011,6 @@ Normal characters are inserted at the current cursor position.
 file names, tags, commands etc. as appropriate.
 
 Tag		Command		Command-line editing-mode action	~
------------------------------------------------------------------------------- ~
  		CTRL-@		not used
 |c_CTRL-A|	CTRL-A		do completion on the pattern in front of the
 				cursor and insert all matches
@@ -1027,7 +1023,7 @@ Tag		Command		Command-line editing-mode action	~
 				command-line window; otherwise not used
 |c_CTRL-G|	CTRL-G		next match when 'incsearch' is active
 |c_<BS>|	<BS>		delete the character in front of the cursor
-|c_digraph|	{char1} <BS> {char2}
+|c_digraph|	{char1} <BS> {char2}	 
 				enter digraph when 'digraph' is on
 |c_CTRL-H|	CTRL-H		same as <BS>
 |c_<Tab>|	<Tab>		if 'wildchar' is <Tab>: Do completion on
@@ -1038,7 +1034,7 @@ Tag		Command		Command-line editing-mode action	~
 |c_CTRL-I|	CTRL-I		same as <Tab>
 |c_<NL>|	<NL>		same as <CR>
 |c_CTRL-J|	CTRL-J		same as <CR>
-|c_CTRL-K|	CTRL-K {char1} {char2}
+|c_CTRL-K|	CTRL-K {char1} {char2}	 
 				enter digraph
 |c_CTRL-L|	CTRL-L		do completion on the pattern in front of the
 				cursor and insert the longest common part
@@ -1053,11 +1049,11 @@ Tag		Command		Command-line editing-mode action	~
 				command-line from history.
 |c_CTRL-Q|	CTRL-Q		same as CTRL-V, unless it's used for terminal
 				control flow
-|c_CTRL-R|	CTRL-R {regname}
+|c_CTRL-R|	CTRL-R {regname}	 
 				insert the contents of a register or object
 				under the cursor as if typed
-|c_CTRL-R_CTRL-R| CTRL-R CTRL-R {regname}
-|c_CTRL-R_CTRL-O| CTRL-R CTRL-O {regname}
+|c_CTRL-R_CTRL-R|	CTRL-R CTRL-R {regname}	 
+|c_CTRL-R_CTRL-O|	CTRL-R CTRL-O {regname}	 
 				insert the contents of a register or object
 				under the cursor literally
  		CTRL-S		not used, or used for terminal control flow
@@ -1072,16 +1068,17 @@ Tag		Command		Command-line editing-mode action	~
  		CTRL-Z		not used (reserved for suspend)
 |c_<Esc>|	<Esc>		abandon command-line without executing it
 |c_CTRL-[|	CTRL-[		same as <Esc>
-|c_CTRL-\_CTRL-N| CTRL-\ CTRL-N	go to Normal mode, abandon command-line
-|c_CTRL-\_CTRL-G| CTRL-\ CTRL-G	go to Normal mode, abandon command-line
+|c_CTRL-\_CTRL-N|	CTRL-\ CTRL-N	go to Normal mode, abandon command-line
+|c_CTRL-\_CTRL-G|	CTRL-\ CTRL-G	go to Normal mode, abandon command-line
  		CTRL-\ a - d	reserved for extensions
-|c_CTRL-\_e|	CTRL-\ e {expr} replace the command line with the result of
+|c_CTRL-\_e|	CTRL-\ e {expr}	replace the command line with the result of
 				{expr}
  		CTRL-\ f - z	reserved for extensions
  		CTRL-\ others	not used
 |c_CTRL-]|	CTRL-]		trigger abbreviation
 |c_CTRL-^|	CTRL-^		toggle use of |:lmap| mappings
 |c_<Del>|	<Del>		delete the character under the cursor
+------------------------------------------------------------------------------
 |c_<Left>|	<Left>		cursor left
 |c_<S-Left>|	<S-Left>	cursor one word left
 |c_<C-Left>|	<C-Left>	cursor one word left
@@ -1104,7 +1101,6 @@ Tag		Command		Command-line editing-mode action	~
 commands in wildmenu mode (see 'wildmenu')
 
 		Char		Wildmenu action	~
------------------------------------------------------------------------------- ~
 		<Up>		move up to parent
 		<Down>		move down to submenu
 		<Left>		select the previous match
@@ -1117,7 +1113,6 @@ commands in wildmenu mode (see 'wildmenu')
 commands in wildmenu mode with 'wildoptions' set to "pum"
 
 		Char		Wildmenu action	~
------------------------------------------------------------------------------- ~
 		<PageUp>	select a match several entries back
 		<PageDown>	select a match several entries forward
 
@@ -1126,10 +1121,8 @@ commands in wildmenu mode with 'wildoptions' set to "pum"
 
 In a |terminal| buffer all keys except CTRL-\ are forwarded to the terminal
 job.  If CTRL-\ is pressed, the next key is forwarded unless it is CTRL-N
-or CTRL-O.
-Use |CTRL-\_CTRL-N| to go to Normal mode.
-Use |t_CTRL-\_CTRL-O| to execute one normal mode command and then return
-to terminal mode.
+or CTRL-O. Use |CTRL-\_CTRL-N| to go to Normal mode. Use |t_CTRL-\_CTRL-O| to
+execute one normal mode command and then return to terminal mode.
 
 
 You found it, Arthur!				*holy-grail*
@@ -1142,7 +1135,6 @@ mentioning any arguments.  The optional part of the command name is inside [].
 The commands are sorted on the non-optional part of their name.
 
 Tag		Command		Action ~
------------------------------------------------------------------------------- ~
 |:|		:		nothing
 |:range|	:{range}	go to last line in {range}
 |:!|		:!		filter lines or execute an external command
@@ -1452,7 +1444,7 @@ Tag		Command		Action ~
 |:marks|	:marks		list all marks
 |:match|	:mat[ch]	define a match to highlight
 |:menu|		:me[nu]		enter a new menu item
-|:menutranslate|  :menut[ranslate] add a menu translation item
+|:menutranslate|	:menut[ranslate]	add a menu translation item
 |:messages|	:mes[sages]	view previously displayed messages
 |:mkexrc|	:mk[exrc]	write current mappings and settings to a file
 |:mksession|	:mks[ession]	write session info to a file
@@ -1539,7 +1531,7 @@ Tag		Command		Action ~
 |:redraw|	:redr[aw]	force a redraw of the display
 |:redrawstatus|	:redraws[tatus]	force a redraw of the status line(s) and
 				window bar(s)
-|:redrawtabline|  :redrawt[abline]  force a redraw of the tabline
+|:redrawtabline|	:redrawt[abline]	force a redraw of the tabline
 |:registers|	:reg[isters]	display the contents of registers
 |:resize|	:res[ize]	change current window height
 |:restart|	:restart	restart the Nvim server
@@ -1580,7 +1572,7 @@ Tag		Command		Action ~
 |:sbrewind|	:sbr[ewind]	split window and go to first file in the
 				buffer list
 |:scriptnames|	:scr[iptnames]	list names of all sourced Vim scripts
-|:scriptencoding| :scripte[ncoding]  encoding used in sourced Vim script
+|:scriptencoding|	:scripte[ncoding]	encoding used in sourced Vim script
 |:set|		:se[t]		show or set options
 |:setfiletype|	:setf[iletype]	set 'filetype', unless it was set already
 |:setglobal|	:setg[lobal]	show global values of options
@@ -1621,7 +1613,7 @@ Tag		Command		Action ~
 |:stop|		:st[op]		suspend the editor or escape to a shell
 |:stag|		:sta[g]		split window and jump to a tag
 |:startinsert|	:star[tinsert]	start Insert mode
-|:startgreplace|  :startg[replace] start Virtual Replace mode
+|:startgreplace|	:startg[replace]	start Virtual Replace mode
 |:startreplace|	:startr[eplace]	start Replace mode
 |:stopinsert|	:stopi[nsert]	stop Insert mode
 |:stjump|	:stj[ump]	do ":tjump" and split window

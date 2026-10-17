@@ -298,8 +298,8 @@ EDITOR
     normally. Async plugins no longer need special |CmdwinLeave| workarounds.
   • The |cmdwin-char| is shown via 'statuscolumn'.
 • |gf| and |<cfile>| support `file://…` URIs.
-• |:help| files render tables (example: |api-types|).
-  • Spec: https://github.com/neovim/tree-sitter-vimdoc#tables
+• |:help| files can contain tables, see |help-table|. Example:
+  |supported-platforms| (https://neovim.io/doc/user/support/#supported-platforms).
 • |:help| documentation is available as PDF via:
   https://neovim.io/doc/user/nvim-help.pdf
 • |:log| opens log files.
@@ -401,6 +401,8 @@ LUA
 • |lua-async|: `vim.async` provides structured concurrency primitives for Lua
   code, including task handles, await helpers, cooperative cancellation,
   completion-order iteration, and semaphores.
+• |vim.inspect_pos()| and |vim.show_pos()| support byte ranges with `end_row`
+  and `end_col`. |:Inspect| accepts line ranges, including Visual selections.
 • |vim.ui.img| can display images. Use `:checkhealth vim.health` to confirm
   your terminal supports it.
 • |vim.net.request()| can specify custom headers by passing `opts.headers`.
