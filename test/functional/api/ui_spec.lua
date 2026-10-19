@@ -293,6 +293,36 @@ describe('UI event channels', function()
     session2:request('nvim_ui_term_event', 'termresponse', 'accepted')
     eq({ 'accepted' }, exec_lua('return _G.filtered'))
 
+    exec_lua([[
+      _G.capability = nil
+      vim.tty.query('missing', { timeout = 0 }, function(cap, found)
+        _G.capability = { cap, found }
+      end)
+    ]])
+    request('nvim_ui_term_event', 'termresponse', '\027P0+r6d697373696e67')
+    eq({ 'missing', false }, exec_lua('return _G.capability'))
+
+    exec_lua([[
+      _G.capabilities = {}
+      vim.tty.query({ 'kcuu1', 'kcud1' }, { timeout = 0 }, function(cap, found, seq)
+        table.insert(_G.capabilities, { cap, found, seq })
+      end)
+    ]])
+    request('nvim_ui_term_event', 'termresponse', '\027P1+r6b63757531=1b4f41;6b63756431=1b4f42')
+    eq({
+      { 'kcuu1', true, '\027OA' },
+      { 'kcud1', true, '\027OB' },
+    }, exec_lua('return _G.capabilities'))
+
+    exec_lua([[
+      _G.sequence = nil
+      vim.tty.query('kbs', { timeout = 0 }, function(_, _, seq)
+        _G.sequence = seq
+      end)
+    ]])
+    request('nvim_ui_term_event', 'termresponse', '\027P1+r6b6273=5c313737')
+    eq(string.char(127), exec_lua('return _G.sequence'))
+
     session2:close()
   end)
 end)

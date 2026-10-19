@@ -194,7 +194,7 @@ function M:open_file()
     return false
   end
 
-  self.logfile, self.openerr = io.open(self.filename, 'a+')
+  self.logfile, self.openerr = io.open(self.filename, 'a')
   if not self.logfile then
     local err_msg = string.format('Failed to open %s log file: %s', self.name, self.openerr)
     notify(err_msg, M.levels.ERROR)
@@ -230,11 +230,11 @@ function M:create_writer(level)
     if argc == 0 then
       return true
     end
-    if not self:open_file() then
-      return false
-    end
     local message = self.format_func(self.level, level, ...)
     if message then
+      if not self:open_file() then
+        return false
+      end
       assert(self.logfile)
       self.logfile:write(message)
       self.logfile:flush()

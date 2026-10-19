@@ -4,6 +4,7 @@
                             NVIM REFERENCE MANUAL
 
 
+==============================================================================
 Notable changes since Nvim 0.12                                 *news*
 
 For changes in the previous release, see |news-0.12|.
@@ -149,8 +150,8 @@ EVENTS
 • |vim.on_key()| callbacks are not invoked for keys consumed by |getchar()|.
 • |BufModifiedSet| has been removed. Use the |OptionSet| event with pattern
   "modified" instead.
-• |ui-messages| `msg_show.bufwrite` and `msg_show.completion` messages are now
-  `msg_show.progress` events.
+• |ui-messages| `msg_show.completion` messages are now `msg_show.progress`
+  events. If :write or :edit is slow it emits `msg_show.progress` events.
 
 LSP
 

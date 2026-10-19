@@ -43,6 +43,7 @@
 #include "nvim/os/fs_defs.h"
 #include "nvim/os/input.h"
 #include "nvim/os/os_defs.h"
+#include "nvim/os/time.h"
 #include "nvim/path.h"
 #include "nvim/pos_defs.h"
 #include "nvim/sha256.h"
@@ -266,8 +267,7 @@ static int buf_write_convert(struct bw_info *ip, char **bufp, int *lenp)
   return wlen;
 }
 
-/// Call write() to write a number of bytes to the file.
-/// Handles 'encoding' conversion.
+/// Writes bytes to the file, converting from UTF-8 to 'fileencoding'.
 ///
 /// @return  FAIL for failure, OK otherwise.
 static int buf_write_bytes(struct bw_info *ip)
@@ -577,7 +577,7 @@ static void emit_err(Error_T *e, char *msg_id)
     xstrlcpy(errmsg, e->msg, IOSIZE);
   }
   if (msg_id != NULL) {
-    msg_progress(errmsg, msg_id, "failed", HLF_E, false, false, true);
+    msg_progress(errmsg, msg_id, "failed", -1, HLF_E, false, false, true);
   } else {
     emsg(errmsg);
   }
@@ -1094,21 +1094,28 @@ int buf_write(buf_T *buf, char *fname, char *sfname, linenr_T start, linenr_T en
   } else {
     msg_scroll = true;              // don't overwrite previous file message
   }
-  // Progress-msg id, e.g. `nvim.bufwrite "foo.txt"`.
-  char msg_id[MAXPATHL + 32];
 #ifndef UNIX
   char *msgname = sfname;
 #else
   char *msgname = fname;
 #endif
-  size_t id_len = xstrlcpy(msg_id, "nvim.bufwrite ", sizeof(msg_id));
-  add_quoted_fname(msg_id + id_len, sizeof(msg_id) - id_len, buf, msgname);
-  msg_id[strlen(msg_id) - 1] = NUL;  // add_quoted_fname() appends a space, for display only.
+  char msg_id[MAXPATHL + 32];  // Progress-msg id.
+  fname_msg_id(msg_id, sizeof(msg_id), "nvim.bufwrite", buf, msgname);
 
-  if (!filtering) {
-    // show that we are busy
-    filemess_progress(buf, msgname, msg_id);
+  // Hide the cursor until done writing, else it jumps to the filename message. #25974
+  const bool show_msg = !filtering && msg_silent == 0;
+  if (show_msg) {
+    ui_busy_start();
   }
+  if (!filtering) {
+    filemess_bufwrite(buf, msgname, msg_id);
+  }
+
+  int progress = -1;  // Progress-message percent for a slow write.
+  off_T progress_nchars = 0;  // `nchars` at the last progress check.
+  const uint64_t write_start = os_hrtime();
+  // Safety: any changes hereafter (eg by Progress autocmds) are not written, so keep 'modified'.
+  const varnumber_T write_tick = buf_get_changedtick(buf);
   msg_scroll = false;               // always overwrite the file message now
 
   char *buffer = verbose_try_malloc(WRITEBUFSIZE);
@@ -1454,6 +1461,9 @@ restore_backup:
     write_info.bw_flags = wb_flags;
     fileformat = get_fileformat_force(buf, eap);
     char *s = buffer;
+
+    // The write loop: copies each line (plus EOL) into `buffer`, which buf_write_bytes() writes to
+    // the file whenever it is full (`bufsize`). Also reports progress.
     for (lnum = start; lnum <= end; lnum++) {
       // The next while loop is done once for each character written.
       // Keep it fast!
@@ -1522,7 +1532,25 @@ restore_backup:
           break;
         }
       }
+
+      // Show a progress-message (with updated %) if slow.
+      if (show_msg && nchars != progress_nchars) {
+        progress_nchars = nchars;
+        const int percent = (int)((int64_t)(lnum - start) * 100 / (end - start + 1));
+        if (percent != progress && (progress >= 0 || os_hrtime() - write_start > slow_io_ns())) {
+          progress = percent;
+          add_quoted_fname(IObuff, IOSIZE, buf, msgname);
+          msg_progress(IObuff, msg_id, "running", progress, 0, false, true, false);
+          if (buf_get_changedtick(buf) != write_tick) {
+            // Progress handler changed the text: the file would mix old and new lines.
+            err = set_err(_(e_buffer_changed_unexpectedly));
+            end = 0;
+            break;
+          }
+        }
+      }
     }
+
     if (write_info.bw_len > 0 && end > 0) {
       int remaining = write_info.bw_len;
       if (buf_write_bytes(&write_info) == FAIL) {
@@ -1728,17 +1756,17 @@ restore_backup:
         xstrlcat(IObuff, shortmess(kShmWri) ? _(" [w]") : _(" written"), IOSIZE);
       }
     }
-    // Hide cursor while emitting "written" message, so cursor doesn't flicker in cmdline. #25974
-    ui_busy_start();
-    set_keep_msg(msg_progress(IObuff, msg_id, "success", 0, true, true, false), 0);
-    ui_busy_stop();
+    set_keep_msg(progress >= 0
+                 ? msg_progress(IObuff, msg_id, "success", -1, 0, true, true, false)
+                 : msg_with_id(IObuff, msg_id, "bufwrite", NULL, 0, true, true, false), 0);
   }
 
-  // When written everything correctly: reset 'modified'.  Unless not
-  // writing to the original file and '+' is not in 'cpoptions'.
+  // When written everything correctly: reset 'modified'.  Unless not writing to the original file
+  // and not 'cpoptions=+', or the buffer changed (by autocmds!?) while writing.
   if (reset_changed && whole && !append
       && !write_info.bw_conv_error
-      && (overwriting || vim_strchr(p_cpo, kCpoPlus) != NULL)) {
+      && (overwriting || vim_strchr(p_cpo, kCpoPlus) != NULL)
+      && buf_get_changedtick(buf) == write_tick) {
     unchanged(buf, true, false);
     const varnumber_T changedtick = buf_get_changedtick(buf);
     if (buf->b_last_changedtick + 1 == changedtick) {
@@ -1813,9 +1841,9 @@ restore_backup:
 fail:
   no_wait_return--;             // may wait for return now
 nofail:
-
-  // Done saving, we accept changed buffer warnings again
-  buf->b_saving = false;
+  if (show_msg) {
+    ui_busy_stop();
+  }
 
   xfree(backup);
   if (buffer != smallbuf) {
@@ -1832,8 +1860,7 @@ nofail:
   if (err.msg != NULL) {
     // - 100 to save some space for further error message.
     add_quoted_fname(IObuff, IOSIZE - 100, buf, msgname);
-    // The error ends the progress-msg started by filemess_progress().
-    emit_err(&err, filtering ? NULL : msg_id);
+    emit_err(&err, progress >= 0 ? msg_id : NULL);
 
     retval = FAIL;
     if (end == 0) {
@@ -1850,6 +1877,9 @@ nofail:
       }
     }
   }
+
+  // Done saving, reported any errors. Allow "changed buffer" warnings and unloading `buf`, again.
+  buf->b_saving = false;
   msg_scroll = msg_save;
 
   // When writing the whole file and 'undofile' is set, also write the undo

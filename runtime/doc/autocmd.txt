@@ -4,6 +4,7 @@
 		  VIM REFERENCE MANUAL	  by Bram Moolenaar
 
 
+==============================================================================
 Automatic commands					*autocmd* *autocommand*
 
 For a basic explanation, see section |40.3| in the user manual.
@@ -1049,6 +1050,11 @@ Progress						*Progress*
 				- status: status of the progress message
 				- percent: how much progress has been made
 				- data: arbitrary data sent with the message
+
+				Emitted during a slow file read (|:edit|, |:read|)
+				or |:write|. While reading a file (id
+				`nvim.bufread "<filename>"`), handlers must
+				not change the current buffer or its text.
 
 				Usage example:
 >lua
