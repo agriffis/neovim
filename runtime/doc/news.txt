@@ -283,13 +283,10 @@ DIAGNOSTICS
 EDITOR
 
 • Multiple cursors (|multicursor|): edit in many places at once.
-  • Toggle cursors with |Q|, |<C-LeftMouse>|, or via API (the
-    "nvim.multicursor" extmarks namespace).
-  • Toggle "follow mode" with |q=|.
+  • Toggle cursors with |Q|, |<C-LeftMouse>|, or |mcursor-api|.
+  • Toggle "follow mode" with |q=| or the 'follow' option.
   • Clear cursors with |CTRL-L|, restore them with |gQ|.
-  • |zq| places a cursor at all targets of a motion. E.g. "zqgn" places at
-    every match (and "gv" selects the matches), "Vzqw" places at every
-    Visual-selected word.
+  • |zq| places cursors at all targets of a motion.
 • |:bcd| sets a buffer-local directory. |getcwd()| and |haslocaldir()| take
   `bufnr` as a third parameter.
 • |:lcd!| |:tcd!| |:bcd!| unsets the directory of that scope.
@@ -473,6 +470,10 @@ OPTIONS
   key and how long a message stays in the message window.
 • 'completeopt' takes the new value "pathopt" to make the file name completion
    consult the 'path' option |i_CTRL-X_CTRL-F|.
+• 'wrap' is now conceal-aware: lines wrap at their extmark-concealed width
+  (|nvim_buf_set_extmark()| `conceal`, |treesitter-highlight-conceal|). The
+  cursor, |screenpos()|, |wincol()| and mouse follow the reflowed layout.
+  • Not supported for legacy |:syn-conceal|, |matchadd()| and `ephemeral` conceal.
 
 PERFORMANCE
 
@@ -509,6 +510,8 @@ STARTUP
   dismissed instead of waiting (indefinitely).
 • |--embed| with |--listen| waits for a UI on the listen address if stdin is
   not a pipe (e.g. tty or /dev/null), instead of exiting.
+• A damaged |shada| file (e.g. truncated by a crash) is repaired on the next
+  write and keeps any valid entries. |shada-error-handling|
 
 TERMINAL
 
