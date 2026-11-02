@@ -60,7 +60,7 @@ function lsp._get_workspace_folders(workspace_folders)
   elseif type(workspace_folders) == 'string' then
     return {
       {
-        uri = vim.uri_from_fname(workspace_folders),
+        uri = vim.uri.from_fname(workspace_folders),
         name = workspace_folders,
       },
     }
@@ -157,12 +157,14 @@ end
 ---         the client has been initialized.
 --- @return string? # Error message, if any
 local function create_and_init_client(config)
-  local ok, res = pcall(require('vim.lsp.client').create, config)
+  local ok, client = pcall(require('vim.lsp.client').create, config)
   if not ok then
-    return nil, res --[[@as string]]
+    return nil, client --[[@as string]]
   end
 
-  local client = assert(res)
+  if not client then -- `cmd()` returned nil.
+    return nil
+  end
 
   client:initialize()
 
@@ -173,7 +175,7 @@ end
 ---
 --- See `cmd` in [vim.lsp.ClientConfig].
 --- See also `reuse_client` to dynamically decide (per-buffer) when `cmd` should be re-invoked.
---- @field cmd? string[]|fun(dispatchers: vim.lsp.rpc.Dispatchers, config: vim.lsp.ClientConfig): vim.lsp.rpc.Client
+--- @field cmd? string[]|fun(dispatchers: vim.lsp.rpc.Dispatchers, config: vim.lsp.ClientConfig): vim.lsp.rpc.Client?
 ---
 --- Filetypes the client will attach to, or `nil` for ALL filetypes. To match files by name,
 --- pattern, or contents, you can define a custom filetype using |vim.filetype.add()|:
@@ -665,7 +667,7 @@ function lsp.enable(name, enable)
     end
   else
     for _, nm in ipairs(names) do
-      for _, client in ipairs(lsp.get_clients({ name = nm })) do
+      for _, client in ipairs(lsp.get_clients({ name = nm, _uninitialized = true })) do
         client:stop(client.exit_timeout)
       end
     end
@@ -916,7 +918,7 @@ local function buf_attach(bufnr)
   end
   attached_buffers[bufnr] = true
 
-  local uri = vim.uri_from_bufnr(bufnr)
+  local uri = vim.uri.from_buf(bufnr)
   local augroup = ('nvim.lsp.b_%d_save'):format(bufnr)
   local group = api.nvim_create_augroup(augroup, { clear = true })
   nvim_on('BufWritePre', group, {
@@ -1176,13 +1178,15 @@ end
 local min_warn_exit_timeout = 100
 
 nvim_on('VimLeavePre', nil, { desc = 'vim.lsp: exit handler' }, function()
-  local active_clients = lsp.get_clients()
+  local active_clients = lsp.get_clients({ _uninitialized = true })
   log.info('exit_handler', active_clients)
 
   local max_timeout = 0
   for _, client in pairs(active_clients) do
     max_timeout = math.max(max_timeout, vim._tointeger(client.exit_timeout) or 0)
-    client:stop(client.exit_timeout)
+    if not client:is_stopped() then -- If client is already "stopping", stop() would force-stop.
+      client:stop(client.exit_timeout)
+    end
   end
 
   local exit_warning_timer = max_timeout > min_warn_exit_timeout

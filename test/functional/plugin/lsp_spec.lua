@@ -118,7 +118,8 @@ describe('LSP', function()
       local test_name = 'basic_init'
       exec_lua(function()
         _G.lsp = require('vim.lsp')
-        function _G.test__start_client()
+        --- @param timeout? string Server timeout in milliseconds.
+        function _G.test__start_client(timeout)
           return vim.lsp.start({
             cmd_env = {
               NVIM_LOG_FILE = fake_lsp_logfile,
@@ -129,6 +130,7 @@ describe('LSP', function()
               '-l',
               fake_lsp_code,
               test_name,
+              timeout,
             },
             workspace_folders = {
               {
@@ -235,6 +237,64 @@ describe('LSP', function()
       end)
       local c1, c2 = clients[1], clients[2]
       eq(false, c1 == c2, 'Expected a fresh client while the old one is stopping')
+    end)
+
+    it('exit handler stops starting clients, not stopping ones #42440', function()
+      exec_lua(create_server_definition)
+      eq(
+        {
+          -- Not answered "initialize": force-stopped, no warning about the exit status.
+          process = { true, {} },
+          -- Same, and a late answer does not initialize it.
+          starting = { true, false, { 'initialize' } },
+          -- Not answered "shutdown": exit_timeout=false is kept; another stop() force-stops it.
+          stopping = { false, { 'initialize', 'initialized', 'shutdown' }, true },
+        },
+        exec_lua(function()
+          local warnings = {} --- @type string[]
+          vim.notify = function(msg)
+            table.insert(warnings, msg)
+          end
+          local respond --- @type fun(err?: lsp.ResponseError, result: any)
+          local starting = _G._create_server({
+            handlers = {
+              initialize = function(_, _, callback)
+                respond = callback
+              end,
+            },
+          })
+          local stopping = _G._create_server({ handlers = { shutdown = function() end } })
+          local function start(name, server)
+            local id = vim.lsp.start({ name = name, cmd = server.cmd }, { attach = false })
+            return assert(vim.lsp.get_client_by_id(assert(id)))
+          end
+          local function sent(server)
+            return vim.tbl_map(function(m)
+              return m.method
+            end, server.messages)
+          end
+          -- The server outlives the wait unless stopped.
+          local process = assert(vim.lsp.get_client_by_id(_G.test__start_client('60000')))
+          local client1, client2 = start('starting', starting), start('stopping', stopping)
+          client2:stop(false)
+
+          vim.api.nvim_exec_autocmds('VimLeavePre', { modeline = false })
+          respond(nil, { capabilities = {} })
+          local result = {
+            process = {
+              vim.wait(4000, function()
+                return vim.lsp.get_client_by_id(process.id) == nil
+              end),
+              warnings,
+            },
+            starting = { client1.rpc.is_closing(), client1.initialized or false, sent(starting) },
+            stopping = { client2.rpc.is_closing(), sent(stopping) },
+          }
+          client2:stop(false)
+          table.insert(result.stopping, client2.rpc.is_closing())
+          return result
+        end)
+      )
     end)
   end)
 
@@ -2555,7 +2615,7 @@ describe('LSP', function()
 
     before_each(function()
       target_bufnr = exec_lua(function()
-        local bufnr = vim.uri_to_bufnr('file:///fake/uri')
+        local bufnr = vim.uri.to_buf('file:///fake/uri')
         local lines = { '1st line of text', '2nd line of 语text' }
         vim.api.nvim_buf_set_lines(bufnr, 0, 1, false, lines)
         return bufnr
@@ -2686,7 +2746,7 @@ describe('LSP', function()
 
     before_each(function()
       exec_lua(function()
-        target_bufnr = vim.uri_to_bufnr('file:///fake/uri')
+        target_bufnr = vim.uri.to_buf('file:///fake/uri')
         local lines = {
           'Original Line #1',
           'Original Line #2',
@@ -2753,7 +2813,7 @@ describe('LSP', function()
 
     it('supports file creation with CreateFile payload', function()
       local tmpfile = tmpname(false)
-      local uri = exec_lua('return vim.uri_from_fname(...)', tmpfile)
+      local uri = exec_lua('return vim.uri.from_fname(...)', tmpfile)
       local edit = {
         documentChanges = {
           {
@@ -2772,7 +2832,7 @@ describe('LSP', function()
       'supports file creation in folder that needs to be created with CreateFile payload',
       function()
         local tmpfile = tmpname(false) .. '/dummy/x/'
-        local uri = exec_lua('return vim.uri_from_fname(...)', tmpfile)
+        local uri = exec_lua('return vim.uri.from_fname(...)', tmpfile)
         local edit = {
           documentChanges = {
             {
@@ -2791,7 +2851,7 @@ describe('LSP', function()
     it('createFile does not touch file if it exists and ignoreIfExists is set', function()
       local tmpfile = tmpname()
       write_file(tmpfile, 'Dummy content')
-      local uri = exec_lua('return vim.uri_from_fname(...)', tmpfile)
+      local uri = exec_lua('return vim.uri.from_fname(...)', tmpfile)
       local edit = {
         documentChanges = {
           {
@@ -2811,7 +2871,7 @@ describe('LSP', function()
     it('createFile overrides file if overwrite is set', function()
       local tmpfile = tmpname()
       write_file(tmpfile, 'Dummy content')
-      local uri = exec_lua('return vim.uri_from_fname(...)', tmpfile)
+      local uri = exec_lua('return vim.uri.from_fname(...)', tmpfile)
       local edit = {
         documentChanges = {
           {
@@ -2835,7 +2895,7 @@ describe('LSP', function()
       local uri = exec_lua(function()
         local bufnr = vim.fn.bufadd(tmpfile)
         vim.fn.bufload(bufnr)
-        return vim.uri_from_fname(tmpfile)
+        return vim.uri.from_fname(tmpfile)
       end)
       local edit = {
         documentChanges = {
@@ -2852,7 +2912,7 @@ describe('LSP', function()
 
     it('DeleteFile fails if file does not exist and ignoreIfNotExists is false', function()
       local tmpfile = tmpname(false)
-      local uri = exec_lua('return vim.uri_from_fname(...)', tmpfile)
+      local uri = exec_lua('return vim.uri.from_fname(...)', tmpfile)
       local edit = {
         documentChanges = {
           {
@@ -3390,6 +3450,29 @@ describe('LSP', function()
         )
         assert(exited)
       end)
+    end)
+
+    it('cmd() returning nil or an invalid client', function()
+      local result = exec_lua(function()
+        local msgs = {} --- @type string[]
+        vim.notify = function(msg)
+          msgs[#msgs + 1] = msg
+        end
+        return {
+          -- Not started, not an error.
+          declined = vim.lsp.start({ name = 'declined', cmd = function() end }),
+          invalid = vim.lsp.start({
+            name = 'invalid',
+            cmd = function()
+              return {} --[[@as vim.lsp.rpc.Client]]
+            end,
+          }),
+          msgs = msgs,
+          clients = #vim.lsp.get_clients(),
+        }
+      end)
+      eq({ nil, nil, 0, 1 }, { result.declined, result.invalid, result.clients, #result.msgs })
+      t.matches('cmd%(%) result: expected vim%.lsp%.rpc%.Client', result.msgs[1])
     end)
   end)
 
@@ -4227,7 +4310,7 @@ describe('LSP', function()
                       },
                       {
                         globPattern = {
-                          baseUri = vim.uri_from_fname(root_dir),
+                          baseUri = vim.uri.from_fname(root_dir),
                           pattern = '{foo}',
                         },
                         kind = 7,
@@ -4281,7 +4364,7 @@ describe('LSP', function()
             return { logfile = logfile, messages = server.messages, notifications = notifications }
           end)
 
-          local uri = vim.uri_from_fname(root_dir .. '/watch')
+          local uri = vim.uri.from_fname(root_dir .. '/watch')
           local messages = result.messages
 
           eq(6, #messages)
@@ -4379,7 +4462,7 @@ describe('LSP', function()
           eq({
             method = 'workspace/didChangeWatchedFiles',
             params = {
-              changes = { { uri = vim.uri_from_fname(root_dir .. '/file.py'), type = created } },
+              changes = { { uri = vim.uri.from_fname(root_dir .. '/file.py'), type = created } },
             },
           }, result)
         end
@@ -4448,7 +4531,7 @@ describe('LSP', function()
       end)
 
       local function watched_uri(fname)
-        return vim.uri_from_fname(root_dir .. '/' .. fname)
+        return vim.uri.from_fname(root_dir .. '/' .. fname)
       end
 
       eq(4, #result)
@@ -4488,7 +4571,7 @@ describe('LSP', function()
         for i = 0, max_kind do
           table.insert(watchers, {
             globPattern = {
-              baseUri = vim.uri_from_fname('/dir[1]'),
+              baseUri = vim.uri.from_fname('/dir[1]'),
               pattern = 'watch' .. tostring(i),
             },
             kind = i,
@@ -4520,7 +4603,7 @@ describe('LSP', function()
       end)
 
       local function watched_uri(fname)
-        return vim.uri_from_fname('/dir[1]/' .. fname)
+        return vim.uri.from_fname('/dir[1]/' .. fname)
       end
 
       eq(3, #result)
@@ -4625,15 +4708,15 @@ describe('LSP', function()
         changes = {
           {
             type = created,
-            uri = vim.uri_from_fname('file1'),
+            uri = vim.uri.from_fname('file1'),
           },
           {
             type = changed,
-            uri = vim.uri_from_fname('file1'),
+            uri = vim.uri.from_fname('file1'),
           },
           {
             type = created,
-            uri = vim.uri_from_fname('file2'),
+            uri = vim.uri.from_fname('file2'),
           },
         },
       }, result[3].params)

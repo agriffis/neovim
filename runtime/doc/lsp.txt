@@ -913,7 +913,7 @@ vim.lsp.Config                                                *vim.lsp.Config*
 
 
     Fields: ~
-      • {cmd}?           (`string[]|fun(dispatchers: vim.lsp.rpc.Dispatchers, config: vim.lsp.ClientConfig): vim.lsp.rpc.Client`)
+      • {cmd}?           (`string[]|fun(dispatchers: vim.lsp.rpc.Dispatchers, config: vim.lsp.ClientConfig): vim.lsp.rpc.Client?`)
                          See `cmd` in |vim.lsp.ClientConfig|. See also
                          `reuse_client` to dynamically decide (per-buffer)
                          when `cmd` should be re-invoked.
@@ -1900,7 +1900,7 @@ vim.lsp.ClientConfig                                    *vim.lsp.ClientConfig*
                                • Note: To send an empty dictionary use
                                  |vim.empty_dict()|, else it will be encoded
                                  as an array.
-      • {cmd}                  (`string[]|fun(dispatchers: vim.lsp.rpc.Dispatchers, config: vim.lsp.ClientConfig): vim.lsp.rpc.Client`)
+      • {cmd}                  (`string[]|fun(dispatchers: vim.lsp.rpc.Dispatchers, config: vim.lsp.ClientConfig): vim.lsp.rpc.Client?`)
                                Command `string[]` that launches the language
                                server (treated as in |jobstart()|, must be
                                absolute or on `$PATH`, shell constructs like
@@ -1908,7 +1908,9 @@ vim.lsp.ClientConfig                                    *vim.lsp.ClientConfig*
                                an RPC client (or an in-process |lsp-server|).
                                Function receives a `dispatchers` table and the
                                resolved `config`, and must return an object in
-                               the form of |vim.lsp.rpc.Client|.
+                               the form of |vim.lsp.rpc.Client|, or `nil` to
+                               indicate the client should not start (for
+                               example, if a required executable is missing).
 
                                Example (list): >lua
                                    cmd = { 'flow', 'lsp' }
@@ -1946,7 +1948,8 @@ vim.lsp.ClientConfig                                    *vim.lsp.ClientConfig*
                                the "shutdown" request. See |Client:stop()|.
                                Note: when Nvim itself is exiting,
                                • `false`: Nvim will not force-stop LSP
-                                 server(s).
+                                 server(s), except uninitialized ones (see
+                                 |Client:stop()|).
                                • `true`: Nvim will force-stop LSP server(s)
                                  that did not comply with the "shutdown"
                                  request.
@@ -1988,7 +1991,9 @@ vim.lsp.ClientConfig                                    *vim.lsp.ClientConfig*
                                `vim.lsp.rpc.client_errors[code]` to get
                                human-friendly name.
       • {on_exit}?             (`elem_or_list<fun(code: integer, signal: integer, client_id: integer)>`)
-                               Callback invoked on client exit.
+                               Callback invoked on client exit. On Nvim exit,
+                               it runs only if the server exits within
+                               `exit_timeout` milliseconds.
                                • code: exit code of the process
                                • signal: number describing the signal used to
                                  terminate (if any)
@@ -2126,7 +2131,8 @@ Client:stop({force})                                           *Client:stop()*
     milliseconds (unless `exit_timeout=false`). Calling stop() on a client
     that was previously requested to shutdown, will escalate to force-stop
     immediately, regardless of `force` (or `self.exit_timeout` if
-    `force=nil`).
+    `force=nil`). A server that has not answered "initialize" cannot receive
+    "shutdown", so it is force-stopped immediately.
 
     Note: Forcing shutdown while a server is busy writing out project or index
     files can lead to file corruption.
