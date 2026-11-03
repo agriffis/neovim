@@ -513,7 +513,7 @@ describe('path.c', function()
       eq(OK, result)
     end)
 
-    itp('produces absolute path for .. without a slash', function()
+    itp('produces absolute path for .. without a slash, and dir/..', function()
       local old_dir = uv.cwd()
       uv.chdir('..')
       local expected = uv.cwd()
@@ -523,6 +523,11 @@ describe('path.c', function()
       local do_expand = 1
       local buf, result = vim_FullName(filename, buflen, do_expand)
       eq(expected, ffi.string(buf))
+      eq(OK, result)
+      -- Also "dir/..".
+      filename = 'unit-test-directory/..'
+      buf, result = vim_FullName(filename, get_buf_len(old_dir, filename), do_expand)
+      eq(old_dir, ffi.string(buf))
       eq(OK, result)
     end)
 
@@ -597,6 +602,12 @@ describe('path.c', function()
       local buflen = get_buf_len(expected, filename)
       local do_expand = 1
       local buf, result = vim_FullName(filename, buflen, do_expand)
+      eq(expected, ffi.string(buf))
+      eq(OK, result)
+      -- But removes it from an existing directory.
+      expected = uv.cwd() .. '/unit-test-directory'
+      filename = 'unit-test-directory/'
+      buf, result = vim_FullName(filename, get_buf_len(expected, filename), do_expand)
       eq(expected, ffi.string(buf))
       eq(OK, result)
     end)

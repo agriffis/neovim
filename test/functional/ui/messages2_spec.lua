@@ -1196,6 +1196,17 @@ describe('messages2', function()
     end)
     feed('2gm')
     t.eq(2, exec_lua('return _G.count'))
+
+    -- Handler does not clobber the file info message, which is repeated after `i_CTRL-O`.
+    finally(function()
+      os.remove('Xfile')
+    end)
+    t.write_file('Xfile', '')
+    command('set messagesopt& shortmess-=F | edit Xfile')
+    feed('i<C-o>:edit<CR>')
+    n.poke_eventloop()
+    -- Message layout varies with redraw timing.
+    screen:expect({ any = '"Xfile" 0L, 0B', none = 'replacement string' })
   end)
 
   it('configured targets per kind', function()

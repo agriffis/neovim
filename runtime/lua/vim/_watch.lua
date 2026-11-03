@@ -435,6 +435,9 @@ local function watch(path, opts, callback)
 
   local _, start_err = handle:start(path, opts.uvflags or {}, function(err, filename, events)
     if err then
+      -- libuv may repeat a persistent error on every loop iteration, e.g. EPERM on Windows after
+      -- the parent directory of a watched file is deleted (libuv#5399).
+      handle:stop()
       return on_error(err)
     end
     local fullpath = path

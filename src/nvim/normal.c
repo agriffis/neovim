@@ -6776,6 +6776,7 @@ void exec_stuffed(cmdarg_T *cap)
 {
   if (cap != NULL) {
     atom_stuff_start(cap);  // Label as one atom.
+    opcount = 0;  // Stuffed keys hold the count: 2"ax => 2dl, not 4dl.
   }
   if (text_locked() || curbuf_locked()) {
     return;
