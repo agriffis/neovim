@@ -59,7 +59,7 @@ char *version_cflags = "Compilation: " NVIM_VERSION_CFLAGS;
 
 static const int vim_versions[] = { 801, 802, 900, 901, 902 };
 
-static const int num_patches[] = { 2409, 4049, 1650, 1726, 865 };
+static const int num_patches[] = { 2409, 4049, 1650, 1726, 875 };
 
 static const int *included_patchsets[] = {
   (const int[]) {  // 801
@@ -3286,11 +3286,19 @@ static const int *included_patchsets[] = {
     5, 4, 3, 2, 1, 0,
   },
   (const int[]) {  // 902
+    1284, 1283,
+    // 1282
+    1281,
+    // 1275-1280
+    1274,
+    // 1269-1273
     1268,
-    // 1261-1267
+    // 1266-1267
+    1265, 1264, 1263, 1262,
+    // 1261
     1260, 1259, 1258,
-    // 1255-1257
-    1254, 1253,
+    // 1257
+    1256, 1255, 1254, 1253,
     // 1252
     1251,
     // 1250
