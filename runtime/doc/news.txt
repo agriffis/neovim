@@ -96,8 +96,8 @@ API
 • |nvim_clear_autocmds()| no longer treats an empty array event as nil.
 • |vim.o|, |vim.opt|, and |nvim_set_option_value()| expand `~` and environment
   variables (|expand-env|).
-• Security: The |TUI| (also with |--remote-ui|) rejects server-to-client API
-  calls. Only UI events are allowed.
+• Security: |TUI|, |--remote-ui| and |--remote| reject server-to-client API
+  calls by default. Only UI events are allowed.
 
 DIAGNOSTICS
 
@@ -133,6 +133,7 @@ EDITOR
 • After a motion forced blockwise (|o_CTRL-V|), |']| is on the last column
   of the block: "g@<C-v>l" gives 'operatorfunc' the block that "y<C-v>l"
   yanks.
+• ":connect!" (with bang "!") was removed.
 • |cmdwin| (|q:|, |q/|, |q?|, |c_CTRL-F|):
   • Only supports one "cmdline level", not "infinite recursion".
   • Expr-register (|i_CTRL-R_=|, |c_CTRL-R_=|) no longer supports opening
@@ -161,7 +162,7 @@ EVENTS
 • |BufModifiedSet| has been removed. Use the |OptionSet| event with pattern
   "modified" instead.
 • |ui-messages| `msg_show.completion` messages are now `msg_show.progress`
-  events. If :write or :edit is slow it emits `msg_show.progress` events.
+  events.
 
 LSP
 
@@ -253,8 +254,12 @@ API
 • |nvim_create_autocmd()| is now |api-fast|, so it can be called from a fast
   event context (e.g. |vim.uv| callbacks).
 • |nvim_create_autocmd()| callback |event-args| provide `win`.
-• |nvim_chan_set()| sets channel properties. With `detach=false`, any RPC
-  channel can enable Nvim "self-exit on channel-close" behavior.
+• |nvim_chan_set()| sets channel properties.
+  • `detach=false` enables Nvim "self-exit on channel-close" behavior.
+  • `trust=false` rejects API calls from an untrusted peer. Also supported by
+    |sockconnect()|.
+  • `addr` stores the address the client uses to reach Nvim (e.g. a tunnel),
+    which may differ from |v:servername|. |:restart| reconnects UIs through it.
 
 BUILD
 
@@ -277,6 +282,8 @@ DEFAULTS
 
 • 'rulerformat' default is exposed as a statusline expression (previously it
   was implemented as an internal C routine).
+• Default 'statusline' shows the hostname (|hl-StatusLineRemote|) if Nvim runs
+  in an SSH session, e.g. |remote-ssh|.
 • 'termpastefilter' no longer removes TAB chars ("HT") when pasting into
   |:terminal|.
 
@@ -318,6 +325,10 @@ EDITOR
 • |:restart| saves/restores the current session (window layout, buffers, …).
   • |:restart!| (with a bang "!") does not save/restore the session.
 • |ZR| restarts Nvim (|:restart|).
+• |:connect| supports `ssh://` URIs. |remote-ssh|
+• |:connect| without arguments shows a menu of known servers and ssh hosts.
+• |:connect| stops the current server if no other UI is attached, or fails if
+  :qall would fail (unsaved changes). ":connect!" (with bang "!") was removed.
 • |:detach| with range "%" detaches all UIs except the current one.
 • |:detach!| (with bang "!") marks the current UI as detachable: Nvim will
   continue running if the UI disconnects unexpectedly (e.g. if you
@@ -408,6 +419,8 @@ LSP
 
 LUA
 
+• CTRL-C during |SystemObj:wait()| fails with "interrupted" (and stops the
+  process) instead of returning a "timeout" (code 124) result.
 • |lua-async|: `vim.async` provides structured concurrency primitives for Lua
   code, including task handles, await helpers, cooperative cancellation,
   completion-order iteration, and semaphores.
@@ -417,6 +430,16 @@ LUA
   your terminal supports it.
 • |vim.net.request()| can specify custom headers by passing `opts.headers`.
 • |vim.net.request()| can now accept  `method` param overload for multiple HTTP methods.
+• |vim.net.request()| works with |vim.async.await()|: closing the task cancels
+  the request.
+• |vim.rpcrequest()| can specify `opts.timeout`.
+• |SystemObj:wait()| accepts a `cond` predicate which allows you to wait for
+  a condition instead of process termination.
+• |SystemObj:close()| stops the process. Closing a |vim.async| task that
+  awaits |vim.system()| stops the process.
+• When stopping a process, |vim.system()| |SystemObj:wait()| sends SIGTERM,
+  then escalates to SIGKILL after 2s. Once it exits, its output ends, even if
+  a descendant process keeps the pipes open.
 • |writefile()| treats Lua and RPC strings as |Blob|, so it can be used to
   write binary data.
 • |vim.fs.abspath()| gained `cwd` and `plain` parameters.
@@ -447,6 +470,11 @@ LUA
 • |vim.ui.input()| now allows setting input scope.
 • |vim.uri| is a module. The old `uri_xx` top-level functions were renamed,
   e.g. `vim.uri_to_fname()` is now |vim.uri.to_fname()|.
+  • Parse/build URIs with |vim.uri.parse()|, |vim.uri.new()|,
+    |vim.uri.join()|.
+  • Check equality with |vim.uri.normalize()|.
+  • Parse/build querystrings with |vim.uri.encode_query()| and
+    |vim.uri.decode_query()|.
 • |vim.log| provides a logging interface.
 • |vim.pack.get()| output includes revision of a pending update.
 • |vim.pack.get()| can fetch new updates before computing the output.
@@ -486,6 +514,7 @@ OPTIONS
 
 PERFORMANCE
 
+• If :write or :edit is slow it emits `msg_show.progress` events.
 • LSP shares identical file watcher registrations, reducing startup work in
   large workspaces. On macOS and Windows, watchers with different glob
   patterns share one native watcher per directory, which reduces cleanup work
@@ -569,10 +598,10 @@ VIMSCRIPT
 • |v:useractive| indicates user activity.
 • |serverlist()| with `info=true` returns details for each server (own + peers).
 • These Vimscript functions may be called from |api-fast| context (e.g.
-  |vim.uv| timer/handle callbacks): |keytrans()|, |char2nr()|, |nr2char()|,
-  |str2list()|, |strpart()|, |strcharpart()|, |strgetchar()|, |strchars()|,
-  |strcharlen()|, |strlen()|, |strdisplaywidth()|, |byteidx()|, |charidx()|,
-  |utf16idx()|, |tr()|, |trim()|.
+  |vim.uv| timer/handle callbacks): |getenv()|, |keytrans()|, |char2nr()|,
+  |nr2char()|, |str2list()|, |strpart()|, |strcharpart()|, |strgetchar()|,
+  |strchars()|, |strcharlen()|, |strlen()|, |strdisplaywidth()|, |byteidx()|,
+  |charidx()|, |utf16idx()|, |tr()|, |trim()|.
 
 ==============================================================================
 CHANGED FEATURES                                                 *news-changed*

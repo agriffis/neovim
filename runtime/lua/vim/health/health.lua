@@ -1,6 +1,8 @@
 local nvim_on = require('vim._core.util').nvim_on
 
 local M = {}
+--- For tests: skip the update check, which queries the network (SLOW).
+M._skip_update_check = false
 local async = require('vim.async') --- @type vim.async._core
 local health = require('vim.health')
 
@@ -618,10 +620,10 @@ local function check_external_tools()
         return
       end
       if vim.version.le(curl_version, { 7, 12, 3 }) then
-        health.warn(('curl version %s not compatible'):format(curl_version))
+        health.warn(('curl version %s not compatible'):format(tostring(curl_version)))
         return
       end
-      local lines = { string.format('curl %s (%s)', curl_version, curl_path) }
+      local lines = { ('curl %s (%s)'):format(tostring(curl_version), curl_path) }
 
       for line in vim.gsplit(curl_out, '\n', { plain = true }) do
         if line ~= '' then
@@ -664,6 +666,42 @@ local function check_external_tools()
     health.error('curl not found', {
       'Required for vim.net.request() to function.',
       'Install curl using your package manager.',
+    })
+  end
+
+  if vim.fn.executable('ssh') == 1 then
+    local ssh_path = vim.fn.exepath('ssh')
+    local ssh_job = vim.system({ ssh_path, '-V' }, { text = true }):wait()
+    -- ssh -V prints version to stderr
+    local ssh_out = vim.trim(ssh_job.stderr or '')
+    if ssh_job.code == 0 then
+      health.ok(('%s (%s)'):format(ssh_out, ssh_path))
+
+      if vim.fn.has('win32') == 1 then
+        health.warn(
+          'Win32-OpenSSH lacks ControlMaster (multiplexing), so :connect ssh:// is not supported.'
+        )
+      else
+        -- Asks `ssh` itself (ignoring ssh_config): `-G` fails on an option it does not support.
+        -- `accept-new` (OpenSSH 7.6) is the newest option that :connect ssh:// uses.
+        local cmd = { ssh_path, '-F', 'none', '-G', '-o', 'StrictHostKeyChecking=accept-new', 'x' }
+        local check = vim.system(cmd, { text = true }):wait()
+        if check.code == 0 then
+          health.ok('ssh supports :connect ssh://')
+        else
+          health.warn(
+            'ssh lacks StrictHostKeyChecking=accept-new (OpenSSH 7.6+), needed by :connect ssh://',
+            { vim.trim(check.stderr or '') }
+          )
+        end
+      end
+    else
+      health.warn('ssh is installed but failed to run `ssh -V`', { ssh_job.stderr })
+    end
+  else
+    health.warn('ssh not found', {
+      'Required for remote SSH connections (:connect ssh://).',
+      'Install ssh using your package manager.',
     })
   end
 end
@@ -766,7 +804,9 @@ local function check_sysinfo()
   local nvim_version = version_out:match('NVIM (v[^\n]+)') or 'unknown'
   local commit = (version_out:match('%+g(%x+)') or ''):sub(1, 12)
 
-  if vim.fn.executable('git') ~= 1 then
+  if M._skip_update_check then
+    vim.health.info('Skipped update check.')
+  elseif vim.fn.executable('git') ~= 1 then
     vim.health.warn('Cannot check for updates: git not found')
   elseif vim.trim(commit) ~= '' then
     check_head_hash(commit)
@@ -824,8 +864,9 @@ local function check_sysinfo()
     if win == -1 then
       return
     end
-    local encoded_body = vim.uri.encode(body) --- @type string
-    local issue_url = 'https://github.com/neovim/neovim/issues/new?type=Bug&body=' .. encoded_body
+    local issue_url = ('https://github.com/neovim/neovim/issues/new?%s'):format(
+      vim.uri.encode_query({ type = 'Bug', body = body })
+    )
 
     --- Opens the prefilled issue from the checkhealth winbar.
     ---@diagnostic disable-next-line: global-in-non-module
@@ -835,11 +876,9 @@ local function check_sysinfo()
     vim.wo[win].winbar =
       '%#WarningMsg#%@v:lua.nvim_health_bugreport_open@▶ Create Bug Report on GitHub%X%*'
 
-    vim.api.nvim_create_autocmd('BufDelete', {
-      buf = buf,
-      once = true,
-      command = 'lua _G.nvim_health_bugreport_open = nil',
-    })
+    nvim_on('BufDelete', nil, { buf = buf, once = true }, function()
+      _G.nvim_health_bugreport_open = nil
+    end)
   end)
 end
 

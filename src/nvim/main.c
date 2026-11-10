@@ -358,7 +358,7 @@ int main(int argc, char **argv)
 
   // NORETURN: Start builtin UI client.
   if (ui_client_channel_id) {
-    ui_client_run();  // NORETURN
+    ui_client_run(remote_ui ? params.server_addr : NULL);  // NORETURN
   }
   assert(!ui_client_channel_id && !use_builtin_ui);
   // Nvim server...
@@ -990,8 +990,9 @@ static uint64_t server_connect(char *server_addr, const char **errmsg)
   CallbackReader on_data = CALLBACK_READER_INIT;
   const char *error = NULL;
   bool is_tcp = socket_address_tcp_host_end(server_addr) != NULL;
-  // connected to channel
-  uint64_t chan = channel_connect(is_tcp, server_addr, true, on_data, 500, &error);
+  uint64_t chan = channel_connect(is_tcp, server_addr, true,
+                                  false,  // Disallow server-to-client API calls.
+                                  on_data, 500, &error);
   if (error) {
     *errmsg = error;
     return 0;
@@ -1708,7 +1709,7 @@ static void handle_tag(char *tagname)
 
     // If the user doesn't want to edit the file then we quit here.
     if (swap_exists_did_quit) {
-      ui_call_error_exit(1);
+      ui_call_error_exit(1, NULL_STRING);
       getout(1);
     }
   }
@@ -1855,7 +1856,7 @@ static void create_windows(mparm_T *parmp)
           if (got_int || only_one_window()) {
             // abort selected or quit and only one window
             did_emsg = false;               // avoid hit-enter prompt
-            ui_call_error_exit(1);
+            ui_call_error_exit(1, NULL_STRING);
             getout(1);
           }
           // We can't close the window, it would disturb what
@@ -1958,7 +1959,7 @@ static void edit_buffers(mparm_T *parmp)
         if (got_int || only_one_window()) {
           // abort selected and only one window
           did_emsg = false;             // avoid hit-enter prompt
-          ui_call_error_exit(1);
+          ui_call_error_exit(1, NULL_STRING);
           getout(1);
         }
         win_close(curwin, true, false);
@@ -2386,7 +2387,7 @@ static void usage(void)
 static void check_swap_exists_action(void)
 {
   if (swap_exists_action == SEA_QUIT) {
-    ui_call_error_exit(1);
+    ui_call_error_exit(1, NULL_STRING);
     getout(1);
   }
   handle_swap_exists(NULL);

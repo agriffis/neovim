@@ -34,14 +34,31 @@ describe(':checkhealth', function()
     eq("Invalid 'runtimepath'", string.match(err, 'Invalid.*'))
   end)
 
-  it('detects invalid $VIM', function()
-    clear()
-    -- Do this after startup, otherwise it just breaks $VIMRUNTIME.
+  it('vim.health report', function()
+    -- Invalid $TERM.
+    clear({ env = { TERM = 'a&b+c' } })
+    exec_lua([[require('vim.health.health')._skip_update_check = true]])
+    -- Invalid $VIM. Do this after startup, otherwise it just breaks $VIMRUNTIME.
     command("let $VIM='zub'")
     command('checkhealth vim.health')
     retry(nil, 10000, function()
+      eq('function', exec_lua('return type(_G.nvim_health_bugreport_open)'))
       matches('ERROR $VIM .* zub', curbuf_contents())
     end)
+    -- All sections ran.
+    eq(nil, curbuf_contents():match('Failed to run healthcheck.*'))
+
+    -- Bug-report URL-encodes the report.
+    local query = exec_lua(function()
+      local url --- @type string
+      vim.ui.open = function(u)
+        url = u
+      end
+      _G.nvim_health_bugreport_open()
+      return assert(vim.uri.parse(url)).query
+    end)
+    eq('Bug', query.type)
+    matches('%$TERM environment variable: `a&b%+c`', query.body)
   end)
 
   it('getcompletion()', function()
@@ -239,7 +256,7 @@ describe('vim.health', function()
       eq(true, exec_lua('return vim.g.healthcheck_responsive'))
       exec_lua('_G.resolve_health_system()')
 
-      retry(nil, 5000, function()
+      retry(nil, 30000, function()
         eq(false, api.nvim_get_option_value('modifiable', { buf = 0 }))
       end)
       eq('checkhealth', api.nvim_get_option_value('filetype', { buf = 0 }))

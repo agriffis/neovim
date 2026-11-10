@@ -1156,7 +1156,7 @@ void ex_diffupdate(exarg_T *eap)
   diff_try_update(&diffio, idx_orig, eap);
 
   // force updating cursor position on screen
-  curwin->w_valid_cursor.lnum = 0;
+  changed_line_abv_curs();
 
 theend:
   // A redraw is needed if there were diffs and they were cleared, or there
@@ -2603,6 +2603,7 @@ void diff_set_topline(win_T *fromwin, win_T *towin)
 
   check_topfill(towin, false);
   hasFolding(towin, towin->w_topline, &towin->w_topline, NULL);
+  set_topline_valid(towin);
 }
 
 /// Parse the diff anchors. If "check_only" is set, will only make sure the
@@ -3579,7 +3580,7 @@ bool diff_find_change(win_T *wp, linenr_T lnum, diffline_T *diffline)
 /// @param  lnum  line number to check within the buffer
 ///
 /// @return false if there are no diff blocks at all in this window.
-bool diff_infold(win_T *wp, linenr_T lnum)
+bool diff_infold(win_T *wp, tabpage_T *tp, linenr_T lnum)
   FUNC_ATTR_PURE FUNC_ATTR_WARN_UNUSED_RESULT FUNC_ATTR_NONNULL_ARG(1)
 {
   // Return if 'diff' isn't set.
@@ -3587,12 +3588,16 @@ bool diff_infold(win_T *wp, linenr_T lnum)
     return false;
   }
 
+  if (tp == NULL) {
+    tp = curtab;
+  }
+
   int idx = -1;
   bool other = false;
   for (int i = 0; i < DB_COUNT; i++) {
-    if (curtab->tp_diffbuf[i] == wp->w_buffer) {
+    if (tp->tp_diffbuf[i] == wp->w_buffer) {
       idx = i;
-    } else if (curtab->tp_diffbuf[i] != NULL) {
+    } else if (tp->tp_diffbuf[i] != NULL) {
       other = true;
     }
   }
@@ -3602,20 +3607,20 @@ bool diff_infold(win_T *wp, linenr_T lnum)
     return false;
   }
 
-  if (curtab->tp_diff_invalid) {
+  if (tp == curtab && tp->tp_diff_invalid) {
     // update after a big change
     ex_diffupdate(NULL);
   }
 
   // Return if there are no diff blocks.  All lines will be folded.
-  if (curtab->tp_first_diff == NULL) {
+  if (tp->tp_first_diff == NULL) {
     return true;
   }
 
   // Resume from the scan finger to avoid restarting at the first block.
   diff_T *le = NULL;             // last block with df_lnum[idx] <= lnum
   bool result = true;
-  for (diff_T *dp = diff_scan_start(curtab, idx, lnum); dp != NULL; dp = dp->df_next) {
+  for (diff_T *dp = diff_scan_start(tp, idx, lnum); dp != NULL; dp = dp->df_next) {
     if (dp->df_lnum[idx] <= lnum) {
       le = dp;
     }
@@ -3629,7 +3634,7 @@ bool diff_infold(win_T *wp, linenr_T lnum)
       break;
     }
   }
-  diff_scan_remember(curtab, idx, lnum, le);
+  diff_scan_remember(tp, idx, lnum, le);
   return result;
 }
 

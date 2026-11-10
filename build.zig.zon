@@ -20,13 +20,13 @@
             .lazy = true,
         },
         .treesitter = .{
-            .url = "git+https://github.com/tree-sitter/tree-sitter?ref=v0.27.1#10eb5ac119eec9cb4267a8e035066473983f5f3a",
-            .hash = "tree_sitter-0.27.1-Tw2sR6zNDQDfaX4mIqMnve2vLRi1xxb2YeeMU7c2h34P",
+            .url = "git+https://github.com/tree-sitter/tree-sitter?ref=v0.27.2#3fb7be49145acfb07e33b61ed5689e2b6771b2e9",
+            .hash = "tree_sitter-0.27.2-Tw2sR8H1DQA0X6RmzcaABPYo71PUgl1SnGAn9YOYBYyU",
             .lazy = true,
         },
         .libuv = .{
-            .url = "git+https://github.com/allyourcodebase/libuv.git#c1ccce24e1077ae7780857c89fb4b3aeb9080315",
-            .hash = "libuv-1.52.0-htqqvzNqAAAB6cHIx-wIffe_mqMW5GOKjHeDBJYHGwls",
+            .url = "git+https://github.com/allyourcodebase/libuv#88bb15e5f2a0843f8dbb45b79bcaa76e91d8ee26",
+            .hash = "libuv-1.53.0-htqqv6ltAAB9F26lEJAp4KqL6xAmkUlRxenqnasabf0E",
             .lazy = true,
         },
         .utf8proc = .{
@@ -49,8 +49,8 @@
             .lazy = true,
         },
         .treesitter_c = .{
-            .url = "git+https://github.com/tree-sitter/tree-sitter-c?ref=v0.24.2#b780e47fc780ddc8da13afa35a3f4ed5c157823d",
-            .hash = "tree_sitter_c-0.24.2-y5boS-ptQADHoCoVfjGT_nFtFQ5LbomIkW0fxG3_cmdB",
+            .url = "git+https://github.com/tree-sitter-grammars/tree-sitter-c?ref=v0.24.3#f3202ac4f1041e0b0a2b908147d5dd0e951da7b1",
+            .hash = "N-V-__8AAKCLSADrSe-FxKXKw7DrCFBZb78ggafFhppAxuQC",
         },
         .treesitter_markdown = .{
             .url = "git+https://github.com/tree-sitter-grammars/tree-sitter-markdown?ref=v0.5.4#41ff24a6c775492c543b09228aeb98d1cd2b3a0f",
@@ -71,10 +71,6 @@
         .treesitter_query = .{
             .url = "git+https://github.com/tree-sitter-grammars/tree-sitter-query?ref=v0.8.0#a225e21d81201be77da58de614e2b7851735677a",
             .hash = "N-V-__8AAMR5AwAzZ5_8S2p2COTEf5usBeeT4ORzh-lBGkWy",
-        },
-        .compile_commands = .{
-            .url = "https://github.com/the-argus/zig-compile-commands/archive/9400cd1963ea6bb58fe47ba7d9700075b808cdd2.tar.gz",
-            .hash = "zig_compile_commands-0.0.1-OZg5-e_JAAAGg1WHAePtq4l4Uvjs34BexnFFCZk63EaG",
         },
         .treesitter_diff = .{
             .url = "git+https://github.com/tree-sitter-grammars/tree-sitter-diff?ref=v0.2.0#ada384ac7bfc1307f32de474620120add29998fb",

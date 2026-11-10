@@ -100,11 +100,14 @@ local function default_format_func(min_level, level, ...)
   -- Stack shape:
   --   default_format_func <- create_writer closure <- user callsite
   local info = debug.getinfo(3, 'Sl')
+  -- Full path (`short_src` is truncated), with $VIMRUNTIME abbreviated.
+  local src = info and (info.source:match('^@(.*)') or info.short_src) or '?'
+  local rt_path = vim.env.VIMRUNTIME and vim.fs.relpath(vim.env.VIMRUNTIME, src)
   local header = string.format(
     '[%s][%s] %s:%s',
     level_names[level],
     os.date(log_date_format),
-    info and info.short_src or '?',
+    rt_path and ('$VIMRUNTIME/%s'):format(rt_path) or src,
     info and info.currentline or -1
   )
   local parts = { header }

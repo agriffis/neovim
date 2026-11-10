@@ -1124,7 +1124,7 @@ M.funcs = {
 
       chansend() writes raw data, not RPC messages.  If the channel
       was created with `"rpc":v:true` then the channel expects RPC
-      messages, use |rpcnotify()| and |rpcrequest()| instead.
+      messages, use |vim.rpcnotify()| and |vim.rpcrequest()| instead.
     ]=],
     name = 'chansend',
     params = { { 'id', 'number' }, { 'data', 'string|string[]' } },
@@ -4161,6 +4161,7 @@ M.funcs = {
       See also |expr-env|.
 
     ]=],
+    fast = true,
     name = 'getenv',
     params = { { 'name', 'string' } },
     returns = 'string',
@@ -6392,8 +6393,8 @@ M.funcs = {
       Returns |job-id| on success, 0 on invalid arguments (or job
       table is full), -1 if {cmd}[0] or 'shell' is not executable.
       The returned job-id is a valid |channel-id| representing the
-      job's stdio streams. Use |chansend()| (or |rpcnotify()| and
-      |rpcrequest()| if "rpc" was enabled) to send data to stdin and
+      job's stdio streams. Use |chansend()| (or |vim.rpcnotify()| and
+      |vim.rpcrequest()| if "rpc" was enabled) to send data to stdin and
       |chanclose()| to close the streams without stopping the job.
 
       See |job-control| and |RPC|.
@@ -8952,6 +8953,8 @@ M.funcs = {
       When the maximum is one before the start the result is an
       empty list.  When the maximum is more than one before the
       start this is an error.
+      The list can have at most 2147483647 items and {stride} must
+      fit in a 32 bit number, otherwise |E1510| is given.
       Examples: >vim
       	echo range(4)		" [0, 1, 2, 3]
       	echo range(2, 4)	" [2, 3, 4]
@@ -9425,32 +9428,24 @@ M.funcs = {
   },
   rpcnotify = {
     args = { 2 },
+    deprecated = true,
     desc = [=[
-      Sends {event} to {channel} via |RPC| and returns immediately.
-      If {channel} is 0, the event is broadcast to all channels.
-      Example: >vim
-      	au VimLeave call rpcnotify(0, "leaving")
-      <
+      Use |vim.rpcnotify()| instead.
     ]=],
     name = 'rpcnotify',
     params = { { 'channel', 'integer' }, { 'event', 'string' }, { '...', 'any' } },
     returns = 'integer',
     signature = 'rpcnotify({channel}, {event} [, {args}...])',
-    see_lua = { '|vim.rpcnotify()|' },
   },
   rpcrequest = {
     args = { 2 },
+    deprecated = true,
     desc = [=[
-      Sends a request to {channel} to invoke {method} via
-      |RPC| and blocks until a response is received.
-      Example: >vim
-      	let result = rpcrequest(rpc_chan, "func", 1, 2, 3)
-      <
+      Use |vim.rpcrequest()| instead.
     ]=],
     name = 'rpcrequest',
     params = { { 'channel', 'integer' }, { 'method', 'string' }, { '...', 'any' } },
     signature = 'rpcrequest({channel}, {method} [, {args}...])',
-    see_lua = { '|vim.rpcrequest()|' },
   },
   rpcstart = {
     deprecated = true,
@@ -11549,14 +11544,16 @@ M.funcs = {
 
       Returns a |channel| ID. Close the socket with |chanclose()|.
       Use |chansend()| to send data over a bytes socket, and
-      |rpcrequest()| and |rpcnotify()| to communicate with a RPC
+      |vim.rpcrequest()| and |vim.rpcnotify()| to communicate with a RPC
       socket.
 
       {opts} is an optional dictionary with these keys:
-        |on_data| : callback invoked when data was read from socket
-        data_buffered : read socket data in |channel-buffered| mode.
-        rpc     : If set, |msgpack-rpc| will be used to communicate
-      	    over the socket.
+        - |on_data|: Callback invoked when data is read from socket.
+        - data_buffered: Read socket data in |channel-buffered| mode.
+        - rpc: Use |msgpack-rpc| to communicate over the socket.
+        - trust: Trust the peer: allow its incoming |RPC| |API|
+          calls. |nvim_chan_set()|
+
       Returns:
         - The channel ID on success (greater than zero)
         - 0 on invalid arguments or connection failure.
@@ -11863,7 +11860,7 @@ M.funcs = {
       handled by this function, see |v:stderr|.
 
       Close the stdio handles with |chanclose()|. Use |chansend()|
-      to send data to stdout, and |rpcrequest()| and |rpcnotify()|
+      to send data to stdout, and |vim.rpcrequest()| and |vim.rpcnotify()|
       to communicate over RPC.
 
       {opts} is a dictionary with these keys:

@@ -2159,34 +2159,10 @@ static int eval3(char **arg, typval_T *rettv, evalarg_T *const evalarg)
   return OK;
 }
 
-/// Handle third level expression:
-///      var1 == var2
-///      var1 =~ var2
-///      var1 != var2
-///      var1 !~ var2
-///      var1 > var2
-///      var1 >= var2
-///      var1 < var2
-///      var1 <= var2
-///      var1 is var2
-///      var1 isnot var2
-///
-/// "arg" must point to the first non-white of the expression.
-/// "arg" is advanced to the next non-white after the recognized expression.
-///
-/// @return  OK or FAIL.
-static int eval4(char **arg, typval_T *rettv, evalarg_T *const evalarg)
+static exprtype_T get_compare_type(const char *p, int *len)
 {
-  typval_T var2;
   exprtype_T type = EXPR_UNKNOWN;
-  int len = 2;
 
-  // Get the first variable.
-  if (eval5(arg, rettv, evalarg) == FAIL) {
-    return FAIL;
-  }
-
-  char *p = *arg;
   switch (p[0]) {
   case '=':
     if (p[1] == '=') {
@@ -2205,7 +2181,7 @@ static int eval4(char **arg, typval_T *rettv, evalarg_T *const evalarg)
   case '>':
     if (p[1] != '=') {
       type = EXPR_GREATER;
-      len = 1;
+      *len = 1;
     } else {
       type = EXPR_GEQUAL;
     }
@@ -2213,7 +2189,7 @@ static int eval4(char **arg, typval_T *rettv, evalarg_T *const evalarg)
   case '<':
     if (p[1] != '=') {
       type = EXPR_SMALLER;
-      len = 1;
+      *len = 1;
     } else {
       type = EXPR_SEQUAL;
     }
@@ -2221,17 +2197,48 @@ static int eval4(char **arg, typval_T *rettv, evalarg_T *const evalarg)
   case 'i':
     if (p[1] == 's') {
       if (p[2] == 'n' && p[3] == 'o' && p[4] == 't') {
-        len = 5;
+        *len = 5;
       }
-      if (!isalnum((uint8_t)p[len]) && p[len] != '_') {
-        type = len == 2 ? EXPR_IS : EXPR_ISNOT;
+      int i = (uint8_t)p[*len];
+      if (!isalnum(i) && i != '_') {
+        type = *len == 2 ? EXPR_IS : EXPR_ISNOT;
       }
     }
     break;
   }
+  return type;
+}
+
+/// Handle third level expression:
+///      var1 == var2
+///      var1 =~ var2
+///      var1 != var2
+///      var1 !~ var2
+///      var1 > var2
+///      var1 >= var2
+///      var1 < var2
+///      var1 <= var2
+///      var1 is var2
+///      var1 isnot var2
+///
+/// "arg" must point to the first non-white of the expression.
+/// "arg" is advanced to the next non-white after the recognized expression.
+///
+/// @return  OK or FAIL.
+static int eval4(char **arg, typval_T *rettv, evalarg_T *const evalarg)
+{
+  // Get the first variable.
+  if (eval5(arg, rettv, evalarg) == FAIL) {
+    return FAIL;
+  }
+
+  char *p = *arg;
+  int len = 2;
+  exprtype_T type = get_compare_type(p, &len);
 
   // If there is a comparative operator, use it.
   if (type != EXPR_UNKNOWN) {
+    typval_T var2;
     bool ic;
     // extra question mark appended: ignore case
     if (p[len] == '?') {
@@ -2755,7 +2762,12 @@ static int eval7(char **arg, typval_T *rettv, evalarg_T *const evalarg, bool wan
     if (**arg == ')') {
       (*arg)++;
     } else if (ret == OK) {
-      emsg(_("E110: Missing ')'"));
+      // Show where the expression stopped, unless at the end.
+      if (**arg == NUL) {
+        emsg(_(e_missing_closing_paren));
+      } else {
+        semsg(_(e_missing_closing_paren_str), *arg);
+      }
       tv_clear(rettv);
       ret = FAIL;
     }
@@ -5454,13 +5466,11 @@ pos_T *var2fpos(const typval_T *const tv, const bool dollar_lnum, int *const ret
   pos.coladd = 0;
 
   if (name[0] == 'w' && dollar_lnum) {
-    // the "w_valid" flags are not reset when moving the cursor, but they
-    // do matter for update_topline() and validate_botline_win().
-    check_cursor_moved(wp);
-
+    // The "w_valid" flags are not reset when moving the cursor, so update
+    // the view before reading either endpoint.
+    update_topline(wp);
     pos.col = 0;
     if (name[1] == '0') {               // "w0": first visible line
-      update_topline(wp);
       // In silent Ex mode topline is zero, but that's not a valid line
       // number; use one instead.
       pos.lnum = wp->w_topline > 0 ? wp->w_topline : 1;

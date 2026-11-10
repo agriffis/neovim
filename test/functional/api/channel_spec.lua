@@ -24,6 +24,7 @@ describe('API', function()
     mode = 'rpc',
     client = {},
     detach = false,
+    trust = true,
   }
   local stderr = {
     stream = 'stderr',
@@ -50,6 +51,14 @@ describe('API', function()
       eq(info, api.nvim_get_chan_info(1))
       api.nvim_chan_set(1, { detach = false })
       eq(false, api.nvim_get_chan_info(1).detach)
+
+      -- `addr`, also on a non-RPC channel.
+      api.nvim_chan_set(1, { addr = '/tmp/tunnel.sock' })
+      eq('/tmp/tunnel.sock', api.nvim_get_chan_info(1).addr)
+      api.nvim_chan_set(1, { addr = '' }) --  Empty string clears it.
+      eq(nil, api.nvim_get_chan_info(1).addr)
+      api.nvim_chan_set(2, { addr = 'x' })
+      eq(vim.tbl_extend('force', stderr, { addr = 'x' }), api.nvim_get_chan_info(2))
     end)
   end)
 
@@ -84,6 +93,7 @@ describe('API', function()
         id = 1,
         mode = 'rpc',
         detach = false,
+        trust = true,
         client = {
           name = 'functionaltests',
           version = { major = 0, minor = 3, patch = 17 },
@@ -107,6 +117,7 @@ describe('API', function()
         mode = 'rpc',
         client = {},
         detach = true,
+        trust = true,
       }
       eq({ info = info }, api.nvim_get_var('opened_event'))
       eq({ [1] = testinfo, [2] = stderr, [3] = info }, api.nvim_list_chans())
@@ -122,6 +133,7 @@ describe('API', function()
         argv = { catpath },
         mode = 'rpc',
         detach = true,
+        trust = true,
         client = {
           name = 'amazing-cat',
           version = { major = 0 },

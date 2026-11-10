@@ -86,7 +86,6 @@
 #include "nvim/menu_defs.h"
 #include "nvim/message.h"
 #include "nvim/move.h"
-#include "nvim/msgpack_rpc/channel.h"
 #include "nvim/msgpack_rpc/channel_defs.h"
 #include "nvim/msgpack_rpc/packer.h"
 #include "nvim/msgpack_rpc/packer_defs.h"
@@ -158,6 +157,8 @@ PRAGMA_DIAG_PUSH_IGNORE_IMPLICIT_FALLTHROUGH
 PRAGMA_DIAG_POP
 PRAGMA_DIAG_POP
 
+static const char e_start_past_end[]
+  = N_("E727: Start past end");
 static const char e_invalid_submatch_number_nr[]
   = N_("E935: Invalid submatch number: %d");
 static const char e_string_list_or_blob_required[]
@@ -4874,12 +4875,46 @@ static void f_range(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     emsg(_("E726: Stride is zero"));
     return;
   }
-  if (stride > 0 ? end + 1 < start : end - 1 > start) {
-    emsg(_("E727: Start past end"));
+
+  if (stride < INT_MIN || stride > INT_MAX) {
+    char buf[NUMBUFLEN];
+    vim_snprintf(buf, sizeof(buf), "%" PRIdVARNUMBER, stride);
+    semsg(_(e_val_too_large), buf);
     return;
   }
 
-  tv_list_alloc_ret(rettv, (end - start) / stride);
+  uvarnumber_T len;
+
+  if (stride > 0 ? end < start : end > start) {
+    // One step before the start gives an empty list, further away is
+    // an error.  Subtract unsigned to avoid an overflow.
+    uvarnumber_T back = stride > 0
+                        ? (uvarnumber_T)start - (uvarnumber_T)end
+                        : (uvarnumber_T)end - (uvarnumber_T)start;
+    if (back > 1) {
+      emsg(_(e_start_past_end));
+      return;
+    }
+    len = 0;
+  } else {
+    varnumber_T astride = stride > 0 ? stride : -stride;
+    uvarnumber_T span = stride > 0
+                        ? (uvarnumber_T)end - (uvarnumber_T)start
+                        : (uvarnumber_T)start - (uvarnumber_T)end;
+    uvarnumber_T count = span / (uvarnumber_T)astride;
+    // The number of items is "count" + 1 and must fit in an int.
+    if (count >= (uvarnumber_T)INT_MAX) {
+      char buf[NUMBUFLEN];
+      // "count + 1" can wrap around.
+      vim_snprintf(buf, sizeof(buf), "%" PRIu64,
+                   count < UVARNUMBER_MAX ? count + 1 : UVARNUMBER_MAX);
+      semsg(_(e_val_too_large), buf);
+      return;
+    }
+    len = count + 1;
+  }
+
+  tv_list_alloc_ret(rettv, (ptrdiff_t)len);
   for (varnumber_T i = start; stride > 0 ? i <= end : i >= end; i += stride) {
     tv_list_append_number(rettv->vval.v_list, i);
   }
@@ -5060,7 +5095,7 @@ static void repeat_list(list_T *l, varnumber_T n, typval_T *rettv)
 {
   const int slen = tv_list_len(l);
 
-  tv_list_alloc_ret(rettv, (n > 0) * n * slen);
+  tv_list_alloc_ret(rettv, kListLenMayKnow);
   if (l == NULL || n <= 0 || slen == 0) {
     return;
   }
@@ -5546,142 +5581,6 @@ theend:
   p_ws = save_p_ws;
 
   return retval;
-}
-
-/// "rpcnotify()" function
-static void f_rpcnotify(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
-{
-  rettv->v_type = VAR_NUMBER;
-  rettv->vval.v_number = 0;
-
-  if (check_secure()) {
-    return;
-  }
-
-  if (argvars[0].v_type != VAR_NUMBER || argvars[0].vval.v_number < 0) {
-    semsg(_(e_invarg2), "Channel id must be a positive integer");
-    return;
-  }
-
-  if (argvars[1].v_type != VAR_STRING) {
-    semsg(_(e_invarg2), "Event type must be a string");
-    return;
-  }
-
-  MAXSIZE_TEMP_ARRAY(args, MAX_FUNC_ARGS);
-  Arena arena = ARENA_EMPTY;
-
-  for (typval_T *tv = argvars + 2; tv->v_type != VAR_UNKNOWN; tv++) {
-    ADD_C(args, vim_to_object(tv, &arena, true));
-  }
-
-  bool ok = rpc_send_event((uint64_t)argvars[0].vval.v_number,
-                           tv_get_string(&argvars[1]), args);
-
-  arena_mem_free(arena_finish(&arena));
-
-  if (!ok) {
-    semsg(_(e_invarg2), "Channel doesn't exist");
-    return;
-  }
-  rettv->vval.v_number = 1;
-}
-
-/// "rpcrequest()" function
-static void f_rpcrequest(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
-{
-  rettv->v_type = VAR_NUMBER;
-  rettv->vval.v_number = 0;
-  const int l_provider_call_nesting = provider_call_nesting;
-
-  if (check_secure()) {
-    return;
-  }
-
-  if (argvars[0].v_type != VAR_NUMBER || argvars[0].vval.v_number <= 0) {
-    semsg(_(e_invarg2), "Channel id must be a positive integer");
-    return;
-  }
-
-  if (argvars[1].v_type != VAR_STRING) {
-    semsg(_(e_invarg2), "Method name must be a string");
-    return;
-  }
-
-  MAXSIZE_TEMP_ARRAY(args, MAX_FUNC_ARGS);
-  Arena arena = ARENA_EMPTY;
-
-  for (typval_T *tv = argvars + 2; tv->v_type != VAR_UNKNOWN; tv++) {
-    ADD_C(args, vim_to_object(tv, &arena, true));
-  }
-
-  sctx_T save_current_sctx;
-  char *save_autocmd_fname, *save_autocmd_match;
-  bool save_autocmd_fname_full;
-  int save_autocmd_bufnr;
-  funccal_entry_T funccal_entry;
-
-  if (l_provider_call_nesting) {
-    // If this is called from a provider function, restore the scope
-    // information of the caller.
-    save_current_sctx = current_sctx;
-    save_autocmd_fname = autocmd_fname;
-    save_autocmd_match = autocmd_match;
-    save_autocmd_fname_full = autocmd_fname_full;
-    save_autocmd_bufnr = autocmd_bufnr;
-    save_funccal(&funccal_entry);
-
-    current_sctx = provider_caller_scope.script_ctx;
-    ga_grow(&exestack, 1);
-    ((estack_T *)exestack.ga_data)[exestack.ga_len++] = provider_caller_scope.es_entry;
-    autocmd_fname = provider_caller_scope.autocmd_fname;
-    autocmd_match = provider_caller_scope.autocmd_match;
-    autocmd_fname_full = provider_caller_scope.autocmd_fname_full;
-    autocmd_bufnr = provider_caller_scope.autocmd_bufnr;
-    set_current_funccal((funccall_T *)(provider_caller_scope.funccalp));
-  }
-
-  Error err = ERROR_INIT;
-
-  uint64_t chan_id = (uint64_t)argvars[0].vval.v_number;
-  const char *method = tv_get_string(&argvars[1]);
-
-  ArenaMem res_mem = NULL;
-  Object result = rpc_send_call(chan_id, method, args, &res_mem, &err);
-  arena_mem_free(arena_finish(&arena));
-
-  if (l_provider_call_nesting) {
-    current_sctx = save_current_sctx;
-    exestack.ga_len--;
-    autocmd_fname = save_autocmd_fname;
-    autocmd_match = save_autocmd_match;
-    autocmd_fname_full = save_autocmd_fname_full;
-    autocmd_bufnr = save_autocmd_bufnr;
-    restore_funccal();
-  }
-
-  if (ERROR_SET(&err)) {
-    const char *name = NULL;
-    Channel *chan = find_channel(chan_id);
-    if (chan) {
-      name = get_client_info(chan, "name");
-    }
-    if (name) {
-      semsg_multiline("rpc_error", "Invoking '%s' on channel %" PRIu64 " (%s):\n%s",
-                      method, chan_id, name, err.msg);
-    } else {
-      semsg_multiline("rpc_error", "Invoking '%s' on channel %" PRIu64 ":\n%s",
-                      method, chan_id, err.msg);
-    }
-
-    goto end;
-  }
-
-  object_to_vim(result, rettv, &err);
-
-end:
-  arena_mem_free(res_mem);
-  api_clear_error(&err);
 }
 
 static void screenchar_adjust(ScreenGrid **grid, int *row, int *col)
@@ -6629,10 +6528,12 @@ static void f_sockconnect(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   }
 
   bool rpc = false;
+  bool trust = true;
   CallbackReader on_data = CALLBACK_READER_INIT;
   if (argvars[2].v_type == VAR_DICT) {
     dict_T *opts = argvars[2].vval.v_dict;
     rpc = tv_dict_get_number(opts, "rpc") != 0;
+    trust = tv_dict_get_bool(opts, "trust", true);
 
     if (!tv_dict_get_callback(opts, S_LEN("on_data"), &on_data.cb)) {
       goto cleanup;
@@ -6644,7 +6545,7 @@ static void f_sockconnect(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   }
 
   const char *error = NULL;
-  uint64_t id = channel_connect(tcp, address, rpc, on_data, 50, &error);
+  uint64_t id = channel_connect(tcp, address, rpc, trust, on_data, 50, &error);
 
   if (error) {
     semsg(_("connection failed: %s"), error);

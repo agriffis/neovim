@@ -864,8 +864,13 @@ function vim.api.nvim_chan_send(chan, data) end
 ---
 --- @param chan integer Channel id, or 0 for current (RPC) channel.
 --- @param config vim.api.keyset.chan_set Properties:
+--- - addr: (string) Address the peer uses to reach this server. Client-side hint, for when the
+---   peer is on another system and can't directly reach `serverlist()` addresses (e.g.
+---   a `remote-ssh` tunnel). `:restart` emits this to reconnect remote UIs.
 --- - detach: (boolean, default: true) Closing the channel does not self-exit Nvim. Nvim
 ---   self-exits when the last `detach=false` `RPC` channel closes. See also `:detach!`.
+--- - trust: (boolean, default: true) Trust the peer: allow its incoming `RPC` `API` calls. Set
+---   to false for untrusted (remote) peers.
 function vim.api.nvim_chan_set(chan, config) end
 
 --- Clears all autocommands matching the {opts} query. To delete autocmds see `nvim_del_autocmd()`.
@@ -1324,6 +1329,7 @@ function vim.api.nvim_get_autocmds(opts) end
 ---
 --- @param chan integer Channel id, or 0 for current (RPC) channel
 --- @return table<string,any> # Channel info dict with these keys:
+--- - "addr"     (optional) Address the peer/client uses to reach this server. |nvim_chan_set()|
 --- - "argv"     (optional) Job arguments list.
 --- - "buf"      (optional) Buffer connected to |terminal| instance.
 --- - "buffer"   (optional) Deprecated alias for `buf`.
@@ -1345,6 +1351,7 @@ function vim.api.nvim_get_autocmds(opts) end
 ---      - "stderr"     stderr of this Nvim instance
 ---      - "socket"     TCP/IP socket or named pipe
 ---      - "job"        Job with communication over its stdio.
+--- - "trust"    (optional) Trust the peer: allow its incoming |RPC| |API| calls. |nvim_chan_set()|
 function vim.api.nvim_get_chan_info(chan) end
 
 --- Returns the 24-bit RGB value of a `nvim_get_color_map()` color name or

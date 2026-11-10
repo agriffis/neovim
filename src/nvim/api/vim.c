@@ -1756,8 +1756,13 @@ void nvim_set_client_info(uint64_t channel_id, String name, Dict version, String
 ///
 /// @param chan Channel id, or 0 for current (RPC) channel.
 /// @param config Properties:
+///     - addr: (string) Address the peer uses to reach this server. Client-side hint, for when the
+///       peer is on another system and can't directly reach |serverlist()| addresses (e.g.
+///       a |remote-ssh| tunnel). |:restart| emits this to reconnect remote UIs.
 ///     - detach: (boolean, default: true) Closing the channel does not self-exit Nvim. Nvim
 ///       self-exits when the last `detach=false` |RPC| channel closes. See also |:detach!|.
+///     - trust: (boolean, default: true) Trust the peer: allow its incoming |RPC| |API| calls. Set
+///       to false for untrusted (remote) peers.
 /// @param[out] err Error details, if any
 void nvim_chan_set(uint64_t channel_id, Integer chan, Dict(chan_set) *config, Error *err)
   FUNC_API_SINCE(15) FUNC_API_FAST
@@ -1772,6 +1777,16 @@ void nvim_chan_set(uint64_t channel_id, Integer chan, Dict(chan_set) *config, Er
 
   if (HAS_KEY(config, chan_set, detach)) {
     channel->detach = config->detach;
+  }
+  if (HAS_KEY(config, chan_set, trust)) {
+    channel->trust = config->trust;
+  }
+  if (HAS_KEY(config, chan_set, addr)) {
+    xfree(channel->addr);
+    channel->addr = config->addr.size ? string_to_cstr(config->addr) : NULL;
+  }
+  if (HAS_KEY(config, chan_set, detach) || HAS_KEY(config, chan_set, trust)
+      || HAS_KEY(config, chan_set, addr)) {
     channel_event(channel, EVENT_CHANINFO);
   }
 }
@@ -1803,6 +1818,7 @@ void nvim__cmdwin_set(String type, Buffer buf, Error *err)
 ///
 /// @param chan Channel id, or 0 for current (RPC) channel
 /// @returns Channel info dict with these keys:
+///    - "addr"     (optional) Address the peer/client uses to reach this server. |nvim_chan_set()|
 ///    - "argv"     (optional) Job arguments list.
 ///    - "buf"      (optional) Buffer connected to |terminal| instance.
 ///    - "buffer"   (optional) Deprecated alias for `buf`.
@@ -1824,6 +1840,7 @@ void nvim__cmdwin_set(String type, Buffer buf, Error *err)
 ///         - "stderr"     stderr of this Nvim instance
 ///         - "socket"     TCP/IP socket or named pipe
 ///         - "job"        Job with communication over its stdio.
+///    - "trust"    (optional) Trust the peer: allow its incoming |RPC| |API| calls. |nvim_chan_set()|
 Dict nvim_get_chan_info(uint64_t channel_id, Integer chan, Arena *arena, Error *err)
   FUNC_API_SINCE(4)
 {

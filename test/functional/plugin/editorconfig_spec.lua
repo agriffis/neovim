@@ -110,6 +110,9 @@ setup(function()
     [skip_trim_when_insert_normal.txt]
     trim_trailing_whitespace = true
 
+    [question?mark.txt]
+    max_line_length = 42
+
     [max_line_length.txt]
     max_line_length = 42
 
@@ -154,6 +157,18 @@ describe('editorconfig', function()
       tabstop = 5,
     })
     eq({ indent_style = 'space', tab_width = '5' }, fn.luaeval('vim.b.editorconfig'))
+  end)
+
+  it('skips a section whose glob is an invalid regex', function()
+    local dir = testdir .. pathsep .. 'invalid_glob'
+    n.mkdir_p(dir)
+    t.write_file(
+      dir .. pathsep .. '.editorconfig',
+      'root = true\n[[z-a].txt]\nindent_style = tab\n[*.txt]\nmax_line_length = 42\n'
+    )
+
+    test_case('invalid_glob' .. pathsep .. 'foo.txt', { textwidth = 42 })
+    t.matches('Error occurred while parsing glob pattern', n.exec_capture('messages'))
   end)
 
   it('sets indent options', function()
@@ -215,6 +230,11 @@ describe('editorconfig', function()
   it('sets newline options', function()
     test_case('with_newline.txt', { fixendofline = true })
     test_case('without_newline.txt', { fixendofline = false })
+  end)
+
+  it('"?" glob does not match "/"', function()
+    test_case('question_mark.txt', { textwidth = 42 })
+    test_case('question' .. pathsep .. 'mark.txt', { textwidth = 0 })
   end)
 
   it('respects trim_trailing_whitespace', function()
