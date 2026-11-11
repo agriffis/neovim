@@ -5958,14 +5958,9 @@ static void ex_connect(exarg_T *eap)
                            { .v_type = VAR_NUMBER, .vval.v_number = (varnumber_T)current_ui },
                            { .v_type = VAR_UNKNOWN } };
     nlua_call_typval("vim.net._ssh", "connect", argvars, &ssh_rettv);
-
-    if (ssh_rettv.v_type == VAR_SPECIAL) {
-      return;  // User declined the prompt, or interrupted (CTRL-C).
-    }
     if (ssh_rettv.v_type != VAR_STRING || ssh_rettv.vval.v_string == NULL) {
-      emsg(_("E6101: SSH connection failed"));
       tv_clear(&ssh_rettv);
-      return;
+      return;  // Declined, interrupted (CTRL-C), or failed (E6101 shown).
     }
 
     addr = ssh_rettv.vval.v_string;
@@ -7045,19 +7040,21 @@ static void ex_redraw(exarg_T *eap)
   } else if (Visual.active) {
     redraw_curbuf_later(UPD_INVERTED);
   }
-  update_screen();
+  const bool redrawn = update_screen() == OK;
   if (need_maketitle) {
     maketitle();
   }
   RedrawingDisabled = r;
   p_lz = p;
 
-  // Reset msg_didout, so that a message that's there is overwritten.
-  msg_didout = false;
-  msg_col = 0;
+  if (redrawn) {  // Else postponed (e.g. at the hit-enter prompt): keep the messages.
+    // Reset msg_didout, so that a message that's there is overwritten.
+    msg_didout = false;
+    msg_col = 0;
 
-  // No need to wait after an intentional redraw.
-  need_wait_return = false;
+    // No need to wait after an intentional redraw.
+    need_wait_return = false;
+  }
 
   ui_flush();
 }

@@ -466,7 +466,7 @@ void check_screensize(void)
   // Limit Rows and Columns to avoid an overflow in Rows * Columns.
   // need room for one window and command line
   Rows = MIN(MAX(Rows, min_rows_for_all_tabpages()), 1000);
-  Columns = MIN(MAX(Columns, MIN_COLUMNS), 10000);
+  Columns = MIN(MAX(MAX(Columns, MIN_COLUMNS), min_cols_for_all_tabpages()), 10000);
 }
 
 /// Return true if redrawing should currently be done.
@@ -504,9 +504,10 @@ int update_screen(void)
     diff_redraw(true);
   }
 
-  // Postpone the redrawing when it's not needed and when being called
-  // recursively.
-  if (!redrawing() || updating_screen || cmdline_number_prompt()) {
+  // Postpone redrawing when it's not needed and when called recursively.
+  // Also at hit-enter prompt: redrawing (by an event) would clear the messages.
+  if (!redrawing() || updating_screen || cmdline_number_prompt()
+      || State == MODE_HITRETURN || State == MODE_SETWSIZE) {
     return FAIL;
   }
 

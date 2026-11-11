@@ -205,6 +205,14 @@ describe('remote-ssh', function()
         require('vim.net._ssh').get_system_info({ host = 'server' })
       end)
     )
+
+    setup_fake_ssh({ uname = 'Linux\n\n' })
+    eq(
+      'Unexpected output from system info detection: Linux',
+      t.pcall_err(n.exec_lua, function()
+        require('vim.net._ssh').get_system_info({ host = 'server' })
+      end)
+    )
   end)
 
   it('connect() returns the local socket of the tunnel', function()
@@ -238,6 +246,7 @@ describe('remote-ssh', function()
     t.matches('RemoteCommand=none', tunnel_args)
     t.matches('StrictHostKeyChecking=accept%-new', tunnel_args)
     t.matches('ServerAliveInterval=15', tunnel_args)
+    t.matches('ControlPath=[^ ]+/ssh/mux_%%C ', tunnel_args)
     -- Teardown stops the tunnel and cancels its forward, but not the local server.
     eq(true, tunnel_exited())
     eq(true, vim.uv.fs_stat(fake_dir .. '/forward.cancelled') ~= nil)
@@ -245,8 +254,10 @@ describe('remote-ssh', function()
     n.assert_alive()
 
     -- Explicit ssh_config values are kept. The target is decoded, with an IPv6 host unbracketed.
+    -- Long stdpath("cache") disables multiplexing (ControlPath too long).
     setup_fake_ssh({ ssh_config = 'stricthostkeychecking yes\nserveraliveinterval 60\n' })
     local socks = n.exec_lua(function()
+      vim.env.XDG_CACHE_HOME = ('%s/%s'):format(fake_dir, ('c'):rep(60))
       local socks = {} ---@type string[]
       -- A long host is cut to fit the socket path limit.
       for _, uri in ipairs({ ('ssh://%s'):format(('h'):rep(120)), 'ssh://a%40b@[::1]:2222/x' }) do
@@ -261,19 +272,16 @@ describe('remote-ssh', function()
     t.matches('/nvim%-ssh%.__1%.%x+$', socks[2]) -- No ":" (`ssh -L` separator).
     local explicit_args = t.read_file(fake_dir .. '/tunnel.args')
     t.matches(' %-p 2222 %-%- a@b@::1 sh ', explicit_args)
+    t.matches(' ControlPath=none ', explicit_args)
     eq(nil, explicit_args:find('StrictHostKeyChecking', 1, true))
     eq(nil, explicit_args:find('ServerAliveInterval', 1, true))
-    eq(
-      'No host in SSH URI: ssh:///x',
-      t.pcall_err(n.exec_lua, [[require('vim.net._ssh').connect('ssh:///x')]])
-    )
+    n.exec_lua([[require('vim.net._ssh').connect('ssh:///x')]])
+    eq('E6101: SSH connection failed: No host in SSH URI: ssh:///x', n.eval('v:errmsg'))
 
     -- Stops the session if the UI detached meanwhile.
     setup_fake_ssh()
-    t.matches(
-      'UI detached: channel 999',
-      t.pcall_err(n.exec_lua, [[require('vim.net._ssh').connect('ssh://user@test-server', 999)]])
-    )
+    n.exec_lua([[require('vim.net._ssh').connect('ssh://user@test-server', 999)]])
+    eq('E6101: SSH connection failed: UI detached: channel 999', n.eval('v:errmsg'))
     eq(true, tunnel_exited())
     eq(true, vim.uv.fs_stat(fake_dir .. '/forward.cancelled') ~= nil)
   end)
@@ -665,21 +673,23 @@ describe('remote-ssh', function()
   end)
 
   it('fails without ssh, or when ssh exits before remote Nvim is ready', function()
+    Screen.new()
     -- Without ssh: fails before asking to confirm.
     setup_fake_ssh()
     n.exec_lua([[require('vim.net._ssh').ssh_cmd = { 'nvim-test-no-ssh' }]])
     eq(
-      'Not found on $PATH: nvim-test-no-ssh',
-      t.pcall_err(n.exec_lua, [[require('vim.net._ssh').connect('ssh://user@test-server')]])
+      'Vim(connect):E6101: SSH connection failed: Not found on $PATH: nvim-test-no-ssh',
+      t.pcall_err(n.command, 'connect ssh://user@test-server')
     )
     eq({}, n.exec_lua('return _G.confirm_log'))
 
+    -- One error, without Lua traceback.
     setup_fake_ssh({
       tunnel = { stderr = 'channel 0: open failed: administratively prohibited\n', exit = 255 },
     })
-    t.matches(
-      'SSH tunnel exited before the remote Nvim was ready: channel 0: open failed',
-      t.pcall_err(n.exec_lua, [[require('vim.net._ssh').connect('ssh://user@test-server')]])
+    eq(
+      'Vim(connect):E6101: SSH connection failed: SSH tunnel exited before the remote Nvim was ready: channel 0: open failed: administratively prohibited',
+      t.pcall_err(n.command, 'connect ssh://user@test-server')
     )
     eq(
       'failed: Failed to connect to ssh://user@test-server',
@@ -721,18 +731,17 @@ describe('remote-ssh', function()
     setup_fake_ssh({
       tunnel = { stdout = 'NVIM_CRASHED\n', exit = 1 },
     })
-    t.matches(
-      'Remote Nvim crashed during startup',
-      t.pcall_err(n.exec_lua, [[require('vim.net._ssh').connect('ssh://user@test-server')]])
-    )
+    n.exec_lua([[require('vim.net._ssh').connect('ssh://user@test-server')]])
+    eq('E6101: SSH connection failed: Remote Nvim crashed during startup', n.eval('v:errmsg'))
 
     -- The script runs, but sshd refused the forward.
     setup_fake_ssh({
       tunnel = { stdout = 'NVIM_READY\n' },
     })
-    t.matches(
-      'Remote Nvim is not reachable through the SSH forward',
-      t.pcall_err(n.exec_lua, [[require('vim.net._ssh').connect('ssh://user@test-server')]])
+    n.exec_lua([[require('vim.net._ssh').connect('ssh://user@test-server')]])
+    eq(
+      'E6101: SSH connection failed: Remote Nvim is not reachable through the SSH forward',
+      n.eval('v:errmsg')
     )
     eq(true, vim.uv.fs_stat(fake_dir .. '/forward.cancelled') ~= nil)
   end)
