@@ -356,6 +356,12 @@ EDITOR
 <    Typing õõ in |Normal-mode| now invokes a mapping bound to ]].
 • New |complete-items| field "commit_chars": characters that accept the
   selected completion item when typed.
+• Improved CTRL-C handling:
+  • While Nvim is waiting for input, CTRL-C only does the current mode's
+    action (e.g. exit Insert-mode); it doesn't discard typeahead, and isn't
+    lost if events are pending.
+  • CTRL-C that interrupts a command only interrupts the command; it doesn't
+    "fallthrough" to the mapping subsystem and (redundantly) also act as a key.
 
 EVENTS
 
@@ -668,6 +674,8 @@ These existing features changed their behavior.
   can be used when printing to a terminal.
 • It is no longer allowed to change the window layout during a |DiffUpdated|
   autocommand.
+• |sockconnect()| channels are closed when the peer closes the connection
+  (EOF), like RPC channels.
 
 ==============================================================================
 REMOVED FEATURES                                                 *news-removed*

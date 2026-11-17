@@ -2424,7 +2424,6 @@ static void f_wait(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     rettv->vval.v_number = -3;
   } else if (got_int) {
     got_int = false;
-    vgetc();
     rettv->vval.v_number = -2;
   } else if (tv_get_number_chk(&exprval, &error)) {
     rettv->vval.v_number = 0;
@@ -6547,6 +6546,7 @@ static void f_sockconnect(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
     on_data.buffered = tv_dict_get_number(opts, "data_buffered");
     if (on_data.buffered && on_data.cb.type == kCallbackNone) {
       on_data.self = opts;
+      opts->dv_refcount++;  // Like common_job_callbacks().
     }
   }
 
@@ -6585,6 +6585,7 @@ static void f_stdioopen(typval_T *argvars, typval_T *rettv, EvalFuncData fptr)
   on_stdin.buffered = tv_dict_get_number(opts, "stdin_buffered");
   if (on_stdin.buffered && on_stdin.cb.type == kCallbackNone) {
     on_stdin.self = opts;
+    opts->dv_refcount++;  // Like common_job_callbacks().
   }
 
   const char *error;
