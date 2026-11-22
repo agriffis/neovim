@@ -4602,13 +4602,16 @@ vim.net.request.Response                            *vim.net.request.Response*
                    response. Names are lowercase; a repeated header's values
                    are a list:
                    `{ ['content-type'] = 'text/html', ['set-cookie'] = { 'a=1', 'b=2' } }`
-      • {status}   (`integer`) HTTP status code of the last response (after
-                   redirects), or 0 if the URL is not HTTP (`file://`).
+      • {status}   (`integer`) Status code of the last response (after
+                   redirects), or 0 if the protocol has none (`file://`).
 
 
 vim.net.request({method}, {url}, {opts}, {on_response})    *vim.net.request()*
     Makes an HTTP request to the given URL, asynchronously passing the result
     to the specified `on_response`, `outpath` or `outbuf`.
+
+    Ignores user ".curlrc". Use environment variables to set a proxy or CA
+    bundle (`https_proxy`, `no_proxy`, `CURL_CA_BUNDLE`).
 
     Examples: >lua
         -- Write response body to file.
@@ -4655,18 +4658,19 @@ vim.net.request({method}, {url}, {opts}, {on_response})    *vim.net.request()*
 <
 
     Parameters: ~
-      • {method}       (`vim.net.HttpMethod`) (default: GET) The HTTP method
+      • {method}       (`vim.net.HttpMethod?`) (default: GET) The HTTP method
                        (GET, POST, PUT, PATCH, HEAD, DELETE).
       • {url}          (`string|vim.Uri`) The URL for the request.
       • {opts}         (`table?`) A table with the following fields:
                        • {body}? (`string`) Request body for POST/PUT/PATCH
                          requests.
                        • {headers}? (`table<string, string|string[]>`) Custom
-                         headers to send with the request. Supports basic
-                         key/value headers and empty headers as supported by
-                         curl. Does not support "@filename" style, internal
-                         header deletion ("Header:"). A list value expands to
-                         one header per item:
+                         headers to send with the request (not visible to
+                         other processes, for security, unlike curl args).
+                         Supports key/value, or empty value; does not support
+                         "@filename" style, nor internal header deletion
+                         ("Header:"). List value expands to one header per
+                         item:
                          `{ Accept = { 'text/html', 'application/json' } }`.
                        • {outbuf}? (`integer`) Buffer to save the response
                          body to.
@@ -4678,7 +4682,9 @@ vim.net.request({method}, {url}, {opts}, {on_response})    *vim.net.request()*
       • {on_response}  (`fun(err?: string, response?: vim.net.request.Response)?`)
                        Invoked (|deferred|) on request completion. On HTTP
                        status >= 400, `err` is set and `response` has the
-                       status and headers (empty `body`).
+                       status and headers (empty `body`). `err` is also set
+                       after `close()`, or if writing `outbuf` fails
+                       (`response` is complete).
 
     Overloads: ~
       • `fun(url: string|vim.Uri, opts?: vim.net.request.Opts, on_response?: fun(err?: string, response?: vim.net.request.Response)): vim.async.Closable`
