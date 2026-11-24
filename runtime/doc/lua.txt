@@ -3907,8 +3907,7 @@ vim.json.encode({obj}, {opts})                             *vim.json.encode()*
           local lines = vim.api.nvim_buf_get_lines(0, vim.v.lnum - 1, vim.v.lnum + vim.v.count - 1, true)
           local o = vim.json.decode(table.concat(lines, '\n'))
           local stringified = vim.json.encode(o, { indent = indent, sort_keys = true })
-          lines = vim.split(stringified, '\n')
-          vim.api.nvim_buf_set_lines(0, vim.v.lnum - 1, vim.v.count, true, lines)
+          vim.api.nvim_buf_set_lines(0, vim.v.lnum - 1, vim.v.lnum + vim.v.count - 1, true, stringified)
         end
         vim.o.formatexpr = 'v:lua.fmt_json()'
 <
@@ -6468,7 +6467,7 @@ To enable this feature (default opts shown, see also 'messagesopt'): >lua
       msg = { -- Options related to the message module.
         ---@type string|table<string, 'cmd'|'msg'|'pager'> Default message target
         ---or table mapping |ui-messages| kinds, triggers and IDs to a target.
-        ---Table keys are matched as a Lua pattern to the message ID. 'default'
+        ---Table keys are Lua patterns matching the start of the message ID. 'default'
         ---mapping applies to any omitted kind: { default = 'cmd', progress = 'msg' }.
         targets = 'cmd',
         dialog = { -- Options related to dialog window.
