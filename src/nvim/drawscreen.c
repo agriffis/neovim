@@ -133,7 +133,6 @@ typedef enum {
 
 #include "drawscreen.c.generated.h"
 
-static bool redraw_popupmenu = false;
 static bool msg_grid_invalid = false;
 static bool resizing_autocmd = false;
 static bool conceal_cursor_used = false;
@@ -285,7 +284,6 @@ void screenclear(void)
   cmdline_was_last_drawn = false;
   redraw_cmdline = true;
   redraw_tabline = true;
-  redraw_popupmenu = true;
   pum_invalidate();
   FOR_ALL_WINDOWS_IN_TAB(wp, curtab) {
     if (wp->w_floating) {
@@ -337,9 +335,13 @@ void screen_resize(int width, int height)
 
   resizing_screen = true;
 
+  // Limit Rows and Columns to avoid an overflow in Rows * Columns.
+  // need room for one window and command line
+  height = MIN(MAX(height, min_rows_for_all_tabpages()), 1000);
+  width = MIN(MAX(MAX(width, MIN_COLUMNS), min_cols_for_all_tabpages()), 10000);
   Rows = height;
   Columns = width;
-  check_screensize();
+
   if (!ui_has(kUIMessages)) {
     // clamp 'cmdheight'
     int max_p_ch = Rows - min_rows(curtab) + 1;
@@ -358,8 +360,7 @@ void screen_resize(int width, int height)
       }
     }
   }
-  height = Rows;
-  width = Columns;
+
   p_lines = Rows;
   p_columns = Columns;
 
@@ -430,7 +431,6 @@ void screen_resize(int width, int height)
         do_check_scrollbind(true);
       }
       if (State & MODE_CMDLINE) {
-        redraw_popupmenu = false;
         update_screen();
         redrawcmdline();
         if (pum_drawn()) {
@@ -439,10 +439,8 @@ void screen_resize(int width, int height)
       } else {
         update_topline(curwin);
         if (pum_drawn()) {
-          // TODO(bfredl): ins_compl_show_pum wants to redraw the screen first.
-          // For now make sure the nested update_screen() won't redraw the
-          // pum at the old position. Try to untangle this later.
-          redraw_popupmenu = false;
+          // TODO(bfredl): ins_compl_show_pum wants to update_screen first, which can redraw the pum
+          // at the old position. Try to untangle this later.
           ins_compl_show_pum();
         }
         update_screen();
@@ -457,16 +455,6 @@ void screen_resize(int width, int height)
     }
   }
   resizing_screen = false;
-}
-
-/// Check if the new Nvim application "screen" dimensions are valid.
-/// Correct it if it's too small or way too big.
-void check_screensize(void)
-{
-  // Limit Rows and Columns to avoid an overflow in Rows * Columns.
-  // need room for one window and command line
-  Rows = MIN(MAX(Rows, min_rows_for_all_tabpages()), 1000);
-  Columns = MIN(MAX(MAX(Columns, MIN_COLUMNS), min_cols_for_all_tabpages()), 10000);
 }
 
 /// Return true if redrawing should currently be done.
