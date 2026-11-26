@@ -178,9 +178,8 @@ char *estack_sfile(estack_arg_T which)
         const sctx_T *const def_ctx = (entry->es_type == ETYPE_UFUNC
                                        ? &entry->es_info.ufunc->uf_script_ctx
                                        : &entry->es_info.aucmd->script_ctx);
-        return def_ctx->sc_sid > 0
-               ? xstrdup((SCRIPT_ITEM(def_ctx->sc_sid)->sn_name))
-               : NULL;
+        const char *const name = def_ctx->sc_sid > 0 ? SCRIPT_ITEM(def_ctx->sc_sid)->sn_name : NULL;
+        return name != NULL ? xstrdup(name) : NULL;
       } else if (entry->es_type == ETYPE_SCRIPT) {
         return xstrdup(entry->es_name);
       }
@@ -2535,7 +2534,8 @@ void ex_scriptnames(exarg_T *eap)
 {
   if (eap->addr_count > 0 || *eap->arg != NUL) {
     // :script {scriptId}: edit the script
-    if (eap->addr_count > 0 && !SCRIPT_ID_VALID(eap->line2)) {
+    if (eap->addr_count > 0
+        && (!SCRIPT_ID_VALID(eap->line2) || SCRIPT_ITEM(eap->line2)->sn_name == NULL)) {
       emsg(_(e_invarg));
     } else {
       if (eap->addr_count > 0) {

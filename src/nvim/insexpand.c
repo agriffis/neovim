@@ -3254,7 +3254,7 @@ int set_cpt_callbacks(optset_T *args)
 
 /// Mark "copyID" references in an array of F{func} callbacks so that they are
 /// not garbage collected.
-bool set_ref_in_cpt_callbacks(Callback *callbacks, int count, int copyID)
+bool set_ref_in_cpt_callbacks(Callback *callbacks, int count, int64_t copyID)
 {
   bool abort = false;
 
@@ -3270,7 +3270,7 @@ bool set_ref_in_cpt_callbacks(Callback *callbacks, int count, int copyID)
 
 /// Mark the global 'completefunc' 'omnifunc' and 'thesaurusfunc' callbacks with
 /// "copyID" so that they are not garbage collected.
-bool set_ref_in_insexpand_funcs(int copyID)
+bool set_ref_in_insexpand_funcs(int64_t copyID)
 {
   bool abort = set_ref_in_callback(&p_cfu, copyID, NULL, NULL);
   abort = abort || set_ref_in_callback(&p_ofu, copyID, NULL, NULL);
@@ -5345,7 +5345,7 @@ static void ins_compl_show_filename(void)
   // configuration `showmode cmdheight=1`, a multi-line message is shown partially, and a message
   // that fits into one line is not shown at all. It's better to be consistent: it should not depend
   // on the exact length of the message whether it is displayed at all.
-  int space = (ui_has(kUIMessages) ? Columns : sc_col) - vim_strsize(lead) - 2;
+  int space = (ui_has(kUIMessages) ? Columns : sc_col) - mb_string2cells(lead) - 2;
   if (space <= 0) {
     return;
   }

@@ -2842,7 +2842,12 @@ const char *did_set_global_undolevels(OptInt value, OptInt old_value)
   // sync undo before 'undolevels' changes
   // use the old value, otherwise u_sync() may not work properly
   p_ul = old_value;
-  u_sync(true);
+  // Non-current buffer may also use the global value, so sync every such buffer. #42447
+  FOR_ALL_BUFFERS(bp) {
+    if (bp == curbuf || bp->b_p_ul == NO_LOCAL_UNDOLEVEL) {
+      u_sync(bp, true);
+    }
+  }
   p_ul = value;
   return NULL;
 }
@@ -2852,7 +2857,7 @@ const char *did_set_buflocal_undolevels(buf_T *buf, OptInt value, OptInt old_val
 {
   // use the old value, otherwise u_sync() may not work properly
   buf->b_p_ul = old_value;
-  u_sync(true);
+  u_sync(buf, true);
   buf->b_p_ul = value;
   return NULL;
 }
@@ -4704,7 +4709,7 @@ static void showoptions(bool all, int opt_flags)
           len = 1;                      // a toggle option fits always
         } else {
           optval_fmt(opt_idx, opt_flags);
-          len = (int)strlen(opt->fullname) + vim_strsize(NameBuff) + 1;
+          len = (int)strlen(opt->fullname) + mb_string2cells(NameBuff) + 1;
         }
         if ((len <= INC - GAP && run == 1)
             || (len > INC - GAP && run == 2)) {

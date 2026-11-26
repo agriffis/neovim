@@ -268,6 +268,42 @@ describe('API', function()
           { output = true }
         )
       )
+
+      -- nvim_exec2 script items have no name; :scriptnames/expand('<script>') shouldn't crash.
+      local anon_sid = api
+        .nvim_exec2(
+          [[
+          let s:x = 1
+          echo expand('<SID>')
+        ]],
+          { output = true }
+        ).output
+        :match('<SNR>(%d+)_')
+      eq('Vim(scriptnames):E474: Invalid argument', pcall_err(command, anon_sid .. 'scriptnames'))
+
+      matches(
+        'E1274:',
+        pcall_err(
+          api.nvim_exec2,
+          [[
+          func s:Foo()
+            verbose call expand('<script>')
+          endfunc
+          call s:Foo()
+        ]]
+        )
+      )
+      matches(
+        'E1274:',
+        pcall_err(
+          api.nvim_exec2,
+          [[
+          let s:a = 1
+          autocmd User foo verbose call expand('<script>')
+          doautocmd User foo
+        ]]
+        )
+      )
     end)
 
     it('non-ASCII input', function()
@@ -1754,6 +1790,20 @@ describe('API', function()
 
     it('cannot handle NULs', function()
       eq(0, api.nvim_strwidth('\0abc'))
+    end)
+
+    it('handles unprintable ASCII chars', function()
+      eq(2, api.nvim_strwidth('\1'))
+      eq(2, api.nvim_strwidth('\t'))
+      eq(2, api.nvim_strwidth('\n')) -- escaped, not causing a reset
+      eq(2, api.nvim_strwidth('\r'))
+      eq(2, api.nvim_strwidth('\127'))
+    end)
+
+    it('handles invalid bytes', function()
+      eq(4, api.nvim_strwidth('\255'))
+      eq(4, api.nvim_strwidth('\194'))
+      eq(4, api.nvim_strwidth('\128'))
     end)
 
     it('can handle emoji with variant selectors and ZWJ', function()
